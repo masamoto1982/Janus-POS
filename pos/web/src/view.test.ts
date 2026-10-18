@@ -31,4 +31,8 @@ describe("view helpers", () => {
     expect(itemCount([])).toBe(0);
     expect(itemCount([{ qty: 2 }, { qty: 1 }])).toBe(3);
   });
+
+  it("hides the top bar while nothing is registered", () => {
+    expect(regTop(0, 0, `<button>会計</button>`)).toBe("");
+  });
 });

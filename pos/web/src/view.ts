@@ -187,8 +187,12 @@ function pointCheck(reg: number, side: Side, st: ActionState): string {
     </div>`;
 }
 
-/** 登録画面の最上部に固定する帯：左から買い物点数・合計金額・会計ボタン */
+/**
+ * 登録画面の最上部に固定する帯：左から買い物点数・合計金額・会計ボタン。
+ * 商品登録が一つもないときは出さない（案内を広く見せる）。
+ */
 export function regTop(total: number, count: number, action: string): string {
+  if (count === 0) return "";
   return `<div class="reg-top"><span class="count"><b>${count}</b> 点</span><span>合計 <b class="total">${yen(total)}</b></span>${action}</div>`;
 }
 
@@ -384,8 +388,8 @@ export function semiSelfScreen(r: RegisterView): string {
 
   if (!c.lines.length) {
     return `${top}${banners.join("")}<div class="welcome">
-      <div class="big">いらっしゃいませ</div>
-      <p>商品のバーコードをスキャンしてください</p>
+      <div class="big">バーコードをスキャンしてください。</div>
+      <p>商品、レジ袋、ポイントカード、お支払い、すべてのバーコードを受け付けます。</p>
     </div>`;
   }
 

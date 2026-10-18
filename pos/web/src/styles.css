@@ -6,6 +6,7 @@
   --line: #e2e5ea;
   --accent: #2563eb;
   --accent-ink: #ffffff;
+  --reg-top-bg: #5b9bd5; /* パステル寄りの青。白文字が読める濃さ */
   --staff-bg: #1f2937;
   --staff-ink: #f3f4f6;
   --staff-line: #374151;
@@ -124,7 +125,8 @@ button { touch-action: manipulation; }
 .lines td, .lines th { padding: 4px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .num { text-align: right; white-space: nowrap; }
 
-.reg-top { position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -8px -12px 6px; padding: 6px 12px; background: var(--cust-bg); border-bottom: 1px solid var(--line); }
+.reg-top { position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: #ffffff; border-bottom: 1px solid var(--line); }
+.reg-top button { border-color: #ffffff; }
 .reg-top .total { font-size: 22px; }
 .reg-top .count b { font-size: 18px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
@@ -176,6 +178,9 @@ details summary h3 { display: inline; }
 .ffmenu button.ff { background: var(--ff); }
 
 .locked, .welcome, .thanks { text-align: center; padding: 40px 8px; }
+.welcome { box-sizing: border-box; min-height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 8px; }
+.welcome .big { font-size: 26px; }
+.welcome p { font-size: 15px; margin: 0; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }

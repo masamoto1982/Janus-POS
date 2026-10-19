@@ -5,6 +5,7 @@
 import type {
   ActionState,
   Coupon,
+  Returned,
   Command,
   CustomerView,
   FfState,
@@ -249,15 +250,55 @@ function ageStatus(v: StaffView): string {
 }
 
 /** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい） */
-export function couponRows(coupons: Coupon[]): string {
+export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState): string {
   return coupons
     .map(
       (c) =>
         `<tr class="coupon"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
           c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
-        }</td><td></td></tr>`,
+        }</td><td>${removeCoupon(reg, side, c, st)}</td></tr>`,
     )
     .join("");
+}
+
+function removeCoupon(reg: number, side: Side, c: Coupon, st: ActionState): string {
+  return btn("取消", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small ghost");
+}
+
+/**
+ * 会計に進んだのに、適用先（対象商品）のないクーポンが残っているときの注意。
+ * クーポンで安く買うつもりの商品が似て非なる商品だった、という事故を防ぐため、
+ * 対象商品を登録するかクーポンを取り消すまで決済できない
+ */
+export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: ActionState): string {
+  const list = coupons
+    .filter((c) => c.discount === null)
+    .map((c) => `<li><b>${esc(c.name)}</b> ${removeCoupon(reg, side, c, st)}</li>`)
+    .join("");
+  const [head, body] =
+    side === "staff"
+      ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください。対象商品を登録するか、クーポンを取り消すまで決済できません"]
+      : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください。対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
+  return `<div class="card coupon-card"><b>${head}</b><p>${body}</p><ul class="coupon-list">${list}</ul></div>`;
+}
+
+/**
+ * 取り消したクーポンの返却。店員側には返却を促し、お客様側にはお返しする旨を案内する。
+ * done はこの画面で案内を閉じるボタン（有人モードのお客様側は、店員の「返却しました」で閉じる）
+ */
+export function returnedCard(reg: number, side: Side, returned: Returned[], done: boolean): string {
+  if (!returned.length) return "";
+  const list = returned.map((c) => `<li><b>${esc(c.name)}</b></li>`).join("");
+  const head =
+    side === "staff"
+      ? "取り消したクーポンをお客様に返却してください"
+      : returned.every((c) => c.unmatched)
+        ? "適用先のなかったクーポンをお返しします"
+        : "取り消したクーポンをお返しします";
+  const label = side === "staff" ? "返却しました" : "受け取りました";
+  return `<div class="card coupon-card returned"><div class="id-head"><b>${head}</b>${
+    done ? btn(label, { type: "dismiss_returned", register: reg }, undefined, "small") : ""
+  }</div><ul class="coupon-list">${list}</ul></div>`;
 }
 
 /** 初期画面のボタンで選んだ案内（レジ:画面 → 種類）。選ばなくても、どのバーコードでも読める */
@@ -296,7 +337,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks(r);
   // 新しく登録した商品ほど上に出す
-  const rows = couponRows(v.coupons) + [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
+  const rows = couponRows(reg, side, v.coupons, a("remove_coupon")) + [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
   const paying = v.phase === "paying";
 
   // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる
@@ -327,7 +368,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
     </div>
-    ${side === "staff" ? confiscatedCard(reg, v) : ""}${pay}
+    ${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
+      v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon")) : ""
+    }${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
@@ -546,7 +589,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     r.max_items,
   );
 
-  if (!c.lines.length && !c.coupons.length) return `${top}${notice}${welcome(reg, side)}`;
+  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side)}`;
   scanGuide.delete(`${reg}:${side}`);
 
   let pay = "";
@@ -567,8 +610,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   }
 
   return `${top}${notice}
+    ${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}
     ${pay}
-    <table class="lines"><tbody>${couponRows(c.coupons)}${rows}</tbody></table>
+    <table class="lines"><tbody>${couponRows(reg, side, c.coupons, a("remove_coupon"))}${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
 }
 

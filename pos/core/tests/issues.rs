@@ -1275,23 +1275,25 @@ fn coupons_apply_whenever_the_target_is_registered() {
     assert_eq!(v.customer.coupons.len(), 1);
     assert_eq!(v.customer.coupons[0].discount, None);
     assert_eq!(v.customer.total, 0);
-    assert!(run(
-        &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":"CP0001"})
-    )
-    .is_err());
     scan(&mut s, 1, "customer", ONIGIRI);
     let v = reg(&s, 1);
     assert_eq!(v.customer.coupons[0].discount, Some(160));
     assert_eq!(v.customer.total, 0);
-    // 商品の後にクーポン（割引券）。もう 1 個のおにぎりは定価
+    // 同じクーポンを 2 枚目も使える。対象商品 1 個につき 1 枚
+    scan(&mut s, 1, "customer", "CP0001");
+    assert_eq!(reg(&s, 1).customer.coupons[1].discount, None);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.coupons[1].discount, Some(160));
+    assert_eq!(v.customer.total, 0);
+    // 商品の後にクーポン（割引券）。3 個目のおにぎりは定価
     scan(&mut s, 1, "customer", SANDWICH);
     scan(&mut s, 1, "customer", ONIGIRI);
     scan(&mut s, 1, "customer", "CP0002");
     let v = reg(&s, 1);
     assert_eq!(v.customer.total, 160 + 320 - 50);
     // クーポンは買い物点数に数えない
-    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 3);
+    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 4);
     // クーポンを使ったまま会計できる
     ok(
         &mut s,
@@ -1304,4 +1306,44 @@ fn coupons_apply_whenever_the_target_is_registered() {
     );
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 430);
+}
+
+#[test]
+fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
+    let mut s = Store::new(1, 2, 1);
+    // おにぎりの引換券のつもりで、別の商品をレジに通した
+    scan(&mut s, 1, "customer", "CP0001");
+    scan(&mut s, 1, "customer", "4900000000028");
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    // 両方の画面に注意を出し、決済できない
+    let v = reg(&s, 1);
+    assert!(v.staff.coupon_unmatched && v.customer.coupon_unmatched);
+    assert!(v
+        .customer
+        .payment_blocker
+        .unwrap()
+        .contains("適用先のないクーポン"));
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    assert!(run(&mut s, json!({"type":"tap_emoney","register":1})).is_err());
+    // お会計中でもクーポンを取り消せる。取り消したクーポンは返却の案内に載る
+    let id = reg(&s, 1).customer.coupons[0].id;
+    ok(
+        &mut s,
+        json!({"type":"remove_coupon","register":1,"side":"customer","coupon_id":id}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.customer.coupons.is_empty() && !v.customer.coupon_unmatched);
+    assert_eq!(v.staff.returned.len(), 1);
+    assert!(v.customer.returned[0].unmatched);
+    ok(&mut s, json!({"type":"dismiss_returned","register":1}));
+    assert!(reg(&s, 1).staff.returned.is_empty());
+    ok(&mut s, json!({"type":"tap_emoney","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 320);
 }

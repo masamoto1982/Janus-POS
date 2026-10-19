@@ -139,6 +139,16 @@ pub enum Command {
         side: Side,
         line_id: u32,
     },
+    /// 読み取ったクーポンを取り消す（お会計中でもよい）。取り消したクーポンはお客様に返す
+    RemoveCoupon {
+        register: u8,
+        side: Side,
+        coupon_id: u32,
+    },
+    /// クーポンの返却の案内を閉じる（返却しました／受け取りました）
+    DismissReturned {
+        register: u8,
+    },
     Checkout {
         register: u8,
         side: Side,
@@ -293,6 +303,8 @@ impl Command {
             | C::CheckFf { register, .. }
             | C::CompleteService { register, .. }
             | C::RemoveLine { register, .. }
+            | C::RemoveCoupon { register, .. }
+            | C::DismissReturned { register }
             | C::Checkout { register, .. }
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
@@ -327,6 +339,7 @@ impl Command {
             C::RegisterFf { side, .. }
             | C::CheckFf { side, .. }
             | C::RemoveLine { side, .. }
+            | C::RemoveCoupon { side, .. }
             | C::Checkout { side, .. }
             | C::BackToRegistering { side, .. }
             | C::SelectPayment { side, .. }
@@ -412,8 +425,11 @@ struct Txn {
     point_card: Option<String>,
     /// 会計ボタンの時点で求められた年齢（年確不要なら None）
     required_age: Option<u8>,
-    /// 読み取った引換券・割引券（対象商品の登録を待つものも含む）
-    coupons: Vec<&'static Coupon>,
+    /// 読み取った引換券・割引券（取消用の番号つき。対象商品の登録を待つものも含む）。
+    /// 同じクーポンを何枚使ってもよい
+    coupons: Vec<(u32, &'static Coupon)>,
+    /// 取り消したクーポン（お客様に返却する。true は適用先がなかったもの）
+    returned: Vec<(&'static str, bool)>,
     /// 店員が選んだ年齢確認のやり方（None はまだ選んでいない）
     age_method: Option<AgeMethod>,
     /// 年確が済んだ年齢（「しない」ならお客様の申告、「する」なら身分証の年齢）
@@ -431,11 +447,11 @@ struct Txn {
 impl Txn {
     /// 読み取ったクーポンと、その値引き額（対象商品がまだなければ None）。
     /// 対象商品 1 個につきクーポン 1 枚。読んだ順番（商品より先か後か）は関係ない
-    fn coupon_uses(&self) -> Vec<(&'static Coupon, Option<(u32, TaxRate)>)> {
+    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, TaxRate)>)> {
         let mut used: Vec<(&str, u32)> = vec![];
         self.coupons
             .iter()
-            .map(|&c| {
+            .map(|&(id, c)| {
                 let have: u32 = self
                     .lines
                     .iter()
@@ -444,14 +460,14 @@ impl Txn {
                     .sum();
                 let n = used.iter().find(|(t, _)| *t == c.target).map_or(0, |e| e.1);
                 if n >= have {
-                    return (c, None);
+                    return (id, c, None);
                 }
                 match used.iter_mut().find(|(t, _)| *t == c.target) {
                     Some(e) => e.1 += 1,
                     None => used.push((c.target, 1)),
                 }
                 let p = catalog::find(c.target);
-                (c, p.map(|p| (c.discount(p.price), p.tax)))
+                (id, c, p.map(|p| (c.discount(p.price), p.tax)))
             })
             .collect()
     }
@@ -459,7 +475,7 @@ impl Txn {
     fn discount_of(&self, rate: Option<TaxRate>) -> u32 {
         self.coupon_uses()
             .iter()
-            .filter_map(|(_, u)| *u)
+            .filter_map(|(_, _, u)| *u)
             .filter(|(_, t)| rate.is_none_or(|r| r == *t))
             .map(|(yen, _)| yen)
             .sum()
@@ -540,6 +556,11 @@ impl Txn {
     }
 
     /// 買い物点数（数量の合計）
+    /// 適用先（対象商品）のないクーポンがある
+    fn coupon_unmatched(&self) -> bool {
+        self.coupon_uses().iter().any(|(_, _, u)| u.is_none())
+    }
+
     fn item_count(&self) -> u32 {
         self.lines.iter().map(|l| l.qty).sum()
     }
@@ -657,6 +678,8 @@ impl Register {
             service_pending: t.service_pending(),
             bill_pending: t.paying && t.bill_pending().is_some(),
             point_pending: t.paying && !t.point_checked,
+            has_coupons: !t.coupons.is_empty(),
+            coupon_unmatched: t.paying && t.coupon_unmatched(),
             method: t.method,
             customer_turn: t.customer_turn,
             menu_open: self.menu.is_some(),
@@ -716,9 +739,19 @@ enum AgeMethod {
 /// 読み取ったクーポン。discount が None なら対象商品の登録待ち
 #[derive(Clone, Debug, Serialize)]
 pub struct CouponView {
+    /// 取消に使う番号
+    pub id: u32,
     pub code: &'static str,
     pub name: &'static str,
     pub discount: Option<u32>,
+}
+
+/// 取り消して、お客様に返すクーポン
+#[derive(Clone, Debug, Serialize)]
+pub struct ReturnedCoupon {
+    pub name: &'static str,
+    /// 適用先（対象商品）がなかった
+    pub unmatched: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1100,6 +1133,39 @@ impl Store {
                 let age = age_on(&birth, &today)?;
                 self.verify_age(register, age)
             }
+            C::RemoveCoupon {
+                register,
+                side,
+                coupon_id,
+            } => {
+                self.check(register, side, Action::RemoveCoupon)?;
+                let r = self.reg_mut(register)?;
+                let unmatched = r
+                    .txn
+                    .coupon_uses()
+                    .iter()
+                    .find(|(id, _, _)| *id == coupon_id)
+                    .ok_or("クーポンが見つかりません")?
+                    .2
+                    .is_none();
+                let i = r
+                    .txn
+                    .coupons
+                    .iter()
+                    .position(|(id, _)| *id == coupon_id)
+                    .unwrap();
+                let (_, c) = r.txn.coupons.remove(i);
+                r.txn.returned.push((c.name, unmatched));
+                done(format!(
+                    "{}を取り消しました。お客様に返却してください",
+                    c.name
+                ))
+            }
+            C::DismissReturned { register } => {
+                let r = self.reg_mut(register)?;
+                r.txn.returned.clear();
+                done("クーポンの返却の案内を閉じました")
+            }
             C::DismissConfiscated { register } => {
                 let r = self.reg_mut(register)?;
                 r.txn.confiscated.clear();
@@ -1416,11 +1482,14 @@ impl Store {
                 done(format!("ポイントカードを読みました{back}"))
             }
             Scanned::Coupon(c) => {
-                if r.txn.coupons.contains(&c) {
-                    return Err(format!("{}は読み取り済みです", c.name));
-                }
-                r.txn.coupons.push(c);
-                let waiting = r.txn.coupon_uses().last().is_some_and(|(_, u)| u.is_none());
+                let id = r.txn.next_line;
+                r.txn.next_line += 1;
+                r.txn.coupons.push((id, c));
+                let waiting = r
+                    .txn
+                    .coupon_uses()
+                    .last()
+                    .is_some_and(|(_, _, u)| u.is_none());
                 done(if waiting {
                     format!(
                         "{}を読みました。対象商品を登録すると値引きします{back}",
@@ -1939,11 +2008,17 @@ impl Store {
         let coupons: Vec<CouponView> = t
             .coupon_uses()
             .into_iter()
-            .map(|(c, u)| CouponView {
+            .map(|(id, c, u)| CouponView {
+                id,
                 code: c.code,
                 name: c.name,
                 discount: u.map(|(yen, _)| yen),
             })
+            .collect();
+        let returned: Vec<ReturnedCoupon> = t
+            .returned
+            .iter()
+            .map(|&(name, unmatched)| ReturnedCoupon { name, unmatched })
             .collect();
         let calls = self.calls.for_register(r.id);
         let staff_called = !calls.is_empty() && c.staff != StaffState::Ready;
@@ -2015,6 +2090,8 @@ impl Store {
                     .collect(),
                 age_pending: c.age_pending,
                 id_pending: c.id_pending,
+                coupon_unmatched: c.coupon_unmatched,
+                returned: returned.clone(),
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 point_pending: c.point_pending,
                 method: t.method,
@@ -2031,6 +2108,8 @@ impl Store {
                 phase: c.phase,
                 lines: customer_lines,
                 coupons,
+                coupon_unmatched: c.coupon_unmatched,
+                returned,
                 total,
                 inserted,
                 due: total.saturating_sub(inserted),
@@ -2098,6 +2177,10 @@ pub struct StaffView {
     pub age_choice_pending: bool,
     /// 年確で販売できず取り除いた商品（店員が没収する）
     pub confiscated: Vec<Confiscated>,
+    /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
+    pub coupon_unmatched: bool,
+    /// 取り消して、お客様に返却するクーポン
+    pub returned: Vec<ReturnedCoupon>,
     pub age_pending: bool,
     /// 「する」を選び、店員の生年月日の入力待ち
     pub id_pending: bool,
@@ -2122,6 +2205,10 @@ pub struct CustomerView {
     pub phase: Phase,
     pub lines: Vec<CustomerLine>,
     pub coupons: Vec<CouponView>,
+    /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
+    pub coupon_unmatched: bool,
+    /// 取り消して、お返しするクーポン
+    pub returned: Vec<ReturnedCoupon>,
     pub total: u32,
     pub inserted: u32,
     pub due: u32,

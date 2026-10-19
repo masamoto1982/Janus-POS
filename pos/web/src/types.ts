@@ -20,9 +20,17 @@ export type LineKind =
 
 /** 読み取ったクーポン。discount が null なら対象商品の登録待ち */
 export interface Coupon {
+  /** 取消に使う番号 */
+  id: number;
   code: string;
   name: string;
   discount: number | null;
+}
+
+/** 取り消して返すクーポン（unmatched は適用先がなかったもの） */
+export interface Returned {
+  name: string;
+  unmatched: boolean;
 }
 
 export type StaffLine = LineKind & {
@@ -75,6 +83,10 @@ export interface StaffView {
   age_choice_pending: boolean;
   /** 年確で販売できず取り除いた商品（店員が没収する） */
   confiscated: { name: string; qty: number }[];
+  /** 会計に進んだが、適用先のないクーポンが残っている（決済できない） */
+  coupon_unmatched: boolean;
+  /** 取り消して、お客様に返却するクーポン */
+  returned: Returned[];
   age_pending: boolean;
   /** 「する」を選び、店員の生年月日の入力待ち */
   id_pending: boolean;
@@ -96,6 +108,8 @@ export interface CustomerView {
   phase: Phase;
   lines: CustomerLine[];
   coupons: Coupon[];
+  coupon_unmatched: boolean;
+  returned: Returned[];
   total: number;
   inserted: number;
   due: number;

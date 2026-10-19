@@ -97,6 +97,8 @@ pub enum Action {
     CheckFf,
     CompleteService,
     RemoveLine,
+    /// 読み取ったクーポンの取消（お会計中でもできる。取り消したクーポンはお客様に返す）
+    RemoveCoupon,
     Checkout,
     BackToRegistering,
     SelectPayment,
@@ -128,6 +130,7 @@ pub const ACTIONS: &[Action] = &[
     Action::CheckFf,
     Action::CompleteService,
     Action::RemoveLine,
+    Action::RemoveCoupon,
     Action::Checkout,
     Action::BackToRegistering,
     Action::SelectPayment,
@@ -170,6 +173,10 @@ pub struct Context {
     pub bill_pending: bool,
     /// 会計に進んだが、ポイントカードの最終確認がまだ
     pub point_pending: bool,
+    /// 読み取ったクーポンがある
+    pub has_coupons: bool,
+    /// 会計に進んだが、適用先（対象商品）のないクーポンが残っている
+    pub coupon_unmatched: bool,
     pub method: Option<PaymentMethod>,
     /// セミセルフで、店員が会計に進めてお客様に支払いを任せている
     pub customer_turn: bool,
@@ -201,6 +208,8 @@ impl Context {
             Some("年齢確認が済んでいません")
         } else if self.id_pending {
             Some("店員が身分証の生年月日を入力していません")
+        } else if self.coupon_unmatched {
+            Some(COUPON_UNMATCHED)
         } else if self.bill_pending {
             Some(BILL_UNCONFIRMED)
         } else if self.ff_waiting {
@@ -217,6 +226,9 @@ pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認にチェックが入っていません";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
+/// 似て非なる商品をクーポンのつもりで定価で買ってしまう事故を防ぐため、決済を止める
+const COUPON_UNMATCHED: Denial =
+    "適用先のないクーポンがあります。対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
 
 /// 会計時の代行収納の内容・金額の確認（どちらのモードでも、お客様が押す）
@@ -405,6 +417,7 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")
         }
+        Action::RemoveCoupon => require(c.has_coupons, "クーポンはありません"),
         Action::VoidTransaction => require(c.has_lines, "明細がありません"),
         Action::Checkout => {
             require(!paying, "すでに会計画面です")?;
@@ -451,6 +464,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")
         }
+        Action::RemoveCoupon => require(c.has_coupons, "クーポンはありません"),
         Action::Checkout => {
             require(!paying, "すでにお会計中です")?;
             require(c.has_lines, "商品を登録してください")?;
@@ -509,6 +523,8 @@ mod tests {
                                         v.push(Context {
                                             menu_open: false,
                                             point_pending: false,
+                                            has_coupons: false,
+                                            coupon_unmatched: false,
                                             touching: None,
                                             items_full: false,
                                             customer_turn,

@@ -385,3 +385,10 @@ body.dragging .drop-hint { display: inline; }
 .call-btn.ff { background: var(--ff); }
 .call-btn.svc { background: #0f766e; }
 .call-btn.tob { background: #6d28d9; }
+
+/* 適用先のないクーポンの注意と、取り消したクーポンの返却 */
+.coupon-card { border: 2px solid var(--danger); background: var(--danger-bg); padding: 8px 10px; font-size: 13px; }
+.coupon-card p { margin: 4px 0; }
+.coupon-card.returned { border-style: dashed; }
+.coupon-list { margin: 4px 0 0; padding-left: 20px; }
+.coupon-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

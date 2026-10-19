@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { billCard, btn, esc, itemCount, regTop, sideOf } from "./view";
+import type { RegisterView } from "./types";
+import { billCard, btn, callNotice, esc, itemCount, regTop, sideOf } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -41,5 +42,19 @@ describe("view helpers", () => {
     expect(html).toContain("customer-only");
     expect(html).toContain("8,640");
     expect(sideOf({ type: "confirm_bill_payment", register: 1 })).toBe("customer");
+  });
+
+  it("shows the staff which calls are open, and the customer a fixed waiting message", () => {
+    const call = (kind: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, created_at, detail: "" });
+    const r = {
+      staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], mat_down: [] },
+      customer: { staff_called: true },
+    } as unknown as RegisterView;
+    const staff = callNotice(r, 6000, "staff");
+    expect(staff).toContain("FF＆煙草");
+    expect(staff).toContain("5秒経過");
+    const customer = callNotice(r, 6000, "customer");
+    expect(customer).toContain("係員を呼び出しています。しばらくお待ちください。");
+    expect(customer).not.toContain("FF");
   });
 });

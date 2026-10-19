@@ -227,10 +227,9 @@ function render(): void {
         idle !== null ? `<span class="idle" title="5分間操作がないとセミセルフに戻って待機します">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} でセミセルフに戻ります</span>` : ""
       }`,
     );
-    // 両方の画面に同じ内容を出す。色がつくのは操作している側だけ
-    const shared = sharedScreen(r, snap);
-    setRegion(`staff-${r.id}`, shared);
-    setRegion(`cust-${r.id}`, shared);
+    // 両方の画面に同じ内容を出す（呼び出しの表示だけは側ごとに出し分ける）
+    setRegion(`staff-${r.id}`, sharedScreen(r, snap, "staff"));
+    setRegion(`cust-${r.id}`, sharedScreen(r, snap, "customer"));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,

@@ -128,28 +128,44 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   </tr>`;
 }
 
-export function staffCalls(r: RegisterView, now: number): string {
+/** 呼び出しの種類の短い表示（店員側画面） */
+const CALL_SHORT: Record<string, string> = {
+  fast_food: "FF",
+  tobacco: "煙草",
+  service: "サービス",
+  customer_help: "呼び出し",
+  age_check: "年確",
+};
+
+/**
+ * 呼び出し中の表示。両画面同内容の原則の、表示上の例外：
+ * お客様側には定型の待機メッセージ、店員側には呼ばれた内容（「FF」「FF＆煙草」のように）を出す。
+ * 情報は一つ（同じ呼び出しの記録）で、側ごとに見せ方だけを変える。
+ */
+export function callNotice(r: RegisterView, now: number, side: Side): string {
   const v = r.staff;
+  if (side === "customer") {
+    return r.customer.staff_called
+      ? `<div class="banner call">係員を呼び出しています。しばらくお待ちください。</div>`
+      : "";
+  }
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  const calls = v.calls
-    .map(
-      (c) =>
-        `<div class="banner call">🔔 ${esc(c.label)}${c.detail ? `（${esc(c.detail)}）` : ""}<span class="muted"> ${secs(now, c.created_at)}経過</span></div>`,
-    )
-    .join("");
-  return warn + calls;
+  if (!v.calls.length) return warn;
+  const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
+  const oldest = Math.min(...v.calls.map((c) => c.created_at));
+  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
 }
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
-export function attendedScreen(r: RegisterView): string {
-  if (r.menu) return storeMenu(r);
+export function attendedScreen(r: RegisterView, notice = ""): string {
+  if (r.menu) return notice + storeMenu(r);
   const v = r.staff;
   const reg = r.id;
   const side = r.active_side;
   const a = (n: string) => find(v.actions, n);
-  if (r.last_receipt && !v.lines.length) return thanks(r);
+  if (r.last_receipt && !v.lines.length) return notice + thanks(r);
   // 新しく登録した商品ほど上に出す
   const rows = [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
   const paying = v.phase === "paying";
@@ -176,7 +192,7 @@ export function attendedScreen(r: RegisterView): string {
       ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
       : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
   );
-  return `${top}
+  return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
@@ -216,11 +232,12 @@ export function itemCount(lines: { qty: number }[]): number {
 
 /**
  * 二つの画面は、まったく同じ内容を映す（情報空間は一つ）。中身はモードで決まり、
- * 操作側でない画面は同じものをグレーで表示するだけ。
+ * どちらの画面もカラーで、その画面から触れない操作だけをグレーにする。
+ * 例外は呼び出し中の表示（`callNotice`）で、側ごとに見せ方を変える。
  */
-export function sharedScreen(r: RegisterView, snap: Snapshot): string {
-  const body = r.mode === "attended" ? attendedScreen(r) : semiSelfScreen(r);
-  return staffCalls(r, snap.now) + body;
+export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
+  const notice = callNotice(r, snap.now, side);
+  return r.mode === "attended" ? attendedScreen(r, notice) : semiSelfScreen(r, notice);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,16 +381,14 @@ export function storeMenu(r: RegisterView): string {
 // セミセルフモードの登録画面（係員なし。お客様が登録して支払う）
 // ---------------------------------------------------------------------------
 
-export function semiSelfScreen(r: RegisterView): string {
-  if (r.menu) return storeMenu(r);
+export function semiSelfScreen(r: RegisterView, notice = ""): string {
+  if (r.menu) return notice + storeMenu(r);
   const c: CustomerView = r.customer;
   const reg = r.id;
   const side = r.active_side;
   const a = (n: string) => find(c.actions, n);
-  if (r.last_receipt && !c.lines.length) return thanks(r);
+  if (r.last_receipt && !c.lines.length) return notice + thanks(r);
 
-  const banners: string[] = [];
-  if (c.staff_called) banners.push(`<div class="banner call">係員をお呼びしています。しばらくお待ちください</div>`);
 
   // 新しく登録した商品ほど上に出す
   const rows = [...c.lines]
@@ -400,7 +415,7 @@ export function semiSelfScreen(r: RegisterView): string {
   );
 
   if (!c.lines.length) {
-    return `${top}${banners.join("")}<div class="welcome">
+    return `${top}${notice}<div class="welcome">
       <div class="big">バーコードをスキャンしてください。</div>
       <p>商品、レジ袋、ポイントカード、お支払い、すべてのバーコードを受け付けます。</p>
     </div>`;
@@ -423,7 +438,7 @@ export function semiSelfScreen(r: RegisterView): string {
       </div>`;
   }
 
-  return `${top}${banners.join("")}
+  return `${top}${notice}
     ${pay}
     <table class="lines"><tbody>${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;

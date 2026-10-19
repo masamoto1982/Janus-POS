@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { ageChart, billCard, btn, callNotice, esc, itemCount, regTop, sideOf, wareki } from "./view";
+import { ageBands, ageChart, billCard, btn, callNotice, esc, itemCount, regTop, sideOf, wareki } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -75,5 +75,13 @@ describe("view helpers", () => {
     for (const y of [2004, 2005, 2006, 2007, 2008]) expect(html).toContain(`<td>${y}年`);
     expect(html).not.toContain("<td>2003年");
     expect(html).not.toContain("<td>2009年");
+  });
+
+  it("splits the customer's age chart by the age levels in the basket", () => {
+    const bands = ageBands([20, 18], new Date(2026, 9, 19));
+    expect(bands.map((b) => [b.age, b.label])).toEqual([[20, "20歳以上"], [18, "18〜19歳"], [0, "18歳未満"]]);
+    expect(bands[0].born).toBe("2006年（平成18年）10月19日以前");
+    expect(bands[1].born).toBe("2006年（平成18年）10月20日〜2008年（平成20年）10月19日");
+    expect(bands[2].born).toBe("2008年（平成20年）10月20日以降");
   });
 });

@@ -1172,14 +1172,16 @@ fn void_lock_and_logout_from_the_store_menu() {
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
 }
 
-/// 年確は二段階：お客様が「X歳以上です」を押してから、店員が身分証を確認する（はい・いいえ）。
-/// 「いいえ」なら年確商品を取り消すまで決済できない。
+/// 年確：お客様が早見表で自分の段階を申告し、店員が身分証で承認する。
+/// 申告の年齢に届かない年確商品は、承認と同時に買い物から取り消す（18 禁雑誌は買えるが酒は買えない等）。
 #[test]
-fn staff_checks_id_after_the_customer_declares_age() {
+fn customer_declares_from_the_chart_and_staff_approves() {
+    const MAGAZINE: &str = "4900000000141";
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", ONIGIRI);
-    scan(&mut s, 1, "staff", BEER);
+    for code in [ONIGIRI, BEER, MAGAZINE] {
+        scan(&mut s, 1, "staff", code);
+    }
     advance(&mut s, 1_000);
     ok(
         &mut s,
@@ -1187,49 +1189,35 @@ fn staff_checks_id_after_the_customer_declares_age() {
     );
     confirm_point(&mut s, 1);
     advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.age_levels, vec![20, 18]);
+    assert_eq!(v.staff.required_age, Some(20));
     let check = |ok: bool, side: &str| json!({"type":"check_id","register":1,"side":side,"ok":ok});
-    // お客様が押すまで、店員の身分証確認は押せない
+    // お客様が申告するまで、店員の承認は押せない
     let e = run(&mut s, check(true, "staff")).unwrap_err();
     assert!(e.contains("お客様"), "{e}");
-    assert!(!reg(&s, 1).staff.id_pending);
-    ok(&mut s, json!({"type":"confirm_age","register":1}));
+    // 早見表にない年齢は選べない
+    assert!(run(&mut s, json!({"type":"confirm_age","register":1,"age":19})).is_err());
+    ok(&mut s, json!({"type":"confirm_age","register":1,"age":18}));
     let v = reg(&s, 1);
     assert!(v.staff.id_pending);
-    assert_eq!(v.customer.age_check, None);
-    // お客様側の画面からは押せない
+    assert_eq!(v.staff.declared_age, Some(18));
+    assert!(v.customer.age_levels.is_empty());
+    // お客様側の画面からは承認できない。承認までは決済できない
     assert!(run(&mut s, check(true, "customer")).is_err());
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
+    // 「いいえ」なら申告からやり直し
     ok(&mut s, check(false, "staff"));
+    assert!(reg(&s, 1).staff.age_pending);
+    ok(&mut s, json!({"type":"confirm_age","register":1,"age":18}));
+    let msg = run(&mut s, check(true, "staff")).unwrap().unwrap();
+    assert!(msg.contains("缶ビール"), "{msg}");
     let v = reg(&s, 1);
-    assert!(v.staff.id_refused && !v.staff.id_pending);
-    assert!(run(&mut s, cash.clone()).unwrap_err().contains("身分証"));
-    // 年確商品を取り消せば、残りは会計できる
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
-    );
-    let beer = reg(&s, 1)
-        .staff
-        .lines
-        .iter()
-        .find(|l| l.line.code == BEER)
-        .unwrap()
-        .line
-        .id;
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":beer}),
-    );
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
-    );
-    confirm_point(&mut s, 1);
-    assert!(!reg(&s, 1).staff.id_refused);
+    let codes: Vec<&str> = v.staff.lines.iter().map(|l| l.line.code).collect();
+    assert_eq!(codes, vec![ONIGIRI, MAGAZINE]);
+    assert!(!v.staff.age_pending && !v.staff.id_pending);
+    assert_eq!(v.staff.phase, Phase::Paying);
     advance(&mut s, 1_000);
     ok(
         &mut s,

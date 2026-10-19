@@ -76,12 +76,54 @@ function thanks(r: RegisterView): string {
     </div>`;
 }
 
-/** 年齢確認ボタン（例外：お客様側の画面からしか押せない） */
-function ageCard(reg: number, age: number, st: ActionState): string {
+/** 生年月日の書き方：2006年（平成18年）10月19日 */
+function birthDate(t: Date): string {
+  const y = t.getFullYear();
+  const m = t.getMonth() + 1;
+  const d = t.getDate();
+  return `${y}年（${wareki(y, m, d)}）${m}月${d}日`;
+}
+
+/** 今日 age 歳になる人の生年月日（この日以前の生まれなら age 歳以上） */
+function ageBoundary(age: number, today: Date): Date {
+  return new Date(today.getFullYear() - age, today.getMonth(), today.getDate());
+}
+
+/**
+ * お客様が選ぶ早見表の段。買い物に含まれる年齢の段階（厳しい順）で生年月日を区切り、
+ * いちばん下は「どの段階にも届かない」（age 0）
+ */
+export function ageBands(levels: number[], today: Date = new Date()): { age: number; born: string; label: string }[] {
+  const next = (t: Date) => new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
+  const bands: { age: number; born: string; label: string }[] = [];
+  let after: Date | null = null;
+  levels.forEach((age, i) => {
+    const until = ageBoundary(age, today);
+    const upper = levels[i - 1];
+    bands.push({
+      age,
+      born: after ? `${birthDate(after)}〜${birthDate(until)}` : `${birthDate(until)}以前`,
+      label: upper ? `${age}〜${upper - 1}歳` : `${age}歳以上`,
+    });
+    after = next(until);
+  });
+  const lowest = levels[levels.length - 1];
+  if (after) bands.push({ age: 0, born: `${birthDate(after)}以降`, label: `${lowest}歳未満` });
+  return bands;
+}
+
+/**
+ * 年齢確認（例外：お客様側の画面からしか押せない）。早見表から生年月日の段を選んで申告する。
+ * 店員はその申告を身分証で確認して承認する
+ */
+function ageCard(reg: number, levels: number[], st: ActionState): string {
+  const rows = ageBands(levels)
+    .map((b) => `<tr><td>${b.born}生まれ</td><td>${btn(b.label, { type: "confirm_age", register: reg, age: b.age }, st, b.age ? "primary" : "")}</td></tr>`)
+    .join("");
   return `<div class="card age-card customer-only">
-      <div class="big">年齢確認</div>
-      <p>年齢確認が必要な商品があります（お客様側の画面で押してください）</p>
-      ${btn(`${age}歳以上です`, { type: "confirm_age", register: reg }, st, "primary big-btn")}
+      <b>年齢確認：生年月日にあてはまる段を選んでください</b>
+      <p class="muted">選んだあと、身分証を店員にお見せください</p>
+      <table class="age-chart age-pick"><tbody>${rows}</tbody></table>
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
 }
@@ -120,24 +162,29 @@ export function ageChart(age: number, today: Date = new Date()): string {
 }
 
 /**
- * 店員側の身分証確認（例外：店員側の画面からしか押せない）。お客様が「X歳以上です」を
- * 押すまでは押せない。早見表を添える
+ * 店員側の身分証確認（例外：店員側の画面からしか押せない）。お客様の早見表での申告を
+ * 身分証で確かめて承認する。申告の年齢に届かない年確商品は、承認すると取り消される
  */
-function idCard(reg: number, age: number, v: StaffView, st: ActionState): string {
-  if (v.id_refused) {
-    return `<div class="card id-card refused">
-        <div class="big">身分証を確認できませんでした</div>
-        <p>年確商品（${age}歳以上）は販売できません。商品を取り消すか、取引を中止してください。</p>
+function idCard(reg: number, v: StaffView, st: ActionState): string {
+  const today = new Date();
+  const declared = v.declared_age;
+  const lowest = v.age_levels[v.age_levels.length - 1] ?? v.required_age ?? 0;
+  if (declared === null) {
+    return `<div class="card id-card staff-only">
+        <div class="id-head"><b>お客様が早見表から生年月日を選んでいます</b></div>
+        ${ageChart(v.required_age ?? lowest, today)}
       </div>`;
   }
+  const drop = v.lines.filter((l) => l.age !== null && l.age > declared).map((l) => esc(l.name));
+  const band = ageBands(v.age_levels, today).find((b) => b.age === declared);
   return `<div class="card id-card staff-only">
       <div class="id-head">
-        <b>身分証で${age}歳以上を確認しましたか？</b>
+        <b>申告「${band?.label ?? `${declared}歳以上`}」は身分証と合っていますか？</b>
         ${btn("はい", { type: "check_id", register: reg, side: "staff", ok: true }, st, "primary")}
         ${btn("いいえ", { type: "check_id", register: reg, side: "staff", ok: false }, st)}
       </div>
-      ${v.age_pending ? `<p class="muted">お客様が「${age}歳以上です」を押すと答えられます</p>` : ""}
-      ${ageChart(age)}
+      <p>${band ? `${band.born}生まれ。` : ""}${drop.length ? `「はい」で <b>${drop.join("・")}</b> を取り消します。` : "取り消す商品はありません。"}「いいえ」でお客様が選び直します。</p>
+      ${ageChart(declared || lowest, today)}
     </div>`;
 }
 
@@ -217,16 +264,15 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
   const age = v.required_age;
   if (!age) return "";
-  if (side === "customer") return v.age_pending ? ageCard(reg, age, a("confirm_age")) : "";
-  return v.age_pending || v.id_pending || v.id_refused ? idCard(reg, age, v, a("check_id")) : "";
+  if (side === "customer") return v.age_pending ? ageCard(reg, v.age_levels, a("confirm_age")) : "";
+  return v.age_pending || v.id_pending ? idCard(reg, v, a("check_id")) : "";
 }
 
 function ageStatus(v: StaffView): string {
   if (!v.required_age) return "不要";
   const age = v.required_age;
-  if (v.age_pending) return `<b class="warn">${age}歳以上：お客様の確認待ち</b>`;
+  if (v.age_pending) return `<b class="warn">${age}歳以上：お客様の申告待ち</b>`;
   if (v.id_pending) return `<b class="warn">${age}歳以上：身分証の確認待ち</b>`;
-  if (v.id_refused) return `<b class="warn">${age}歳以上：販売できません</b>`;
   return `<span class="ok">確認済</span>`;
 }
 
@@ -498,7 +544,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   let pay = "";
   if (c.phase === "paying") {
     const age =
-      (c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "") +
+      (c.age_check !== null ? ageCard(reg, c.age_levels, a("confirm_age")) : "") +
       (c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "");
     const methods = `<div class="row center wrap">${METHODS
       .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${c.method === m ? "on" : ""}`))

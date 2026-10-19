@@ -10,7 +10,7 @@ use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
-    StaffState, ACTIONS, ID_REFUSED, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
+    StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
@@ -157,6 +157,9 @@ pub enum Command {
         register: u8,
         #[serde(default = "customer_side")]
         side: Side,
+        /// 早見表で選んだ年齢（その段階以上。0 はどの段階にも届かない）。省略は最も厳しい段階
+        #[serde(default)]
+        age: Option<u8>,
     },
     /// 身分証の確認（はい・いいえ）。店員側の画面からしか押せない
     CheckId {
@@ -398,12 +401,12 @@ struct Txn {
     point_card: Option<String>,
     /// 会計ボタンの時点で求められた年齢（年確不要なら None）
     required_age: Option<u8>,
-    /// お客様が「X歳以上です」を押した
-    age_declared: bool,
-    /// 店員が身分証を確認した（「はい」）。年確はこれで済む
-    age_verified: bool,
-    /// 店員が身分証を確認できなかった（「いいえ」）。取引中止まで残る
-    id_refused: bool,
+    /// 買い物に含まれる年確の年齢の段階（厳しい順。会計ボタンの時点で決まる）
+    age_levels: Vec<u8>,
+    /// お客様が早見表で選んだ年齢（その段階以上。0 はどの段階にも届かない）
+    declared_age: Option<u8>,
+    /// 店員が身分証で承認した年齢。これ以下の年確商品は確認済み
+    verified_age: Option<u8>,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
@@ -461,23 +464,23 @@ impl Txn {
         Some(pending.map(Line::amount).sum())
     }
 
-    /// お客様の「X歳以上です」待ち
+    /// 承認済みの年齢で、いまの年確商品がすべて足りている
+    fn age_cleared(&self) -> bool {
+        match (self.required_age, self.verified_age) {
+            (None, _) => true,
+            (Some(need), Some(ok)) => ok >= need,
+            _ => false,
+        }
+    }
+
+    /// お客様の申告（早見表）待ち
     fn age_pending(&self) -> bool {
-        self.paying && self.required_age.is_some() && !self.age_declared && !self.age_verified
+        self.paying && !self.age_cleared() && self.declared_age.is_none()
     }
 
-    /// 店員の身分証確認待ち
+    /// 店員の身分証での承認待ち
     fn id_pending(&self) -> bool {
-        self.paying
-            && self.required_age.is_some()
-            && self.age_declared
-            && !self.age_verified
-            && !self.id_refused
-    }
-
-    /// 身分証を確認できず、年確商品が残っている
-    fn id_refused(&self) -> bool {
-        self.paying && self.required_age.is_some() && self.id_refused
+        self.paying && !self.age_cleared() && self.declared_age.is_some()
     }
 
     /// 買い物点数（数量の合計）
@@ -589,7 +592,6 @@ impl Register {
             has_lines: !t.lines.is_empty(),
             age_pending: t.age_pending(),
             id_pending: t.id_pending(),
-            id_refused: t.id_refused(),
             ff_waiting: t.any_ff(FfState::Waiting),
             has_ff: t
                 .lines
@@ -938,27 +940,29 @@ impl Store {
                 r.txn.method = Some(method);
                 done(format!("{}を選びました", method.label()))
             }
-            C::ConfirmAge { register, side } => {
+            C::ConfirmAge {
+                register,
+                side,
+                age,
+            } => {
                 self.check(register, side, Action::ConfirmAge)?;
                 let r = self.reg_mut(register)?;
-                r.txn.age_declared = true;
-                let age = r.txn.required_age.unwrap_or(0);
-                done(format!(
-                    "お客様が{age}歳以上と答えました。店員が身分証を確認してください"
-                ))
+                let age = age.or(r.txn.required_age).unwrap_or(0);
+                if age != 0 && !r.txn.age_levels.contains(&age) {
+                    return Err("早見表にない年齢です".into());
+                }
+                r.txn.declared_age = Some(age);
+                done("お客様が早見表から申告しました。店員が身分証で確認します")
             }
             C::CheckId { register, side, ok } => {
                 self.check(register, side, Action::CheckId)?;
                 self.calls.resolve(register, CallKind::AgeCheck, self.now);
-                let r = self.reg_mut(register)?;
-                let age = r.txn.required_age.unwrap_or(0);
-                if ok {
-                    r.txn.age_verified = true;
-                    done(format!("身分証で{age}歳以上であることを確認しました"))
-                } else {
-                    r.txn.id_refused = true;
-                    done(ID_REFUSED)
+                if !ok {
+                    let r = self.reg_mut(register)?;
+                    r.txn.declared_age = None;
+                    return done("申告を身分証で確認できませんでした。お客様に早見表から選び直していただきます");
                 }
+                self.verify_age(register)
             }
             C::ConfirmBillPayment { register, side } => {
                 self.check(register, side, Action::ConfirmBillPayment)?;
@@ -1354,6 +1358,47 @@ impl Store {
         ))
     }
 
+    /// 店員が身分証でお客様の申告を承認した。申告の年齢に届かない年確商品は買い物から取り消す
+    fn verify_age(&mut self, register: u8) -> Result<Outcome, String> {
+        let rules = &self.age_rules;
+        let r = self
+            .registers
+            .iter_mut()
+            .find(|r| r.id == register)
+            .ok_or("レジがありません")?;
+        let ok = r.txn.declared_age.unwrap_or(0);
+        let mut removed = vec![];
+        r.txn.lines.retain(|l| {
+            let keep = rules.age_for(l.code, l.category).is_none_or(|a| a <= ok);
+            if !keep {
+                removed.push(l.name);
+            }
+            keep
+        });
+        r.txn.verified_age = Some(ok);
+        r.txn.required_age = r
+            .txn
+            .lines
+            .iter()
+            .filter_map(|l| rules.age_for(l.code, l.category))
+            .max();
+        r.txn.age_levels.retain(|&a| a <= ok);
+        if r.txn.lines.is_empty() {
+            // すべて取り消しになったら登録画面に戻る
+            r.txn.paying = false;
+            r.txn.method = None;
+            r.txn.customer_turn = false;
+        }
+        if removed.is_empty() {
+            done("身分証で申告を確認しました")
+        } else {
+            done(format!(
+                "身分証で申告を確認しました。年齢確認をクリアできない{}を取り消しました",
+                removed.join("・")
+            ))
+        }
+    }
+
     fn checkout(&mut self, register: u8, side: Side) -> Result<Outcome, String> {
         self.check(register, side, Action::Checkout)?;
         let rules = &self.age_rules;
@@ -1369,8 +1414,21 @@ impl Store {
             .iter()
             .filter_map(|l| rules.age_for(l.code, l.category))
             .max();
+        let mut levels: Vec<u8> = r
+            .txn
+            .lines
+            .iter()
+            .filter_map(|l| rules.age_for(l.code, l.category))
+            .collect();
+        levels.sort_unstable_by(|a, b| b.cmp(a));
+        levels.dedup();
         r.txn.paying = true;
         r.txn.required_age = age;
+        r.txn.age_levels = levels;
+        // 承認済みの年齢で足りなければ（より厳しい商品を足した等）、申告からやり直す
+        if !r.txn.age_cleared() {
+            r.txn.declared_age = None;
+        }
         // 会計ボタンの後は、まずポイントカードの最終確認。読み取り済みなら確認済み
         r.txn.point_checked = r.txn.point_card.is_some();
         // セミセルフでは、会計に進めたら支払いはお客様に任せる
@@ -1789,10 +1847,10 @@ impl Store {
                 tax10: t.tax_of(TaxRate::Standard10),
                 point_card: t.point_card.clone(),
                 required_age: t.required_age.filter(|_| t.paying),
-                age_verified: t.age_verified,
+                age_levels: t.age_levels.clone(),
+                declared_age: t.declared_age.filter(|_| c.id_pending),
                 age_pending: c.age_pending,
                 id_pending: c.id_pending,
-                id_refused: c.id_refused,
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 point_pending: c.point_pending,
                 method: t.method,
@@ -1814,6 +1872,11 @@ impl Store {
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
                 age_check: c.age_pending.then_some(t.required_age.unwrap_or(0)),
+                age_levels: if c.age_pending {
+                    t.age_levels.clone()
+                } else {
+                    vec![]
+                },
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 staff_called,
                 staff_present: c.staff == StaffState::Ready,
@@ -1869,12 +1932,13 @@ pub struct StaffView {
     pub tax10: u32,
     pub point_card: Option<String>,
     pub required_age: Option<u8>,
-    pub age_verified: bool,
+    /// 買い物に含まれる年確の年齢の段階（厳しい順）
+    pub age_levels: Vec<u8>,
+    /// 身分証での承認待ちの、お客様の申告（0 はどの段階にも届かない）
+    pub declared_age: Option<u8>,
     pub age_pending: bool,
-    /// お客様が「X歳以上です」を押し、店員の身分証確認待ち
+    /// お客様が早見表で申告し、店員の身分証での承認待ち
     pub id_pending: bool,
-    /// 身分証を確認できなかった（年確商品を取り消すか取引中止まで決済できない）
-    pub id_refused: bool,
     /// 会計時、お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
@@ -1902,6 +1966,8 @@ pub struct CustomerView {
     pub point_pending: bool,
     /// 年確中なら求める年齢
     pub age_check: Option<u8>,
+    /// 年確の早見表に並べる年齢の段階（厳しい順。申告待ちのときだけ）
+    pub age_levels: Vec<u8>,
     /// お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
     pub staff_called: bool,

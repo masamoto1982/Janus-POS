@@ -103,7 +103,7 @@ pub enum Action {
     /// 会計時のポイントカードの最終確認（「ポイントカードなしで進む」）
     ConfirmPointCard,
     ConfirmAge,
-    /// 身分証の確認（店員が「はい」「いいえ」で答える。お客様の「X歳以上です」の後）
+    /// 身分証の確認（お客様の早見表での申告を、店員が身分証で承認する）
     CheckId,
     /// 代行収納の支払い内容・金額の確認（お客様の承認）
     ConfirmBillPayment,
@@ -153,10 +153,8 @@ pub struct Context {
     pub has_lines: bool,
     /// 会計時の年確で、お客様がまだ「X歳以上です」を押していない
     pub age_pending: bool,
-    /// お客様は押したが、店員がまだ身分証を確認していない
+    /// お客様は早見表で申告したが、店員がまだ身分証で承認していない
     pub id_pending: bool,
-    /// 店員が身分証を確認できなかった（「いいえ」）。年確商品を取り消すか取引中止まで決済できない
-    pub id_refused: bool,
     /// お渡し確認のチェックが入っていない FF がある
     pub ff_waiting: bool,
     /// FF の明細がある
@@ -194,10 +192,8 @@ impl Context {
             Some(POINT_UNCONFIRMED)
         } else if self.age_pending {
             Some("年齢確認が済んでいません")
-        } else if self.id_refused {
-            Some(ID_REFUSED)
         } else if self.id_pending {
-            Some("店員が身分証を確認していません")
+            Some("店員が身分証で申告を確認していません")
         } else if self.bill_pending {
             Some(BILL_UNCONFIRMED)
         } else if self.ff_waiting {
@@ -214,8 +210,6 @@ pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認にチェックが入っていません";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
-pub const ID_REFUSED: Denial =
-    "身分証を確認できなかったため、年確商品は販売できません（取り消すか取引中止）";
 const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
 
 /// 会計時の代行収納の内容・金額の確認（どちらのモードでも、お客様が押す）
@@ -237,7 +231,7 @@ pub fn is_customer_only(action: Action) -> bool {
 }
 
 /// 店員本人が確かめる操作。店員側の画面からしか押せず、どちらの画面が操作側でも押せる。
-/// いまは身分証の確認（年確でお客様が「X歳以上です」を押した後）だけ。
+/// いまは身分証の確認（年確でお客様が早見表から申告した後）だけ。
 pub fn is_staff_only(action: Action) -> bool {
     action == Action::CheckId
 }
@@ -253,10 +247,10 @@ pub fn fixed_side(action: Action) -> Option<Side> {
     }
 }
 
-/// 身分証の確認（有人モードで、お客様が「X歳以上です」を押した後）
+/// 身分証の確認（有人モードで、お客様が早見表から申告した後）
 fn check_id(c: &Context) -> Result<(), Denial> {
     require(c.phase == Phase::Paying, "お会計前です")?;
-    require(!c.age_pending, "お客様の「年齢確認」の操作を待っています")?;
+    require(!c.age_pending, "お客様の申告（早見表）を待っています")?;
     require(c.id_pending, "身分証の確認は不要です")
 }
 
@@ -500,7 +494,6 @@ mod tests {
                                             has_lines,
                                             age_pending: age_pending && phase == Phase::Paying,
                                             id_pending: false,
-                                            id_refused: false,
                                             ff_waiting,
                                             has_ff,
                                             service_pending,

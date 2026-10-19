@@ -78,7 +78,7 @@ function thanks(r: RegisterView): string {
 
 /** 年齢確認ボタン（例外：お客様側の画面からしか押せない） */
 function ageCard(reg: number, age: number, st: ActionState): string {
-  return `<div class="card age-card">
+  return `<div class="card age-card customer-only">
       <div class="big">年齢確認</div>
       <p>年齢確認が必要な商品があります（お客様側の画面で押してください）</p>
       ${btn(`${age}歳以上です`, { type: "confirm_age", register: reg }, st, "primary big-btn")}
@@ -86,10 +86,23 @@ function ageCard(reg: number, age: number, st: ActionState): string {
     </div>`;
 }
 
+/**
+ * 代行収納の支払い内容・金額の確認。年確と同じく、お客様本人がお客様側の画面で押す
+ * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
+ */
+export function billCard(reg: number, amount: number, st: ActionState): string {
+  return `<div class="card bill-card customer-only">
+      <div class="big">お支払い内容の確認</div>
+      <p>代行収納（公共料金）　<b>${yen(amount)}</b><br>払込票の内容・金額をご確認ください（お客様側の画面で押してください）</p>
+      ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
+      ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
+    </div>`;
+}
+
 /** 支払方法を選んだ後の案内 */
 function payHint(method: string | null, blocker: string | null): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
-  if (method && method !== "cash") return `<p>財布の${METHOD_LABEL[method]}を、お客様側の端末にかざしてください</p>`;
+  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、お客様側の端末にかざしてください</p>`;
   return `<p>現金を投入してください（または支払方法を選んでください）</p>`;
 }
 
@@ -115,28 +128,43 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   </tr>`;
 }
 
-export function staffCalls(r: RegisterView, now: number): string {
+/** 呼び出しの種類の短い表示（店員側画面） */
+const CALL_SHORT: Record<string, string> = {
+  fast_food: "FF",
+  tobacco: "煙草",
+  service: "サービス",
+  customer_help: "呼び出し",
+  age_check: "年確",
+};
+
+/**
+ * 呼び出し中の表示。両画面同内容の原則の、表示上の例外：
+ * お客様側には定型の待機メッセージ、店員側には呼ばれた内容（「FF」「FF＆煙草」のように）を出す。
+ * 情報は一つ（同じ呼び出しの記録）で、側ごとに見せ方だけを変える。
+ */
+export function callNotice(r: RegisterView, now: number, side: Side): string {
   const v = r.staff;
+  if (side === "customer") {
+    return r.customer.staff_called
+      ? `<div class="banner call">係員を呼び出しています。しばらくお待ちください。</div>`
+      : "";
+  }
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  const calls = v.calls
-    .map(
-      (c) =>
-        `<div class="banner call">🔔 ${esc(c.label)}${c.detail ? `（${esc(c.detail)}）` : ""}<span class="muted"> ${secs(now, c.created_at)}経過</span></div>`,
-    )
-    .join("");
-  return warn + calls;
+  if (!v.calls.length) return warn;
+  const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
+  const oldest = Math.min(...v.calls.map((c) => c.created_at));
+  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
 }
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
-export function attendedScreen(r: RegisterView): string {
-  if (r.menu) return storeMenu(r);
+export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
+  if (r.menu) return notice + storeMenu(r);
   const v = r.staff;
   const reg = r.id;
-  const side = r.active_side;
   const a = (n: string) => find(v.actions, n);
-  if (r.last_receipt && !v.lines.length) return thanks(r);
+  if (r.last_receipt && !v.lines.length) return notice + thanks(r);
   // 新しく登録した商品ほど上に出す
   const rows = [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
   const paying = v.phase === "paying";
@@ -145,7 +173,7 @@ export function attendedScreen(r: RegisterView): string {
   const pay = paying && v.point_pending
     ? pointCheck(reg, side, a("confirm_point_card"))
     : paying
-    ? `${v.age_pending ? ageCard(reg, v.required_age ?? 0, a("confirm_age")) : ""}<div class="paybox">
+    ? `${v.age_pending ? ageCard(reg, v.required_age ?? 0, a("confirm_age")) : ""}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
         <div>年確：${v.required_age ? (v.age_pending ? `<b class="warn">${v.required_age}歳以上の確認待ち</b>` : `<span class="ok">確認済</span>`) : "不要"}</div>
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
         <div class="row wrap">${METHODS
@@ -162,8 +190,9 @@ export function attendedScreen(r: RegisterView): string {
     paying
       ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
       : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
+    r.max_items,
   );
-  return `${top}
+  return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
@@ -171,11 +200,7 @@ export function attendedScreen(r: RegisterView): string {
     ${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
-    <div class="row">
-      ${btn("取引中止", { type: "void_transaction", register: reg }, a("void_transaction"), "ghost")}
-      ${btn("ロック", { type: "lock", register: reg }, a("lock"), "ghost")}
-      ${btn("ログアウト", { type: "end_staff_mode", register: reg }, a("end_staff_mode"), "ghost")}
-    </div>`;
+`;
 }
 
 /** 会計ボタンの後のポイントカードの最終確認。ポイントカードを読むか「なしで進む」で支払方法へ */
@@ -191,9 +216,10 @@ function pointCheck(reg: number, side: Side, st: ActionState): string {
  * 登録画面の最上部に固定する帯：左から買い物点数・合計金額・会計ボタン。
  * 商品登録が一つもないときは出さない（案内を広く見せる）。
  */
-export function regTop(total: number, count: number, action: string): string {
+export function regTop(total: number, count: number, action: string, max = Infinity): string {
   if (count === 0) return "";
-  return `<div class="reg-top"><span class="count"><b>${count}</b> 点</span><span>合計 <b class="total">${yen(total)}</b></span>${action}</div>`;
+  const full = count >= max ? `<small class="full">上限</small>` : "";
+  return `<div class="reg-top"><span class="count"><b>${count}</b> 点${full}</span><span>合計 <b class="total">${yen(total)}</b></span>${action}</div>`;
 }
 
 /** 買い物点数（数量の合計） */
@@ -203,11 +229,12 @@ export function itemCount(lines: { qty: number }[]): number {
 
 /**
  * 二つの画面は、まったく同じ内容を映す（情報空間は一つ）。中身はモードで決まり、
- * 操作側でない画面は同じものをグレーで表示するだけ。
+ * どちらの画面もカラーで、その画面から触れない操作だけをグレーにする。
+ * 例外は呼び出し中の表示（`callNotice`）で、側ごとに見せ方を変える。
  */
-export function sharedScreen(r: RegisterView, snap: Snapshot): string {
-  const body = r.mode === "attended" ? attendedScreen(r) : semiSelfScreen(r);
-  return staffCalls(r, snap.now) + body;
+export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
+  const notice = callNotice(r, snap.now, side);
+  return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +251,7 @@ export function clockText(d: Date): string {
 export function screenHead(r: RegisterView, now: Date): string {
   const call = find(r.customer.actions, "call_staff");
   const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="係員を呼ぶ（押している間鳴ります）" title="${esc(call.allowed ? "係員を呼ぶ（押している間鳴ります）" : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
-  const gear = `<button type="button" class="gear" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー"${r.staff.state === "ready" ? "" : " hidden"}>⚙</button>`;
+  const gear = `<button type="button" class="gear" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー"${r.staff.state === "ready" ? "" : " hidden"}>☰</button>`;
   return `<span class="head-l">${gear}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
 
@@ -246,7 +273,7 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 8;
 export type FfUi = { tab: string; page: number };
 
-export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi): string {
+export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   const reg = r.id;
   if (r.menu) return "";
   if (r.mode === "semi_self") {
@@ -259,8 +286,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi): string {
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
-  // どちらの画面からも登録できる（押せるのは操作側の画面）
-  const side = r.active_side;
+  // どちらの画面からも登録できる（もう一方が触れている一瞬だけ押せない）
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -312,12 +338,18 @@ export function storeMenu(r: RegisterView): string {
   const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
   const head = (title: string) =>
     `<div class="menu-head">${btn("‹ 戻る", go("top"), undefined, "small ghost")}<b>${esc(title)}</b></div>`;
+  const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   switch (m.screen) {
     case "top":
       return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span>${btn("閉じる", go(null), undefined, "small ghost")}</div>
         <div class="menu-list">${(["refund", "emergency", "deposit", "expense", "changer"] as const)
-          .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
-          .join("")}</div>`;
+          .map((k) => btn(MENU_LABEL[k], go(k), busy, "menu-item"))
+          .join("")}</div>
+        <div class="menu-list">
+          ${btn("取引中止", { type: "void_transaction", register: reg }, find(v.actions, "void_transaction"), "menu-item")}
+          ${btn("ロック", { type: "lock", register: reg }, find(v.actions, "lock"), "menu-item")}
+          ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
+        </div>`;
     case "refund":
     case "emergency":
     case "expense": {
@@ -351,16 +383,13 @@ export function storeMenu(r: RegisterView): string {
 // セミセルフモードの登録画面（係員なし。お客様が登録して支払う）
 // ---------------------------------------------------------------------------
 
-export function semiSelfScreen(r: RegisterView): string {
-  if (r.menu) return storeMenu(r);
+export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
+  if (r.menu) return notice + storeMenu(r);
   const c: CustomerView = r.customer;
   const reg = r.id;
-  const side = r.active_side;
   const a = (n: string) => find(c.actions, n);
-  if (r.last_receipt && !c.lines.length) return thanks(r);
+  if (r.last_receipt && !c.lines.length) return notice + thanks(r);
 
-  const banners: string[] = [];
-  if (c.staff_called) banners.push(`<div class="banner call">係員をお呼びしています。しばらくお待ちください</div>`);
 
   // 新しく登録した商品ほど上に出す
   const rows = [...c.lines]
@@ -384,10 +413,11 @@ export function semiSelfScreen(r: RegisterView): string {
     c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost"),
+    r.max_items,
   );
 
   if (!c.lines.length) {
-    return `${top}${banners.join("")}<div class="welcome">
+    return `${top}${notice}<div class="welcome">
       <div class="big">バーコードをスキャンしてください。</div>
       <p>商品、レジ袋、ポイントカード、お支払い、すべてのバーコードを受け付けます。</p>
     </div>`;
@@ -395,7 +425,9 @@ export function semiSelfScreen(r: RegisterView): string {
 
   let pay = "";
   if (c.phase === "paying") {
-    const age = c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "";
+    const age =
+      (c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "") +
+      (c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "");
     const methods = `<div class="row center wrap">${METHODS
       .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${c.method === m ? "on" : ""}`))
       .join("")}</div>`;
@@ -408,7 +440,7 @@ export function semiSelfScreen(r: RegisterView): string {
       </div>`;
   }
 
-  return `${top}${banners.join("")}
+  return `${top}${notice}
     ${pay}
     <table class="lines"><tbody>${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
@@ -489,15 +521,12 @@ function item(code: string, name: string, sub: string, cls = ""): string {
     <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
 }
 
+/** Item：カテゴリの見出しは付けず、棚の並び順のまま一つにまとめる（表示スペースの節約） */
 export function shelfPanel(s: Snapshot): string {
-  const groups = SHELVES.map((g) => {
-    const items = s.catalog.filter(g.match);
-    if (!items.length) return "";
-    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
-      .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
-      .join("")}</div></div>`;
-  }).join("");
-  return groups;
+  const items = [...new Set(SHELVES.flatMap((g) => s.catalog.filter(g.match)))];
+  return `<div class="shelf"><div class="items">${items
+    .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
+    .join("")}</div></div>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -519,14 +548,14 @@ export function walletPanel(): string {
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
     walletItem("pay:emoney", "電子マネー", "端末にかざす", "pay"),
   ];
-  const group = (label: string, xs: string[]) => `<div class="shelf"><h3>${label}</h3><div class="items">${xs.join("")}</div></div>`;
-  return group("紙幣", bills) + group("硬貨", coins) + group("カード・スマホ", cards);
+  // 見出しなしの一つの並び（表示スペースの節約）
+  return `<div class="shelf"><div class="items">${[...bills, ...coins, ...cards].join("")}</div></div>`;
 }
 
 /** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */
 export function sideOf(cmd: Command): "staff" | "customer" | "store" {
   if (cmd.side === "staff" || cmd.side === "customer") return cmd.side;
-  if (["ff_button", "confirm_age", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
+  if (["ff_button", "confirm_age", "confirm_bill_payment", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
   if (typeof cmd.register === "number") return "staff";
   return "store";
 }

@@ -116,7 +116,7 @@ function buildSkeleton(): void {
   app.innerHTML = `
     <header class="top">
       <h1>Janus POS</h1>
-      <p class="muted">右の売り場から商品をつかんで、レジの店員画面かお客様画面に落とすと、その側のスキャナーで読んだことになります。</p>
+      <p class="muted">右の Item から商品をつかんで、レジの店員画面かお客様画面に落とすと、その側のスキャナーで読んだことになります。</p>
     </header>
     <article class="floor">
       <div class="left">
@@ -128,12 +128,12 @@ function buildSkeleton(): void {
         ${regs}
       </div>
       <div class="right-col">
-        <aside class="right" aria-label="売り場">
-          <h2>売り場 <button class="small ghost rules-open" data-open-rules aria-haspopup="dialog">年確ルール設定</button></h2>
+        <aside class="right" aria-label="Item">
+          <h2>Item <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="年確ルール設定" title="年確ルール設定">⚙</button></h2>
           <div data-region="shelf"></div>
         </aside>
-        <aside class="right wallet" aria-label="財布">
-          <h2>財布</h2>
+        <aside class="right wallet" aria-label="Wallet">
+          <h2>Wallet</h2>
           <div data-region="wallet"></div>
         </aside>
       </div>
@@ -205,16 +205,14 @@ function render(): void {
       lamp.title = on ? `呼び出し中（${Math.floor((r.call_waiting_ms ?? 0) / 1000)}秒）` : "呼び出しランプ";
     }
     const head = screenHead(r, new Date());
-    const items = itemsPanel(r, snap, ffUi(r.id));
-    // 操作できない側の画面は表示のみ（排他）
+    // もう一方が触れている一瞬（またはお客様側に限られる場面）は、この画面の操作が利かない
     for (const side of ["staff", "customer"] as const) {
+      const items = itemsPanel(r, snap, ffUi(r.id), side);
+      const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
-      el?.classList.toggle("inactive", r.active_side !== side);
-      // 有人モードでは、グレーの画面にタッチして操作を引き継げる
-      el?.classList.toggle("claimable", r.active_side !== side && r.switchable);
+      el?.classList.toggle("inactive", locked);
       const wrap = el?.parentElement;
-      wrap?.classList.toggle("inactive", r.active_side !== side);
-      wrap?.classList.toggle("claimable", r.active_side !== side && r.switchable);
+      wrap?.classList.toggle("inactive", locked);
       // レジ画面のヘッダー（歯車は店員ログイン中だけ。時刻とベルは常時）
       setRegion(`head-${r.id}-${side}`, head);
       setRegion(`items-${r.id}-${side}`, items);
@@ -227,10 +225,9 @@ function render(): void {
         idle !== null ? `<span class="idle" title="5分間操作がないとセミセルフに戻って待機します">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} でセミセルフに戻ります</span>` : ""
       }`,
     );
-    // 両方の画面に同じ内容を出す。色がつくのは操作している側だけ
-    const shared = sharedScreen(r, snap);
-    setRegion(`staff-${r.id}`, shared);
-    setRegion(`cust-${r.id}`, shared);
+    // 両方の画面に同じ内容を出す（呼び出しの表示だけは側ごとに出し分ける）
+    setRegion(`staff-${r.id}`, sharedScreen(r, snap, "staff"));
+    setRegion(`cust-${r.id}`, sharedScreen(r, snap, "customer"));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -392,14 +389,6 @@ document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
 
 app.addEventListener("click", (e) => {
-  // 有人モードでグレーの画面にタッチすると、操作をその画面に引き継ぐ
-  const idle = (e.target as Element).closest<HTMLElement>(".screen.claimable[data-drop]");
-  // 年齢確認ボタンは操作側でなくても押せる（例外）ので、引き継ぎにはしない
-  if (idle && !(e.target as Element).closest(".age-card")) {
-    const [reg, side] = idle.dataset.drop!.split(":");
-    send({ type: "claim", register: Number(reg), side });
-    return;
-  }
   const b = (e.target as Element).closest("button");
   if (!b || b.disabled) return;
   if (b.hasAttribute("data-open-rules")) return rulesDlg().showModal();
@@ -428,7 +417,7 @@ app.addEventListener("click", (e) => {
   if (b.dataset.cmd) {
     const cmd = JSON.parse(b.dataset.cmd) as Command;
     // 年齢確認は、押した画面（お客様側だけ受け付ける）をコアに伝える
-    if (cmd.type === "confirm_age") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
+    if (cmd.type === "confirm_age" || cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
     send(cmd);
   }
   else if (b.dataset.form) form(b);

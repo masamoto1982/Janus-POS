@@ -16,7 +16,7 @@ export interface ActionState {
 export type LineKind =
   | { kind: "item" }
   | { kind: "ff"; state: FfState }
-  | { kind: "service"; done: boolean };
+  | { kind: "service"; done: boolean; confirm_pending: boolean };
 
 export type StaffLine = LineKind & {
   id: number;
@@ -65,6 +65,8 @@ export interface StaffView {
   required_age: number | null;
   age_verified: boolean;
   age_pending: boolean;
+  /** 会計時、お客様の確認待ちの代行収納の金額 */
+  bill_check: number | null;
   point_pending: boolean;
   method: Method | null;
   inserted: number;
@@ -86,6 +88,7 @@ export interface CustomerView {
   point_card: boolean;
   point_pending: boolean;
   age_check: number | null;
+  bill_check: number | null;
   staff_called: boolean;
   staff_present: boolean;
   method: Method | null;
@@ -96,9 +99,11 @@ export interface CustomerView {
 export interface RegisterView {
   id: number;
   /** 今、画面を操作できる側（もう一方は表示だけ） */
-  active_side: Side;
+  /** 操作できる側が片方に限られているなら、その側（null なら両方の画面が操作できる） */
+  active_side: Side | null;
+  /** 買い物点数の上限 */
+  max_items: number;
   /** 有人モードで、グレーの画面にタッチして操作を引き継げる */
-  switchable: boolean;
   /** レジ本体の呼び出しランプ（店員が来るまで点灯） */
   lamp: boolean;
   /** 店員が来ていない呼び出しの放置時間（ms） */

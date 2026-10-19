@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
-    active_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side, StaffState, ACTIONS,
+    active_side, is_customer_only, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
+    StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
@@ -157,6 +158,12 @@ pub enum Command {
         #[serde(default = "customer_side")]
         side: Side,
     },
+    /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない
+    ConfirmBillPayment {
+        register: u8,
+        #[serde(default = "customer_side")]
+        side: Side,
+    },
     InsertCash {
         register: u8,
         denomination: u32,
@@ -271,6 +278,7 @@ impl Command {
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
             | C::ConfirmAge { register, .. }
+            | C::ConfirmBillPayment { register, .. }
             | C::InsertCash { register, .. }
             | C::TapEmoney { register, .. }
             | C::CallStaff { register, .. }
@@ -345,8 +353,14 @@ pub enum FfState {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LineKind {
     Item,
-    Ff { state: FfState },
-    Service { done: bool },
+    Ff {
+        state: FfState,
+    },
+    /// `confirm_pending`：受付した内容・金額をお客様がまだ確認していない（代行収納）
+    Service {
+        done: bool,
+        confirm_pending: bool,
+    },
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -412,11 +426,35 @@ impl Txn {
     fn service_pending(&self) -> bool {
         self.lines
             .iter()
-            .any(|l| matches!(l.kind, LineKind::Service { done: false }))
+            .any(|l| matches!(l.kind, LineKind::Service { done: false, .. }))
+    }
+
+    /// お客様の確認待ちの代行収納の金額の合計（なければ None）
+    fn bill_pending(&self) -> Option<u32> {
+        let mut pending = self
+            .lines
+            .iter()
+            .filter(|l| {
+                matches!(
+                    l.kind,
+                    LineKind::Service {
+                        confirm_pending: true,
+                        ..
+                    }
+                )
+            })
+            .peekable();
+        pending.peek()?;
+        Some(pending.map(Line::amount).sum())
     }
 
     fn age_pending(&self) -> bool {
         self.paying && self.required_age.is_some() && !self.age_verified
+    }
+
+    /// 買い物点数（数量の合計）
+    fn item_count(&self) -> u32 {
+        self.lines.iter().map(|l| l.qty).sum()
     }
 
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind) {
@@ -475,19 +513,10 @@ struct Register {
     outlet: Cash,
     /// お客様画面に開いている店舗メニュー
     menu: Option<Menu>,
-    /// 有人モードで画面を持っている側
-    holder: Side,
-    /// 各画面が最後に触られた時刻（[店員, お客様]）
-    touched: [Option<u64>; 2],
+    /// いま触れている側と、その一瞬が終わる時刻（その間だけもう一方は操作できない）
+    touch: Option<(Side, u64)>,
     /// お客様画面の呼び出しボタンが押されている（触れている間 MAT が鳴る）
     pressing: bool,
-}
-
-fn slot(side: Side) -> usize {
-    match side {
-        Side::Staff => 0,
-        Side::Customer => 1,
-    }
 }
 
 impl Register {
@@ -537,11 +566,13 @@ impl Register {
                 .iter()
                 .any(|l| matches!(l.kind, LineKind::Ff { .. })),
             service_pending: t.service_pending(),
+            bill_pending: t.paying && t.bill_pending().is_some(),
             point_pending: t.paying && !t.point_checked,
             method: t.method,
             customer_turn: t.customer_turn,
             menu_open: self.menu.is_some(),
-            holder: self.holder,
+            touching: self.touch.map(|(side, _)| side),
+            items_full: t.item_count() >= MAX_ITEMS,
         }
     }
 }
@@ -601,9 +632,6 @@ pub fn ring_volume(waiting_ms: u64) -> f32 {
     RING_MIN + (1.0 - RING_MIN) * t
 }
 
-/// 画面を持っている側がこの時間触られていなければ、もう一方が引き継げる
-pub const HOLD_MS: u64 = 3 * 1000;
-
 impl Store {
     /// 基本構成はレジ 2 台・MAT 1 台。レジは 10 台、MAT は 5 台まで増やせる。
     pub fn new(seed: u64, registers: u8, mats: u8) -> Store {
@@ -622,8 +650,7 @@ impl Store {
                     last_op: 0,
                     outlet: Cash::default(),
                     menu: None,
-                    holder: Side::Customer,
-                    touched: [None, None],
+                    touch: None,
                     pressing: false,
                 }
             })
@@ -656,6 +683,12 @@ impl Store {
     pub fn tick(&mut self, now: u64) {
         self.now = self.now.max(now);
         let now = self.now;
+        // 触れている一瞬が過ぎたら、両方の画面に戻す
+        for r in &mut self.registers {
+            if r.touch.is_some_and(|(_, until)| until <= now) {
+                r.touch = None;
+            }
+        }
         // MAT はデジタルな呼び鈴：ボタンが押されている間だけ鳴る。鳴らし直しはしない。
         // 年確・代行収納の読み取りのようにボタンを介さない呼び出しは、起きた瞬間に短く鳴る
         if self.calls.raised > self.seen_raised {
@@ -710,7 +743,7 @@ impl Store {
             .reg(register)
             .ok_or_else(|| format!("レジ{register}はありません"))?;
         let c = r.context();
-        permitted(active_side(&c), action, &c).map_err(String::from)
+        permitted(active_side(&c).unwrap_or(Side::Customer), action, &c).map_err(String::from)
     }
 
     fn check(&self, register: u8, side: Side, action: Action) -> Result<(), String> {
@@ -733,7 +766,7 @@ impl Store {
         if let (Ok(_), Some((side, id))) = (&res, screen) {
             let now = self.now;
             if let Ok(r) = self.reg_mut(id) {
-                r.touched[slot(side)] = Some(now);
+                r.touch = Some((side, now + TOUCH_LOCK_MS));
             }
         }
         let self_ok = self.self_mode_enabled;
@@ -811,11 +844,15 @@ impl Store {
                     .lines
                     .iter_mut()
                     .find(|l| {
-                        l.id == line_id && matches!(l.kind, LineKind::Service { done: false })
+                        l.id == line_id && matches!(l.kind, LineKind::Service { done: false, .. })
                     })
                     .ok_or("受付待ちのサービス商品が見つかりません")?;
                 l.unit_price = amount;
-                l.kind = LineKind::Service { done: true };
+                // 代行収納は、受付した内容・金額をお客様が会計時に確認する
+                l.kind = LineKind::Service {
+                    done: true,
+                    confirm_pending: catalog::find(l.code).is_some_and(|p| p.customer_confirms),
+                };
                 let name = l.name;
                 if !self.reg_mut(register)?.txn.service_pending() {
                     self.calls.resolve(register, CallKind::Service, self.now);
@@ -879,6 +916,22 @@ impl Store {
                 self.calls.resolve(register, CallKind::AgeCheck, self.now);
                 done(format!("{age}歳以上であることを確認しました"))
             }
+            C::ConfirmBillPayment { register, side } => {
+                self.check(register, side, Action::ConfirmBillPayment)?;
+                let r = self.reg_mut(register)?;
+                let amount = r.txn.bill_pending().unwrap_or(0);
+                for l in &mut r.txn.lines {
+                    if let LineKind::Service {
+                        confirm_pending, ..
+                    } = &mut l.kind
+                    {
+                        *confirm_pending = false;
+                    }
+                }
+                done(format!(
+                    "お客様が代行収納の支払い内容・金額（{amount}円）を確認しました"
+                ))
+            }
             C::InsertCash {
                 register,
                 denomination,
@@ -927,6 +980,8 @@ impl Store {
                 self.check_active(register, Action::VoidTransaction)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
+                // 店舗メニューから行うので、済んだらメニューを閉じる
+                r.menu = None;
                 let txn = std::mem::take(&mut r.txn);
                 let back = txn.inserted.total();
                 for l in &txn.lines {
@@ -972,7 +1027,9 @@ impl Store {
             }
             C::Lock { register } => {
                 self.check_active(register, Action::Lock)?;
-                if let Some(s) = &mut self.reg_mut(register)?.staff {
+                let r = self.reg_mut(register)?;
+                r.menu = None;
+                if let Some(s) = &mut r.staff {
                     s.locked = true;
                 }
                 done("画面をロックしました（スタッフバーコードで解除）")
@@ -1004,7 +1061,8 @@ impl Store {
                 if r.staff_state() != StaffState::Ready {
                     return Err("店舗メニューは名札でログインした店員だけが使えます".into());
                 }
-                if screen.is_some() && !r.txn.lines.is_empty() {
+                // 取引中は一覧（取引中止・ロック・ログアウト）だけを開ける
+                if screen.is_some_and(|s| s != MenuScreen::Top) && !r.txn.lines.is_empty() {
                     return Err("取引中は店舗メニューを開けません".into());
                 }
                 let to = exchange_to
@@ -1117,15 +1175,8 @@ impl Store {
                 account: acc,
                 locked: false,
             });
-            // ログイン直後はお客様画面が操作側。支払い中の引き継ぎなら店員側
-            if was == StaffState::Absent || took_over {
-                r.holder = if took_over {
-                    Side::Staff
-                } else {
-                    Side::Customer
-                };
-                r.touched = [None, None];
-            }
+            // ログイン後は両方の画面が操作できる（触れている一瞬だけ排他）
+            r.touch = None;
             // ログインで店員側が操作できるようになる（お客様の支払い中でも）
             r.txn.customer_turn = false;
             // 店員が来たので、呼び出しボタンの鳴動も止める
@@ -1155,6 +1206,10 @@ impl Store {
                 return done("ポイントカードを読みました。お支払い方法を選んでください");
             }
         }
+        // 買い物点数の上限を超える商品は登録しない（会計画面にもとどまる）
+        if matches!(scanned, Scanned::Product(_)) && r.txn.item_count() >= MAX_ITEMS {
+            return Err(ITEMS_FULL.into());
+        }
         // 会計画面で読まれたら、登録画面に引き返して追加する（投入済みの現金はそのまま）
         let back = if r.txn.paying {
             r.txn.paying = false;
@@ -1172,7 +1227,14 @@ impl Store {
                 done(format!("ポイントカードを読みました{back}"))
             }
             Scanned::Product(p) if p.needs_staff => {
-                r.txn.push(p, 1, LineKind::Service { done: false });
+                r.txn.push(
+                    p,
+                    1,
+                    LineKind::Service {
+                        done: false,
+                        confirm_pending: false,
+                    },
+                );
                 let ready = r.staff_state() == StaffState::Ready;
                 if !ready {
                     self.calls.raise(register, CallKind::Service, now, p.name);
@@ -1202,6 +1264,10 @@ impl Store {
             .filter(|p| p.category == Category::FastFood)
             .ok_or("FF の商品が見つかりません")?;
         let qty = qty.max(1);
+        let count = self.reg(register).map_or(0, |r| r.txn.item_count());
+        if count + qty > MAX_ITEMS {
+            return Err(ITEMS_FULL.into());
+        }
         let stock = self
             .ff_stock
             .iter_mut()
@@ -1301,37 +1367,23 @@ impl Store {
     }
 
     /// 投入口：店舗メニューの入金・両替画面が開いていればそちら、なければお会計の支払い
-    /// グレーの画面にタッチして操作を引き継ぐ。持っている側がしばらく
-    /// 触られていないときだけ。お客様の確認待ちなどはお客様側のまま
+    /// 画面に触れる。もう一方が触れている一瞬や、お客様側に限られる場面では利かない
     fn claim(&mut self, register: u8, side: Side) -> Result<Outcome, String> {
-        let now = self.now;
-        let r = self.reg_mut(register)?;
+        let r = self.reg(register).ok_or("レジがありません")?;
         let c = r.context();
-        if active_side(&c) == side {
-            return Ok(Outcome::default());
-        }
-        if active_side(&Context { holder: side, ..c }) != side {
-            return Err(if c.menu_open {
+        match active_side(&c) {
+            Some(s) if s != side => Err(if c.menu_open {
                 "お客様画面で店舗メニューを操作中です"
             } else if c.staff != StaffState::Ready {
                 "スタッフバーコードでログインしてください"
-            } else if c.age_pending {
-                "お客様の年齢確認を待っています"
-            } else {
+            } else if c.customer_turn {
                 "お客様がお支払い中です"
+            } else {
+                "もう一方の画面で操作中です"
             }
-            .into());
+            .into()),
+            _ => Ok(Outcome::default()),
         }
-        let other = r.touched[slot(r.holder)];
-        if other.is_some_and(|t| now.saturating_sub(t) < HOLD_MS) {
-            return Err(match r.holder {
-                Side::Staff => "係員側の画面が操作中です",
-                Side::Customer => "お客様側の画面が操作中です",
-            }
-            .into());
-        }
-        r.holder = side;
-        Ok(Outcome::default())
     }
 
     fn insert(&mut self, register: u8, amount: u32) -> Result<Outcome, String> {
@@ -1614,13 +1666,17 @@ impl Store {
     fn register_view(&self, r: &Register) -> RegisterView {
         let c = r.context();
         let t = &r.txn;
-        // どちらの画面にも同じボタンが並ぶ。押せるのは操作側の画面
-        let c_side = active_side(&c);
+        // どちらの画面にも同じボタンが並ぶ。触れている一瞬は、触れている側の画面だけが押せる
+        let c_side = active_side(&c).unwrap_or(Side::Customer);
         let actions = |side: Side, list: &[Action]| {
             list.iter()
                 .map(|&a| {
                     // 年齢確認ボタンだけは、どちらが操作側でもお客様側の画面で押す
-                    let side = if a == Action::ConfirmAge { Side::Customer } else { side };
+                    let side = if is_customer_only(a) {
+                        Side::Customer
+                    } else {
+                        side
+                    };
                     let res = permitted(side, a, &c);
                     ActionState {
                         action: a,
@@ -1671,16 +1727,10 @@ impl Store {
         RegisterView {
             id: r.id,
             active_side: active_side(&c),
+            max_items: MAX_ITEMS,
             lamp: waiting.is_some(),
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
-            switchable: active_side(&Context {
-                holder: Side::Staff,
-                ..c
-            }) != active_side(&Context {
-                holder: Side::Customer,
-                ..c
-            }),
             mode: r.mode,
             mode_label: r.mode.label(),
             outlet: r.outlet.total(),
@@ -1701,6 +1751,7 @@ impl Store {
                 required_age: t.required_age.filter(|_| t.paying),
                 age_verified: t.age_verified,
                 age_pending: c.age_pending,
+                bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 point_pending: c.point_pending,
                 method: t.method,
                 inserted,
@@ -1721,6 +1772,7 @@ impl Store {
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
                 age_check: c.age_pending.then_some(t.required_age.unwrap_or(0)),
+                bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 staff_called,
                 staff_present: c.staff == StaffState::Ready,
                 method: t.method,
@@ -1777,6 +1829,8 @@ pub struct StaffView {
     pub required_age: Option<u8>,
     pub age_verified: bool,
     pub age_pending: bool,
+    /// 会計時、お客様の確認待ちの代行収納の金額
+    pub bill_check: Option<u32>,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
     pub point_pending: bool,
     pub method: Option<PaymentMethod>,
@@ -1802,6 +1856,8 @@ pub struct CustomerView {
     pub point_pending: bool,
     /// 年確中なら求める年齢
     pub age_check: Option<u8>,
+    /// お客様の確認待ちの代行収納の金額
+    pub bill_check: Option<u32>,
     pub staff_called: bool,
     pub staff_present: bool,
     pub method: Option<PaymentMethod>,
@@ -1812,8 +1868,10 @@ pub struct CustomerView {
 #[derive(Clone, Debug, Serialize)]
 pub struct RegisterView {
     pub id: u8,
-    /// 今、画面を操作できる側（もう一方は表示だけ）
-    pub active_side: Side,
+    /// 操作できる側が片方に限られているなら、その側（None なら両方の画面が操作できる）
+    pub active_side: Option<Side>,
+    /// 買い物点数の上限
+    pub max_items: u32,
     /// レジ本体の呼び出しランプ。店員が来るまで点きっぱなし（音は MAT だけ。
     /// 呼び出しは順番待ちにせず、どれも発生した瞬間から知らせる）
     pub lamp: bool,
@@ -1821,8 +1879,6 @@ pub struct RegisterView {
     pub call_waiting_ms: Option<u64>,
     /// 鳴動の音量（放置が長いほど大きい。呼び出しがなければ 0）
     pub ring_volume: f32,
-    /// グレーの画面にタッチして操作を引き継げる状態か（有人モードで、お客様の確認待ちなどでない）
-    pub switchable: bool,
     pub mode: Mode,
     pub mode_label: &'static str,
     /// 排出口にたまっているお金

@@ -94,7 +94,6 @@ button { touch-action: manipulation; }
 .screen-cap { font-size: 11px; letter-spacing: .08em; color: var(--muted); margin: 0 0 3px 2px; }
 .screen-cap::after { content: ""; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
-.screen-wrap.claimable .screen-cap::after { content: "　表示のみ（タッチで操作を引き継ぐ）"; }
 /* レジ画面：ヘッダー ＋ 上 2/3 が登録画面 ＋ 下 1/3 がバーコードなしアイテム欄 */
 .screen { position: relative; border-radius: 10px; min-width: 0; overflow: hidden; height: clamp(320px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; height: 34px; padding: 0 4px; border-bottom: 1px solid var(--line); }
@@ -129,6 +128,11 @@ button { touch-action: manipulation; }
 .reg-top button { border-color: #ffffff; }
 .reg-top .total { font-size: 22px; }
 .reg-top .count b { font-size: 18px; }
+.reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #ffffff; color: var(--reg-top-bg); font-weight: 700; }
+/* 登録の明細は表示エリアが狭いので小ぶりに */
+.screen-main .lines td { font-size: 12px; padding: 3px 4px; }
+.screen-main .lines .tag { font-size: 10px; }
+.screen-main .lines button { font-size: 11px; padding: 1px 8px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
 .total { font-size: 20px; }
 
@@ -141,7 +145,7 @@ button {
   background: var(--accent); color: var(--accent-ink);
 }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button:disabled { opacity: .35; cursor: not-allowed; }
+button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost { background: transparent; color: inherit; border-color: currentColor; opacity: .85; }
 button.ghost:disabled { opacity: .3; }
 button.small { padding: 3px 8px; font-size: 12px; }
@@ -187,6 +191,7 @@ details summary h3 { display: inline; }
 .point-card { text-align: center; }
 .point-card .big { font-size: 18px; font-weight: 700; }
 .age-card { background: var(--warn-bg); color: var(--warn); }
+.bill-card { background: var(--warn-bg); color: var(--warn); }
 .ffcheck { display: inline-flex; vertical-align: middle; margin-left: 6px; }
 .ffcheck input { width: 18px; height: 18px; accent-color: var(--ff); cursor: pointer; }
 .ffcheck input:disabled { cursor: not-allowed; }
@@ -291,19 +296,16 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-/* 操作できない側の画面（排他）：表示は続けるが、ボタンは押せない */
+/* 操作できない側の画面（排他）：両方の画面ともカラーで表示し、その画面から触れない操作だけをグレーアウトする */
 .banner.watch { background: var(--line); color: var(--ink); }
-.screen.inactive [data-region] > * { filter: grayscale(1); opacity: .55; }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
-.screen.inactive [data-region] select, .screen.inactive [data-region] summary { pointer-events: none; }
-/* 例外：年齢確認ボタンはお客様側の画面でだけ、どちらが操作側でも押せる。係員側では押せない */
-.customer-screen.inactive [data-region] > .age-card { filter: none; opacity: 1; }
-.customer-screen.inactive [data-region] .age-card button { pointer-events: auto; }
-.staff-screen .age-card button { pointer-events: none; opacity: .45; }
-.screen.inactive::after {
-  content: ""; position: absolute; inset: 0; background: var(--line); opacity: .25; pointer-events: none; border-radius: inherit;
+.screen.inactive [data-region] select, .screen.inactive [data-region] summary {
+  pointer-events: none; filter: grayscale(1); opacity: .45;
 }
-.screen.claimable { cursor: pointer; }
+/* 例外：お客様本人が押すボタン（年齢確認・代行収納の内容確認）はお客様側の画面でだけ、
+   どちらが操作側でも押せる。係員側では押せない */
+.customer-screen.inactive [data-region] .customer-only button { pointer-events: auto; filter: none; opacity: 1; }
+.staff-screen .customer-only button { pointer-events: none; filter: grayscale(1); opacity: .45; }
 
 /* 店員画面に映すお客様画面の内容 */
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }
@@ -325,13 +327,14 @@ body.dragging .drop-hint { display: inline; }
 .idle { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
 /* 店舗メニューの歯車（レジ画面ヘッダーの左上。店員ログイン中だけ） */
-.gear { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
-.gear:hover { color: var(--ink); }
+.gear, .icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
+.gear:hover, .icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: 14px; margin: 14px 0 6px; }
 /* お客様画面の店舗メニュー（一画面ずつ） */
 .menu-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .menu-head b { flex: 1; }
 .menu-list { display: grid; gap: 6px; }
+.menu-list + .menu-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .menu-item { text-align: left; padding: 10px 12px; }
 .menu-form { display: flex; flex-wrap: wrap; gap: 6px; }
 .menu-form input { flex: 1 1 8em; min-width: 0; }

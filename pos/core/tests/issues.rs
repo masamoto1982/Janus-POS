@@ -1,6 +1,6 @@
 //! 新型レジで報告された問題と、壁打ちで決めた仕様を、シナリオで検証する。
 
-use janus_pos_core::authority::{Action, Mode, Phase, Side, StaffState};
+use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{Command, RegisterView, Store};
 use serde_json::{json, Value};
@@ -59,6 +59,14 @@ fn login(s: &mut Store, r: u8) {
 fn login_as(s: &mut Store, r: u8, badge: &str) {
     scan(s, r, "staff", badge);
     ok(s, json!({"type":"claim","register":r,"side":"staff"}));
+}
+
+/// 年確で店員が「しない」を選ぶ（お客様の「X歳以上です」で済ませる）
+fn no_id_check(s: &mut Store, r: u8) {
+    ok(
+        s,
+        json!({"type":"choose_age_check","register":r,"id_check":false}),
+    );
 }
 
 /// 会計ボタンの後のポイントカードの最終確認（ポイントカードなしで進む）。操作側の画面で行う
@@ -129,6 +137,7 @@ fn scanning_on_payment_screen_returns_to_registering() {
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":500,"count":1}),
     );
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.last_receipt.as_ref().unwrap().change_total, 600 - 320);
 }
@@ -149,6 +158,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert_eq!(v.customer.age_check, Some(20));
     assert!(run(
@@ -156,8 +166,12 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         json!({"type":"insert_cash","register":1,"denomination":1000,"count":1})
     )
     .is_err());
+    // 店員が「しない」を選ぶと、お客様の「20歳以上です」で済む
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"id_check":false}),
+    );
     ok(&mut s, json!({"type":"confirm_age","register":1}));
-    ok(&mut s, json!({"type":"check_id","register":1,"ok":true}));
     // 同じ取引で戻って追加しても、再確認はしない
     scan(&mut s, 1, "staff", BEER);
     ok(
@@ -189,8 +203,11 @@ fn self_mode_age_check_calls_staff() {
         .any(|c| c.register == 2 && c.kind == CallKind::AgeCheck));
     assert!(!allowed(&reg(&s, 2), Side::Customer, Action::ConfirmAge));
     scan(&mut s, 2, "staff", "ST1002");
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":2,"id_check":false}),
+    );
     ok(&mut s, json!({"type":"confirm_age","register":2}));
-    ok(&mut s, json!({"type":"check_id","register":2,"ok":true}));
     // 名札を読んだので有人モード。モードはログアウトか 5 分の無操作でだけ戻る
     assert_eq!(reg(&s, 2).mode, Mode::Attended);
     assert_eq!(reg(&s, 2).staff.state, StaffState::Ready);
@@ -220,6 +237,7 @@ fn only_owner_changes_age_rules() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     assert_eq!(reg(&s, 1).customer.age_check, Some(20));
     assert_eq!(s.snapshot().age_rules.history.len(), 1);
 }
@@ -422,7 +440,7 @@ fn mat_rings_despite_loss_and_reports_link_down() {
     advance(&mut s, 8_000);
     let snap = s.snapshot();
     assert!(!snap.mats[0].link_ok);
-    assert_eq!(snap.registers[0].staff.mat_down, vec!["MAT-1".to_string()]);
+    assert_eq!(snap.registers[0].staff.mat_down, vec!["呼び鈴".to_string()]);
 }
 
 /// お客様画面には分類や年確対象の情報を出さない（店員画面にだけ出す）。
@@ -558,6 +576,7 @@ fn customer_registers_ff_in_self_mode() {
         &mut s,
         json!({"type":"insert_cash","register":2,"denomination":1000,"count":1}),
     );
+    ok(&mut s, json!({"type":"finish_insert","register":2}));
     assert!(reg(&s, 2).customer.lines.is_empty(), "paid and settled");
 }
 
@@ -630,9 +649,30 @@ fn inlet_pays_and_change_waits_in_outlet() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     confirm_point(&mut s, 1);
+    // 入れたお金は積み上がり、Enter で投入を終えると決済する
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    assert!(
+        run(&mut s, json!({"type":"finish_insert","register":1})).is_err(),
+        "not enough yet"
+    );
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     let v = reg(&s, 1);
-    assert_eq!(v.outlet, 1000 - 160);
+    assert_eq!(v.staff.inserted, 1100);
+    assert_eq!(
+        v.staff.method,
+        Some(PaymentMethod::Cash),
+        "cash picks itself"
+    );
+    assert!(v.last_receipt.is_none(), "waits for Enter");
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.outlet, 1100 - 160);
+    // 「ありがとうございました」は 3 秒で消え、新しいお客様の待ち受けに戻る
+    assert!(v.last_receipt.is_some());
+    s.tick(v.last_receipt.as_ref().unwrap().at + 2999);
+    assert!(reg(&s, 1).last_receipt.is_some());
+    s.tick(v.last_receipt.as_ref().unwrap().at + 3000);
+    assert!(reg(&s, 1).last_receipt.is_none());
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).outlet, 0);
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
@@ -987,6 +1027,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
         json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 220);
 
     // ポイントカードを先に読んでいれば、確認は済んでいる
@@ -1025,6 +1066,7 @@ fn either_screen_can_operate_except_age_confirmation() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert!(v.staff.age_pending);
     assert_eq!(v.active_side, Some(Side::Customer));
@@ -1049,6 +1091,7 @@ fn age_button_works_only_on_customer_screen_while_staff_holds() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert!(v.staff.age_pending);
     assert_eq!(v.active_side, Some(Side::Staff));
@@ -1118,28 +1161,28 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 8_640 + 1_200);
 }
 
-/// 買い物点数は 10 点まで（数量の合計）。上限を超える商品は登録されず、FF も同じ。
+/// 買い物点数は 5 点まで（数量の合計）。上限を超える商品は登録されず、FF も同じ。
 #[test]
-fn shopping_is_limited_to_ten_items() {
+fn shopping_is_limited_to_five_items() {
     let mut s = Store::new(1, 2, 1);
-    for _ in 0..9 {
+    for _ in 0..4 {
         scan(&mut s, 1, "customer", ONIGIRI);
     }
     login(&mut s, 1);
     advance(&mut s, 1_000);
     let ff = |qty: u32| json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":qty});
     let e = run(&mut s, ff(2)).unwrap_err();
-    assert!(e.contains("10点"), "{e}");
+    assert!(e.contains("5点"), "{e}");
     ok(&mut s, ff(1));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 10);
+    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 5);
     assert!(!allowed(&v, Side::Staff, Action::RegisterFf));
     let e = run(
         &mut s,
         json!({"type":"scan","register":1,"side":"customer","code":ONIGIRI}),
     )
     .unwrap_err();
-    assert!(e.contains("10点"), "{e}");
+    assert!(e.contains("5点"), "{e}");
     // 取り消せば、また登録できる
     let id = reg(&s, 1).staff.lines[0].line.id;
     advance(&mut s, 1_000);
@@ -1172,14 +1215,17 @@ fn void_lock_and_logout_from_the_store_menu() {
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
 }
 
-/// 年確は二段階：お客様が「X歳以上です」を押してから、店員が身分証を確認する（はい・いいえ）。
-/// 「いいえ」なら年確商品を取り消すまで決済できない。
+/// 年確：年確商品があれば、まず店員が「年齢確認をする／しない」を選ぶ。
+/// 「する」なら身分証の生年月日を入力し、年齢に届かない年確商品は買い物から取り除いて
+/// 没収する商品と個数を店員に示す（18 禁雑誌は買えるが酒は買えない等）。
 #[test]
-fn staff_checks_id_after_the_customer_declares_age() {
+fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
+    const MAGAZINE: &str = "4900000000141";
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", ONIGIRI);
-    scan(&mut s, 1, "staff", BEER);
+    for code in [ONIGIRI, BEER, BEER, MAGAZINE] {
+        scan(&mut s, 1, "staff", code);
+    }
     advance(&mut s, 1_000);
     ok(
         &mut s,
@@ -1187,53 +1233,141 @@ fn staff_checks_id_after_the_customer_declares_age() {
     );
     confirm_point(&mut s, 1);
     advance(&mut s, 1_000);
-    let check = |ok: bool, side: &str| json!({"type":"check_id","register":1,"side":side,"ok":ok});
-    // お客様が押すまで、店員の身分証確認は押せない
-    let e = run(&mut s, check(true, "staff")).unwrap_err();
-    assert!(e.contains("お客様"), "{e}");
-    assert!(!reg(&s, 1).staff.id_pending);
-    ok(&mut s, json!({"type":"confirm_age","register":1}));
     let v = reg(&s, 1);
-    assert!(v.staff.id_pending);
-    assert_eq!(v.customer.age_check, None);
-    // お客様側の画面からは押せない
-    assert!(run(&mut s, check(true, "customer")).is_err());
+    assert!(v.staff.age_choice_pending);
+    assert_eq!(
+        v.customer.age_check, None,
+        "customer waits for the staff choice"
+    );
+    let birth = |b: &str| json!({"type":"check_id","register":1,"birth":b,"today":"2026-10-19"});
+    // 選ぶ前は入力できない。お客様側の画面からは選べない
+    assert!(run(&mut s, birth("20070501")).is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"side":"customer","id_check":true})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"id_check":true}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.staff.id_pending && !v.staff.age_choice_pending);
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
-    ok(&mut s, check(false, "staff"));
+    assert!(run(&mut s, birth("20270101")).is_err());
+    // 19 歳：雑誌（18）は買えるが、ビール（20）は買えない
+    let msg = run(&mut s, birth("20070501")).unwrap().unwrap();
+    assert!(msg.contains("19歳") && msg.contains("缶ビール"), "{msg}");
     let v = reg(&s, 1);
-    assert!(v.staff.id_refused && !v.staff.id_pending);
-    assert!(run(&mut s, cash.clone()).unwrap_err().contains("身分証"));
-    // 年確商品を取り消せば、残りは会計できる
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
-    );
-    let beer = reg(&s, 1)
-        .staff
-        .lines
-        .iter()
-        .find(|l| l.line.code == BEER)
-        .unwrap()
-        .line
-        .id;
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":beer}),
-    );
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
-    );
-    confirm_point(&mut s, 1);
-    assert!(!reg(&s, 1).staff.id_refused);
+    let codes: Vec<&str> = v.staff.lines.iter().map(|l| l.line.code).collect();
+    assert!(!codes.contains(&BEER) && codes.contains(&MAGAZINE) && codes.contains(&ONIGIRI));
+    assert_eq!(v.staff.confiscated.len(), 1);
+    assert_eq!(v.staff.confiscated[0].qty, 2);
+    assert!(!v.staff.id_pending && v.staff.phase == Phase::Paying);
+    ok(&mut s, json!({"type":"dismiss_confiscated","register":1}));
+    assert!(reg(&s, 1).staff.confiscated.is_empty());
     advance(&mut s, 1_000);
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
     );
     ok(&mut s, cash);
+}
+
+#[test]
+fn age_counts_the_birthday() {
+    use janus_pos_core::store::age_on;
+    assert_eq!(age_on("20061019", "2026-10-19"), Ok(20));
+    assert_eq!(age_on("20061020", "2026-10-19"), Ok(19));
+    assert_eq!(age_on("19821002", "2026-10-19"), Ok(44));
+    // 西暦 8 桁だけ。存在しない日付や和暦は読まない
+    for bad in ["2006/10/19", "20070231", "570102", "S57.10.2", "2006101"] {
+        assert!(age_on(bad, "2026-10-19").is_err(), "{bad}");
+    }
+}
+
+/// 引換券・割引券は商品より先に読んでもよい。対象商品が登録されたときに値引きし、
+/// 対象商品がなければ「対象商品待ち」のまま決済の邪魔はしない。
+#[test]
+fn coupons_apply_whenever_the_target_is_registered() {
+    const SANDWICH: &str = "4900000000028";
+    let mut s = Store::new(1, 2, 1);
+    // 商品より先にクーポン
+    scan(&mut s, 1, "customer", "CP0001");
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.coupons.len(), 1);
+    assert_eq!(v.customer.coupons[0].discount, None);
+    assert_eq!(v.customer.total, 0);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.coupons[0].discount, Some(160));
+    assert_eq!(v.customer.total, 0);
+    // 同じクーポンを 2 枚目も使える。対象商品 1 個につき 1 枚
+    scan(&mut s, 1, "customer", "CP0001");
+    assert_eq!(reg(&s, 1).customer.coupons[1].discount, None);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.coupons[1].discount, Some(160));
+    assert_eq!(v.customer.total, 0);
+    // 商品の後にクーポン（割引券）。3 個目のおにぎりは定価
+    scan(&mut s, 1, "customer", SANDWICH);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", "CP0002");
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.total, 160 + 320 - 50);
+    // クーポンは買い物点数に数えない
+    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 4);
+    // クーポンを使ったまま会計できる
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    ok(&mut s, json!({"type":"tap_emoney","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 430);
+}
+
+#[test]
+fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
+    let mut s = Store::new(1, 2, 1);
+    // おにぎりの引換券のつもりで、別の商品をレジに通した
+    scan(&mut s, 1, "customer", "CP0001");
+    scan(&mut s, 1, "customer", "4900000000028");
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    // 両方の画面に注意を出し、決済できない
+    let v = reg(&s, 1);
+    assert!(v.staff.coupon_unmatched && v.customer.coupon_unmatched);
+    assert!(v
+        .customer
+        .payment_blocker
+        .unwrap()
+        .contains("適用先のないクーポン"));
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    assert!(run(&mut s, json!({"type":"tap_emoney","register":1})).is_err());
+    // お会計中でもクーポンを取り消せる。取り消したクーポンは返却の案内に載る
+    let id = reg(&s, 1).customer.coupons[0].id;
+    ok(
+        &mut s,
+        json!({"type":"remove_coupon","register":1,"side":"customer","coupon_id":id}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.customer.coupons.is_empty() && !v.customer.coupon_unmatched);
+    assert_eq!(v.staff.returned.len(), 1);
+    assert!(v.customer.returned[0].unmatched);
+    ok(&mut s, json!({"type":"dismiss_returned","register":1}));
+    assert!(reg(&s, 1).staff.returned.is_empty());
+    ok(&mut s, json!({"type":"tap_emoney","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 320);
 }

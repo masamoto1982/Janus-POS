@@ -10,12 +10,12 @@ use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
-    StaffState, ACTIONS, ID_REFUSED, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
+    StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
 use crate::catalog::{
-    self, Category, FfTab, Product, Scanned, TaxRate, CATALOG, FF_MENU, INITIAL_FF_STOCK,
+    self, Category, Coupon, FfTab, Product, Scanned, TaxRate, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
 use crate::mat::{Bell, Mat};
 use crate::rng::Rng;
@@ -139,6 +139,16 @@ pub enum Command {
         side: Side,
         line_id: u32,
     },
+    /// 読み取ったクーポンを取り消す（お会計中でもよい）。取り消したクーポンはお客様に返す
+    RemoveCoupon {
+        register: u8,
+        side: Side,
+        coupon_id: u32,
+    },
+    /// クーポンの返却の案内を閉じる（返却しました／受け取りました）
+    DismissReturned {
+        register: u8,
+    },
     Checkout {
         register: u8,
         side: Side,
@@ -152,18 +162,30 @@ pub enum Command {
         side: Side,
         method: PaymentMethod,
     },
-    /// 年齢確認ボタン。お客様側の画面からしか押せない（押した画面を side で伝える）
+    /// 年齢確認ボタン（「X歳以上です」）。店員が「しない」を選んだとき、お客様側の画面で押す
     ConfirmAge {
         register: u8,
         #[serde(default = "customer_side")]
         side: Side,
     },
-    /// 身分証の確認（はい・いいえ）。店員側の画面からしか押せない
+    /// 年確商品があるとき、店員が年齢確認を「する」（身分証の生年月日を入力）か「しない」か選ぶ
+    ChooseAgeCheck {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+        id_check: bool,
+    },
+    /// 身分証の生年月日を入力して判定する（YYYY-MM-DD）。today はレジの日付
     CheckId {
         register: u8,
         #[serde(default = "staff_side")]
         side: Side,
-        ok: bool,
+        birth: String,
+        today: String,
+    },
+    /// 没収した商品の一覧を閉じる（店員が商品を引き取った）
+    DismissConfiscated {
+        register: u8,
     },
     /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない
     ConfirmBillPayment {
@@ -175,6 +197,10 @@ pub enum Command {
         register: u8,
         denomination: u32,
         count: u32,
+    },
+    /// 「投入おわり」（入金ボックスの Enter はその近道）：現金の投入を終え、決済する（投入額が足りなければ受け付けない）
+    FinishInsert {
+        register: u8,
     },
     /// 財布のカード・スマホを端末にかざす（電子マネー・バーコード決済・クレジットカード）。
     /// 選ばれた支払方法と違うものをかざすと受け付けない（省略時は選ばれた方法）
@@ -281,13 +307,18 @@ impl Command {
             | C::CheckFf { register, .. }
             | C::CompleteService { register, .. }
             | C::RemoveLine { register, .. }
+            | C::RemoveCoupon { register, .. }
+            | C::DismissReturned { register }
             | C::Checkout { register, .. }
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
             | C::ConfirmAge { register, .. }
+            | C::ChooseAgeCheck { register, .. }
             | C::CheckId { register, .. }
+            | C::DismissConfiscated { register }
             | C::ConfirmBillPayment { register, .. }
             | C::InsertCash { register, .. }
+            | C::FinishInsert { register }
             | C::TapEmoney { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
@@ -313,6 +344,7 @@ impl Command {
             C::RegisterFf { side, .. }
             | C::CheckFf { side, .. }
             | C::RemoveLine { side, .. }
+            | C::RemoveCoupon { side, .. }
             | C::Checkout { side, .. }
             | C::BackToRegistering { side, .. }
             | C::SelectPayment { side, .. }
@@ -398,12 +430,17 @@ struct Txn {
     point_card: Option<String>,
     /// 会計ボタンの時点で求められた年齢（年確不要なら None）
     required_age: Option<u8>,
-    /// お客様が「X歳以上です」を押した
-    age_declared: bool,
-    /// 店員が身分証を確認した（「はい」）。年確はこれで済む
-    age_verified: bool,
-    /// 店員が身分証を確認できなかった（「いいえ」）。取引中止まで残る
-    id_refused: bool,
+    /// 読み取った引換券・割引券（取消用の番号つき。対象商品の登録を待つものも含む）。
+    /// 同じクーポンを何枚使ってもよい
+    coupons: Vec<(u32, &'static Coupon)>,
+    /// 取り消したクーポン（お客様に返却する。true は適用先がなかったもの）
+    returned: Vec<(&'static str, bool)>,
+    /// 店員が選んだ年齢確認のやり方（None はまだ選んでいない）
+    age_method: Option<AgeMethod>,
+    /// 年確が済んだ年齢（「しない」ならお客様の申告、「する」なら身分証の年齢）
+    verified_age: Option<u8>,
+    /// 年確で販売できず、買い物から取り除いた商品（店員が没収する）
+    confiscated: Vec<(&'static str, u32)>,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
@@ -413,8 +450,45 @@ struct Txn {
 }
 
 impl Txn {
+    /// 読み取ったクーポンと、その値引き額（対象商品がまだなければ None）。
+    /// 対象商品 1 個につきクーポン 1 枚。読んだ順番（商品より先か後か）は関係ない
+    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, TaxRate)>)> {
+        let mut used: Vec<(&str, u32)> = vec![];
+        self.coupons
+            .iter()
+            .map(|&(id, c)| {
+                let have: u32 = self
+                    .lines
+                    .iter()
+                    .filter(|l| l.code == c.target && l.kind == LineKind::Item)
+                    .map(|l| l.qty)
+                    .sum();
+                let n = used.iter().find(|(t, _)| *t == c.target).map_or(0, |e| e.1);
+                if n >= have {
+                    return (id, c, None);
+                }
+                match used.iter_mut().find(|(t, _)| *t == c.target) {
+                    Some(e) => e.1 += 1,
+                    None => used.push((c.target, 1)),
+                }
+                let p = catalog::find(c.target);
+                (id, c, p.map(|p| (c.discount(p.price), p.tax)))
+            })
+            .collect()
+    }
+
+    fn discount_of(&self, rate: Option<TaxRate>) -> u32 {
+        self.coupon_uses()
+            .iter()
+            .filter_map(|(_, _, u)| *u)
+            .filter(|(_, t)| rate.is_none_or(|r| r == *t))
+            .map(|(yen, _)| yen)
+            .sum()
+    }
+
     fn total(&self) -> u32 {
-        self.lines.iter().map(Line::amount).sum()
+        let gross: u32 = self.lines.iter().map(Line::amount).sum();
+        gross.saturating_sub(self.discount_of(None))
     }
 
     fn tax_of(&self, rate: TaxRate) -> u32 {
@@ -423,7 +497,8 @@ impl Txn {
             .iter()
             .filter(|l| l.tax == rate)
             .map(Line::amount)
-            .sum();
+            .sum::<u32>()
+            .saturating_sub(self.discount_of(Some(rate)));
         match rate {
             TaxRate::Reduced8 => gross * 8 / 108,
             TaxRate::Standard10 => gross * 10 / 110,
@@ -461,26 +536,36 @@ impl Txn {
         Some(pending.map(Line::amount).sum())
     }
 
-    /// お客様の「X歳以上です」待ち
+    /// 承認済みの年齢で、いまの年確商品がすべて足りている
+    fn age_cleared(&self) -> bool {
+        match (self.required_age, self.verified_age) {
+            (None, _) => true,
+            (Some(need), Some(ok)) => ok >= need,
+            _ => false,
+        }
+    }
+
+    /// 店員の「する／しない」待ち
+    fn age_choice_pending(&self) -> bool {
+        self.paying && !self.age_cleared() && self.age_method.is_none()
+    }
+
+    /// 「しない」を選び、お客様の「X歳以上です」待ち
     fn age_pending(&self) -> bool {
-        self.paying && self.required_age.is_some() && !self.age_declared && !self.age_verified
+        self.paying && !self.age_cleared() && self.age_method == Some(AgeMethod::Declare)
     }
 
-    /// 店員の身分証確認待ち
+    /// 「する」を選び、店員の生年月日の入力待ち
     fn id_pending(&self) -> bool {
-        self.paying
-            && self.required_age.is_some()
-            && self.age_declared
-            && !self.age_verified
-            && !self.id_refused
-    }
-
-    /// 身分証を確認できず、年確商品が残っている
-    fn id_refused(&self) -> bool {
-        self.paying && self.required_age.is_some() && self.id_refused
+        self.paying && !self.age_cleared() && self.age_method == Some(AgeMethod::Id)
     }
 
     /// 買い物点数（数量の合計）
+    /// 適用先（対象商品）のないクーポンがある
+    fn coupon_unmatched(&self) -> bool {
+        self.coupon_uses().iter().any(|(_, _, u)| u.is_none())
+    }
+
     fn item_count(&self) -> u32 {
         self.lines.iter().map(|l| l.qty).sum()
     }
@@ -587,9 +672,9 @@ impl Register {
             },
             staff: self.staff_state(),
             has_lines: !t.lines.is_empty(),
+            age_choice_pending: t.age_choice_pending(),
             age_pending: t.age_pending(),
             id_pending: t.id_pending(),
-            id_refused: t.id_refused(),
             ff_waiting: t.any_ff(FfState::Waiting),
             has_ff: t
                 .lines
@@ -598,6 +683,8 @@ impl Register {
             service_pending: t.service_pending(),
             bill_pending: t.paying && t.bill_pending().is_some(),
             point_pending: t.paying && !t.point_checked,
+            has_coupons: !t.coupons.is_empty(),
+            coupon_unmatched: t.paying && t.coupon_unmatched(),
             method: t.method,
             customer_turn: t.customer_turn,
             menu_open: self.menu.is_some(),
@@ -645,11 +732,91 @@ fn customer_side() -> Side {
     Side::Customer
 }
 
+/// 年確のやり方（店員が選ぶ）
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AgeMethod {
+    /// 「しない」：お客様の「X歳以上です」で済ませる
+    Declare,
+    /// 「する」：身分証の生年月日で判定する
+    Id,
+}
+
+/// 読み取ったクーポン。discount が None なら対象商品の登録待ち
+#[derive(Clone, Debug, Serialize)]
+pub struct CouponView {
+    /// 取消に使う番号
+    pub id: u32,
+    pub code: &'static str,
+    pub name: &'static str,
+    pub discount: Option<u32>,
+}
+
+/// 取り消して、お客様に返すクーポン
+#[derive(Clone, Debug, Serialize)]
+pub struct ReturnedCoupon {
+    pub name: &'static str,
+    /// 適用先（対象商品）がなかった
+    pub unmatched: bool,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Confiscated {
+    pub name: &'static str,
+    pub qty: u32,
+}
+
+/// 日付を読む。西暦 8 桁（19821002）か YYYY-MM-DD。存在しない日付は読まない
+fn ymd(s: &str) -> Option<(u32, u32, u32)> {
+    let s = s.trim();
+    let (y, m, d) = if s.len() == 8 && s.bytes().all(|b| b.is_ascii_digit()) {
+        (
+            s[..4].parse().ok()?,
+            s[4..6].parse().ok()?,
+            s[6..].parse().ok()?,
+        )
+    } else {
+        let mut it = s.split('-').map(|x| x.parse::<u32>().ok());
+        let ymd = (it.next()??, it.next()??, it.next()??);
+        if it.next().is_some() {
+            return None;
+        }
+        ymd
+    };
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let days = match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return None,
+    };
+    (y >= 1900 && (1..=days).contains(&d)).then_some((y, m, d))
+}
+
+/// 生年月日 birth の人の today 時点の年齢。
+///
+/// 生年月日は身分証の西暦を 8 桁で打ち込む（19821002）。カレンダーから選ぶ方式は、
+/// 今年から 18〜20 年も遡るのがかえって手間なので使わない。
+/// 設計メモ：和暦（S57.10.2 のような元号入力）にも対応できるが、身分証は西暦表記が
+/// 主流になりつつあり導入の重要性は薄いため、いまは西暦のみ受け付ける。
+pub fn age_on(birth: &str, today: &str) -> Result<u8, String> {
+    let (by, bm, bd) = ymd(birth).ok_or("生年月日を西暦 8 桁で入力してください（例：19821002）")?;
+    let (ty, tm, td) = ymd(today).ok_or("日付が正しくありません")?;
+    if (by, bm, bd) > (ty, tm, td) {
+        return Err("生年月日が今日より後です".into());
+    }
+    let age = ty - by - u32::from((tm, td) < (bm, bd));
+    Ok(age.min(150) as u8)
+}
+
 fn staff_side() -> Side {
     Side::Staff
 }
 
 /// 無操作がこの時間続くと、レジはセミセルフモードに戻って待機する
+/// 決済後の「ありがとうございました」を出す時間。過ぎると新しいお客様の待ち受けに戻る
+pub const THANKS_MS: u64 = 3000;
+
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 /// 放置された呼び出しほど大きく鳴らす。最初は RING_MIN、RING_FULL_MS 放置で最大
 pub const RING_MIN: f32 = 0.25;
@@ -690,7 +857,7 @@ impl Store {
             self_mode_enabled: false,
             rng: Rng::new(seed),
             registers: regs,
-            mats: (1..=mats).map(|i| Mat::new(&format!("MAT-{i}"))).collect(),
+            mats: (0..mats).map(|i| Mat::new(&bell_name(i))).collect(),
             calls: Calls::default(),
             age_rules: AgeRules::default(),
             auth: Authenticator::default(),
@@ -717,6 +884,12 @@ impl Store {
         for r in &mut self.registers {
             if r.touch.is_some_and(|(_, until)| until <= now) {
                 r.touch = None;
+            }
+            if r.last_receipt
+                .as_ref()
+                .is_some_and(|rc| rc.at + THANKS_MS <= now)
+            {
+                r.last_receipt = None;
             }
         }
         // MAT はデジタルな呼び鈴：ボタンが押されている間だけ鳴る。鳴らし直しはしない。
@@ -941,24 +1114,76 @@ impl Store {
             C::ConfirmAge { register, side } => {
                 self.check(register, side, Action::ConfirmAge)?;
                 let r = self.reg_mut(register)?;
-                r.txn.age_declared = true;
+                r.txn.verified_age = r.txn.required_age;
                 let age = r.txn.required_age.unwrap_or(0);
-                done(format!(
-                    "お客様が{age}歳以上と答えました。店員が身分証を確認してください"
-                ))
+                done(format!("{age}歳以上であることを確認しました"))
             }
-            C::CheckId { register, side, ok } => {
-                self.check(register, side, Action::CheckId)?;
+            C::ChooseAgeCheck {
+                register,
+                side,
+                id_check,
+            } => {
+                self.check(register, side, Action::ChooseAgeCheck)?;
                 self.calls.resolve(register, CallKind::AgeCheck, self.now);
                 let r = self.reg_mut(register)?;
                 let age = r.txn.required_age.unwrap_or(0);
-                if ok {
-                    r.txn.age_verified = true;
-                    done(format!("身分証で{age}歳以上であることを確認しました"))
+                if id_check {
+                    r.txn.age_method = Some(AgeMethod::Id);
+                    done("身分証の生年月日を入力してください")
                 } else {
-                    r.txn.id_refused = true;
-                    done(ID_REFUSED)
+                    r.txn.age_method = Some(AgeMethod::Declare);
+                    done(format!(
+                        "お客様画面で「{age}歳以上です」の確認をお願いします"
+                    ))
                 }
+            }
+            C::CheckId {
+                register,
+                side,
+                birth,
+                today,
+            } => {
+                self.check(register, side, Action::CheckId)?;
+                let age = age_on(&birth, &today)?;
+                self.verify_age(register, age)
+            }
+            C::RemoveCoupon {
+                register,
+                side,
+                coupon_id,
+            } => {
+                self.check(register, side, Action::RemoveCoupon)?;
+                let r = self.reg_mut(register)?;
+                let unmatched = r
+                    .txn
+                    .coupon_uses()
+                    .iter()
+                    .find(|(id, _, _)| *id == coupon_id)
+                    .ok_or("クーポンが見つかりません")?
+                    .2
+                    .is_none();
+                let i = r
+                    .txn
+                    .coupons
+                    .iter()
+                    .position(|(id, _)| *id == coupon_id)
+                    .unwrap();
+                let (_, c) = r.txn.coupons.remove(i);
+                r.txn.returned.push((c.name, unmatched));
+                done(format!(
+                    "{}を取り消しました。お客様に返却してください",
+                    c.name
+                ))
+            }
+            C::DismissReturned { register } => {
+                let r = self.reg_mut(register)?;
+                r.txn.returned.clear();
+                done("クーポンの返却の案内を閉じました")
+            }
+            C::DismissConfiscated { register } => {
+                let r = self.reg_mut(register)?;
+                r.txn.confiscated.clear();
+                done("没収の確認を閉じました")
             }
             C::ConfirmBillPayment { register, side } => {
                 self.check(register, side, Action::ConfirmBillPayment)?;
@@ -981,6 +1206,7 @@ impl Store {
                 denomination,
                 count,
             } => self.insert_cash(register, denomination, count),
+            C::FinishInsert { register } => self.finish_insert(register),
             C::TapEmoney { register, method } => {
                 self.check(register, Side::Customer, Action::TapEmoney)?;
                 let r = self.reg_mut(register)?;
@@ -1270,6 +1496,24 @@ impl Store {
                 r.txn.point_card = Some(no);
                 done(format!("ポイントカードを読みました{back}"))
             }
+            Scanned::Coupon(c) => {
+                let id = r.txn.next_line;
+                r.txn.next_line += 1;
+                r.txn.coupons.push((id, c));
+                let waiting = r
+                    .txn
+                    .coupon_uses()
+                    .last()
+                    .is_some_and(|(_, _, u)| u.is_none());
+                done(if waiting {
+                    format!(
+                        "{}を読みました。対象商品を登録すると値引きします{back}",
+                        c.name
+                    )
+                } else {
+                    format!("{}を読みました{back}", c.name)
+                })
+            }
             Scanned::Product(p) if p.needs_staff => {
                 r.txn.push(
                     p,
@@ -1354,6 +1598,50 @@ impl Store {
         ))
     }
 
+    /// 身分証の年齢で判定する。年齢に届かない年確商品は買い物から取り除き、没収の一覧に載せる
+    fn verify_age(&mut self, register: u8, age: u8) -> Result<Outcome, String> {
+        let rules = &self.age_rules;
+        let r = self
+            .registers
+            .iter_mut()
+            .find(|r| r.id == register)
+            .ok_or("レジがありません")?;
+        let mut removed: Vec<(&'static str, u32)> = vec![];
+        r.txn.lines.retain(|l| {
+            let keep = rules.age_for(l.code, l.category).is_none_or(|a| a <= age);
+            if !keep {
+                match removed.iter_mut().find(|(n, _)| *n == l.name) {
+                    Some(e) => e.1 += l.qty,
+                    None => removed.push((l.name, l.qty)),
+                }
+            }
+            keep
+        });
+        r.txn.verified_age = Some(age);
+        r.txn.required_age = r
+            .txn
+            .lines
+            .iter()
+            .filter_map(|l| rules.age_for(l.code, l.category))
+            .max();
+        if r.txn.lines.is_empty() {
+            // すべて取り除いたら登録画面に戻る
+            r.txn.paying = false;
+            r.txn.method = None;
+            r.txn.customer_turn = false;
+        }
+        if removed.is_empty() {
+            return done(format!("{age}歳です。年齢確認が済みました"));
+        }
+        let list = removed
+            .iter()
+            .map(|(n, q)| format!("{n}×{q}"))
+            .collect::<Vec<_>>()
+            .join("・");
+        r.txn.confiscated.extend(removed);
+        done(format!("{age}歳です。販売できない{list}を取り除きました"))
+    }
+
     fn checkout(&mut self, register: u8, side: Side) -> Result<Outcome, String> {
         self.check(register, side, Action::Checkout)?;
         let rules = &self.age_rules;
@@ -1371,12 +1659,16 @@ impl Store {
             .max();
         r.txn.paying = true;
         r.txn.required_age = age;
+        // 済んだ年齢で足りなければ（より厳しい商品を足した等）、年確のやり方の選択からやり直す
+        if !r.txn.age_cleared() {
+            r.txn.age_method = None;
+        }
         // 会計ボタンの後は、まずポイントカードの最終確認。読み取り済みなら確認済み
         r.txn.point_checked = r.txn.point_card.is_some();
         // セミセルフでは、会計に進めたら支払いはお客様に任せる
         r.txn.customer_turn = r.mode == Mode::SemiSelf;
         let ready = r.staff_state() == StaffState::Ready;
-        let pending = r.txn.age_pending();
+        let pending = r.txn.age_choice_pending();
         let mode = r.mode;
         if pending && mode != Mode::Attended && !ready {
             self.calls.raise(
@@ -1392,7 +1684,7 @@ impl Store {
         }
         if pending {
             done(format!(
-                "お客様画面で「{}歳以上です」の確認をお願いします",
+                "{}歳以上の年齢確認があります。店員画面で年齢確認をするか選んでください",
                 age.unwrap_or(0)
             ))
         } else {
@@ -1472,6 +1764,9 @@ impl Store {
         ))
     }
 
+    /// 現金を入れる。会計の確認が済んでいれば、入れただけで支払方法は現金になる
+    /// （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）。
+    /// 投入額は積み上がり、「投入おわり」（[`Command::FinishInsert`]）を押すと決済する。入金ボックスの Enter はその近道
     fn pay_cash(&mut self, register: u8, c: Cash) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         r.txn.method = Some(PaymentMethod::Cash);
@@ -1480,6 +1775,22 @@ impl Store {
         let total = r.txn.total();
         if paid < total {
             return done(format!("{paid}円 投入（あと {}円）", total - paid));
+        }
+        done(format!(
+            "{paid}円 投入。「投入おわり」を押すとお支払いを確定します"
+        ))
+    }
+
+    fn finish_insert(&mut self, register: u8) -> Result<Outcome, String> {
+        self.check(register, Side::Customer, Action::InsertCash)?;
+        let r = self.reg_mut(register)?;
+        let paid = r.txn.inserted.total();
+        if paid == 0 {
+            return Err("お金を入れてください".into());
+        }
+        let total = r.txn.total();
+        if paid < total {
+            return Err(format!("あと {}円 入れてください", total - paid));
         }
         let inserted = r.txn.inserted.clone();
         self.settle(register, PaymentMethod::Cash, paid, inserted)
@@ -1632,8 +1943,10 @@ impl Store {
             mats: self
                 .mats
                 .iter()
-                .map(|m| MatView {
+                .enumerate()
+                .map(|(i, m)| MatView {
                     id: m.id.clone(),
+                    kind: bell_kind(i as u8),
                     buzzing: m.buzzing(now),
                     link_ok: m.rx_ok(now),
                     rings: m.rings,
@@ -1728,6 +2041,21 @@ impl Store {
         };
         let total = t.total();
         let inserted = t.inserted.total();
+        let coupons: Vec<CouponView> = t
+            .coupon_uses()
+            .into_iter()
+            .map(|(id, c, u)| CouponView {
+                id,
+                code: c.code,
+                name: c.name,
+                discount: u.map(|(yen, _)| yen),
+            })
+            .collect();
+        let returned: Vec<ReturnedCoupon> = t
+            .returned
+            .iter()
+            .map(|&(name, unmatched)| ReturnedCoupon { name, unmatched })
+            .collect();
         let calls = self.calls.for_register(r.id);
         let staff_called = !calls.is_empty() && c.staff != StaffState::Ready;
         let waiting = staff_called
@@ -1787,12 +2115,19 @@ impl Store {
                 total,
                 tax8: t.tax_of(TaxRate::Reduced8),
                 tax10: t.tax_of(TaxRate::Standard10),
+                coupons: coupons.clone(),
                 point_card: t.point_card.clone(),
                 required_age: t.required_age.filter(|_| t.paying),
-                age_verified: t.age_verified,
+                age_choice_pending: c.age_choice_pending,
+                confiscated: t
+                    .confiscated
+                    .iter()
+                    .map(|&(name, qty)| Confiscated { name, qty })
+                    .collect(),
                 age_pending: c.age_pending,
                 id_pending: c.id_pending,
-                id_refused: c.id_refused,
+                coupon_unmatched: c.coupon_unmatched,
+                returned: returned.clone(),
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 point_pending: c.point_pending,
                 method: t.method,
@@ -1808,6 +2143,9 @@ impl Store {
             customer: CustomerView {
                 phase: c.phase,
                 lines: customer_lines,
+                coupons,
+                coupon_unmatched: c.coupon_unmatched,
+                returned,
                 total,
                 inserted,
                 due: total.saturating_sub(inserted),
@@ -1867,14 +2205,21 @@ pub struct StaffView {
     pub total: u32,
     pub tax8: u32,
     pub tax10: u32,
+    /// 読み取った引換券・割引券
+    pub coupons: Vec<CouponView>,
     pub point_card: Option<String>,
     pub required_age: Option<u8>,
-    pub age_verified: bool,
+    /// 店員の「年齢確認をする／しない」待ち
+    pub age_choice_pending: bool,
+    /// 年確で販売できず取り除いた商品（店員が没収する）
+    pub confiscated: Vec<Confiscated>,
+    /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
+    pub coupon_unmatched: bool,
+    /// 取り消して、お客様に返却するクーポン
+    pub returned: Vec<ReturnedCoupon>,
     pub age_pending: bool,
-    /// お客様が「X歳以上です」を押し、店員の身分証確認待ち
+    /// 「する」を選び、店員の生年月日の入力待ち
     pub id_pending: bool,
-    /// 身分証を確認できなかった（年確商品を取り消すか取引中止まで決済できない）
-    pub id_refused: bool,
     /// 会計時、お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
@@ -1895,6 +2240,11 @@ pub struct StaffView {
 pub struct CustomerView {
     pub phase: Phase,
     pub lines: Vec<CustomerLine>,
+    pub coupons: Vec<CouponView>,
+    /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
+    pub coupon_unmatched: bool,
+    /// 取り消して、お返しするクーポン
+    pub returned: Vec<ReturnedCoupon>,
     pub total: u32,
     pub inserted: u32,
     pub due: u32,
@@ -1939,10 +2289,39 @@ pub struct RegisterView {
     pub last_receipt: Option<Receipt>,
 }
 
+/// 呼び鈴（Bell）の種類。据え付け型の呼び鈴が主で、携帯型の検品端末の呼び鈴は「あれば便利」。
+/// スタッフが重い端末を常に持ち歩く前提は現実的でない（制服にポケットもない）
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BellKind {
+    /// 据え付け型の呼び鈴（1 台目）
+    Fixed,
+    /// 携帯型の検品端末（2 台目以降）
+    Handheld,
+}
+
+fn bell_kind(i: u8) -> BellKind {
+    if i == 0 {
+        BellKind::Fixed
+    } else {
+        BellKind::Handheld
+    }
+}
+
+/// 1 台目は据え付けの「呼び鈴」、2 台目以降は「検品端末」（2 台以上なら番号を付ける）
+fn bell_name(i: u8) -> String {
+    match i {
+        0 => "呼び鈴".into(),
+        1 => "検品端末".into(),
+        n => format!("検品端末{n}"),
+    }
+}
+
 /// MAT 自身の画面：鳴動と不通表示だけ
 #[derive(Clone, Debug, Serialize)]
 pub struct MatView {
     pub id: String,
+    pub kind: BellKind,
     pub buzzing: bool,
     pub link_ok: bool,
     pub rings: u64,

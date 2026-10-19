@@ -177,10 +177,7 @@ pub const CATALOG: &[Product] = &[
     p("FF01", "チキン（プレーン）", 220, Reduced8, FastFood),
     p("FF02", "チキン（スパイシー）", 220, Reduced8, FastFood),
     p("FF03", "アメリカンドック", 140, Reduced8, FastFood),
-    p("FF06", "ジャイアントフランク", 200, Reduced8, FastFood),
-    p("FF07", "つくね串", 150, Reduced8, FastFood),
     p("FF04", "コロッケ", 110, Reduced8, FastFood),
-    p("FF08", "ハッシュドポテト", 120, Reduced8, FastFood),
     p("FF21", "焼き鳥（モモシオ）", 140, Reduced8, FastFood),
     p("FF22", "焼き鳥（モモタレ）", 140, Reduced8, FastFood),
     p("FF23", "大学芋", 250, Reduced8, FastFood),
@@ -192,13 +189,7 @@ pub const CATALOG: &[Product] = &[
     p("FF35", "アイスコーヒー M", 150, Reduced8, FastFood),
     p("FF36", "アイスコーヒー L", 190, Reduced8, FastFood),
     p("FF37", "ホットカフェラテ S", 180, Reduced8, FastFood),
-    p("FF38", "ホットカフェラテ M", 230, Reduced8, FastFood),
     p("FF39", "アイスカフェラテ S", 180, Reduced8, FastFood),
-    p("FF40", "アイスカフェラテ M", 230, Reduced8, FastFood),
-    p("FF41", "ホットアーモンドラテ S", 200, Reduced8, FastFood),
-    p("FF42", "ホットアーモンドラテ M", 250, Reduced8, FastFood),
-    p("FF43", "アイスアーモンドラテ S", 200, Reduced8, FastFood),
-    p("FF44", "アイスアーモンドラテ M", 250, Reduced8, FastFood),
     p("FF51", "ミルクソフト（コーン）", 300, Reduced8, FastFood),
     p("FF52", "ミルクソフト（カップ）", 300, Reduced8, FastFood),
     p("FF53", "チョコソフト（コーン）", 320, Reduced8, FastFood),
@@ -206,14 +197,11 @@ pub const CATALOG: &[Product] = &[
     p("FF05", "肉まん", 180, Reduced8, FastFood),
     p("FF61", "ピザまん", 190, Reduced8, FastFood),
     p("FF62", "あんまん", 160, Reduced8, FastFood),
+    p("FF63", "カレーまん", 190, Reduced8, FastFood),
     p("FF71", "大根", 100, Reduced8, FastFood),
-    p("FF72", "白滝", 90, Reduced8, FastFood),
     p("FF73", "厚揚げ", 120, Reduced8, FastFood),
     p("FF74", "煮卵", 100, Reduced8, FastFood),
     p("FF75", "牛筋", 150, Reduced8, FastFood),
-    p("FF76", "ウィンナー", 130, Reduced8, FastFood),
-    p("FF77", "はんぺん", 110, Reduced8, FastFood),
-    p("FF78", "結び昆布", 90, Reduced8, FastFood),
 ];
 
 /// FF のタブ（レジ画面の下 1/3）。
@@ -242,14 +230,12 @@ impl FfTab {
 }
 
 /// FF のタブ分けと並び順。各タブの中は売れ筋順で、先頭ページの最上部に売れ筋が来る。
+/// 画面に収めるため各タブ 4 品（1 ページ）。ドリンクだけはページ送りを見せるため 8 品（2 ページ）
 pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF01", FfTab::Fried),
     ("FF02", FfTab::Fried),
     ("FF03", FfTab::Fried),
-    ("FF06", FfTab::Fried),
-    ("FF07", FfTab::Fried),
     ("FF04", FfTab::Fried),
-    ("FF08", FfTab::Fried),
     ("FF21", FfTab::Deli),
     ("FF22", FfTab::Deli),
     ("FF23", FfTab::Deli),
@@ -261,13 +247,7 @@ pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF35", FfTab::Drink),
     ("FF36", FfTab::Drink),
     ("FF37", FfTab::Drink),
-    ("FF38", FfTab::Drink),
     ("FF39", FfTab::Drink),
-    ("FF40", FfTab::Drink),
-    ("FF41", FfTab::Drink),
-    ("FF42", FfTab::Drink),
-    ("FF43", FfTab::Drink),
-    ("FF44", FfTab::Drink),
     ("FF51", FfTab::Cold),
     ("FF52", FfTab::Cold),
     ("FF53", FfTab::Cold),
@@ -275,14 +255,11 @@ pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF05", FfTab::Bun),
     ("FF61", FfTab::Bun),
     ("FF62", FfTab::Bun),
+    ("FF63", FfTab::Bun),
     ("FF71", FfTab::Oden),
-    ("FF72", FfTab::Oden),
     ("FF73", FfTab::Oden),
     ("FF74", FfTab::Oden),
     ("FF75", FfTab::Oden),
-    ("FF76", FfTab::Oden),
-    ("FF77", FfTab::Oden),
-    ("FF78", FfTab::Oden),
 ];
 
 pub fn find(code: &str) -> Option<&'static Product> {
@@ -295,10 +272,7 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF01", 3),
     ("FF02", 2),
     ("FF03", 4),
-    ("FF06", 4),
-    ("FF07", 5),
     ("FF04", 0),
-    ("FF08", 6),
     ("FF21", 6),
     ("FF22", 6),
     ("FF23", 3),
@@ -310,13 +284,7 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF35", 99),
     ("FF36", 99),
     ("FF37", 99),
-    ("FF38", 99),
     ("FF39", 99),
-    ("FF40", 99),
-    ("FF41", 99),
-    ("FF42", 99),
-    ("FF43", 99),
-    ("FF44", 99),
     ("FF51", 20),
     ("FF52", 20),
     ("FF53", 20),
@@ -324,14 +292,11 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF05", 5),
     ("FF61", 3),
     ("FF62", 4),
+    ("FF63", 3),
     ("FF71", 10),
-    ("FF72", 10),
     ("FF73", 10),
     ("FF74", 10),
     ("FF75", 10),
-    ("FF76", 10),
-    ("FF77", 10),
-    ("FF78", 10),
 ];
 
 /// 読み取ったバーコードの種類。
@@ -339,11 +304,58 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
 pub enum Scanned {
     Product(&'static Product),
     PointCard(String),
+    Coupon(&'static Coupon),
     Staff(String),
     Unknown,
 }
 
 pub const POINT_CARD_PREFIX: &str = "PC";
+pub const COUPON_PREFIX: &str = "CP";
+
+/// クーポンの効き方
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "yen")]
+pub enum CouponKind {
+    /// 引換券：対象商品 1 個が無料
+    Exchange,
+    /// 割引券：対象商品 1 個から値引き
+    Discount(u32),
+}
+
+/// 引換券・割引券。商品より先に読んでも、対象商品が登録されたときに効く
+#[derive(Debug, PartialEq, Eq)]
+pub struct Coupon {
+    pub code: &'static str,
+    pub name: &'static str,
+    /// 対象商品のバーコード
+    pub target: &'static str,
+    pub kind: CouponKind,
+}
+
+pub const COUPONS: &[Coupon] = &[
+    Coupon {
+        code: "CP0001",
+        name: "おにぎり 鮭 引換券",
+        target: "4900000000011",
+        kind: CouponKind::Exchange,
+    },
+    Coupon {
+        code: "CP0002",
+        name: "ミックスサンド 50円引き",
+        target: "4900000000028",
+        kind: CouponKind::Discount(50),
+    },
+];
+
+impl Coupon {
+    /// 対象商品 1 個に対する値引き額
+    pub fn discount(&self, price: u32) -> u32 {
+        match self.kind {
+            CouponKind::Exchange => price,
+            CouponKind::Discount(yen) => yen.min(price),
+        }
+    }
+}
 pub const STAFF_PREFIX: &str = "ST";
 
 pub fn classify(code: &str) -> Scanned {
@@ -353,6 +365,12 @@ pub fn classify(code: &str) -> Scanned {
     }
     if let Some(id) = code.strip_prefix(STAFF_PREFIX) {
         return Scanned::Staff(id.to_string());
+    }
+    if code.starts_with(COUPON_PREFIX) {
+        return COUPONS
+            .iter()
+            .find(|c| c.code == code)
+            .map_or(Scanned::Unknown, Scanned::Coupon);
     }
     match find(code) {
         // FF はバーコードでは登録しない（店員操作モードのメニューからのみ）
@@ -365,6 +383,27 @@ pub fn classify(code: &str) -> Scanned {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ff_tabs_fit_one_page_except_drinks() {
+        for tab in [
+            FfTab::Fried,
+            FfTab::Deli,
+            FfTab::Drink,
+            FfTab::Cold,
+            FfTab::Bun,
+            FfTab::Oden,
+        ] {
+            let n = FF_MENU.iter().filter(|(_, t)| *t == tab).count();
+            assert_eq!(n, if tab == FfTab::Drink { 8 } else { 4 }, "{tab:?}");
+        }
+        for (code, _) in FF_MENU {
+            assert!(
+                find(code).is_some() && INITIAL_FF_STOCK.iter().any(|(c, _)| c == code),
+                "{code}"
+            );
+        }
+    }
 
     #[test]
     fn classifies_every_kind_of_barcode() {

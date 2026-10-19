@@ -9,6 +9,7 @@
 
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { Command, Snapshot } from "./types";
+import type { GuideKind } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 import {
   esc,
@@ -16,6 +17,8 @@ import {
   type FfUi,
   itemsPanel,
   screenHead,
+  isoDate,
+  scanGuide,
   matPanel,
   ownerPanel,
   shelfPanel,
@@ -48,7 +51,8 @@ function bytesFromB64(b64: string): Uint8Array {
 async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
-  reset(2, 1);
+  // 呼び鈴は据え付け型 1 台と、携帯型の検品端末 1 台
+  reset(2, 2);
   setupDrag();
   window.setInterval(frame, 100);
 }
@@ -120,8 +124,8 @@ function buildSkeleton(): void {
     </header>
     <article class="floor">
       <div class="left">
-        <section class="mat-area" aria-label="携帯情報端末">
-          <h2>携帯情報端末（MAT）</h2>
+        <section class="mat-area" aria-label="Bell（呼び鈴）">
+          <h2>Bell</h2>
           <div class="mats" data-region="mats"></div>
           <div class="toast" id="toast-store"></div>
         </section>
@@ -232,6 +236,14 @@ function render(): void {
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
     );
+    // おつりなど、出金ボックスにお金があれば枠と文字を点滅させる
+    app.querySelector(`[data-outlet="${r.id}"]`)?.classList.toggle("blink", r.outlet > 0);
+    // 入金ボックス：支払方法が決まったら中の文字を点滅させる。現金は投入額を積み上げて見せる
+    const inlet = app.querySelector<HTMLInputElement>(`[data-inlet="${r.id}"]`);
+    if (inlet) {
+      inlet.classList.toggle("blink", !r.menu && r.staff.phase === "paying" && r.staff.method !== null);
+      if (!inlet.dataset.typed) inlet.value = !r.menu && r.staff.inserted ? String(r.staff.inserted) : "";
+    }
   }
   setRegion("mats", matPanel(snap));
   setRegion("owner", ownerPanel(snap));
@@ -296,11 +308,13 @@ function send(cmd: Command): boolean {
   // 画面を指定しないコマンドの知らせは、そのレジの操作側の画面に出す
   const active = typeof cmd.register === "number" && !cmd.side ? snap.registers.find((x) => x.id === cmd.register)?.active_side : undefined;
   const side = sideOf(cmd) === "store" ? "store" : (active ?? sideOf(cmd));
-  const where = cmd.type === "set_product_age" ? "toast-rules" : ["cash_in", "cash_out", "open_menu", "insert", "take_outlet"].includes(cmd.type) ? `toast-${cmd.register}-customer` : side === "store" ? "toast-store" : `toast-${cmd.register}-${side}`;
+  const where = cmd.type === "set_product_age" ? "toast-rules" : ["cash_in", "cash_out", "open_menu", "insert", "finish_insert", "take_outlet"].includes(cmd.type) ? `toast-${cmd.register}-customer` : side === "store" ? "toast-store" : `toast-${cmd.register}-${side}`;
   if (res.ok) {
     if (res.message) toast(where, res.message, false);
   } else {
     toast(where, res.error ?? "操作できません", true);
+    // 買い物点数の上限は表示エリアに合わせたシミュレーターだけの制約（実際のシステムでは起きない）
+    if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
   }
   // スキャナーと FF 登録の音（読めたら「ピッ」、受け付けられなければ「ブッブー」）
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok ? beepScan : beepError)();
@@ -327,6 +341,9 @@ function form(b: HTMLElement): void {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
       break;
+    case "birth":
+      send({ type: "check_id", register: reg, side: "staff", birth: val(`birth-${reg}`), today: isoDate(new Date()) });
+      break;
     case "cashout":
       send({
         type: "cash_out",
@@ -343,13 +360,34 @@ function form(b: HTMLElement): void {
 // 投入口：数字だけを受け付け、Enter で入れる
 app.addEventListener("input", (e) => {
   const el = e.target as HTMLInputElement;
-  if (el.dataset.inlet) el.value = el.value.replace(/[^0-9０-９]/g, "");
+  if (el.dataset.inlet) {
+    el.value = el.value.replace(/[^0-9０-９]/g, "");
+    el.dataset.typed = "1";
+  }
+  // 生年月日：西暦 8 桁。全角の数字は半角に直す
+  if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
+});
+app.addEventListener("keydown", (e) => {
+  const el = e.target as HTMLInputElement;
+  if (!el.dataset?.birth || e.key !== "Enter" || e.isComposing) return;
+  el.closest(".id-head")?.querySelector<HTMLButtonElement>('[data-form="birth"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.inlet || e.key !== "Enter" || e.isComposing) return;
   const amount = Number(el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)) || 0);
-  if (send({ type: "insert", register: Number(el.dataset.inlet), amount })) el.value = "";
+  const register = Number(el.dataset.inlet);
+  const r = snap.registers.find((x) => x.id === register);
+  delete el.dataset.typed;
+  // 店舗メニューの入金・両替は、打ち込んだ金額をそのまま入れる
+  if (r?.menu) {
+    if (send({ type: "insert", register, amount })) el.value = "";
+    return;
+  }
+  // お会計：箱の金額が投入額。打ち込んで増やした分を入れてから、Enter で投入を終えて決済する
+  const extra = amount - (r?.staff.inserted ?? 0);
+  if (extra > 0 && !send({ type: "insert", register, amount: extra })) return;
+  send({ type: "finish_insert", register });
 });
 
 app.addEventListener("change", (e) => {
@@ -412,6 +450,15 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.outlet) {
     send({ type: "take_outlet", register: Number(b.dataset.outlet) });
+    return;
+  }
+  if (b.dataset.guide) {
+    // 初期画面の案内ボタン：もう一度押すと閉じる
+    const [reg, side, kind] = b.dataset.guide.split(":");
+    const key = `${reg}:${side}`;
+    if (scanGuide.get(key) === kind) scanGuide.delete(key);
+    else scanGuide.set(key, kind as GuideKind);
+    frame();
     return;
   }
   if (b.dataset.cmd) {

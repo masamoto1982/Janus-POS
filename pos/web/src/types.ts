@@ -18,6 +18,21 @@ export type LineKind =
   | { kind: "ff"; state: FfState }
   | { kind: "service"; done: boolean; confirm_pending: boolean };
 
+/** 読み取ったクーポン。discount が null なら対象商品の登録待ち */
+export interface Coupon {
+  /** 取消に使う番号 */
+  id: number;
+  code: string;
+  name: string;
+  discount: number | null;
+}
+
+/** 取り消して返すクーポン（unmatched は適用先がなかったもの） */
+export interface Returned {
+  name: string;
+  unmatched: boolean;
+}
+
 export type StaffLine = LineKind & {
   id: number;
   code: string;
@@ -61,14 +76,20 @@ export interface StaffView {
   total: number;
   tax8: number;
   tax10: number;
+  coupons: Coupon[];
   point_card: string | null;
   required_age: number | null;
-  age_verified: boolean;
+  /** 店員の「年齢確認をする／しない」待ち */
+  age_choice_pending: boolean;
+  /** 年確で販売できず取り除いた商品（店員が没収する） */
+  confiscated: { name: string; qty: number }[];
+  /** 会計に進んだが、適用先のないクーポンが残っている（決済できない） */
+  coupon_unmatched: boolean;
+  /** 取り消して、お客様に返却するクーポン */
+  returned: Returned[];
   age_pending: boolean;
-  /** お客様が「X歳以上です」を押し、店員の身分証確認待ち */
+  /** 「する」を選び、店員の生年月日の入力待ち */
   id_pending: boolean;
-  /** 身分証を確認できなかった（年確商品を取り消すか取引中止まで決済できない） */
-  id_refused: boolean;
   /** 会計時、お客様の確認待ちの代行収納の金額 */
   bill_check: number | null;
   point_pending: boolean;
@@ -86,6 +107,9 @@ export interface StaffView {
 export interface CustomerView {
   phase: Phase;
   lines: CustomerLine[];
+  coupons: Coupon[];
+  coupon_unmatched: boolean;
+  returned: Returned[];
   total: number;
   inserted: number;
   due: number;
@@ -138,7 +162,7 @@ export interface AgeRule {
 export interface Snapshot {
   now: number;
   registers: RegisterView[];
-  mats: { id: string; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean }[];
+  mats: { id: string; kind: "fixed" | "handheld"; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean }[];
   mat_links: { id: string; link_ok: boolean; acked_seq: number; sent: number; retries: number }[];
   bell: { seq: number; held: number; presses: number };
   calls: Call[];

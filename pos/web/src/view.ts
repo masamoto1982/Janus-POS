@@ -4,6 +4,8 @@
 
 import type {
   ActionState,
+  Coupon,
+  Returned,
   Command,
   CustomerView,
   FfState,
@@ -65,18 +67,15 @@ const METHODS = ["cash", "emoney", "qr", "credit"] as const;
 type Side = "staff" | "customer";
 
 /** 支払いが終わった後のお礼とおつり */
-function thanks(r: RegisterView): string {
-  const rc = r.last_receipt!;
-  const change = rc.change.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join("　");
-  return `<div class="thanks">
-      <div class="big">ありがとうございました</div>
-      <div>お支払い ${yen(rc.total)}（${esc(rc.method)}）</div>
-      ${rc.change_total ? `<div class="change">おつり <b>${yen(rc.change_total)}</b><div class="muted">${change}</div><div class="muted">紙幣と硬貨はそろえてお返しします</div></div>` : ""}
-      ${rc.point_card ? `<div>ポイント ${rc.points}pt を付与しました</div>` : ""}
-    </div>`;
+/**
+ * 決済後の画面。3 秒（core THANKS_MS）で新しいお客様の待ち受けに戻る。
+ * 買った商品や持ち物の忘れ物はセルフレジで起こりがちなので、二行目で注意を促す
+ */
+function thanks(): string {
+  return `<div class="thanks"><div class="big">ありがとうございました</div><div>お忘れ物にご注意ください</div></div>`;
 }
 
-/** 年齢確認ボタン（例外：お客様側の画面からしか押せない） */
+/** 年齢確認ボタン（店員が「しない」を選んだとき。例外：お客様側の画面からしか押せない） */
 function ageCard(reg: number, age: number, st: ActionState): string {
   return `<div class="card age-card customer-only">
       <div class="big">年齢確認</div>
@@ -84,6 +83,11 @@ function ageCard(reg: number, age: number, st: ActionState): string {
       ${btn(`${age}歳以上です`, { type: "confirm_age", register: reg }, st, "primary big-btn")}
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
+}
+
+/** 日付を YYYY-MM-DD で（レジの日付として生年月日の判定に使う） */
+export function isoDate(t: Date): string {
+  return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
 /** 和暦（その日付の元号）。元年は「元年」と書く */
@@ -120,24 +124,36 @@ export function ageChart(age: number, today: Date = new Date()): string {
 }
 
 /**
- * 店員側の身分証確認（例外：店員側の画面からしか押せない）。お客様が「X歳以上です」を
- * 押すまでは押せない。早見表を添える
+ * 店員側の年齢確認（例外：店員側の画面からしか押せない）。まず「する／しない」を選び、
+ * 「する」なら身分証の生年月日を入力して判定する。早見表を添える
  */
-function idCard(reg: number, age: number, v: StaffView, st: ActionState): string {
-  if (v.id_refused) {
-    return `<div class="card id-card refused">
-        <div class="big">身分証を確認できませんでした</div>
-        <p>年確商品（${age}歳以上）は販売できません。商品を取り消すか、取引を中止してください。</p>
-      </div>`;
+function idCard(reg: number, age: number, v: StaffView, a: (n: string) => ActionState): string {
+  const choose = (idCheck: boolean, label: string, cls = "") =>
+    btn(label, { type: "choose_age_check", register: reg, side: "staff", id_check: idCheck }, a("choose_age_check"), cls);
+  let body: string;
+  if (v.age_choice_pending) {
+    body = `<div class="id-head"><b>${age}歳以上の年齢確認をしますか？</b>${choose(true, "する", "primary")}${choose(false, "しない")}</div>
+      <p>「する」：身分証の生年月日を入力して判定します。「しない」：お客様が「${age}歳以上です」を押します。</p>`;
+  } else if (v.id_pending) {
+    const st = a("check_id");
+    body = `<div class="id-head"><b>身分証の生年月日（西暦8桁）</b>
+        <input type="text" inputmode="numeric" maxlength="8" placeholder="例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
+        <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
+        ${choose(false, "しないに変更", "small ghost")}</div>
+      <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;
+  } else {
+    body = `<div class="id-head"><b>お客様の「${age}歳以上です」を待っています</b>${choose(true, "身分証で確認する", "small")}</div>`;
   }
-  return `<div class="card id-card staff-only">
-      <div class="id-head">
-        <b>身分証で${age}歳以上を確認しましたか？</b>
-        ${btn("はい", { type: "check_id", register: reg, side: "staff", ok: true }, st, "primary")}
-        ${btn("いいえ", { type: "check_id", register: reg, side: "staff", ok: false }, st)}
-      </div>
-      ${v.age_pending ? `<p class="muted">お客様が「${age}歳以上です」を押すと答えられます</p>` : ""}
-      ${ageChart(age)}
+  return `<div class="card id-card staff-only">${body}${ageChart(age)}</div>`;
+}
+
+/** 年確で販売できず取り除いた商品。店員がお客様から引き取る（没収する） */
+function confiscatedCard(reg: number, v: StaffView): string {
+  if (!v.confiscated.length) return "";
+  const items = v.confiscated.map((c) => `<li><b>${esc(c.name)}</b> × ${c.qty}</li>`).join("");
+  return `<div class="card id-card refused staff-only">
+      <div class="id-head"><b>販売できない商品を没収してください</b>${btn("没収しました", { type: "dismiss_confiscated", register: reg }, undefined, "small")}</div>
+      <ul class="confiscated">${items}</ul>
     </div>`;
 }
 
@@ -155,10 +171,23 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 }
 
 /** 支払方法を選んだ後の案内 */
-function payHint(method: string | null, blocker: string | null): string {
+function payHint(method: string | null, blocker: string | null, inserted: number): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
-  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、お客様側の端末にかざしてください</p>`;
-  return `<p>現金を投入してください（または支払方法を選んでください）</p>`;
+  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
+  if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
+  if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
+  return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
+}
+
+/**
+ * 支払方法の選択肢。現金は入れただけで支払方法が現金に決まるので、入れた後は出さない
+ * （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）
+ */
+function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = ""): string {
+  if (method === "cash" && inserted) return "";
+  return `<div class="row wrap ${cls}">${METHODS
+    .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, st, `seg ${method === m ? "on" : ""}`))
+    .join("")}</div>`;
 }
 
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
@@ -218,16 +247,96 @@ function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => Action
   const age = v.required_age;
   if (!age) return "";
   if (side === "customer") return v.age_pending ? ageCard(reg, age, a("confirm_age")) : "";
-  return v.age_pending || v.id_pending || v.id_refused ? idCard(reg, age, v, a("check_id")) : "";
+  return v.age_choice_pending || v.age_pending || v.id_pending ? idCard(reg, age, v, a) : "";
 }
 
 function ageStatus(v: StaffView): string {
   if (!v.required_age) return "不要";
   const age = v.required_age;
+  if (v.age_choice_pending) return `<b class="warn">${age}歳以上：店員が確認方法を選んでいます</b>`;
   if (v.age_pending) return `<b class="warn">${age}歳以上：お客様の確認待ち</b>`;
-  if (v.id_pending) return `<b class="warn">${age}歳以上：身分証の確認待ち</b>`;
-  if (v.id_refused) return `<b class="warn">${age}歳以上：販売できません</b>`;
+  if (v.id_pending) return `<b class="warn">${age}歳以上：身分証の確認中</b>`;
   return `<span class="ok">確認済</span>`;
+}
+
+/** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい） */
+export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState): string {
+  return coupons
+    .map(
+      (c) =>
+        `<tr class="coupon"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
+          c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
+        }</td><td>${removeCoupon(reg, side, c, st)}</td></tr>`,
+    )
+    .join("");
+}
+
+function removeCoupon(reg: number, side: Side, c: Coupon, st: ActionState): string {
+  return btn("取消", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small ghost");
+}
+
+/**
+ * 会計に進んだのに、適用先（対象商品）のないクーポンが残っているときの注意。
+ * クーポンで安く買うつもりの商品が似て非なる商品だった、という事故を防ぐため、
+ * 対象商品を登録するかクーポンを取り消すまで決済できない
+ */
+export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: ActionState): string {
+  const list = coupons
+    .filter((c) => c.discount === null)
+    .map((c) => `<li><b>${esc(c.name)}</b> ${removeCoupon(reg, side, c, st)}</li>`)
+    .join("");
+  const [head, body] =
+    side === "staff"
+      ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください。対象商品を登録するか、クーポンを取り消すまで決済できません"]
+      : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください。対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
+  return `<div class="card coupon-card"><b>${head}</b><p>${body}</p><ul class="coupon-list">${list}</ul></div>`;
+}
+
+/**
+ * 取り消したクーポンの返却。店員側には返却を促し、お客様側にはお返しする旨を案内する。
+ * done はこの画面で案内を閉じるボタン（有人モードのお客様側は、店員の「返却しました」で閉じる）
+ */
+export function returnedCard(reg: number, side: Side, returned: Returned[], done: boolean): string {
+  if (!returned.length) return "";
+  const list = returned.map((c) => `<li><b>${esc(c.name)}</b></li>`).join("");
+  const head =
+    side === "staff"
+      ? "取り消したクーポンをお客様に返却してください"
+      : returned.every((c) => c.unmatched)
+        ? "適用先のなかったクーポンをお返しします"
+        : "取り消したクーポンをお返しします";
+  const label = side === "staff" ? "返却しました" : "受け取りました";
+  return `<div class="card coupon-card returned"><div class="id-head"><b>${head}</b>${
+    done ? btn(label, { type: "dismiss_returned", register: reg }, undefined, "small") : ""
+  }</div><ul class="coupon-list">${list}</ul></div>`;
+}
+
+/** 初期画面のボタンで選んだ案内（レジ:画面 → 種類）。選ばなくても、どのバーコードでも読める */
+export const scanGuide = new Map<string, GuideKind>();
+export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon";
+const GUIDES: [GuideKind, string, string][] = [
+  ["item", "商品", "商品のバーコードをスキャンしてください"],
+  ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
+  ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
+  ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
+  ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
+];
+
+/**
+ * 初期画面。慣れた人はそのままスキャンし、不慣れな人はボタンで何を読むか選んで案内を見る
+ * （自由度がなさすぎても、ありすぎても人は迷う）
+ */
+export function welcome(reg: number, side: Side): string {
+  const on = scanGuide.get(`${reg}:${side}`);
+  const guide = GUIDES.find(([k]) => k === on);
+  return `<div class="welcome">
+      <div class="big">バーコードをスキャンしてください</div>
+      <p>すべてのバーコードを受け付けます</p>
+      <div class="guide-row">${GUIDES.map(
+        ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
+      ).join("")}</div>
+      ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
+    </div>`;
 }
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
@@ -236,9 +345,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
-  if (r.last_receipt && !v.lines.length) return notice + thanks(r);
+  if (r.last_receipt && !v.lines.length) return notice + thanks();
   // 新しく登録した商品ほど上に出す
-  const rows = [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
+  const rows = couponRows(reg, side, v.coupons, a("remove_coupon")) + [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
   const paying = v.phase === "paying";
 
   // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる
@@ -248,10 +357,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
         <div>年確：${ageStatus(v)}</div>
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
-        <div class="row wrap">${METHODS
-          .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${v.method === m ? "on" : ""}`))
-          .join("")}</div>
-        ${payHint(v.method, v.payment_blocker)}
+        ${methodRow(reg, side, v.method, v.inserted, a("select_payment"))}
+        ${payHint(v.method, v.payment_blocker, v.inserted)}
       </div>`
     : "";
 
@@ -260,7 +367,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     v.total,
     itemCount(v.lines),
     paying
-      ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
+      ? v.method === "cash"
+        ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
+        : btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
       : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
     r.max_items,
   );
@@ -269,7 +378,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
     </div>
-    ${pay}
+    ${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
+      v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon")) : ""
+    }${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
@@ -288,6 +399,21 @@ function pointCheck(reg: number, side: Side, st: ActionState): string {
  * 登録画面の最上部に固定する帯：左から買い物点数・合計金額・会計ボタン。
  * 商品登録が一つもないときは出さない（案内を広く見せる）。
  */
+/**
+ * 現金払いのときだけ、会計ボタンの位置が「投入おわり」に切り替わる。
+ * 入金ボックスで Enter を押すのは、このボタンを押す近道
+ */
+function finishInsert(reg: number, inserted: number, due: number, st: ActionState): string {
+  const ready: ActionState = !st.allowed
+    ? st
+    : !inserted
+      ? { ...st, allowed: false, reason: "お金を入れてください" }
+      : due > 0
+        ? { ...st, allowed: false, reason: `あと ${yen(due)} 入れてください` }
+        : st;
+  return btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary");
+}
+
 export function regTop(total: number, count: number, action: string, max = Infinity): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
@@ -342,7 +468,7 @@ export const FF_TABS = [
   ["bun", "中華まん"],
   ["oden", "おでん"],
 ] as const;
-export const FF_PER_PAGE = 8;
+export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
@@ -460,7 +586,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
-  if (r.last_receipt && !c.lines.length) return notice + thanks(r);
+  if (r.last_receipt && !c.lines.length) return notice + thanks();
 
 
   // 新しく登録した商品ほど上に出す
@@ -484,49 +610,46 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     itemCount(c.lines),
     c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
-      : btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost"),
+      : c.method === "cash"
+        ? finishInsert(reg, c.inserted, c.due, a("insert_cash"))
+        : btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost"),
     r.max_items,
   );
 
-  if (!c.lines.length) {
-    return `${top}${notice}<div class="welcome">
-      <div class="big">バーコードをスキャンしてください。</div>
-      <p>商品、レジ袋、ポイントカード、お支払い、すべてのバーコードを受け付けます。</p>
-    </div>`;
-  }
+  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side)}`;
+  scanGuide.delete(`${reg}:${side}`);
 
   let pay = "";
   if (c.phase === "paying") {
     const age =
       (c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "") +
       (c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "");
-    const methods = `<div class="row center wrap">${METHODS
-      .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${c.method === m ? "on" : ""}`))
-      .join("")}</div>`;
+    const methods = methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center");
     pay = c.point_pending
       ? `${pointCheck(reg, side, a("confirm_point_card"))}${age}`
       : `${age}<div class="paybox center">
         <div>お支払い <b class="total">${yen(c.total)}</b></div>
         ${c.inserted ? `<div>お預かり ${yen(c.inserted)}　残り <b>${yen(c.due)}</b></div>` : ""}
-        ${methods}${payHint(c.method, c.payment_blocker)}
+        ${methods}${payHint(c.method, c.payment_blocker, c.inserted)}
       </div>`;
   }
 
   return `${top}${notice}
+    ${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}
     ${pay}
-    <table class="lines"><tbody>${rows}</tbody></table>
+    <table class="lines"><tbody>${couponRows(reg, side, c.coupons, a("remove_coupon"))}${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
 }
 
 // ---------------------------------------------------------------------------
-// MAT・店舗の設定
+// Bell（呼び鈴：据え付け型と携帯型の検品端末）・店舗の設定
 // ---------------------------------------------------------------------------
 
 export function matPanel(s: Snapshot): string {
   return s.mats
     .map(
       (m) => `<div class="mat ${m.buzzing ? "buzz" : ""}">
-        <span class="bell">🔔</span><span class="mat-id">${esc(m.id)}</span><span class="mat-state">${m.buzzing ? "鳴動中" : "待機"}</span>
+        <span class="bell">${m.kind === "fixed" ? "🔔" : "📱"}</span><span class="mat-id">${esc(m.id)}</span><span class="mat-kind">${m.kind === "fixed" ? "据え付け" : "携帯"}</span><span class="mat-state">${m.buzzing ? "鳴動中" : "待機"}</span>
       </div>`,
     )
     .join("");
@@ -616,6 +739,9 @@ export function walletPanel(): string {
   const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "硬貨", "coin"));
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
+    item("PC87654321", "ポイントアプリ", "スマホ", "card"),
+    item("CP0001", "おにぎり 鮭", "引換券", "coupon"),
+    item("CP0002", "ミックスサンド", "50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
     walletItem("pay:emoney", "電子マネー", "端末にかざす", "pay"),

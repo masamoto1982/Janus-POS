@@ -86,6 +86,61 @@ function ageCard(reg: number, age: number, st: ActionState): string {
     </div>`;
 }
 
+/** 和暦（その日付の元号）。元年は「元年」と書く */
+export function wareki(y: number, m: number, d: number): string {
+  const ymd = y * 10000 + m * 100 + d;
+  const [era, start] =
+    ymd >= 20190501 ? ["令和", 2019] : ymd >= 19890108 ? ["平成", 1989] : ymd >= 19261225 ? ["昭和", 1926] : ["大正", 1912];
+  const n = y - start + 1;
+  return `${era}${n === 1 ? "元" : n}年`;
+}
+
+/**
+ * 年確早見表。今日ちょうど age 歳になる生まれ年を中心に、前後 2 年（計 5 年）を並べる。
+ * その年の今日の日付以前に生まれていれば age 歳以上
+ */
+export function ageChart(age: number, today: Date = new Date()): string {
+  const ty = today.getFullYear();
+  const m = today.getMonth() + 1;
+  const d = today.getDate();
+  const y0 = ty - age;
+  const rows = [-2, -1, 0, 1, 2]
+    .map((k) => {
+      const y = y0 + k;
+      const verdict =
+        k < 0 ? `<span class="ok">購入できます</span>` : k === 0 ? `<b>${m}月${d}日以前の生まれなら購入できます</b>` : `<span class="warn">購入できません</span>`;
+      return `<tr class="${k === 0 ? "edge" : ""}"><td>${y}年（${wareki(y, m, d)}）</td><td>${ty - y - 1}〜${ty - y}歳</td><td>${verdict}</td></tr>`;
+    })
+    .join("");
+  return `<table class="age-chart">
+      <caption>年確早見表（${ty}年${m}月${d}日：${y0}年（${wareki(y0, m, d)}）${m}月${d}日以前の生まれが${age}歳以上）</caption>
+      <thead><tr><th>生まれ年</th><th>今日の年齢</th><th>判定</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+/**
+ * 店員側の身分証確認（例外：店員側の画面からしか押せない）。お客様が「X歳以上です」を
+ * 押すまでは押せない。早見表を添える
+ */
+function idCard(reg: number, age: number, v: StaffView, st: ActionState): string {
+  if (v.id_refused) {
+    return `<div class="card id-card refused">
+        <div class="big">身分証を確認できませんでした</div>
+        <p>年確商品（${age}歳以上）は販売できません。商品を取り消すか、取引を中止してください。</p>
+      </div>`;
+  }
+  return `<div class="card id-card staff-only">
+      <div class="id-head">
+        <b>身分証で${age}歳以上を確認しましたか？</b>
+        ${btn("はい", { type: "check_id", register: reg, side: "staff", ok: true }, st, "primary")}
+        ${btn("いいえ", { type: "check_id", register: reg, side: "staff", ok: false }, st)}
+      </div>
+      ${v.age_pending ? `<p class="muted">お客様が「${age}歳以上です」を押すと答えられます</p>` : ""}
+      ${ageChart(age)}
+    </div>`;
+}
+
 /**
  * 代行収納の支払い内容・金額の確認。年確と同じく、お客様本人がお客様側の画面で押す
  * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
@@ -158,6 +213,23 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
 }
 
+/** 会計時の年確。お客様側は「X歳以上です」、店員側は身分証の確認（はい・いいえ）と早見表 */
+function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
+  const age = v.required_age;
+  if (!age) return "";
+  if (side === "customer") return v.age_pending ? ageCard(reg, age, a("confirm_age")) : "";
+  return v.age_pending || v.id_pending || v.id_refused ? idCard(reg, age, v, a("check_id")) : "";
+}
+
+function ageStatus(v: StaffView): string {
+  if (!v.required_age) return "不要";
+  const age = v.required_age;
+  if (v.age_pending) return `<b class="warn">${age}歳以上：お客様の確認待ち</b>`;
+  if (v.id_pending) return `<b class="warn">${age}歳以上：身分証の確認待ち</b>`;
+  if (v.id_refused) return `<b class="warn">${age}歳以上：販売できません</b>`;
+  return `<span class="ok">確認済</span>`;
+}
+
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
   if (r.menu) return notice + storeMenu(r);
@@ -173,8 +245,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const pay = paying && v.point_pending
     ? pointCheck(reg, side, a("confirm_point_card"))
     : paying
-    ? `${v.age_pending ? ageCard(reg, v.required_age ?? 0, a("confirm_age")) : ""}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
-        <div>年確：${v.required_age ? (v.age_pending ? `<b class="warn">${v.required_age}歳以上の確認待ち</b>` : `<span class="ok">確認済</span>`) : "不要"}</div>
+    ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
+        <div>年確：${ageStatus(v)}</div>
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
         <div class="row wrap">${METHODS
           .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${v.method === m ? "on" : ""}`))

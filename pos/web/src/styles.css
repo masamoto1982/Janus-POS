@@ -306,6 +306,17 @@ body.dragging .drop-hint { display: inline; }
    どちらが操作側でも押せる。係員側では押せない */
 .customer-screen.inactive [data-region] .customer-only button { pointer-events: auto; filter: none; opacity: 1; }
 .staff-screen .customer-only button { pointer-events: none; filter: grayscale(1); opacity: .45; }
+/* 身分証の確認は店員本人が行う：店員側の画面でだけ押せる */
+.staff-screen.inactive [data-region] .staff-only button:not(:disabled) { pointer-events: auto; filter: none; opacity: 1; }
+.id-card { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; }
+.id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
+.id-head button { min-width: 64px; }
+.id-card p { margin: 4px 0 0; font-size: 11px; }
+.id-card.refused { background: var(--danger-bg); color: var(--danger); }
+.age-chart { width: 100%; margin: 6px 0 0; border-collapse: collapse; font-size: 11px; color: var(--ink); background: var(--panel); }
+.age-chart caption { font-size: 11px; padding-bottom: 4px; color: inherit; }
+.age-chart th, .age-chart td { border: 1px solid var(--line); padding: 1px 6px; text-align: left; }
+.age-chart tr.edge td { background: var(--warn-bg); }
 
 /* 店員画面に映すお客様画面の内容 */
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }

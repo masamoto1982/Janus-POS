@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
-    active_side, is_customer_only, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
-    StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
+    active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
+    StaffState, ACTIONS, ID_REFUSED, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
@@ -158,6 +158,13 @@ pub enum Command {
         #[serde(default = "customer_side")]
         side: Side,
     },
+    /// 身分証の確認（はい・いいえ）。店員側の画面からしか押せない
+    CheckId {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+        ok: bool,
+    },
     /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない
     ConfirmBillPayment {
         register: u8,
@@ -278,6 +285,7 @@ impl Command {
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
             | C::ConfirmAge { register, .. }
+            | C::CheckId { register, .. }
             | C::ConfirmBillPayment { register, .. }
             | C::InsertCash { register, .. }
             | C::TapEmoney { register, .. }
@@ -390,7 +398,12 @@ struct Txn {
     point_card: Option<String>,
     /// 会計ボタンの時点で求められた年齢（年確不要なら None）
     required_age: Option<u8>,
+    /// お客様が「X歳以上です」を押した
+    age_declared: bool,
+    /// 店員が身分証を確認した（「はい」）。年確はこれで済む
     age_verified: bool,
+    /// 店員が身分証を確認できなかった（「いいえ」）。取引中止まで残る
+    id_refused: bool,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
@@ -448,8 +461,23 @@ impl Txn {
         Some(pending.map(Line::amount).sum())
     }
 
+    /// お客様の「X歳以上です」待ち
     fn age_pending(&self) -> bool {
-        self.paying && self.required_age.is_some() && !self.age_verified
+        self.paying && self.required_age.is_some() && !self.age_declared && !self.age_verified
+    }
+
+    /// 店員の身分証確認待ち
+    fn id_pending(&self) -> bool {
+        self.paying
+            && self.required_age.is_some()
+            && self.age_declared
+            && !self.age_verified
+            && !self.id_refused
+    }
+
+    /// 身分証を確認できず、年確商品が残っている
+    fn id_refused(&self) -> bool {
+        self.paying && self.required_age.is_some() && self.id_refused
     }
 
     /// 買い物点数（数量の合計）
@@ -560,6 +588,8 @@ impl Register {
             staff: self.staff_state(),
             has_lines: !t.lines.is_empty(),
             age_pending: t.age_pending(),
+            id_pending: t.id_pending(),
+            id_refused: t.id_refused(),
             ff_waiting: t.any_ff(FfState::Waiting),
             has_ff: t
                 .lines
@@ -911,10 +941,24 @@ impl Store {
             C::ConfirmAge { register, side } => {
                 self.check(register, side, Action::ConfirmAge)?;
                 let r = self.reg_mut(register)?;
-                r.txn.age_verified = true;
+                r.txn.age_declared = true;
                 let age = r.txn.required_age.unwrap_or(0);
+                done(format!(
+                    "お客様が{age}歳以上と答えました。店員が身分証を確認してください"
+                ))
+            }
+            C::CheckId { register, side, ok } => {
+                self.check(register, side, Action::CheckId)?;
                 self.calls.resolve(register, CallKind::AgeCheck, self.now);
-                done(format!("{age}歳以上であることを確認しました"))
+                let r = self.reg_mut(register)?;
+                let age = r.txn.required_age.unwrap_or(0);
+                if ok {
+                    r.txn.age_verified = true;
+                    done(format!("身分証で{age}歳以上であることを確認しました"))
+                } else {
+                    r.txn.id_refused = true;
+                    done(ID_REFUSED)
+                }
             }
             C::ConfirmBillPayment { register, side } => {
                 self.check(register, side, Action::ConfirmBillPayment)?;
@@ -1671,12 +1715,8 @@ impl Store {
         let actions = |side: Side, list: &[Action]| {
             list.iter()
                 .map(|&a| {
-                    // 年齢確認ボタンだけは、どちらが操作側でもお客様側の画面で押す
-                    let side = if is_customer_only(a) {
-                        Side::Customer
-                    } else {
-                        side
-                    };
+                    // 年齢確認・身分証確認などは、どちらが操作側でも決まった側の画面で押す
+                    let side = fixed_side(a).unwrap_or(side);
                     let res = permitted(side, a, &c);
                     ActionState {
                         action: a,
@@ -1751,6 +1791,8 @@ impl Store {
                 required_age: t.required_age.filter(|_| t.paying),
                 age_verified: t.age_verified,
                 age_pending: c.age_pending,
+                id_pending: c.id_pending,
+                id_refused: c.id_refused,
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 point_pending: c.point_pending,
                 method: t.method,
@@ -1829,6 +1871,10 @@ pub struct StaffView {
     pub required_age: Option<u8>,
     pub age_verified: bool,
     pub age_pending: bool,
+    /// お客様が「X歳以上です」を押し、店員の身分証確認待ち
+    pub id_pending: bool,
+    /// 身分証を確認できなかった（年確商品を取り消すか取引中止まで決済できない）
+    pub id_refused: bool,
     /// 会計時、お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）

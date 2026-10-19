@@ -103,6 +103,8 @@ pub enum Action {
     /// 会計時のポイントカードの最終確認（「ポイントカードなしで進む」）
     ConfirmPointCard,
     ConfirmAge,
+    /// 身分証の確認（店員が「はい」「いいえ」で答える。お客様の「X歳以上です」の後）
+    CheckId,
     /// 代行収納の支払い内容・金額の確認（お客様の承認）
     ConfirmBillPayment,
     InsertCash,
@@ -129,6 +131,7 @@ pub const ACTIONS: &[Action] = &[
     Action::SelectPayment,
     Action::ConfirmPointCard,
     Action::ConfirmAge,
+    Action::CheckId,
     Action::ConfirmBillPayment,
     Action::InsertCash,
     Action::TapEmoney,
@@ -148,8 +151,12 @@ pub struct Context {
     pub phase: Phase,
     pub staff: StaffState,
     pub has_lines: bool,
-    /// 会計時の年確がまだ済んでいない
+    /// 会計時の年確で、お客様がまだ「X歳以上です」を押していない
     pub age_pending: bool,
+    /// お客様は押したが、店員がまだ身分証を確認していない
+    pub id_pending: bool,
+    /// 店員が身分証を確認できなかった（「いいえ」）。年確商品を取り消すか取引中止まで決済できない
+    pub id_refused: bool,
     /// お渡し確認のチェックが入っていない FF がある
     pub ff_waiting: bool,
     /// FF の明細がある
@@ -187,6 +194,10 @@ impl Context {
             Some(POINT_UNCONFIRMED)
         } else if self.age_pending {
             Some("年齢確認が済んでいません")
+        } else if self.id_refused {
+            Some(ID_REFUSED)
+        } else if self.id_pending {
+            Some("店員が身分証を確認していません")
         } else if self.bill_pending {
             Some(BILL_UNCONFIRMED)
         } else if self.ff_waiting {
@@ -203,6 +214,8 @@ pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認にチェックが入っていません";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
+pub const ID_REFUSED: Denial =
+    "身分証を確認できなかったため、年確商品は販売できません（取り消すか取引中止）";
 const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
 
 /// 会計時の代行収納の内容・金額の確認（どちらのモードでも、お客様が押す）
@@ -221,6 +234,30 @@ fn confirm_bill(c: &Context) -> Result<(), Denial> {
 /// 宅配便の危険物・禁制品がないことの申告（ラベル・ステッカーで行うため扱わない）がある。
 pub fn is_customer_only(action: Action) -> bool {
     matches!(action, Action::ConfirmAge | Action::ConfirmBillPayment)
+}
+
+/// 店員本人が確かめる操作。店員側の画面からしか押せず、どちらの画面が操作側でも押せる。
+/// いまは身分証の確認（年確でお客様が「X歳以上です」を押した後）だけ。
+pub fn is_staff_only(action: Action) -> bool {
+    action == Action::CheckId
+}
+
+/// その操作を押せる画面が決まっているなら、その側（画面の排他の例外）
+pub fn fixed_side(action: Action) -> Option<Side> {
+    if is_customer_only(action) {
+        Some(Side::Customer)
+    } else if is_staff_only(action) {
+        Some(Side::Staff)
+    } else {
+        None
+    }
+}
+
+/// 身分証の確認（有人モードで、お客様が「X歳以上です」を押した後）
+fn check_id(c: &Context) -> Result<(), Denial> {
+    require(c.phase == Phase::Paying, "お会計前です")?;
+    require(!c.age_pending, "お客様の「年齢確認」の操作を待っています")?;
+    require(c.id_pending, "身分証の確認は不要です")
 }
 
 /// 会計ボタンの後のポイントカードの最終確認（どちらの画面からでも）
@@ -266,11 +303,13 @@ pub fn is_device_action(action: Action) -> bool {
 /// これはお客様側の画面からしか押せない。
 pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> {
     rules(action, c)?;
-    if is_customer_only(action) {
-        // 例外：お客様本人が押すもの。お客様側の画面からだけ、
+    if let Some(fixed) = fixed_side(action) {
+        // 例外：お客様本人・店員本人が押すもの。決まった側の画面からだけ、
         // どちらの画面が操作側でも押せる
-        return if side == Side::Customer {
+        return if side == fixed {
             Ok(())
+        } else if action == Action::CheckId {
+            Err("身分証の確認は店員側の画面で行います")
         } else if action == Action::ConfirmAge {
             Err("年齢確認はお客様側の画面で押していただきます")
         } else {
@@ -369,6 +408,7 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         }
         Action::ConfirmPointCard => confirm_point(c),
         Action::ConfirmAge => require(paying && c.age_pending, "年齢確認は不要です"),
+        Action::CheckId => check_id(c),
         Action::ConfirmBillPayment => confirm_bill(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
@@ -411,6 +451,10 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::ConfirmAge => {
             require(paying && c.age_pending, "年齢確認は不要です")?;
             Err("係員が向かっています。しばらくお待ちください")
+        }
+        Action::CheckId => {
+            check_id(c)?;
+            Err("身分証の確認は係員が名札でログインしてから行います")
         }
         Action::ConfirmBillPayment => confirm_bill(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
@@ -455,6 +499,8 @@ mod tests {
                                             staff: StaffState::Ready,
                                             has_lines,
                                             age_pending: age_pending && phase == Phase::Paying,
+                                            id_pending: false,
+                                            id_refused: false,
                                             ff_waiting,
                                             has_ff,
                                             service_pending,
@@ -486,7 +532,7 @@ mod tests {
                 let any = |side: Side| {
                     ACTIONS.iter().any(|&a| {
                         !is_device_action(a)
-                            && !is_customer_only(a)
+                            && fixed_side(a).is_none()
                             && permitted(side, a, &c).is_ok()
                     })
                 };
@@ -520,8 +566,8 @@ mod tests {
                 for &a in ACTIONS {
                     for side in [Side::Staff, Side::Customer] {
                         let expect = rules(a, &c).is_ok()
-                            && if is_customer_only(a) {
-                                side == Side::Customer
+                            && if let Some(fixed) = fixed_side(a) {
+                                side == fixed
                             } else {
                                 is_device_action(a) || active.is_none_or(|s| s == side)
                             };

@@ -157,6 +157,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
     )
     .is_err());
     ok(&mut s, json!({"type":"confirm_age","register":1}));
+    ok(&mut s, json!({"type":"check_id","register":1,"ok":true}));
     // 同じ取引で戻って追加しても、再確認はしない
     scan(&mut s, 1, "staff", BEER);
     ok(
@@ -189,6 +190,7 @@ fn self_mode_age_check_calls_staff() {
     assert!(!allowed(&reg(&s, 2), Side::Customer, Action::ConfirmAge));
     scan(&mut s, 2, "staff", "ST1002");
     ok(&mut s, json!({"type":"confirm_age","register":2}));
+    ok(&mut s, json!({"type":"check_id","register":2,"ok":true}));
     // 名札を読んだので有人モード。モードはログアウトか 5 分の無操作でだけ戻る
     assert_eq!(reg(&s, 2).mode, Mode::Attended);
     assert_eq!(reg(&s, 2).staff.state, StaffState::Ready);
@@ -1168,4 +1170,70 @@ fn void_lock_and_logout_from_the_store_menu() {
     ok(&mut s, top);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+}
+
+/// 年確は二段階：お客様が「X歳以上です」を押してから、店員が身分証を確認する（はい・いいえ）。
+/// 「いいえ」なら年確商品を取り消すまで決済できない。
+#[test]
+fn staff_checks_id_after_the_customer_declares_age() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", ONIGIRI);
+    scan(&mut s, 1, "staff", BEER);
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    advance(&mut s, 1_000);
+    let check = |ok: bool, side: &str| json!({"type":"check_id","register":1,"side":side,"ok":ok});
+    // お客様が押すまで、店員の身分証確認は押せない
+    let e = run(&mut s, check(true, "staff")).unwrap_err();
+    assert!(e.contains("お客様"), "{e}");
+    assert!(!reg(&s, 1).staff.id_pending);
+    ok(&mut s, json!({"type":"confirm_age","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.staff.id_pending);
+    assert_eq!(v.customer.age_check, None);
+    // お客様側の画面からは押せない
+    assert!(run(&mut s, check(true, "customer")).is_err());
+    let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
+    assert!(run(&mut s, cash.clone()).is_err());
+    ok(&mut s, check(false, "staff"));
+    let v = reg(&s, 1);
+    assert!(v.staff.id_refused && !v.staff.id_pending);
+    assert!(run(&mut s, cash.clone()).unwrap_err().contains("身分証"));
+    // 年確商品を取り消せば、残りは会計できる
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+    );
+    let beer = reg(&s, 1)
+        .staff
+        .lines
+        .iter()
+        .find(|l| l.line.code == BEER)
+        .unwrap()
+        .line
+        .id;
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":beer}),
+    );
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    assert!(!reg(&s, 1).staff.id_refused);
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
+    );
+    ok(&mut s, cash);
 }

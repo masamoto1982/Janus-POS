@@ -65,6 +65,10 @@ export interface StaffView {
   required_age: number | null;
   age_verified: boolean;
   age_pending: boolean;
+  /** お客様が「X歳以上です」を押し、店員の身分証確認待ち */
+  id_pending: boolean;
+  /** 身分証を確認できなかった（年確商品を取り消すか取引中止まで決済できない） */
+  id_refused: boolean;
   /** 会計時、お客様の確認待ちの代行収納の金額 */
   bill_check: number | null;
   point_pending: boolean;

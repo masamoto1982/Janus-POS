@@ -679,15 +679,42 @@ pub struct Confiscated {
     pub qty: u32,
 }
 
+/// 日付を読む。西暦 8 桁（19821002）か YYYY-MM-DD。存在しない日付は読まない
 fn ymd(s: &str) -> Option<(u32, u32, u32)> {
-    let mut it = s.trim().split('-').map(|x| x.parse::<u32>().ok());
-    let (y, m, d) = (it.next()??, it.next()??, it.next()??);
-    (it.next().is_none() && (1..=12).contains(&m) && (1..=31).contains(&d)).then_some((y, m, d))
+    let s = s.trim();
+    let (y, m, d) = if s.len() == 8 && s.bytes().all(|b| b.is_ascii_digit()) {
+        (
+            s[..4].parse().ok()?,
+            s[4..6].parse().ok()?,
+            s[6..].parse().ok()?,
+        )
+    } else {
+        let mut it = s.split('-').map(|x| x.parse::<u32>().ok());
+        let ymd = (it.next()??, it.next()??, it.next()??);
+        if it.next().is_some() {
+            return None;
+        }
+        ymd
+    };
+    let leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    let days = match m {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => return None,
+    };
+    (y >= 1900 && (1..=days).contains(&d)).then_some((y, m, d))
 }
 
-/// 生年月日 birth の人の today 時点の年齢（日付は YYYY-MM-DD）
+/// 生年月日 birth の人の today 時点の年齢。
+///
+/// 生年月日は身分証の西暦を 8 桁で打ち込む（19821002）。カレンダーから選ぶ方式は、
+/// 今年から 18〜20 年も遡るのがかえって手間なので使わない。
+/// 設計メモ：和暦（S57.10.2 のような元号入力）にも対応できるが、身分証は西暦表記が
+/// 主流になりつつあり導入の重要性は薄いため、いまは西暦のみ受け付ける。
 pub fn age_on(birth: &str, today: &str) -> Result<u8, String> {
-    let (by, bm, bd) = ymd(birth).ok_or("生年月日を YYYY-MM-DD で入力してください")?;
+    let (by, bm, bd) = ymd(birth).ok_or("生年月日を西暦 8 桁で入力してください（例：19821002）")?;
     let (ty, tm, td) = ymd(today).ok_or("日付が正しくありません")?;
     if (by, bm, bd) > (ty, tm, td) {
         return Err("生年月日が今日より後です".into());

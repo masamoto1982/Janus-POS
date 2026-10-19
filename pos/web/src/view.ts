@@ -137,8 +137,8 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
       <p>「する」：身分証の生年月日を入力して判定します。「しない」：お客様が「${age}歳以上です」を押します。</p>`;
   } else if (v.id_pending) {
     const st = a("check_id");
-    body = `<div class="id-head"><b>身分証の生年月日</b>
-        <input type="date" data-key="birth-${reg}" aria-label="身分証の生年月日" />
+    body = `<div class="id-head"><b>身分証の生年月日（西暦8桁）</b>
+        <input type="text" inputmode="numeric" maxlength="8" placeholder="例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
         ${choose(false, "しないに変更", "small ghost")}</div>
       <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;

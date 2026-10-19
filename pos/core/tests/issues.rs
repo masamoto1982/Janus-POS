@@ -1217,7 +1217,7 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     );
     let birth = |b: &str| json!({"type":"check_id","register":1,"birth":b,"today":"2026-10-19"});
     // 選ぶ前は入力できない。お客様側の画面からは選べない
-    assert!(run(&mut s, birth("2007-05-01")).is_err());
+    assert!(run(&mut s, birth("20070501")).is_err());
     assert!(run(
         &mut s,
         json!({"type":"choose_age_check","register":1,"side":"customer","id_check":true})
@@ -1231,9 +1231,9 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     assert!(v.staff.id_pending && !v.staff.age_choice_pending);
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
-    assert!(run(&mut s, birth("2027-01-01")).is_err());
+    assert!(run(&mut s, birth("20270101")).is_err());
     // 19 歳：雑誌（18）は買えるが、ビール（20）は買えない
-    let msg = run(&mut s, birth("2007-05-01")).unwrap().unwrap();
+    let msg = run(&mut s, birth("20070501")).unwrap().unwrap();
     assert!(msg.contains("19歳") && msg.contains("缶ビール"), "{msg}");
     let v = reg(&s, 1);
     let codes: Vec<&str> = v.staff.lines.iter().map(|l| l.line.code).collect();
@@ -1254,7 +1254,11 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
 #[test]
 fn age_counts_the_birthday() {
     use janus_pos_core::store::age_on;
-    assert_eq!(age_on("2006-10-19", "2026-10-19"), Ok(20));
-    assert_eq!(age_on("2006-10-20", "2026-10-19"), Ok(19));
-    assert!(age_on("2006/10/19", "2026-10-19").is_err());
+    assert_eq!(age_on("20061019", "2026-10-19"), Ok(20));
+    assert_eq!(age_on("20061020", "2026-10-19"), Ok(19));
+    assert_eq!(age_on("19821002", "2026-10-19"), Ok(44));
+    // 西暦 8 桁だけ。存在しない日付や和暦は読まない
+    for bad in ["2006/10/19", "20070231", "570102", "S57.10.2", "2006101"] {
+        assert!(age_on(bad, "2026-10-19").is_err(), "{bad}");
+    }
 }

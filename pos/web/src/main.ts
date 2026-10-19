@@ -348,6 +348,13 @@ function form(b: HTMLElement): void {
 app.addEventListener("input", (e) => {
   const el = e.target as HTMLInputElement;
   if (el.dataset.inlet) el.value = el.value.replace(/[^0-9０-９]/g, "");
+  // 生年月日：西暦 8 桁。全角の数字は半角に直す
+  if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
+});
+app.addEventListener("keydown", (e) => {
+  const el = e.target as HTMLInputElement;
+  if (!el.dataset?.birth || e.key !== "Enter" || e.isComposing) return;
+  el.closest(".id-head")?.querySelector<HTMLButtonElement>('[data-form="birth"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;

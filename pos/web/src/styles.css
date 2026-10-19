@@ -311,7 +311,7 @@ body.dragging .drop-hint { display: inline; }
 .id-card { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; }
 .id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
 .id-head button { min-width: 64px; }
-.id-head input[type=date] { font-size: 14px; padding: 4px 6px; }
+.id-head input[data-birth] { width: 9em; font-size: 16px; padding: 4px 6px; letter-spacing: .05em; font-variant-numeric: tabular-nums; }
 .confiscated { margin: 6px 0 0; padding-left: 20px; text-align: left; font-size: 14px; }
 .id-card p { margin: 4px 0 0; font-size: 11px; }
 .id-card.refused { background: var(--danger-bg); color: var(--danger); }

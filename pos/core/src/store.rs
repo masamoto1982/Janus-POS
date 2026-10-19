@@ -980,6 +980,8 @@ impl Store {
                 self.check_active(register, Action::VoidTransaction)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
+                // 店舗メニューから行うので、済んだらメニューを閉じる
+                r.menu = None;
                 let txn = std::mem::take(&mut r.txn);
                 let back = txn.inserted.total();
                 for l in &txn.lines {
@@ -1025,7 +1027,9 @@ impl Store {
             }
             C::Lock { register } => {
                 self.check_active(register, Action::Lock)?;
-                if let Some(s) = &mut self.reg_mut(register)?.staff {
+                let r = self.reg_mut(register)?;
+                r.menu = None;
+                if let Some(s) = &mut r.staff {
                     s.locked = true;
                 }
                 done("画面をロックしました（スタッフバーコードで解除）")
@@ -1057,7 +1061,8 @@ impl Store {
                 if r.staff_state() != StaffState::Ready {
                     return Err("店舗メニューは名札でログインした店員だけが使えます".into());
                 }
-                if screen.is_some() && !r.txn.lines.is_empty() {
+                // 取引中は一覧（取引中止・ロック・ログアウト）だけを開ける
+                if screen.is_some_and(|s| s != MenuScreen::Top) && !r.txn.lines.is_empty() {
                     return Err("取引中は店舗メニューを開けません".into());
                 }
                 let to = exchange_to

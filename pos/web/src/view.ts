@@ -200,11 +200,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     ${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
-    <div class="row">
-      ${btn("取引中止", { type: "void_transaction", register: reg }, a("void_transaction"), "ghost")}
-      ${btn("ロック", { type: "lock", register: reg }, a("lock"), "ghost")}
-      ${btn("ログアウト", { type: "end_staff_mode", register: reg }, a("end_staff_mode"), "ghost")}
-    </div>`;
+`;
 }
 
 /** 会計ボタンの後のポイントカードの最終確認。ポイントカードを読むか「なしで進む」で支払方法へ */
@@ -342,12 +338,18 @@ export function storeMenu(r: RegisterView): string {
   const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
   const head = (title: string) =>
     `<div class="menu-head">${btn("‹ 戻る", go("top"), undefined, "small ghost")}<b>${esc(title)}</b></div>`;
+  const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   switch (m.screen) {
     case "top":
       return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span>${btn("閉じる", go(null), undefined, "small ghost")}</div>
         <div class="menu-list">${(["refund", "emergency", "deposit", "expense", "changer"] as const)
-          .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
-          .join("")}</div>`;
+          .map((k) => btn(MENU_LABEL[k], go(k), busy, "menu-item"))
+          .join("")}</div>
+        <div class="menu-list">
+          ${btn("取引中止", { type: "void_transaction", register: reg }, find(v.actions, "void_transaction"), "menu-item")}
+          ${btn("ロック", { type: "lock", register: reg }, find(v.actions, "lock"), "menu-item")}
+          ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
+        </div>`;
     case "refund":
     case "emergency":
     case "expense": {

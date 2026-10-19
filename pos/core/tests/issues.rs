@@ -1147,3 +1147,25 @@ fn shopping_is_limited_to_ten_items() {
     );
     scan(&mut s, 1, "customer", ONIGIRI);
 }
+
+/// 取引中止・ロック・ログアウトは店舗メニュー（☰）から行い、済んだらメニューは閉じる。
+#[test]
+fn void_lock_and_logout_from_the_store_menu() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    let top = json!({"type":"open_menu","register":1,"screen":"top"});
+    ok(&mut s, top.clone());
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.menu.is_none() && v.staff.lines.is_empty());
+    ok(&mut s, top.clone());
+    ok(&mut s, json!({"type":"lock","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.menu.is_none());
+    assert_eq!(v.staff.state, StaffState::Locked);
+    scan(&mut s, 1, "staff", "ST1001");
+    ok(&mut s, top);
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+}

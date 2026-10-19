@@ -334,6 +334,7 @@ body.dragging .drop-hint { display: inline; }
 .menu-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .menu-head b { flex: 1; }
 .menu-list { display: grid; gap: 6px; }
+.menu-list + .menu-list { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
 .menu-item { text-align: left; padding: 10px 12px; }
 .menu-form { display: flex; flex-wrap: wrap; gap: 6px; }
 .menu-form input { flex: 1 1 8em; min-width: 0; }

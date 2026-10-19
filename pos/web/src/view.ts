@@ -548,8 +548,8 @@ export function walletPanel(): string {
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
     walletItem("pay:emoney", "電子マネー", "端末にかざす", "pay"),
   ];
-  const group = (label: string, xs: string[]) => `<div class="shelf"><h3>${label}</h3><div class="items">${xs.join("")}</div></div>`;
-  return group("紙幣", bills) + group("硬貨", coins) + group("カード・スマホ", cards);
+  // 見出しなしの一つの並び（表示スペースの節約）
+  return `<div class="shelf"><div class="items">${[...bills, ...coins, ...cards].join("")}</div></div>`;
 }
 
 /** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */

@@ -67,15 +67,9 @@ const METHODS = ["cash", "emoney", "qr", "credit"] as const;
 type Side = "staff" | "customer";
 
 /** 支払いが終わった後のお礼とおつり */
-function thanks(r: RegisterView): string {
-  const rc = r.last_receipt!;
-  const change = rc.change.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join("　");
-  return `<div class="thanks">
-      <div class="big">ありがとうございました</div>
-      <div>お支払い ${yen(rc.total)}（${esc(rc.method)}）</div>
-      ${rc.change_total ? `<div class="change">おつり <b>${yen(rc.change_total)}</b><div class="muted">${change}</div><div class="muted">紙幣と硬貨はそろえてお返しします</div></div>` : ""}
-      ${rc.point_card ? `<div>ポイント ${rc.points}pt を付与しました</div>` : ""}
-    </div>`;
+/** 決済後の画面。3 秒（core THANKS_MS）で新しいお客様の待ち受けに戻る */
+function thanks(): string {
+  return `<div class="thanks"><div class="big">ありがとうございました</div></div>`;
 }
 
 /** 年齢確認ボタン（店員が「しない」を選んだとき。例外：お客様側の画面からしか押せない） */
@@ -348,7 +342,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
-  if (r.last_receipt && !v.lines.length) return notice + thanks(r);
+  if (r.last_receipt && !v.lines.length) return notice + thanks();
   // 新しく登録した商品ほど上に出す
   const rows = couponRows(reg, side, v.coupons, a("remove_coupon")) + [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
   const paying = v.phase === "paying";
@@ -589,7 +583,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
-  if (r.last_receipt && !c.lines.length) return notice + thanks(r);
+  if (r.last_receipt && !c.lines.length) return notice + thanks();
 
 
   // 新しく登録した商品ほど上に出す

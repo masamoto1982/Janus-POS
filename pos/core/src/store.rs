@@ -814,6 +814,9 @@ fn staff_side() -> Side {
 }
 
 /// 無操作がこの時間続くと、レジはセミセルフモードに戻って待機する
+/// 決済後の「ありがとうございました」を出す時間。過ぎると新しいお客様の待ち受けに戻る
+pub const THANKS_MS: u64 = 3000;
+
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 /// 放置された呼び出しほど大きく鳴らす。最初は RING_MIN、RING_FULL_MS 放置で最大
 pub const RING_MIN: f32 = 0.25;
@@ -881,6 +884,12 @@ impl Store {
         for r in &mut self.registers {
             if r.touch.is_some_and(|(_, until)| until <= now) {
                 r.touch = None;
+            }
+            if r.last_receipt
+                .as_ref()
+                .is_some_and(|rc| rc.at + THANKS_MS <= now)
+            {
+                r.last_receipt = None;
             }
         }
         // MAT はデジタルな呼び鈴：ボタンが押されている間だけ鳴る。鳴らし直しはしない。
@@ -1767,7 +1776,9 @@ impl Store {
         if paid < total {
             return done(format!("{paid}円 投入（あと {}円）", total - paid));
         }
-        done(format!("{paid}円 投入。「投入おわり」を押すとお支払いを確定します"))
+        done(format!(
+            "{paid}円 投入。「投入おわり」を押すとお支払いを確定します"
+        ))
     }
 
     fn finish_insert(&mut self, register: u8) -> Result<Outcome, String> {

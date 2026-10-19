@@ -667,6 +667,12 @@ fn inlet_pays_and_change_waits_in_outlet() {
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.outlet, 1100 - 160);
+    // 「ありがとうございました」は 3 秒で消え、新しいお客様の待ち受けに戻る
+    assert!(v.last_receipt.is_some());
+    s.tick(v.last_receipt.as_ref().unwrap().at + 2999);
+    assert!(reg(&s, 1).last_receipt.is_some());
+    s.tick(v.last_receipt.as_ref().unwrap().at + 3000);
+    assert!(reg(&s, 1).last_receipt.is_none());
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).outlet, 0);
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());

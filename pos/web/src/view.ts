@@ -67,9 +67,12 @@ const METHODS = ["cash", "emoney", "qr", "credit"] as const;
 type Side = "staff" | "customer";
 
 /** 支払いが終わった後のお礼とおつり */
-/** 決済後の画面。3 秒（core THANKS_MS）で新しいお客様の待ち受けに戻る */
+/**
+ * 決済後の画面。3 秒（core THANKS_MS）で新しいお客様の待ち受けに戻る。
+ * 買った商品や持ち物の忘れ物はセルフレジで起こりがちなので、二行目で注意を促す
+ */
 function thanks(): string {
-  return `<div class="thanks"><div class="big">ありがとうございました</div></div>`;
+  return `<div class="thanks"><div class="big">ありがとうございました</div><div>お忘れ物にご注意ください</div></div>`;
 }
 
 /** 年齢確認ボタン（店員が「しない」を選んだとき。例外：お客様側の画面からしか押せない） */

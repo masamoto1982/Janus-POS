@@ -102,7 +102,7 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 /** 支払方法を選んだ後の案内 */
 function payHint(method: string | null, blocker: string | null): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
-  if (method && method !== "cash") return `<p>財布の${METHOD_LABEL[method]}を、お客様側の端末にかざしてください</p>`;
+  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、お客様側の端末にかざしてください</p>`;
   return `<p>現金を投入してください（または支払方法を選んでください）</p>`;
 }
 
@@ -255,7 +255,7 @@ export function clockText(d: Date): string {
 export function screenHead(r: RegisterView, now: Date): string {
   const call = find(r.customer.actions, "call_staff");
   const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="係員を呼ぶ（押している間鳴ります）" title="${esc(call.allowed ? "係員を呼ぶ（押している間鳴ります）" : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
-  const gear = `<button type="button" class="gear" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー"${r.staff.state === "ready" ? "" : " hidden"}>⚙</button>`;
+  const gear = `<button type="button" class="gear" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー"${r.staff.state === "ready" ? "" : " hidden"}>☰</button>`;
   return `<span class="head-l">${gear}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
 
@@ -519,15 +519,12 @@ function item(code: string, name: string, sub: string, cls = ""): string {
     <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
 }
 
+/** Item：カテゴリの見出しは付けず、棚の並び順のまま一つにまとめる（表示スペースの節約） */
 export function shelfPanel(s: Snapshot): string {
-  const groups = SHELVES.map((g) => {
-    const items = s.catalog.filter(g.match);
-    if (!items.length) return "";
-    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
-      .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
-      .join("")}</div></div>`;
-  }).join("");
-  return groups;
+  const items = [...new Set(SHELVES.flatMap((g) => s.catalog.filter(g.match)))];
+  return `<div class="shelf"><div class="items">${items
+    .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
+    .join("")}</div></div>`;
 }
 
 // ---------------------------------------------------------------------------

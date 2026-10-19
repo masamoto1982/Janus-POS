@@ -327,8 +327,8 @@ body.dragging .drop-hint { display: inline; }
 .idle { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
 /* 店舗メニューの歯車（レジ画面ヘッダーの左上。店員ログイン中だけ） */
-.gear { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
-.gear:hover { color: var(--ink); }
+.gear, .icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--line); }
+.gear:hover, .icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: 14px; margin: 14px 0 6px; }
 /* お客様画面の店舗メニュー（一画面ずつ） */
 .menu-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }

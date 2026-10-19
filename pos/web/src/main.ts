@@ -116,7 +116,7 @@ function buildSkeleton(): void {
   app.innerHTML = `
     <header class="top">
       <h1>Janus POS</h1>
-      <p class="muted">右の売り場から商品をつかんで、レジの店員画面かお客様画面に落とすと、その側のスキャナーで読んだことになります。</p>
+      <p class="muted">右の Item から商品をつかんで、レジの店員画面かお客様画面に落とすと、その側のスキャナーで読んだことになります。</p>
     </header>
     <article class="floor">
       <div class="left">
@@ -128,12 +128,12 @@ function buildSkeleton(): void {
         ${regs}
       </div>
       <div class="right-col">
-        <aside class="right" aria-label="売り場">
-          <h2>売り場 <button class="small ghost rules-open" data-open-rules aria-haspopup="dialog">年確ルール設定</button></h2>
+        <aside class="right" aria-label="Item">
+          <h2>Item <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="年確ルール設定" title="年確ルール設定">⚙</button></h2>
           <div data-region="shelf"></div>
         </aside>
-        <aside class="right wallet" aria-label="財布">
-          <h2>財布</h2>
+        <aside class="right wallet" aria-label="Wallet">
+          <h2>Wallet</h2>
           <div data-region="wallet"></div>
         </aside>
       </div>

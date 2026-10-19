@@ -247,6 +247,33 @@ function ageStatus(v: StaffView): string {
   return `<span class="ok">確認済</span>`;
 }
 
+/** 初期画面のボタンで選んだ案内（レジ:画面 → 種類）。選ばなくても、どのバーコードでも読める */
+export const scanGuide = new Map<string, GuideKind>();
+export type GuideKind = "item" | "bag" | "point" | "pay";
+const GUIDES: [GuideKind, string, string][] = [
+  ["item", "商品", "商品のバーコードをスキャンしてください"],
+  ["bag", "レジ袋", "レジ袋の見本のバーコードをスキャンしてください（S・L）"],
+  ["point", "ポイントカード", "ポイントカードのバーコードをスキャンしてください（お会計の後でも読めます）"],
+  ["pay", "お支払い", "商品を登録して「お会計」に進むと、お支払い方法を選べます"],
+];
+
+/**
+ * 初期画面。慣れた人はそのままスキャンし、不慣れな人はボタンで何を読むか選んで案内を見る
+ * （自由度がなさすぎても、ありすぎても人は迷う）
+ */
+export function welcome(reg: number, side: Side): string {
+  const on = scanGuide.get(`${reg}:${side}`);
+  const guide = GUIDES.find(([k]) => k === on);
+  return `<div class="welcome">
+      <div class="big">バーコードをスキャンしてください</div>
+      <p>すべてのバーコードを受け付けます</p>
+      <div class="guide-row">${GUIDES.map(
+        ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
+      ).join("")}</div>
+      ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
+    </div>`;
+}
+
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
   if (r.menu) return notice + storeMenu(r);
@@ -359,7 +386,7 @@ export const FF_TABS = [
   ["bun", "中華まん"],
   ["oden", "おでん"],
 ] as const;
-export const FF_PER_PAGE = 8;
+export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
@@ -505,12 +532,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     r.max_items,
   );
 
-  if (!c.lines.length) {
-    return `${top}${notice}<div class="welcome">
-      <div class="big">バーコードをスキャンしてください。</div>
-      <p>商品、レジ袋、ポイントカード、お支払い、すべてのバーコードを受け付けます。</p>
-    </div>`;
-  }
+  if (!c.lines.length) return `${top}${notice}${welcome(reg, side)}`;
+  scanGuide.delete(`${reg}:${side}`);
 
   let pay = "";
   if (c.phase === "paying") {

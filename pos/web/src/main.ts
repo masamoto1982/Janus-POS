@@ -9,6 +9,7 @@
 
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { Command, Snapshot } from "./types";
+import type { GuideKind } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 import {
   esc,
@@ -17,6 +18,7 @@ import {
   itemsPanel,
   screenHead,
   isoDate,
+  scanGuide,
   matPanel,
   ownerPanel,
   shelfPanel,
@@ -302,6 +304,8 @@ function send(cmd: Command): boolean {
     if (res.message) toast(where, res.message, false);
   } else {
     toast(where, res.error ?? "操作できません", true);
+    // 買い物点数の上限は表示エリアに合わせたシミュレーターだけの制約（実際のシステムでは起きない）
+    if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
   }
   // スキャナーと FF 登録の音（読めたら「ピッ」、受け付けられなければ「ブッブー」）
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok ? beepScan : beepError)();
@@ -423,6 +427,15 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.outlet) {
     send({ type: "take_outlet", register: Number(b.dataset.outlet) });
+    return;
+  }
+  if (b.dataset.guide) {
+    // 初期画面の案内ボタン：もう一度押すと閉じる
+    const [reg, side, kind] = b.dataset.guide.split(":");
+    const key = `${reg}:${side}`;
+    if (scanGuide.get(key) === kind) scanGuide.delete(key);
+    else scanGuide.set(key, kind as GuideKind);
+    frame();
     return;
   }
   if (b.dataset.cmd) {

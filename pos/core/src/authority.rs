@@ -184,8 +184,8 @@ pub struct Context {
 /// 一回のお買い物で登録できる点数（数量の合計）の上限。
 /// Janus POS はセミセルフ POS の模範的なありかたを探るシミュレーターなので、
 /// 画面の表示エリアに収まる点数に絞る
-pub const MAX_ITEMS: u32 = 10;
-pub const ITEMS_FULL: Denial = "買い物点数の上限（10点）に達しています";
+pub const MAX_ITEMS: u32 = 5;
+pub const ITEMS_FULL: Denial = "買い物点数の上限（5点）に達しています";
 
 /// 操作した側が「触れている」とみなす時間。この間だけ、もう一方の画面は操作できない
 pub const TOUCH_LOCK_MS: u64 = 1000;

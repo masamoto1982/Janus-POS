@@ -642,14 +642,14 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 }
 
 // ---------------------------------------------------------------------------
-// MAT・店舗の設定
+// Bell（呼び鈴：据え付け型と携帯型の検品端末）・店舗の設定
 // ---------------------------------------------------------------------------
 
 export function matPanel(s: Snapshot): string {
   return s.mats
     .map(
       (m) => `<div class="mat ${m.buzzing ? "buzz" : ""}">
-        <span class="bell">🔔</span><span class="mat-id">${esc(m.id)}</span><span class="mat-state">${m.buzzing ? "鳴動中" : "待機"}</span>
+        <span class="bell">${m.kind === "fixed" ? "🔔" : "📱"}</span><span class="mat-id">${esc(m.id)}</span><span class="mat-kind">${m.kind === "fixed" ? "据え付け" : "携帯"}</span><span class="mat-state">${m.buzzing ? "鳴動中" : "待機"}</span>
       </div>`,
     )
     .join("");

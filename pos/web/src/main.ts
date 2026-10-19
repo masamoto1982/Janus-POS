@@ -51,7 +51,8 @@ function bytesFromB64(b64: string): Uint8Array {
 async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
-  reset(2, 1);
+  // 呼び鈴は据え付け型 1 台と、携帯型の検品端末 1 台
+  reset(2, 2);
   setupDrag();
   window.setInterval(frame, 100);
 }
@@ -123,8 +124,8 @@ function buildSkeleton(): void {
     </header>
     <article class="floor">
       <div class="left">
-        <section class="mat-area" aria-label="携帯情報端末">
-          <h2>携帯情報端末（MAT）</h2>
+        <section class="mat-area" aria-label="Bell（呼び鈴）">
+          <h2>Bell</h2>
           <div class="mats" data-region="mats"></div>
           <div class="toast" id="toast-store"></div>
         </section>

@@ -440,7 +440,7 @@ fn mat_rings_despite_loss_and_reports_link_down() {
     advance(&mut s, 8_000);
     let snap = s.snapshot();
     assert!(!snap.mats[0].link_ok);
-    assert_eq!(snap.registers[0].staff.mat_down, vec!["MAT-1".to_string()]);
+    assert_eq!(snap.registers[0].staff.mat_down, vec!["呼び鈴".to_string()]);
 }
 
 /// お客様画面には分類や年確対象の情報を出さない（店員画面にだけ出す）。

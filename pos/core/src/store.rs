@@ -857,7 +857,7 @@ impl Store {
             self_mode_enabled: false,
             rng: Rng::new(seed),
             registers: regs,
-            mats: (1..=mats).map(|i| Mat::new(&format!("MAT-{i}"))).collect(),
+            mats: (0..mats).map(|i| Mat::new(&bell_name(i))).collect(),
             calls: Calls::default(),
             age_rules: AgeRules::default(),
             auth: Authenticator::default(),
@@ -1943,8 +1943,10 @@ impl Store {
             mats: self
                 .mats
                 .iter()
-                .map(|m| MatView {
+                .enumerate()
+                .map(|(i, m)| MatView {
                     id: m.id.clone(),
+                    kind: bell_kind(i as u8),
                     buzzing: m.buzzing(now),
                     link_ok: m.rx_ok(now),
                     rings: m.rings,
@@ -2287,10 +2289,39 @@ pub struct RegisterView {
     pub last_receipt: Option<Receipt>,
 }
 
+/// 呼び鈴（Bell）の種類。据え付け型の呼び鈴が主で、携帯型の検品端末の呼び鈴は「あれば便利」。
+/// スタッフが重い端末を常に持ち歩く前提は現実的でない（制服にポケットもない）
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BellKind {
+    /// 据え付け型の呼び鈴（1 台目）
+    Fixed,
+    /// 携帯型の検品端末（2 台目以降）
+    Handheld,
+}
+
+fn bell_kind(i: u8) -> BellKind {
+    if i == 0 {
+        BellKind::Fixed
+    } else {
+        BellKind::Handheld
+    }
+}
+
+/// 1 台目は据え付けの「呼び鈴」、2 台目以降は「検品端末」（2 台以上なら番号を付ける）
+fn bell_name(i: u8) -> String {
+    match i {
+        0 => "呼び鈴".into(),
+        1 => "検品端末".into(),
+        n => format!("検品端末{n}"),
+    }
+}
+
 /// MAT 自身の画面：鳴動と不通表示だけ
 #[derive(Clone, Debug, Serialize)]
 pub struct MatView {
     pub id: String,
+    pub kind: BellKind,
     pub buzzing: bool,
     pub link_ok: bool,
     pub rings: u64,

@@ -159,11 +159,10 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
 }
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
-export function attendedScreen(r: RegisterView, notice = ""): string {
+export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
   if (r.menu) return notice + storeMenu(r);
   const v = r.staff;
   const reg = r.id;
-  const side = r.active_side;
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks(r);
   // 新しく登録した商品ほど上に出す
@@ -237,7 +236,7 @@ export function itemCount(lines: { qty: number }[]): number {
  */
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
   const notice = callNotice(r, snap.now, side);
-  return r.mode === "attended" ? attendedScreen(r, notice) : semiSelfScreen(r, notice);
+  return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +275,7 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 8;
 export type FfUi = { tab: string; page: number };
 
-export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi): string {
+export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   const reg = r.id;
   if (r.menu) return "";
   if (r.mode === "semi_self") {
@@ -289,8 +288,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi): string {
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
-  // どちらの画面からも登録できる（押せるのは操作側の画面）
-  const side = r.active_side;
+  // どちらの画面からも登録できる（もう一方が触れている一瞬だけ押せない）
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -381,11 +379,10 @@ export function storeMenu(r: RegisterView): string {
 // セミセルフモードの登録画面（係員なし。お客様が登録して支払う）
 // ---------------------------------------------------------------------------
 
-export function semiSelfScreen(r: RegisterView, notice = ""): string {
+export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
   if (r.menu) return notice + storeMenu(r);
   const c: CustomerView = r.customer;
   const reg = r.id;
-  const side = r.active_side;
   const a = (n: string) => find(c.actions, n);
   if (r.last_receipt && !c.lines.length) return notice + thanks(r);
 

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
-    active_side, is_customer_only, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
+    active_side, is_customer_only, permitted, TOUCH_LOCK_MS, Action, Context, Mode, PaymentMethod, Phase, Side,
     StaffState, ACTIONS,
 };
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
@@ -508,20 +508,12 @@ struct Register {
     outlet: Cash,
     /// お客様画面に開いている店舗メニュー
     menu: Option<Menu>,
-    /// 有人モードで画面を持っている側
-    holder: Side,
-    /// 各画面が最後に触られた時刻（[店員, お客様]）
-    touched: [Option<u64>; 2],
+    /// いま触れている側と、その一瞬が終わる時刻（その間だけもう一方は操作できない）
+    touch: Option<(Side, u64)>,
     /// お客様画面の呼び出しボタンが押されている（触れている間 MAT が鳴る）
     pressing: bool,
 }
 
-fn slot(side: Side) -> usize {
-    match side {
-        Side::Staff => 0,
-        Side::Customer => 1,
-    }
-}
 
 impl Register {
     /// 運用モードは名札で決まる：名札でログイン中なら有人、いなければセミセルフ。
@@ -575,7 +567,7 @@ impl Register {
             method: t.method,
             customer_turn: t.customer_turn,
             menu_open: self.menu.is_some(),
-            holder: self.holder,
+            touching: self.touch.map(|(side, _)| side),
         }
     }
 }
@@ -635,9 +627,6 @@ pub fn ring_volume(waiting_ms: u64) -> f32 {
     RING_MIN + (1.0 - RING_MIN) * t
 }
 
-/// 画面を持っている側がこの時間触られていなければ、もう一方が引き継げる
-pub const HOLD_MS: u64 = 3 * 1000;
-
 impl Store {
     /// 基本構成はレジ 2 台・MAT 1 台。レジは 10 台、MAT は 5 台まで増やせる。
     pub fn new(seed: u64, registers: u8, mats: u8) -> Store {
@@ -656,8 +645,7 @@ impl Store {
                     last_op: 0,
                     outlet: Cash::default(),
                     menu: None,
-                    holder: Side::Customer,
-                    touched: [None, None],
+                    touch: None,
                     pressing: false,
                 }
             })
@@ -690,6 +678,12 @@ impl Store {
     pub fn tick(&mut self, now: u64) {
         self.now = self.now.max(now);
         let now = self.now;
+        // 触れている一瞬が過ぎたら、両方の画面に戻す
+        for r in &mut self.registers {
+            if r.touch.is_some_and(|(_, until)| until <= now) {
+                r.touch = None;
+            }
+        }
         // MAT はデジタルな呼び鈴：ボタンが押されている間だけ鳴る。鳴らし直しはしない。
         // 年確・代行収納の読み取りのようにボタンを介さない呼び出しは、起きた瞬間に短く鳴る
         if self.calls.raised > self.seen_raised {
@@ -744,7 +738,7 @@ impl Store {
             .reg(register)
             .ok_or_else(|| format!("レジ{register}はありません"))?;
         let c = r.context();
-        permitted(active_side(&c), action, &c).map_err(String::from)
+        permitted(active_side(&c).unwrap_or(Side::Customer), action, &c).map_err(String::from)
     }
 
     fn check(&self, register: u8, side: Side, action: Action) -> Result<(), String> {
@@ -767,7 +761,7 @@ impl Store {
         if let (Ok(_), Some((side, id))) = (&res, screen) {
             let now = self.now;
             if let Ok(r) = self.reg_mut(id) {
-                r.touched[slot(side)] = Some(now);
+                r.touch = Some((side, now + TOUCH_LOCK_MS));
             }
         }
         let self_ok = self.self_mode_enabled;
@@ -1171,15 +1165,8 @@ impl Store {
                 account: acc,
                 locked: false,
             });
-            // ログイン直後はお客様画面が操作側。支払い中の引き継ぎなら店員側
-            if was == StaffState::Absent || took_over {
-                r.holder = if took_over {
-                    Side::Staff
-                } else {
-                    Side::Customer
-                };
-                r.touched = [None, None];
-            }
+            // ログイン後は両方の画面が操作できる（触れている一瞬だけ排他）
+            r.touch = None;
             // ログインで店員側が操作できるようになる（お客様の支払い中でも）
             r.txn.customer_turn = false;
             // 店員が来たので、呼び出しボタンの鳴動も止める
@@ -1362,37 +1349,23 @@ impl Store {
     }
 
     /// 投入口：店舗メニューの入金・両替画面が開いていればそちら、なければお会計の支払い
-    /// グレーの画面にタッチして操作を引き継ぐ。持っている側がしばらく
-    /// 触られていないときだけ。お客様の確認待ちなどはお客様側のまま
+    /// 画面に触れる。もう一方が触れている一瞬や、お客様側に限られる場面では利かない
     fn claim(&mut self, register: u8, side: Side) -> Result<Outcome, String> {
-        let now = self.now;
-        let r = self.reg_mut(register)?;
+        let r = self.reg(register).ok_or("レジがありません")?;
         let c = r.context();
-        if active_side(&c) == side {
-            return Ok(Outcome::default());
-        }
-        if active_side(&Context { holder: side, ..c }) != side {
-            return Err(if c.menu_open {
+        match active_side(&c) {
+            Some(s) if s != side => Err(if c.menu_open {
                 "お客様画面で店舗メニューを操作中です"
             } else if c.staff != StaffState::Ready {
                 "スタッフバーコードでログインしてください"
-            } else if c.age_pending {
-                "お客様の年齢確認を待っています"
-            } else {
+            } else if c.customer_turn {
                 "お客様がお支払い中です"
+            } else {
+                "もう一方の画面で操作中です"
             }
-            .into());
+            .into()),
+            _ => Ok(Outcome::default()),
         }
-        let other = r.touched[slot(r.holder)];
-        if other.is_some_and(|t| now.saturating_sub(t) < HOLD_MS) {
-            return Err(match r.holder {
-                Side::Staff => "係員側の画面が操作中です",
-                Side::Customer => "お客様側の画面が操作中です",
-            }
-            .into());
-        }
-        r.holder = side;
-        Ok(Outcome::default())
     }
 
     fn insert(&mut self, register: u8, amount: u32) -> Result<Outcome, String> {
@@ -1675,8 +1648,8 @@ impl Store {
     fn register_view(&self, r: &Register) -> RegisterView {
         let c = r.context();
         let t = &r.txn;
-        // どちらの画面にも同じボタンが並ぶ。押せるのは操作側の画面
-        let c_side = active_side(&c);
+        // どちらの画面にも同じボタンが並ぶ。触れている一瞬は、触れている側の画面だけが押せる
+        let c_side = active_side(&c).unwrap_or(Side::Customer);
         let actions = |side: Side, list: &[Action]| {
             list.iter()
                 .map(|&a| {
@@ -1739,13 +1712,6 @@ impl Store {
             lamp: waiting.is_some(),
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
-            switchable: active_side(&Context {
-                holder: Side::Staff,
-                ..c
-            }) != active_side(&Context {
-                holder: Side::Customer,
-                ..c
-            }),
             mode: r.mode,
             mode_label: r.mode.label(),
             outlet: r.outlet.total(),
@@ -1883,8 +1849,8 @@ pub struct CustomerView {
 #[derive(Clone, Debug, Serialize)]
 pub struct RegisterView {
     pub id: u8,
-    /// 今、画面を操作できる側（もう一方は表示だけ）
-    pub active_side: Side,
+    /// 操作できる側が片方に限られているなら、その側（None なら両方の画面が操作できる）
+    pub active_side: Option<Side>,
     /// レジ本体の呼び出しランプ。店員が来るまで点きっぱなし（音は MAT だけ。
     /// 呼び出しは順番待ちにせず、どれも発生した瞬間から知らせる）
     pub lamp: bool,
@@ -1892,8 +1858,6 @@ pub struct RegisterView {
     pub call_waiting_ms: Option<u64>,
     /// 鳴動の音量（放置が長いほど大きい。呼び出しがなければ 0）
     pub ring_volume: f32,
-    /// グレーの画面にタッチして操作を引き継げる状態か（有人モードで、お客様の確認待ちなどでない）
-    pub switchable: bool,
     pub mode: Mode,
     pub mode_label: &'static str,
     /// 排出口にたまっているお金

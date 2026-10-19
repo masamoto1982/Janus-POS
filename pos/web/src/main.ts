@@ -205,16 +205,14 @@ function render(): void {
       lamp.title = on ? `呼び出し中（${Math.floor((r.call_waiting_ms ?? 0) / 1000)}秒）` : "呼び出しランプ";
     }
     const head = screenHead(r, new Date());
-    const items = itemsPanel(r, snap, ffUi(r.id));
-    // 操作できない側の画面は表示のみ（排他）
+    // もう一方が触れている一瞬（またはお客様側に限られる場面）は、この画面の操作が利かない
     for (const side of ["staff", "customer"] as const) {
+      const items = itemsPanel(r, snap, ffUi(r.id), side);
+      const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
-      el?.classList.toggle("inactive", r.active_side !== side);
-      // 有人モードでは、グレーの画面にタッチして操作を引き継げる
-      el?.classList.toggle("claimable", r.active_side !== side && r.switchable);
+      el?.classList.toggle("inactive", locked);
       const wrap = el?.parentElement;
-      wrap?.classList.toggle("inactive", r.active_side !== side);
-      wrap?.classList.toggle("claimable", r.active_side !== side && r.switchable);
+      wrap?.classList.toggle("inactive", locked);
       // レジ画面のヘッダー（歯車は店員ログイン中だけ。時刻とベルは常時）
       setRegion(`head-${r.id}-${side}`, head);
       setRegion(`items-${r.id}-${side}`, items);
@@ -391,14 +389,6 @@ document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
 
 app.addEventListener("click", (e) => {
-  // 有人モードでグレーの画面にタッチすると、操作をその画面に引き継ぐ
-  const idle = (e.target as Element).closest<HTMLElement>(".screen.claimable[data-drop]");
-  // 年齢確認ボタンは操作側でなくても押せる（例外）ので、引き継ぎにはしない
-  if (idle && !(e.target as Element).closest(".customer-only")) {
-    const [reg, side] = idle.dataset.drop!.split(":");
-    send({ type: "claim", register: Number(reg), side });
-    return;
-  }
   const b = (e.target as Element).closest("button");
   if (!b || b.disabled) return;
   if (b.hasAttribute("data-open-rules")) return rulesDlg().showModal();

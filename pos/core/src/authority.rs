@@ -1,18 +1,18 @@
 //! 操作権のモデル（問題3・5への対策）。
 //!
 //! レジには画面が二つ（店員側・お客様側）あるが、**画面ごとの役割の区別はない**。
-//! 二つの画面は一つの買い物画面（情報空間）を同じ内容で映し、操作は排他：
-//! どちらかが操作されているあいだ、もう一方は操作できない。
+//! 二つの画面は一つの買い物画面（情報空間）を同じ内容で映し、どちらからでも操作できる。
+//! 排他は触れている一瞬だけ：どちらかが操作した直後のわずかな間（[`TOUCH_LOCK_MS`]）、
+//! もう一方からの操作は利かない。どちらも触れていなければ、両方の画面が操作できる。
 //!
 //! 何ができるかは **モード** だけで決まる。名札でログインした係員がいれば有人モード、
 //! いなければセミセルフモード（[`rules`]）。どちらの画面から操作するかは関係ない。
-//! 唯一の例外は会計時の年齢確認ボタンで、お客様本人が押すものなのでお客様側の
-//! 画面からしか押せない（問題5）。
+//! 例外はお客様本人が押すボタン（年齢確認・代行収納の内容確認）で、お客様側の
+//! 画面からしか押せない（問題5、[`is_customer_only`]）。
 //!
-//! どちらの画面が操作側かは純粋関数 [`active_side`] で一意に決まる。店舗メニューは
-//! お客様側、セミセルフ（係員なし）もお客様側。有人モードでは画面を
-//! 持っている側が操作し、ログイン直後はお客様側が持つ。持っている側がしばらく
-//! 触られていないときだけ、もう一方がタッチで引き継げる（問題3）。
+//! 片方の画面だけが操作できる状態は純粋関数 [`active_side`] で決まる。店舗メニューは
+//! お客様側、セミセルフ（係員なし）もお客様側。有人モードでは、触れている一瞬だけ
+//! その側に限られ、それ以外は両方（`None`）。
 //!
 //! スキャナー・現金投入口・電子マネー端末・名札は画面ではない（機器）ので排他の対象外。
 //!
@@ -165,10 +165,12 @@ pub struct Context {
     pub customer_turn: bool,
     /// 店員がお客様画面で店舗メニュー（入出金・両替）を開いている
     pub menu_open: bool,
-    /// 有人モードで、いま画面を持っている側（ログイン直後はお客様側。
-    /// 持っている側がしばらく触られていなければ、もう一方がタッチで引き継ぐ）
-    pub holder: Side,
+    /// いま触れている側（操作した直後の一瞬だけ。その間はもう一方からの操作が利かない）
+    pub touching: Option<Side>,
 }
+
+/// 操作した側が「触れている」とみなす時間。この間だけ、もう一方の画面は操作できない
+pub const TOUCH_LOCK_MS: u64 = 1000;
 
 impl Context {
     /// 決済を止めている理由（なければ None）。決済の関門はここに集める。
@@ -219,23 +221,23 @@ fn confirm_point(c: &Context) -> Result<(), Denial> {
     require(c.point_pending, "ポイントカードの確認は済んでいます")
 }
 
-/// 今、画面を操作できる側。もう一方の画面は表示だけになる。
-pub fn active_side(c: &Context) -> Side {
+/// 今、操作できる側が片方に限られているなら、その側（`None` なら両方の画面が操作できる）。
+pub fn active_side(c: &Context) -> Option<Side> {
     if c.menu_open {
         // 店舗メニューはお客様画面に出す（釣銭機の出し入れ口が売り場側にあるため）
-        return Side::Customer;
+        return Some(Side::Customer);
     }
     if c.staff != StaffState::Ready {
         // 店員が操作できない（未ログイン・ロック中）ならお客様側
-        return Side::Customer;
+        return Some(Side::Customer);
     }
     if c.customer_turn {
         // セミセルフで店員が会計に進めた後はお客様の支払い。
-        // 店員が名札を読む（ログインする）と店員側に戻る
-        return Side::Customer;
+        // 店員が名札を読む（ログインする）と両方に戻る
+        return Some(Side::Customer);
     }
-    // 有人モードでは、画面を持っている側が操作する（登録・FF はどちらの画面からでもできる）
-    c.holder
+    // 有人モードでは、どちらかが触れている一瞬だけその側に限る
+    c.touching
 }
 
 /// 画面ではなく機器の操作（排他の対象外）
@@ -267,7 +269,7 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Err("支払い内容・金額の確認はお客様側の画面で押していただきます")
         };
     }
-    if !is_device_action(action) && active_side(c) != side {
+    if !is_device_action(action) && active_side(c).is_some_and(|s| s != side) {
         return Err("もう一方の画面で操作中です");
     }
     Ok(())
@@ -433,7 +435,7 @@ mod tests {
                                         v.push(Context {
                                             menu_open: false,
                                             point_pending: false,
-                                            holder: Side::Staff,
+                                            touching: None,
                                             customer_turn,
                                             mode,
                                             phase,
@@ -457,44 +459,48 @@ mod tests {
         v
     }
 
-    /// 画面の操作は排他：同じ状態で両方の画面が操作できることはない（年齢確認ボタンを除く）。
+    fn touch_states(base: Context) -> impl Iterator<Item = Context> {
+        [None, Some(Side::Staff), Some(Side::Customer)]
+            .into_iter()
+            .map(move |touching| Context { touching, ..base })
+    }
+
+    /// 触れている一瞬は排他：その間、もう一方の画面は操作できない（お客様だけが押すボタンを除く）。
     #[test]
-    fn screens_are_mutually_exclusive() {
-        for c in contexts() {
-            let any = |side: Side, list: &[Action]| {
-                list.iter().any(|&a| {
-                    // 年齢確認ボタンは唯一の例外（お客様側だけで押せる）
-                    !is_device_action(a) && !is_customer_only(a) && permitted(side, a, &c).is_ok()
-                })
-            };
-            assert!(
-                !(any(Side::Staff, ACTIONS) && any(Side::Customer, ACTIONS)),
-                "{c:?}"
-            );
+    fn touching_one_screen_locks_the_other() {
+        for base in contexts() {
+            for c in touch_states(base).filter(|c| c.touching.is_some()) {
+                let any = |side: Side| {
+                    ACTIONS.iter().any(|&a| {
+                        !is_device_action(a) && !is_customer_only(a) && permitted(side, a, &c).is_ok()
+                    })
+                };
+                assert!(!(any(Side::Staff) && any(Side::Customer)), "{c:?}");
+            }
         }
     }
 
-    /// 問題5：有人モードで係員が画面を持っていても、年確ボタンはお客様側の画面で押せる
-    /// （係員の画面からは押せない）。操作側の画面は年確で切り替わらない。
+    /// 有人モードで年確が出ても、年確ボタンはお客様側の画面で押す（係員の画面からは押せない）。
+    /// 係員が触れている最中でも同じ。
     #[test]
     fn age_confirmation_is_pressed_on_the_customer_side() {
-        for c in contexts()
+        for base in contexts()
             .into_iter()
             .filter(|c| c.mode == Mode::Attended && !c.customer_turn && c.age_pending)
         {
-            assert_eq!(active_side(&c), Side::Staff);
-            assert!(permitted(Side::Customer, Action::ConfirmAge, &c).is_ok());
-            assert!(permitted(Side::Staff, Action::ConfirmAge, &c).is_err());
+            for c in touch_states(base) {
+                assert!(permitted(Side::Customer, Action::ConfirmAge, &c).is_ok());
+                assert!(permitted(Side::Staff, Action::ConfirmAge, &c).is_err());
+            }
         }
     }
 
-    /// 画面の区別はない：操作側の画面なら、どちらでも同じことができる。
-    /// 例外は年齢確認ボタンだけで、お客様側からしか押せない。
+    /// 画面の区別はない：どちらも触れていなければ両方の画面で同じことができ、
+    /// 触れている一瞬だけその側に限られる。例外はお客様だけが押すボタン。
     #[test]
-    fn both_screens_can_do_the_same_except_age_confirmation() {
+    fn both_screens_can_do_the_same_except_customer_only_buttons() {
         for base in contexts() {
-            for holder in [Side::Staff, Side::Customer] {
-                let c = Context { holder, ..base };
+            for c in touch_states(base) {
                 let active = active_side(&c);
                 for &a in ACTIONS {
                     for side in [Side::Staff, Side::Customer] {
@@ -502,7 +508,7 @@ mod tests {
                             && if is_customer_only(a) {
                                 side == Side::Customer
                             } else {
-                                is_device_action(a) || side == active
+                                is_device_action(a) || active.is_none_or(|s| s == side)
                             };
                         assert_eq!(
                             permitted(side, a, &c).is_ok(),
@@ -511,6 +517,19 @@ mod tests {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    /// 有人モードでどちらも触れていなければ、FF はどちらの画面からも登録できる
+    #[test]
+    fn attended_ff_from_either_screen_when_nobody_touches() {
+        for c in contexts().into_iter().filter(|c| {
+            c.mode == Mode::Attended && !c.customer_turn && c.phase == Phase::Registering
+        }) {
+            assert_eq!(active_side(&c), None);
+            for side in [Side::Staff, Side::Customer] {
+                assert!(permitted(side, Action::RegisterFf, &c).is_ok());
             }
         }
     }

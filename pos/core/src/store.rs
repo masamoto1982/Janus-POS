@@ -198,6 +198,10 @@ pub enum Command {
         denomination: u32,
         count: u32,
     },
+    /// 入金ボックスで Enter：現金の投入を終え、決済する（投入額が足りなければ受け付けない）
+    FinishInsert {
+        register: u8,
+    },
     /// 財布のカード・スマホを端末にかざす（電子マネー・バーコード決済・クレジットカード）。
     /// 選ばれた支払方法と違うものをかざすと受け付けない（省略時は選ばれた方法）
     TapEmoney {
@@ -314,6 +318,7 @@ impl Command {
             | C::DismissConfiscated { register }
             | C::ConfirmBillPayment { register, .. }
             | C::InsertCash { register, .. }
+            | C::FinishInsert { register }
             | C::TapEmoney { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
@@ -1192,6 +1197,7 @@ impl Store {
                 denomination,
                 count,
             } => self.insert_cash(register, denomination, count),
+            C::FinishInsert { register } => self.finish_insert(register),
             C::TapEmoney { register, method } => {
                 self.check(register, Side::Customer, Action::TapEmoney)?;
                 let r = self.reg_mut(register)?;
@@ -1749,6 +1755,9 @@ impl Store {
         ))
     }
 
+    /// 現金を入れる。会計の確認が済んでいれば、入れただけで支払方法は現金になる
+    /// （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）。
+    /// 投入額は積み上がり、入金ボックスで Enter（[`Command::FinishInsert`]）を押すと決済する
     fn pay_cash(&mut self, register: u8, c: Cash) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         r.txn.method = Some(PaymentMethod::Cash);
@@ -1757,6 +1766,20 @@ impl Store {
         let total = r.txn.total();
         if paid < total {
             return done(format!("{paid}円 投入（あと {}円）", total - paid));
+        }
+        done(format!("{paid}円 投入。Enter でお支払いを確定します"))
+    }
+
+    fn finish_insert(&mut self, register: u8) -> Result<Outcome, String> {
+        self.check(register, Side::Customer, Action::InsertCash)?;
+        let r = self.reg_mut(register)?;
+        let paid = r.txn.inserted.total();
+        if paid == 0 {
+            return Err("お金を入れてください".into());
+        }
+        let total = r.txn.total();
+        if paid < total {
+            return Err(format!("あと {}円 入れてください", total - paid));
         }
         let inserted = r.txn.inserted.clone();
         self.settle(register, PaymentMethod::Cash, paid, inserted)

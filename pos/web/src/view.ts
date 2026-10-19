@@ -174,10 +174,23 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 }
 
 /** 支払方法を選んだ後の案内 */
-function payHint(method: string | null, blocker: string | null): string {
+function payHint(method: string | null, blocker: string | null, inserted: number): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
-  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、お客様側の端末にかざしてください</p>`;
-  return `<p>現金を投入してください（または支払方法を選んでください）</p>`;
+  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
+  if (inserted) return `<p>入金ボックスで Enter を押すと、お支払いが確定します</p>`;
+  if (method === "cash") return `<p>現金を入金ボックスに入れ、Enter で確定してください</p>`;
+  return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
+}
+
+/**
+ * 支払方法の選択肢。現金は入れただけで支払方法が現金に決まるので、入れた後は出さない
+ * （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）
+ */
+function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = ""): string {
+  if (method === "cash" && inserted) return "";
+  return `<div class="row wrap ${cls}">${METHODS
+    .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, st, `seg ${method === m ? "on" : ""}`))
+    .join("")}</div>`;
 }
 
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
@@ -347,10 +360,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
         <div>年確：${ageStatus(v)}</div>
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
-        <div class="row wrap">${METHODS
-          .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${v.method === m ? "on" : ""}`))
-          .join("")}</div>
-        ${payHint(v.method, v.payment_blocker)}
+        ${methodRow(reg, side, v.method, v.inserted, a("select_payment"))}
+        ${payHint(v.method, v.payment_blocker, v.inserted)}
       </div>`
     : "";
 
@@ -597,15 +608,13 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     const age =
       (c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "") +
       (c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "");
-    const methods = `<div class="row center wrap">${METHODS
-      .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${c.method === m ? "on" : ""}`))
-      .join("")}</div>`;
+    const methods = methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center");
     pay = c.point_pending
       ? `${pointCheck(reg, side, a("confirm_point_card"))}${age}`
       : `${age}<div class="paybox center">
         <div>お支払い <b class="total">${yen(c.total)}</b></div>
         ${c.inserted ? `<div>お預かり ${yen(c.inserted)}　残り <b>${yen(c.due)}</b></div>` : ""}
-        ${methods}${payHint(c.method, c.payment_blocker)}
+        ${methods}${payHint(c.method, c.payment_blocker, c.inserted)}
       </div>`;
   }
 

@@ -235,6 +235,14 @@ function render(): void {
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
     );
+    // おつりなど、出金ボックスにお金があれば枠と文字を点滅させる
+    app.querySelector(`[data-outlet="${r.id}"]`)?.classList.toggle("blink", r.outlet > 0);
+    // 入金ボックス：支払方法が決まったら中の文字を点滅させる。現金は投入額を積み上げて見せる
+    const inlet = app.querySelector<HTMLInputElement>(`[data-inlet="${r.id}"]`);
+    if (inlet) {
+      inlet.classList.toggle("blink", !r.menu && r.staff.phase === "paying" && r.staff.method !== null);
+      if (!inlet.dataset.typed) inlet.value = !r.menu && r.staff.inserted ? String(r.staff.inserted) : "";
+    }
   }
   setRegion("mats", matPanel(snap));
   setRegion("owner", ownerPanel(snap));
@@ -299,7 +307,7 @@ function send(cmd: Command): boolean {
   // 画面を指定しないコマンドの知らせは、そのレジの操作側の画面に出す
   const active = typeof cmd.register === "number" && !cmd.side ? snap.registers.find((x) => x.id === cmd.register)?.active_side : undefined;
   const side = sideOf(cmd) === "store" ? "store" : (active ?? sideOf(cmd));
-  const where = cmd.type === "set_product_age" ? "toast-rules" : ["cash_in", "cash_out", "open_menu", "insert", "take_outlet"].includes(cmd.type) ? `toast-${cmd.register}-customer` : side === "store" ? "toast-store" : `toast-${cmd.register}-${side}`;
+  const where = cmd.type === "set_product_age" ? "toast-rules" : ["cash_in", "cash_out", "open_menu", "insert", "finish_insert", "take_outlet"].includes(cmd.type) ? `toast-${cmd.register}-customer` : side === "store" ? "toast-store" : `toast-${cmd.register}-${side}`;
   if (res.ok) {
     if (res.message) toast(where, res.message, false);
   } else {
@@ -351,7 +359,10 @@ function form(b: HTMLElement): void {
 // 投入口：数字だけを受け付け、Enter で入れる
 app.addEventListener("input", (e) => {
   const el = e.target as HTMLInputElement;
-  if (el.dataset.inlet) el.value = el.value.replace(/[^0-9０-９]/g, "");
+  if (el.dataset.inlet) {
+    el.value = el.value.replace(/[^0-9０-９]/g, "");
+    el.dataset.typed = "1";
+  }
   // 生年月日：西暦 8 桁。全角の数字は半角に直す
   if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
 });
@@ -364,7 +375,18 @@ app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.inlet || e.key !== "Enter" || e.isComposing) return;
   const amount = Number(el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)) || 0);
-  if (send({ type: "insert", register: Number(el.dataset.inlet), amount })) el.value = "";
+  const register = Number(el.dataset.inlet);
+  const r = snap.registers.find((x) => x.id === register);
+  delete el.dataset.typed;
+  // 店舗メニューの入金・両替は、打ち込んだ金額をそのまま入れる
+  if (r?.menu) {
+    if (send({ type: "insert", register, amount })) el.value = "";
+    return;
+  }
+  // お会計：箱の金額が投入額。打ち込んで増やした分を入れてから、Enter で投入を終えて決済する
+  const extra = amount - (r?.staff.inserted ?? 0);
+  if (extra > 0 && !send({ type: "insert", register, amount: extra })) return;
+  send({ type: "finish_insert", register });
 });
 
 app.addEventListener("change", (e) => {

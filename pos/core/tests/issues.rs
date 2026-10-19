@@ -1,6 +1,6 @@
 //! 新型レジで報告された問題と、壁打ちで決めた仕様を、シナリオで検証する。
 
-use janus_pos_core::authority::{Action, Mode, Phase, Side, StaffState};
+use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{Command, RegisterView, Store};
 use serde_json::{json, Value};
@@ -137,6 +137,7 @@ fn scanning_on_payment_screen_returns_to_registering() {
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":500,"count":1}),
     );
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.last_receipt.as_ref().unwrap().change_total, 600 - 320);
 }
@@ -575,6 +576,7 @@ fn customer_registers_ff_in_self_mode() {
         &mut s,
         json!({"type":"insert_cash","register":2,"denomination":1000,"count":1}),
     );
+    ok(&mut s, json!({"type":"finish_insert","register":2}));
     assert!(reg(&s, 2).customer.lines.is_empty(), "paid and settled");
 }
 
@@ -647,9 +649,24 @@ fn inlet_pays_and_change_waits_in_outlet() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     confirm_point(&mut s, 1);
+    // 入れたお金は積み上がり、Enter で投入を終えると決済する
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    assert!(
+        run(&mut s, json!({"type":"finish_insert","register":1})).is_err(),
+        "not enough yet"
+    );
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     let v = reg(&s, 1);
-    assert_eq!(v.outlet, 1000 - 160);
+    assert_eq!(v.staff.inserted, 1100);
+    assert_eq!(
+        v.staff.method,
+        Some(PaymentMethod::Cash),
+        "cash picks itself"
+    );
+    assert!(v.last_receipt.is_none(), "waits for Enter");
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.outlet, 1100 - 160);
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).outlet, 0);
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
@@ -1004,6 +1021,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
         json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 220);
 
     // ポイントカードを先に読んでいれば、確認は済んでいる

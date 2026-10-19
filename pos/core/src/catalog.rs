@@ -91,6 +91,8 @@ pub struct Product {
     pub category: Category,
     /// 「要店員」：お客様側で読まれたら店員呼び出しをかけ、店員の受付操作を待つ
     pub needs_staff: bool,
+    /// 受付した内容・金額を、お客様本人がお客様側の画面で確認する（代行収納）
+    pub customer_confirms: bool,
 }
 
 const fn p(
@@ -107,6 +109,7 @@ const fn p(
         tax,
         category,
         needs_staff: matches!(category, Category::Service),
+        customer_confirms: false,
     }
 }
 
@@ -160,13 +163,16 @@ pub const CATALOG: &[Product] = &[
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
     p("2100000000014", "宅急便 発送受付", 0, Standard10, Service),
-    p(
-        "2100000000021",
-        "代行収納（公共料金）",
-        0,
-        Standard10,
-        Service,
-    ),
+    Product {
+        customer_confirms: true,
+        ..p(
+            "2100000000021",
+            "代行収納（公共料金）",
+            0,
+            Standard10,
+            Service,
+        )
+    },
     // FF（バーコードなし。レジ画面下のタブから登録する）
     p("FF01", "チキン（プレーン）", 220, Reduced8, FastFood),
     p("FF02", "チキン（スパイシー）", 220, Reduced8, FastFood),

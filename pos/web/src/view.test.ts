@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { btn, esc, itemCount, regTop, sideOf } from "./view";
+import { billCard, btn, esc, itemCount, regTop, sideOf } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -34,5 +34,12 @@ describe("view helpers", () => {
 
   it("hides the top bar while nothing is registered", () => {
     expect(regTop(0, 0, `<button>会計</button>`)).toBe("");
+  });
+
+  it("marks the bill-payment confirmation as a customer-only button", () => {
+    const html = billCard(1, 8640, { action: "confirm_bill_payment", allowed: true, reason: null });
+    expect(html).toContain("customer-only");
+    expect(html).toContain("8,640");
+    expect(sideOf({ type: "confirm_bill_payment", register: 1 })).toBe("customer");
   });
 });

@@ -11,6 +11,7 @@ const LIGHTER: &str = "4900000000134";
 const LOTTERY: &str = "4900000000158";
 const FIREWORKS: &str = "4900000000165";
 const PARCEL: &str = "2100000000014";
+const BILL: &str = "2100000000021";
 
 fn run(s: &mut Store, v: Value) -> Result<Option<String>, String> {
     let cmd: Command = serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("{v}: {e}"));
@@ -1041,14 +1042,72 @@ fn age_button_works_only_on_customer_screen_while_staff_holds() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BEER);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
     confirm_point(&mut s, 1);
     let v = reg(&s, 1);
     assert!(v.staff.age_pending);
     assert_eq!(v.active_side, Side::Staff);
-    let e = run(&mut s, json!({"type":"confirm_age","register":1,"side":"staff"})).unwrap_err();
+    let e = run(
+        &mut s,
+        json!({"type":"confirm_age","register":1,"side":"staff"}),
+    )
+    .unwrap_err();
     assert!(e.contains("お客様側"), "{e}");
-    ok(&mut s, json!({"type":"confirm_age","register":1,"side":"customer"}));
+    ok(
+        &mut s,
+        json!({"type":"confirm_age","register":1,"side":"customer"}),
+    );
     assert!(!reg(&s, 1).staff.age_pending);
     assert_eq!(reg(&s, 1).active_side, Side::Staff);
+}
+
+/// 代行収納：係員が受け付けた支払い内容・金額は、会計時にお客様が確認するまで決済できない。
+/// 確認ボタンは年確と同じく、お客様側の画面からしか押せない（係員が画面を持っていても）。
+/// 宅配便は確認の対象外。
+#[test]
+fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BILL);
+    scan(&mut s, 1, "staff", PARCEL);
+    for (i, amount) in [(0, 8_640), (1, 1_200)] {
+        let id = reg(&s, 1).staff.lines[i].line.id;
+        ok(
+            &mut s,
+            json!({"type":"complete_service","register":1,"line_id":id,"amount":amount}),
+        );
+    }
+    // 登録中は確認を求めない
+    assert_eq!(reg(&s, 1).customer.bill_check, None);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.bill_check, Some(8_640), "宅配便は確認しない");
+    assert_eq!(v.active_side, Side::Staff);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+    );
+    assert!(run(&mut s, json!({"type":"tap_emoney","register":1})).is_err());
+    let e = run(
+        &mut s,
+        json!({"type":"confirm_bill_payment","register":1,"side":"staff"}),
+    )
+    .unwrap_err();
+    assert!(e.contains("お客様側"), "{e}");
+    ok(
+        &mut s,
+        json!({"type":"confirm_bill_payment","register":1,"side":"customer"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.bill_check, None);
+    assert_eq!(v.active_side, Side::Staff, "確認しても操作側は変わらない");
+    ok(&mut s, json!({"type":"tap_emoney","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 8_640 + 1_200);
 }

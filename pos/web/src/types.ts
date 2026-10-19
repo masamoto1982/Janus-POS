@@ -16,7 +16,7 @@ export interface ActionState {
 export type LineKind =
   | { kind: "item" }
   | { kind: "ff"; state: FfState }
-  | { kind: "service"; done: boolean };
+  | { kind: "service"; done: boolean; confirm_pending: boolean };
 
 export type StaffLine = LineKind & {
   id: number;
@@ -65,6 +65,8 @@ export interface StaffView {
   required_age: number | null;
   age_verified: boolean;
   age_pending: boolean;
+  /** 会計時、お客様の確認待ちの代行収納の金額 */
+  bill_check: number | null;
   point_pending: boolean;
   method: Method | null;
   inserted: number;
@@ -86,6 +88,7 @@ export interface CustomerView {
   point_card: boolean;
   point_pending: boolean;
   age_check: number | null;
+  bill_check: number | null;
   staff_called: boolean;
   staff_present: boolean;
   method: Method | null;

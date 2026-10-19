@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
-    active_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side, StaffState, ACTIONS,
+    active_side, is_customer_only, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
+    StaffState, ACTIONS,
 };
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
@@ -157,6 +158,12 @@ pub enum Command {
         #[serde(default = "customer_side")]
         side: Side,
     },
+    /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない
+    ConfirmBillPayment {
+        register: u8,
+        #[serde(default = "customer_side")]
+        side: Side,
+    },
     InsertCash {
         register: u8,
         denomination: u32,
@@ -271,6 +278,7 @@ impl Command {
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
             | C::ConfirmAge { register, .. }
+            | C::ConfirmBillPayment { register, .. }
             | C::InsertCash { register, .. }
             | C::TapEmoney { register, .. }
             | C::CallStaff { register, .. }
@@ -345,8 +353,14 @@ pub enum FfState {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LineKind {
     Item,
-    Ff { state: FfState },
-    Service { done: bool },
+    Ff {
+        state: FfState,
+    },
+    /// `confirm_pending`：受付した内容・金額をお客様がまだ確認していない（代行収納）
+    Service {
+        done: bool,
+        confirm_pending: bool,
+    },
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -412,7 +426,26 @@ impl Txn {
     fn service_pending(&self) -> bool {
         self.lines
             .iter()
-            .any(|l| matches!(l.kind, LineKind::Service { done: false }))
+            .any(|l| matches!(l.kind, LineKind::Service { done: false, .. }))
+    }
+
+    /// お客様の確認待ちの代行収納の金額の合計（なければ None）
+    fn bill_pending(&self) -> Option<u32> {
+        let mut pending = self
+            .lines
+            .iter()
+            .filter(|l| {
+                matches!(
+                    l.kind,
+                    LineKind::Service {
+                        confirm_pending: true,
+                        ..
+                    }
+                )
+            })
+            .peekable();
+        pending.peek()?;
+        Some(pending.map(Line::amount).sum())
     }
 
     fn age_pending(&self) -> bool {
@@ -537,6 +570,7 @@ impl Register {
                 .iter()
                 .any(|l| matches!(l.kind, LineKind::Ff { .. })),
             service_pending: t.service_pending(),
+            bill_pending: t.paying && t.bill_pending().is_some(),
             point_pending: t.paying && !t.point_checked,
             method: t.method,
             customer_turn: t.customer_turn,
@@ -811,11 +845,15 @@ impl Store {
                     .lines
                     .iter_mut()
                     .find(|l| {
-                        l.id == line_id && matches!(l.kind, LineKind::Service { done: false })
+                        l.id == line_id && matches!(l.kind, LineKind::Service { done: false, .. })
                     })
                     .ok_or("受付待ちのサービス商品が見つかりません")?;
                 l.unit_price = amount;
-                l.kind = LineKind::Service { done: true };
+                // 代行収納は、受付した内容・金額をお客様が会計時に確認する
+                l.kind = LineKind::Service {
+                    done: true,
+                    confirm_pending: catalog::find(l.code).is_some_and(|p| p.customer_confirms),
+                };
                 let name = l.name;
                 if !self.reg_mut(register)?.txn.service_pending() {
                     self.calls.resolve(register, CallKind::Service, self.now);
@@ -878,6 +916,22 @@ impl Store {
                 let age = r.txn.required_age.unwrap_or(0);
                 self.calls.resolve(register, CallKind::AgeCheck, self.now);
                 done(format!("{age}歳以上であることを確認しました"))
+            }
+            C::ConfirmBillPayment { register, side } => {
+                self.check(register, side, Action::ConfirmBillPayment)?;
+                let r = self.reg_mut(register)?;
+                let amount = r.txn.bill_pending().unwrap_or(0);
+                for l in &mut r.txn.lines {
+                    if let LineKind::Service {
+                        confirm_pending, ..
+                    } = &mut l.kind
+                    {
+                        *confirm_pending = false;
+                    }
+                }
+                done(format!(
+                    "お客様が代行収納の支払い内容・金額（{amount}円）を確認しました"
+                ))
             }
             C::InsertCash {
                 register,
@@ -1172,7 +1226,14 @@ impl Store {
                 done(format!("ポイントカードを読みました{back}"))
             }
             Scanned::Product(p) if p.needs_staff => {
-                r.txn.push(p, 1, LineKind::Service { done: false });
+                r.txn.push(
+                    p,
+                    1,
+                    LineKind::Service {
+                        done: false,
+                        confirm_pending: false,
+                    },
+                );
                 let ready = r.staff_state() == StaffState::Ready;
                 if !ready {
                     self.calls.raise(register, CallKind::Service, now, p.name);
@@ -1620,7 +1681,11 @@ impl Store {
             list.iter()
                 .map(|&a| {
                     // 年齢確認ボタンだけは、どちらが操作側でもお客様側の画面で押す
-                    let side = if a == Action::ConfirmAge { Side::Customer } else { side };
+                    let side = if is_customer_only(a) {
+                        Side::Customer
+                    } else {
+                        side
+                    };
                     let res = permitted(side, a, &c);
                     ActionState {
                         action: a,
@@ -1701,6 +1766,7 @@ impl Store {
                 required_age: t.required_age.filter(|_| t.paying),
                 age_verified: t.age_verified,
                 age_pending: c.age_pending,
+                bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 point_pending: c.point_pending,
                 method: t.method,
                 inserted,
@@ -1721,6 +1787,7 @@ impl Store {
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
                 age_check: c.age_pending.then_some(t.required_age.unwrap_or(0)),
+                bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 staff_called,
                 staff_present: c.staff == StaffState::Ready,
                 method: t.method,
@@ -1777,6 +1844,8 @@ pub struct StaffView {
     pub required_age: Option<u8>,
     pub age_verified: bool,
     pub age_pending: bool,
+    /// 会計時、お客様の確認待ちの代行収納の金額
+    pub bill_check: Option<u32>,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
     pub point_pending: bool,
     pub method: Option<PaymentMethod>,
@@ -1802,6 +1871,8 @@ pub struct CustomerView {
     pub point_pending: bool,
     /// 年確中なら求める年齢
     pub age_check: Option<u8>,
+    /// お客様の確認待ちの代行収納の金額
+    pub bill_check: Option<u32>,
     pub staff_called: bool,
     pub staff_present: bool,
     pub method: Option<PaymentMethod>,

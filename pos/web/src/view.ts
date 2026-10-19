@@ -78,10 +78,23 @@ function thanks(r: RegisterView): string {
 
 /** 年齢確認ボタン（例外：お客様側の画面からしか押せない） */
 function ageCard(reg: number, age: number, st: ActionState): string {
-  return `<div class="card age-card">
+  return `<div class="card age-card customer-only">
       <div class="big">年齢確認</div>
       <p>年齢確認が必要な商品があります（お客様側の画面で押してください）</p>
       ${btn(`${age}歳以上です`, { type: "confirm_age", register: reg }, st, "primary big-btn")}
+      ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
+    </div>`;
+}
+
+/**
+ * 代行収納の支払い内容・金額の確認。年確と同じく、お客様本人がお客様側の画面で押す
+ * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
+ */
+export function billCard(reg: number, amount: number, st: ActionState): string {
+  return `<div class="card bill-card customer-only">
+      <div class="big">お支払い内容の確認</div>
+      <p>代行収納（公共料金）　<b>${yen(amount)}</b><br>払込票の内容・金額をご確認ください（お客様側の画面で押してください）</p>
+      ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
 }
@@ -145,7 +158,7 @@ export function attendedScreen(r: RegisterView): string {
   const pay = paying && v.point_pending
     ? pointCheck(reg, side, a("confirm_point_card"))
     : paying
-    ? `${v.age_pending ? ageCard(reg, v.required_age ?? 0, a("confirm_age")) : ""}<div class="paybox">
+    ? `${v.age_pending ? ageCard(reg, v.required_age ?? 0, a("confirm_age")) : ""}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
         <div>年確：${v.required_age ? (v.age_pending ? `<b class="warn">${v.required_age}歳以上の確認待ち</b>` : `<span class="ok">確認済</span>`) : "不要"}</div>
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
         <div class="row wrap">${METHODS
@@ -395,7 +408,9 @@ export function semiSelfScreen(r: RegisterView): string {
 
   let pay = "";
   if (c.phase === "paying") {
-    const age = c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "";
+    const age =
+      (c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "") +
+      (c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "");
     const methods = `<div class="row center wrap">${METHODS
       .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, a("select_payment"), `seg ${c.method === m ? "on" : ""}`))
       .join("")}</div>`;
@@ -526,7 +541,7 @@ export function walletPanel(): string {
 /** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */
 export function sideOf(cmd: Command): "staff" | "customer" | "store" {
   if (cmd.side === "staff" || cmd.side === "customer") return cmd.side;
-  if (["ff_button", "confirm_age", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
+  if (["ff_button", "confirm_age", "confirm_bill_payment", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
   if (typeof cmd.register === "number") return "staff";
   return "store";
 }

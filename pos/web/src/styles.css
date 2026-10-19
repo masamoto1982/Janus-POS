@@ -141,7 +141,7 @@ button {
   background: var(--accent); color: var(--accent-ink);
 }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-button:disabled { opacity: .35; cursor: not-allowed; }
+button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost { background: transparent; color: inherit; border-color: currentColor; opacity: .85; }
 button.ghost:disabled { opacity: .3; }
 button.small { padding: 3px 8px; font-size: 12px; }
@@ -187,6 +187,7 @@ details summary h3 { display: inline; }
 .point-card { text-align: center; }
 .point-card .big { font-size: 18px; font-weight: 700; }
 .age-card { background: var(--warn-bg); color: var(--warn); }
+.bill-card { background: var(--warn-bg); color: var(--warn); }
 .ffcheck { display: inline-flex; vertical-align: middle; margin-left: 6px; }
 .ffcheck input { width: 18px; height: 18px; accent-color: var(--ff); cursor: pointer; }
 .ffcheck input:disabled { cursor: not-allowed; }
@@ -291,18 +292,16 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-/* 操作できない側の画面（排他）：表示は続けるが、ボタンは押せない */
+/* 操作できない側の画面（排他）：両方の画面ともカラーで表示し、その画面から触れない操作だけをグレーアウトする */
 .banner.watch { background: var(--line); color: var(--ink); }
-.screen.inactive [data-region] > * { filter: grayscale(1); opacity: .55; }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
-.screen.inactive [data-region] select, .screen.inactive [data-region] summary { pointer-events: none; }
-/* 例外：年齢確認ボタンはお客様側の画面でだけ、どちらが操作側でも押せる。係員側では押せない */
-.customer-screen.inactive [data-region] > .age-card { filter: none; opacity: 1; }
-.customer-screen.inactive [data-region] .age-card button { pointer-events: auto; }
-.staff-screen .age-card button { pointer-events: none; opacity: .45; }
-.screen.inactive::after {
-  content: ""; position: absolute; inset: 0; background: var(--line); opacity: .25; pointer-events: none; border-radius: inherit;
+.screen.inactive [data-region] select, .screen.inactive [data-region] summary {
+  pointer-events: none; filter: grayscale(1); opacity: .45;
 }
+/* 例外：お客様本人が押すボタン（年齢確認・代行収納の内容確認）はお客様側の画面でだけ、
+   どちらが操作側でも押せる。係員側では押せない */
+.customer-screen.inactive [data-region] .customer-only button { pointer-events: auto; filter: none; opacity: 1; }
+.staff-screen .customer-only button { pointer-events: none; filter: grayscale(1); opacity: .45; }
 .screen.claimable { cursor: pointer; }
 
 /* 店員画面に映すお客様画面の内容 */

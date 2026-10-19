@@ -395,7 +395,7 @@ app.addEventListener("click", (e) => {
   // 有人モードでグレーの画面にタッチすると、操作をその画面に引き継ぐ
   const idle = (e.target as Element).closest<HTMLElement>(".screen.claimable[data-drop]");
   // 年齢確認ボタンは操作側でなくても押せる（例外）ので、引き継ぎにはしない
-  if (idle && !(e.target as Element).closest(".age-card")) {
+  if (idle && !(e.target as Element).closest(".customer-only")) {
     const [reg, side] = idle.dataset.drop!.split(":");
     send({ type: "claim", register: Number(reg), side });
     return;
@@ -428,7 +428,7 @@ app.addEventListener("click", (e) => {
   if (b.dataset.cmd) {
     const cmd = JSON.parse(b.dataset.cmd) as Command;
     // 年齢確認は、押した画面（お客様側だけ受け付ける）をコアに伝える
-    if (cmd.type === "confirm_age") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
+    if (cmd.type === "confirm_age" || cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
     send(cmd);
   }
   else if (b.dataset.form) form(b);

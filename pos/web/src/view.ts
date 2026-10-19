@@ -177,8 +177,8 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 function payHint(method: string | null, blocker: string | null, inserted: number): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
-  if (inserted) return `<p>入金ボックスで Enter を押すと、お支払いが確定します</p>`;
-  if (method === "cash") return `<p>現金を入金ボックスに入れ、Enter で確定してください</p>`;
+  if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
+  if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
 }
 
@@ -370,7 +370,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     v.total,
     itemCount(v.lines),
     paying
-      ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
+      ? v.method === "cash"
+        ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
+        : btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
       : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
     r.max_items,
   );
@@ -400,6 +402,21 @@ function pointCheck(reg: number, side: Side, st: ActionState): string {
  * 登録画面の最上部に固定する帯：左から買い物点数・合計金額・会計ボタン。
  * 商品登録が一つもないときは出さない（案内を広く見せる）。
  */
+/**
+ * 現金払いのときだけ、会計ボタンの位置が「投入おわり」に切り替わる。
+ * 入金ボックスで Enter を押すのは、このボタンを押す近道
+ */
+function finishInsert(reg: number, inserted: number, due: number, st: ActionState): string {
+  const ready: ActionState = !st.allowed
+    ? st
+    : !inserted
+      ? { ...st, allowed: false, reason: "お金を入れてください" }
+      : due > 0
+        ? { ...st, allowed: false, reason: `あと ${yen(due)} 入れてください` }
+        : st;
+  return btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary");
+}
+
 export function regTop(total: number, count: number, action: string, max = Infinity): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
@@ -596,7 +613,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     itemCount(c.lines),
     c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
-      : btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost"),
+      : c.method === "cash"
+        ? finishInsert(reg, c.inserted, c.due, a("insert_cash"))
+        : btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost"),
     r.max_items,
   );
 

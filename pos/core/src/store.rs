@@ -198,7 +198,7 @@ pub enum Command {
         denomination: u32,
         count: u32,
     },
-    /// 入金ボックスで Enter：現金の投入を終え、決済する（投入額が足りなければ受け付けない）
+    /// 「投入おわり」（入金ボックスの Enter はその近道）：現金の投入を終え、決済する（投入額が足りなければ受け付けない）
     FinishInsert {
         register: u8,
     },
@@ -1757,7 +1757,7 @@ impl Store {
 
     /// 現金を入れる。会計の確認が済んでいれば、入れただけで支払方法は現金になる
     /// （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）。
-    /// 投入額は積み上がり、入金ボックスで Enter（[`Command::FinishInsert`]）を押すと決済する
+    /// 投入額は積み上がり、「投入おわり」（[`Command::FinishInsert`]）を押すと決済する。入金ボックスの Enter はその近道
     fn pay_cash(&mut self, register: u8, c: Cash) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         r.txn.method = Some(PaymentMethod::Cash);
@@ -1767,7 +1767,7 @@ impl Store {
         if paid < total {
             return done(format!("{paid}円 投入（あと {}円）", total - paid));
         }
-        done(format!("{paid}円 投入。Enter でお支払いを確定します"))
+        done(format!("{paid}円 投入。「投入おわり」を押すとお支払いを確定します"))
     }
 
     fn finish_insert(&mut self, register: u8) -> Result<Outcome, String> {

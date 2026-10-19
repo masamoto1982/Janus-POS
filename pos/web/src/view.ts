@@ -4,6 +4,7 @@
 
 import type {
   ActionState,
+  Coupon,
   Command,
   CustomerView,
   FfState,
@@ -247,14 +248,27 @@ function ageStatus(v: StaffView): string {
   return `<span class="ok">確認済</span>`;
 }
 
+/** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい） */
+export function couponRows(coupons: Coupon[]): string {
+  return coupons
+    .map(
+      (c) =>
+        `<tr class="coupon"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
+          c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
+        }</td><td></td></tr>`,
+    )
+    .join("");
+}
+
 /** 初期画面のボタンで選んだ案内（レジ:画面 → 種類）。選ばなくても、どのバーコードでも読める */
 export const scanGuide = new Map<string, GuideKind>();
-export type GuideKind = "item" | "bag" | "point" | "pay";
+export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon";
 const GUIDES: [GuideKind, string, string][] = [
   ["item", "商品", "商品のバーコードをスキャンしてください"],
-  ["bag", "レジ袋", "レジ袋の見本のバーコードをスキャンしてください（S・L）"],
-  ["point", "ポイントカード", "ポイントカードのバーコードをスキャンしてください（お会計の後でも読めます）"],
-  ["pay", "お支払い", "商品を登録して「お会計」に進むと、お支払い方法を選べます"],
+  ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
+  ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
+  ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
+  ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
 ];
 
 /**
@@ -282,7 +296,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks(r);
   // 新しく登録した商品ほど上に出す
-  const rows = [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
+  const rows = couponRows(v.coupons) + [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
   const paying = v.phase === "paying";
 
   // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる
@@ -532,7 +546,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     r.max_items,
   );
 
-  if (!c.lines.length) return `${top}${notice}${welcome(reg, side)}`;
+  if (!c.lines.length && !c.coupons.length) return `${top}${notice}${welcome(reg, side)}`;
   scanGuide.delete(`${reg}:${side}`);
 
   let pay = "";
@@ -554,7 +568,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 
   return `${top}${notice}
     ${pay}
-    <table class="lines"><tbody>${rows}</tbody></table>
+    <table class="lines"><tbody>${couponRows(c.coupons)}${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
 }
 
@@ -656,6 +670,9 @@ export function walletPanel(): string {
   const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "硬貨", "coin"));
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
+    item("PC87654321", "ポイントアプリ", "スマホ", "card"),
+    item("CP0001", "おにぎり 鮭", "引換券", "coupon"),
+    item("CP0002", "ミックスサンド", "50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
     walletItem("pay:emoney", "電子マネー", "端末にかざす", "pay"),

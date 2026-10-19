@@ -15,7 +15,7 @@ use crate::authority::{
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
 use crate::catalog::{
-    self, Category, FfTab, Product, Scanned, TaxRate, CATALOG, FF_MENU, INITIAL_FF_STOCK,
+    self, Category, Coupon, FfTab, Product, Scanned, TaxRate, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
 use crate::mat::{Bell, Mat};
 use crate::rng::Rng;
@@ -412,6 +412,8 @@ struct Txn {
     point_card: Option<String>,
     /// 会計ボタンの時点で求められた年齢（年確不要なら None）
     required_age: Option<u8>,
+    /// 読み取った引換券・割引券（対象商品の登録を待つものも含む）
+    coupons: Vec<&'static Coupon>,
     /// 店員が選んだ年齢確認のやり方（None はまだ選んでいない）
     age_method: Option<AgeMethod>,
     /// 年確が済んだ年齢（「しない」ならお客様の申告、「する」なら身分証の年齢）
@@ -427,8 +429,45 @@ struct Txn {
 }
 
 impl Txn {
+    /// 読み取ったクーポンと、その値引き額（対象商品がまだなければ None）。
+    /// 対象商品 1 個につきクーポン 1 枚。読んだ順番（商品より先か後か）は関係ない
+    fn coupon_uses(&self) -> Vec<(&'static Coupon, Option<(u32, TaxRate)>)> {
+        let mut used: Vec<(&str, u32)> = vec![];
+        self.coupons
+            .iter()
+            .map(|&c| {
+                let have: u32 = self
+                    .lines
+                    .iter()
+                    .filter(|l| l.code == c.target && l.kind == LineKind::Item)
+                    .map(|l| l.qty)
+                    .sum();
+                let n = used.iter().find(|(t, _)| *t == c.target).map_or(0, |e| e.1);
+                if n >= have {
+                    return (c, None);
+                }
+                match used.iter_mut().find(|(t, _)| *t == c.target) {
+                    Some(e) => e.1 += 1,
+                    None => used.push((c.target, 1)),
+                }
+                let p = catalog::find(c.target);
+                (c, p.map(|p| (c.discount(p.price), p.tax)))
+            })
+            .collect()
+    }
+
+    fn discount_of(&self, rate: Option<TaxRate>) -> u32 {
+        self.coupon_uses()
+            .iter()
+            .filter_map(|(_, u)| *u)
+            .filter(|(_, t)| rate.is_none_or(|r| r == *t))
+            .map(|(yen, _)| yen)
+            .sum()
+    }
+
     fn total(&self) -> u32 {
-        self.lines.iter().map(Line::amount).sum()
+        let gross: u32 = self.lines.iter().map(Line::amount).sum();
+        gross.saturating_sub(self.discount_of(None))
     }
 
     fn tax_of(&self, rate: TaxRate) -> u32 {
@@ -437,7 +476,8 @@ impl Txn {
             .iter()
             .filter(|l| l.tax == rate)
             .map(Line::amount)
-            .sum();
+            .sum::<u32>()
+            .saturating_sub(self.discount_of(Some(rate)));
         match rate {
             TaxRate::Reduced8 => gross * 8 / 108,
             TaxRate::Standard10 => gross * 10 / 110,
@@ -671,6 +711,14 @@ enum AgeMethod {
     Declare,
     /// 「する」：身分証の生年月日で判定する
     Id,
+}
+
+/// 読み取ったクーポン。discount が None なら対象商品の登録待ち
+#[derive(Clone, Debug, Serialize)]
+pub struct CouponView {
+    pub code: &'static str,
+    pub name: &'static str,
+    pub discount: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1367,6 +1415,21 @@ impl Store {
                 r.txn.point_card = Some(no);
                 done(format!("ポイントカードを読みました{back}"))
             }
+            Scanned::Coupon(c) => {
+                if r.txn.coupons.contains(&c) {
+                    return Err(format!("{}は読み取り済みです", c.name));
+                }
+                r.txn.coupons.push(c);
+                let waiting = r.txn.coupon_uses().last().is_some_and(|(_, u)| u.is_none());
+                done(if waiting {
+                    format!(
+                        "{}を読みました。対象商品を登録すると値引きします{back}",
+                        c.name
+                    )
+                } else {
+                    format!("{}を読みました{back}", c.name)
+                })
+            }
             Scanned::Product(p) if p.needs_staff => {
                 r.txn.push(
                     p,
@@ -1873,6 +1936,15 @@ impl Store {
         };
         let total = t.total();
         let inserted = t.inserted.total();
+        let coupons: Vec<CouponView> = t
+            .coupon_uses()
+            .into_iter()
+            .map(|(c, u)| CouponView {
+                code: c.code,
+                name: c.name,
+                discount: u.map(|(yen, _)| yen),
+            })
+            .collect();
         let calls = self.calls.for_register(r.id);
         let staff_called = !calls.is_empty() && c.staff != StaffState::Ready;
         let waiting = staff_called
@@ -1932,6 +2004,7 @@ impl Store {
                 total,
                 tax8: t.tax_of(TaxRate::Reduced8),
                 tax10: t.tax_of(TaxRate::Standard10),
+                coupons: coupons.clone(),
                 point_card: t.point_card.clone(),
                 required_age: t.required_age.filter(|_| t.paying),
                 age_choice_pending: c.age_choice_pending,
@@ -1957,6 +2030,7 @@ impl Store {
             customer: CustomerView {
                 phase: c.phase,
                 lines: customer_lines,
+                coupons,
                 total,
                 inserted,
                 due: total.saturating_sub(inserted),
@@ -2016,6 +2090,8 @@ pub struct StaffView {
     pub total: u32,
     pub tax8: u32,
     pub tax10: u32,
+    /// 読み取った引換券・割引券
+    pub coupons: Vec<CouponView>,
     pub point_card: Option<String>,
     pub required_age: Option<u8>,
     /// 店員の「年齢確認をする／しない」待ち
@@ -2045,6 +2121,7 @@ pub struct StaffView {
 pub struct CustomerView {
     pub phase: Phase,
     pub lines: Vec<CustomerLine>,
+    pub coupons: Vec<CouponView>,
     pub total: u32,
     pub inserted: u32,
     pub due: u32,

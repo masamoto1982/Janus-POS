@@ -18,6 +18,13 @@ export type LineKind =
   | { kind: "ff"; state: FfState }
   | { kind: "service"; done: boolean; confirm_pending: boolean };
 
+/** 読み取ったクーポン。discount が null なら対象商品の登録待ち */
+export interface Coupon {
+  code: string;
+  name: string;
+  discount: number | null;
+}
+
 export type StaffLine = LineKind & {
   id: number;
   code: string;
@@ -61,6 +68,7 @@ export interface StaffView {
   total: number;
   tax8: number;
   tax10: number;
+  coupons: Coupon[];
   point_card: string | null;
   required_age: number | null;
   /** 店員の「年齢確認をする／しない」待ち */
@@ -87,6 +95,7 @@ export interface StaffView {
 export interface CustomerView {
   phase: Phase;
   lines: CustomerLine[];
+  coupons: Coupon[];
   total: number;
   inserted: number;
   due: number;

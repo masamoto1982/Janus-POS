@@ -1262,3 +1262,46 @@ fn age_counts_the_birthday() {
         assert!(age_on(bad, "2026-10-19").is_err(), "{bad}");
     }
 }
+
+/// 引換券・割引券は商品より先に読んでもよい。対象商品が登録されたときに値引きし、
+/// 対象商品がなければ「対象商品待ち」のまま決済の邪魔はしない。
+#[test]
+fn coupons_apply_whenever_the_target_is_registered() {
+    const SANDWICH: &str = "4900000000028";
+    let mut s = Store::new(1, 2, 1);
+    // 商品より先にクーポン
+    scan(&mut s, 1, "customer", "CP0001");
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.coupons.len(), 1);
+    assert_eq!(v.customer.coupons[0].discount, None);
+    assert_eq!(v.customer.total, 0);
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":"CP0001"})
+    )
+    .is_err());
+    scan(&mut s, 1, "customer", ONIGIRI);
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.coupons[0].discount, Some(160));
+    assert_eq!(v.customer.total, 0);
+    // 商品の後にクーポン（割引券）。もう 1 個のおにぎりは定価
+    scan(&mut s, 1, "customer", SANDWICH);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", "CP0002");
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.total, 160 + 320 - 50);
+    // クーポンは買い物点数に数えない
+    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 3);
+    // クーポンを使ったまま会計できる
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    ok(&mut s, json!({"type":"tap_emoney","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 430);
+}

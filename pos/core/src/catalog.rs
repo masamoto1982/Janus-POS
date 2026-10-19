@@ -304,11 +304,58 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
 pub enum Scanned {
     Product(&'static Product),
     PointCard(String),
+    Coupon(&'static Coupon),
     Staff(String),
     Unknown,
 }
 
 pub const POINT_CARD_PREFIX: &str = "PC";
+pub const COUPON_PREFIX: &str = "CP";
+
+/// クーポンの効き方
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "yen")]
+pub enum CouponKind {
+    /// 引換券：対象商品 1 個が無料
+    Exchange,
+    /// 割引券：対象商品 1 個から値引き
+    Discount(u32),
+}
+
+/// 引換券・割引券。商品より先に読んでも、対象商品が登録されたときに効く
+#[derive(Debug, PartialEq, Eq)]
+pub struct Coupon {
+    pub code: &'static str,
+    pub name: &'static str,
+    /// 対象商品のバーコード
+    pub target: &'static str,
+    pub kind: CouponKind,
+}
+
+pub const COUPONS: &[Coupon] = &[
+    Coupon {
+        code: "CP0001",
+        name: "おにぎり 鮭 引換券",
+        target: "4900000000011",
+        kind: CouponKind::Exchange,
+    },
+    Coupon {
+        code: "CP0002",
+        name: "ミックスサンド 50円引き",
+        target: "4900000000028",
+        kind: CouponKind::Discount(50),
+    },
+];
+
+impl Coupon {
+    /// 対象商品 1 個に対する値引き額
+    pub fn discount(&self, price: u32) -> u32 {
+        match self.kind {
+            CouponKind::Exchange => price,
+            CouponKind::Discount(yen) => yen.min(price),
+        }
+    }
+}
 pub const STAFF_PREFIX: &str = "ST";
 
 pub fn classify(code: &str) -> Scanned {
@@ -318,6 +365,12 @@ pub fn classify(code: &str) -> Scanned {
     }
     if let Some(id) = code.strip_prefix(STAFF_PREFIX) {
         return Scanned::Staff(id.to_string());
+    }
+    if code.starts_with(COUPON_PREFIX) {
+        return COUPONS
+            .iter()
+            .find(|c| c.code == code)
+            .map_or(Scanned::Unknown, Scanned::Coupon);
     }
     match find(code) {
         // FF はバーコードでは登録しない（店員操作モードのメニューからのみ）

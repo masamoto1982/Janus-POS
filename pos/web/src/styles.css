@@ -273,6 +273,8 @@ button.emoney { background: #0ea5e9; }
 .item-sub b { color: var(--warn); font-weight: 600; }
 .item.staff { background: var(--staff-bg); color: var(--staff-ink); border-color: var(--staff-line); }
 .item.staff .item-sub { color: #9ca3af; }
+.item.coupon { background: var(--danger-bg); color: var(--danger); }
+.lines tr.coupon td { color: var(--danger); }
 .item.card { background: var(--call-bg); color: var(--call); }
 .item.bill { background: var(--bill-bg); border-color: var(--bill-line); }
 .item.coin { background: var(--coin-bg); border-color: var(--coin-line); border-radius: 999px; }

@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
-    active_side, is_customer_only, permitted, TOUCH_LOCK_MS, Action, Context, Mode, PaymentMethod, Phase, Side,
-    StaffState, ACTIONS,
+    active_side, is_customer_only, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
+    StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
@@ -452,6 +452,11 @@ impl Txn {
         self.paying && self.required_age.is_some() && !self.age_verified
     }
 
+    /// 買い物点数（数量の合計）
+    fn item_count(&self) -> u32 {
+        self.lines.iter().map(|l| l.qty).sum()
+    }
+
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind) {
         // 同じ商品はまとめる（FF は状態が同じお渡し前どうしだけ）
         if let Some(l) = self.lines.iter_mut().find(|l| {
@@ -514,7 +519,6 @@ struct Register {
     pressing: bool,
 }
 
-
 impl Register {
     /// 運用モードは名札で決まる：名札でログイン中なら有人、いなければセミセルフ。
     /// セルフ（将来の拡張）は、有効なときに明示的に選んだ場合だけ。
@@ -568,6 +572,7 @@ impl Register {
             customer_turn: t.customer_turn,
             menu_open: self.menu.is_some(),
             touching: self.touch.map(|(side, _)| side),
+            items_full: t.item_count() >= MAX_ITEMS,
         }
     }
 }
@@ -1196,6 +1201,10 @@ impl Store {
                 return done("ポイントカードを読みました。お支払い方法を選んでください");
             }
         }
+        // 買い物点数の上限を超える商品は登録しない（会計画面にもとどまる）
+        if matches!(scanned, Scanned::Product(_)) && r.txn.item_count() >= MAX_ITEMS {
+            return Err(ITEMS_FULL.into());
+        }
         // 会計画面で読まれたら、登録画面に引き返して追加する（投入済みの現金はそのまま）
         let back = if r.txn.paying {
             r.txn.paying = false;
@@ -1250,6 +1259,10 @@ impl Store {
             .filter(|p| p.category == Category::FastFood)
             .ok_or("FF の商品が見つかりません")?;
         let qty = qty.max(1);
+        let count = self.reg(register).map_or(0, |r| r.txn.item_count());
+        if count + qty > MAX_ITEMS {
+            return Err(ITEMS_FULL.into());
+        }
         let stock = self
             .ff_stock
             .iter_mut()
@@ -1709,6 +1722,7 @@ impl Store {
         RegisterView {
             id: r.id,
             active_side: active_side(&c),
+            max_items: MAX_ITEMS,
             lamp: waiting.is_some(),
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
@@ -1851,6 +1865,8 @@ pub struct RegisterView {
     pub id: u8,
     /// 操作できる側が片方に限られているなら、その側（None なら両方の画面が操作できる）
     pub active_side: Option<Side>,
+    /// 買い物点数の上限
+    pub max_items: u32,
     /// レジ本体の呼び出しランプ。店員が来るまで点きっぱなし（音は MAT だけ。
     /// 呼び出しは順番待ちにせず、どれも発生した瞬間から知らせる）
     pub lamp: bool,

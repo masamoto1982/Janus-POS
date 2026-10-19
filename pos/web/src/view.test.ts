@@ -57,4 +57,9 @@ describe("view helpers", () => {
     expect(customer).toContain("係員を呼び出しています。しばらくお待ちください。");
     expect(customer).not.toContain("FF");
   });
+
+  it("marks the item count when the limit is reached", () => {
+    expect(regTop(100, 9, "", 10)).not.toContain("上限");
+    expect(regTop(100, 10, "", 10)).toContain("上限");
+  });
 });

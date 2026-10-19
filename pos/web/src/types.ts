@@ -101,6 +101,8 @@ export interface RegisterView {
   /** 今、画面を操作できる側（もう一方は表示だけ） */
   /** 操作できる側が片方に限られているなら、その側（null なら両方の画面が操作できる） */
   active_side: Side | null;
+  /** 買い物点数の上限 */
+  max_items: number;
   /** 有人モードで、グレーの画面にタッチして操作を引き継げる */
   /** レジ本体の呼び出しランプ（店員が来るまで点灯） */
   lamp: boolean;

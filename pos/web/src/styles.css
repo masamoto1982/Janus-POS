@@ -128,6 +128,11 @@ button { touch-action: manipulation; }
 .reg-top button { border-color: #ffffff; }
 .reg-top .total { font-size: 22px; }
 .reg-top .count b { font-size: 18px; }
+.reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #ffffff; color: var(--reg-top-bg); font-weight: 700; }
+/* 登録の明細は表示エリアが狭いので小ぶりに */
+.screen-main .lines td { font-size: 12px; padding: 3px 4px; }
+.screen-main .lines .tag { font-size: 10px; }
+.screen-main .lines button { font-size: 11px; padding: 1px 8px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
 .total { font-size: 20px; }
 

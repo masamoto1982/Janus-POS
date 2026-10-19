@@ -167,7 +167,15 @@ pub struct Context {
     pub menu_open: bool,
     /// いま触れている側（操作した直後の一瞬だけ。その間はもう一方からの操作が利かない）
     pub touching: Option<Side>,
+    /// 買い物点数が上限（[`MAX_ITEMS`]）に達している
+    pub items_full: bool,
 }
+
+/// 一回のお買い物で登録できる点数（数量の合計）の上限。
+/// Janus POS はセミセルフ POS の模範的なありかたを探るシミュレーターなので、
+/// 画面の表示エリアに収まる点数に絞る
+pub const MAX_ITEMS: u32 = 10;
+pub const ITEMS_FULL: Denial = "買い物点数の上限（10点）に達しています";
 
 /// 操作した側が「触れている」とみなす時間。この間だけ、もう一方の画面は操作できない
 pub const TOUCH_LOCK_MS: u64 = 1000;
@@ -336,7 +344,10 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
     }
     match action {
         Action::Scan | Action::SetMode | Action::Lock | Action::EndStaffMode => Ok(()),
-        Action::RegisterFf => require(!paying, "お会計中です"),
+        Action::RegisterFf => {
+            require(!paying, "お会計中です")?;
+            require(!c.items_full, ITEMS_FULL)
+        }
         Action::CashOut => require(!c.has_lines, "取引中は出金操作ができません"),
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
         Action::CheckFf => check_ff(c),
@@ -377,7 +388,8 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         }
         Action::RegisterFf => {
             require(c.mode == Mode::FullSelf, "FF は係員にお申し付けください")?;
-            require(!paying, "お会計中です")
+            require(!paying, "お会計中です")?;
+            require(!c.items_full, ITEMS_FULL)
         }
         Action::CheckFf => check_ff(c),
         Action::RemoveLine => {
@@ -436,6 +448,7 @@ mod tests {
                                             menu_open: false,
                                             point_pending: false,
                                             touching: None,
+                                            items_full: false,
                                             customer_turn,
                                             mode,
                                             phase,
@@ -472,7 +485,9 @@ mod tests {
             for c in touch_states(base).filter(|c| c.touching.is_some()) {
                 let any = |side: Side| {
                     ACTIONS.iter().any(|&a| {
-                        !is_device_action(a) && !is_customer_only(a) && permitted(side, a, &c).is_ok()
+                        !is_device_action(a)
+                            && !is_customer_only(a)
+                            && permitted(side, a, &c).is_ok()
                     })
                 };
                 assert!(!(any(Side::Staff) && any(Side::Customer)), "{c:?}");

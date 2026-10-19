@@ -61,6 +61,14 @@ fn login_as(s: &mut Store, r: u8, badge: &str) {
     ok(s, json!({"type":"claim","register":r,"side":"staff"}));
 }
 
+/// 年確で店員が「しない」を選ぶ（お客様の「X歳以上です」で済ませる）
+fn no_id_check(s: &mut Store, r: u8) {
+    ok(
+        s,
+        json!({"type":"choose_age_check","register":r,"id_check":false}),
+    );
+}
+
 /// 会計ボタンの後のポイントカードの最終確認（ポイントカードなしで進む）。操作側の画面で行う
 fn confirm_point(s: &mut Store, r: u8) {
     let side = match reg(s, r).active_side {
@@ -149,6 +157,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert_eq!(v.customer.age_check, Some(20));
     assert!(run(
@@ -156,8 +165,12 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         json!({"type":"insert_cash","register":1,"denomination":1000,"count":1})
     )
     .is_err());
+    // 店員が「しない」を選ぶと、お客様の「20歳以上です」で済む
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"id_check":false}),
+    );
     ok(&mut s, json!({"type":"confirm_age","register":1}));
-    ok(&mut s, json!({"type":"check_id","register":1,"ok":true}));
     // 同じ取引で戻って追加しても、再確認はしない
     scan(&mut s, 1, "staff", BEER);
     ok(
@@ -189,8 +202,11 @@ fn self_mode_age_check_calls_staff() {
         .any(|c| c.register == 2 && c.kind == CallKind::AgeCheck));
     assert!(!allowed(&reg(&s, 2), Side::Customer, Action::ConfirmAge));
     scan(&mut s, 2, "staff", "ST1002");
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":2,"id_check":false}),
+    );
     ok(&mut s, json!({"type":"confirm_age","register":2}));
-    ok(&mut s, json!({"type":"check_id","register":2,"ok":true}));
     // 名札を読んだので有人モード。モードはログアウトか 5 分の無操作でだけ戻る
     assert_eq!(reg(&s, 2).mode, Mode::Attended);
     assert_eq!(reg(&s, 2).staff.state, StaffState::Ready);
@@ -220,6 +236,7 @@ fn only_owner_changes_age_rules() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     assert_eq!(reg(&s, 1).customer.age_check, Some(20));
     assert_eq!(s.snapshot().age_rules.history.len(), 1);
 }
@@ -1025,6 +1042,7 @@ fn either_screen_can_operate_except_age_confirmation() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert!(v.staff.age_pending);
     assert_eq!(v.active_side, Some(Side::Customer));
@@ -1049,6 +1067,7 @@ fn age_button_works_only_on_customer_screen_while_staff_holds() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
+    no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert!(v.staff.age_pending);
     assert_eq!(v.active_side, Some(Side::Staff));
@@ -1172,14 +1191,15 @@ fn void_lock_and_logout_from_the_store_menu() {
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
 }
 
-/// 年確：お客様が早見表で自分の段階を申告し、店員が身分証で承認する。
-/// 申告の年齢に届かない年確商品は、承認と同時に買い物から取り消す（18 禁雑誌は買えるが酒は買えない等）。
+/// 年確：年確商品があれば、まず店員が「年齢確認をする／しない」を選ぶ。
+/// 「する」なら身分証の生年月日を入力し、年齢に届かない年確商品は買い物から取り除いて
+/// 没収する商品と個数を店員に示す（18 禁雑誌は買えるが酒は買えない等）。
 #[test]
-fn customer_declares_from_the_chart_and_staff_approves() {
+fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     const MAGAZINE: &str = "4900000000141";
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    for code in [ONIGIRI, BEER, MAGAZINE] {
+    for code in [ONIGIRI, BEER, BEER, MAGAZINE] {
         scan(&mut s, 1, "staff", code);
     }
     advance(&mut s, 1_000);
@@ -1190,38 +1210,51 @@ fn customer_declares_from_the_chart_and_staff_approves() {
     confirm_point(&mut s, 1);
     advance(&mut s, 1_000);
     let v = reg(&s, 1);
-    assert_eq!(v.customer.age_levels, vec![20, 18]);
-    assert_eq!(v.staff.required_age, Some(20));
-    let check = |ok: bool, side: &str| json!({"type":"check_id","register":1,"side":side,"ok":ok});
-    // お客様が申告するまで、店員の承認は押せない
-    let e = run(&mut s, check(true, "staff")).unwrap_err();
-    assert!(e.contains("お客様"), "{e}");
-    // 早見表にない年齢は選べない
-    assert!(run(&mut s, json!({"type":"confirm_age","register":1,"age":19})).is_err());
-    ok(&mut s, json!({"type":"confirm_age","register":1,"age":18}));
+    assert!(v.staff.age_choice_pending);
+    assert_eq!(
+        v.customer.age_check, None,
+        "customer waits for the staff choice"
+    );
+    let birth = |b: &str| json!({"type":"check_id","register":1,"birth":b,"today":"2026-10-19"});
+    // 選ぶ前は入力できない。お客様側の画面からは選べない
+    assert!(run(&mut s, birth("2007-05-01")).is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"side":"customer","id_check":true})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"id_check":true}),
+    );
     let v = reg(&s, 1);
-    assert!(v.staff.id_pending);
-    assert_eq!(v.staff.declared_age, Some(18));
-    assert!(v.customer.age_levels.is_empty());
-    // お客様側の画面からは承認できない。承認までは決済できない
-    assert!(run(&mut s, check(true, "customer")).is_err());
+    assert!(v.staff.id_pending && !v.staff.age_choice_pending);
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
-    // 「いいえ」なら申告からやり直し
-    ok(&mut s, check(false, "staff"));
-    assert!(reg(&s, 1).staff.age_pending);
-    ok(&mut s, json!({"type":"confirm_age","register":1,"age":18}));
-    let msg = run(&mut s, check(true, "staff")).unwrap().unwrap();
-    assert!(msg.contains("缶ビール"), "{msg}");
+    assert!(run(&mut s, birth("2027-01-01")).is_err());
+    // 19 歳：雑誌（18）は買えるが、ビール（20）は買えない
+    let msg = run(&mut s, birth("2007-05-01")).unwrap().unwrap();
+    assert!(msg.contains("19歳") && msg.contains("缶ビール"), "{msg}");
     let v = reg(&s, 1);
     let codes: Vec<&str> = v.staff.lines.iter().map(|l| l.line.code).collect();
-    assert_eq!(codes, vec![ONIGIRI, MAGAZINE]);
-    assert!(!v.staff.age_pending && !v.staff.id_pending);
-    assert_eq!(v.staff.phase, Phase::Paying);
+    assert!(!codes.contains(&BEER) && codes.contains(&MAGAZINE) && codes.contains(&ONIGIRI));
+    assert_eq!(v.staff.confiscated.len(), 1);
+    assert_eq!(v.staff.confiscated[0].qty, 2);
+    assert!(!v.staff.id_pending && v.staff.phase == Phase::Paying);
+    ok(&mut s, json!({"type":"dismiss_confiscated","register":1}));
+    assert!(reg(&s, 1).staff.confiscated.is_empty());
     advance(&mut s, 1_000);
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
     );
     ok(&mut s, cash);
+}
+
+#[test]
+fn age_counts_the_birthday() {
+    use janus_pos_core::store::age_on;
+    assert_eq!(age_on("2006-10-19", "2026-10-19"), Ok(20));
+    assert_eq!(age_on("2006-10-20", "2026-10-19"), Ok(19));
+    assert!(age_on("2006/10/19", "2026-10-19").is_err());
 }

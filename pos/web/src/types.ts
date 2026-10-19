@@ -63,12 +63,12 @@ export interface StaffView {
   tax10: number;
   point_card: string | null;
   required_age: number | null;
-  /** 買い物に含まれる年確の年齢の段階（厳しい順） */
-  age_levels: number[];
-  /** 身分証での承認待ちの、お客様の申告（0 はどの段階にも届かない） */
-  declared_age: number | null;
+  /** 店員の「年齢確認をする／しない」待ち */
+  age_choice_pending: boolean;
+  /** 年確で販売できず取り除いた商品（店員が没収する） */
+  confiscated: { name: string; qty: number }[];
   age_pending: boolean;
-  /** お客様が早見表で申告し、店員の身分証での承認待ち */
+  /** 「する」を選び、店員の生年月日の入力待ち */
   id_pending: boolean;
   /** 会計時、お客様の確認待ちの代行収納の金額 */
   bill_check: number | null;
@@ -93,8 +93,6 @@ export interface CustomerView {
   point_card: boolean;
   point_pending: boolean;
   age_check: number | null;
-  /** 年確の早見表に並べる年齢の段階（厳しい順。申告待ちのときだけ） */
-  age_levels: number[];
   bill_check: number | null;
   staff_called: boolean;
   staff_present: boolean;

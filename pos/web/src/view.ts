@@ -55,8 +55,8 @@ function ffCheck(reg: number, l: { id: number; kind: string; state?: FfState }, 
   return `<label class="ffcheck" title="${esc(title)}"><input type="checkbox" data-ffcheck="${reg}:${l.id}"${l.state === "received" ? " checked" : ""}${a.allowed ? "" : " disabled"} aria-label="お渡し確認" /></label>`;
 }
 
-const METHOD_LABEL: Record<string, string> = { cash: "現金", emoney: "電子マネー", qr: "バーコード決済", credit: "クレジットカード" };
-const METHODS = ["cash", "emoney", "qr", "credit"] as const;
+const METHOD_LABEL: Record<string, string> = { cash: "現金", emoney: "電子マネー", qr: "バーコード決済", credit: "クレジットカード", points: "ポイント利用" };
+const METHODS = ["cash", "emoney", "qr", "credit", "points"] as const;
 
 // ---------------------------------------------------------------------------
 // レジ画面。店員側・お客様側の区別はなく、二つの画面に同じものを映す。
@@ -161,6 +161,7 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 /** 支払方法を選んだ後の案内 */
 function payHint(method: string | null, blocker: string | null, inserted: number): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
+  if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、入金ボックスにかざしてください</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
   if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
   if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
@@ -176,6 +177,15 @@ function methodRow(reg: number, side: Side, method: string | null, inserted: num
   return `<div class="row wrap ${cls}">${METHODS
     .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, st, `seg ${method === m ? "on" : ""}`))
     .join("")}</div>`;
+}
+
+/**
+ * 有人モードのお客様側：支払方法の一覧を見せるだけ（選ぶのは店員）。電子マネーとバーコード決済、
+ * 電子マネーとポイントを取り違えるお客様が多いので、現金以外は店員を介して決める
+ */
+function methodList(method: string | null, inserted: number): string {
+  if (method === "cash" && inserted) return "";
+  return `<div class="row wrap method-list">${METHODS.map((m) => `<span class="seg ${method === m ? "on" : ""}">${METHOD_LABEL[m]}</span>`).join("")}</div>`;
 }
 
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
@@ -406,7 +416,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
         ${hideAgeChoice ? "" : `<div>年確：${ageStatus(v)}</div>`}
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
-        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : ""}
+        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : methodList(v.method, v.inserted)}
         ${hideAgeChoice ? "" : side === "staff" || v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : "<p>現金は入金ボックスに入れてください。ほかのお支払い方法は店員が選びます</p>"}
       </div>`
     : "";

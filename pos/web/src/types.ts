@@ -3,7 +3,7 @@
 export type Side = "staff" | "customer";
 export type Mode = "attended" | "semi_self" | "full_self";
 export type Phase = "registering" | "paying";
-export type Method = "cash" | "emoney" | "qr" | "credit";
+export type Method = "cash" | "emoney" | "qr" | "credit" | "points";
 export type StaffState = "absent" | "locked" | "ready";
 export type FfState = "waiting" | "received";
 

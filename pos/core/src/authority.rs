@@ -65,6 +65,8 @@ pub enum PaymentMethod {
     Emoney,
     Qr,
     Credit,
+    /// ポイント利用（ポイントカード・ポイントアプリを入金ボックスにかざす）
+    Points,
 }
 
 impl PaymentMethod {
@@ -74,6 +76,7 @@ impl PaymentMethod {
             PaymentMethod::Emoney => "電子マネー",
             PaymentMethod::Qr => "バーコード決済",
             PaymentMethod::Credit => "クレジットカード",
+            PaymentMethod::Points => "ポイント利用",
         }
     }
 }
@@ -378,7 +381,12 @@ fn pay_action(action: Action, c: &Context) -> Result<(), Denial> {
         require(
             matches!(
                 c.method,
-                Some(PaymentMethod::Emoney | PaymentMethod::Qr | PaymentMethod::Credit)
+                Some(
+                    PaymentMethod::Emoney
+                        | PaymentMethod::Qr
+                        | PaymentMethod::Credit
+                        | PaymentMethod::Points
+                )
             ),
             "キャッシュレスの支払方法が選ばれていません",
         )

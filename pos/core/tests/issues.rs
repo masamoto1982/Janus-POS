@@ -1405,3 +1405,37 @@ fn coupon_and_line_ids_never_collide() {
     ids.dedup();
     assert_eq!(ids.len(), n);
 }
+
+/// 決済手段に「ポイント利用」がある。店員が選び、ポイントカード・アプリを入金ボックスにかざすと決済になる。
+#[test]
+fn points_can_pay_once_staff_chooses_them() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    // 選ぶ前にかざしても決済にならない
+    assert!(run(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"points"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+    );
+    // 選んだ手段と違うものをかざしても決済にならない
+    assert!(run(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"points"}),
+    );
+    assert!(reg(&s, 1).staff.lines.is_empty());
+}

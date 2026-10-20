@@ -153,6 +153,8 @@ button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { background: transparent; color: inherit; border-color: currentColor; padding: 4px 10px; opacity: .7; }
 button.seg.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); opacity: 1; }
+.method-list .seg { border: 1px solid currentColor; border-radius: 6px; padding: 4px 10px; opacity: .7; }
+.method-list .seg.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); opacity: 1; }
 button.ff { background: var(--ff); }
 .segs { display: inline-flex; gap: 4px; }
 

@@ -1247,7 +1247,7 @@ impl Store {
             C::CallStaff { register, topic } => {
                 self.check_active(register, Action::CallStaff)?;
                 let (kind, detail) = match topic {
-                    Some(CallTopic::Service) => (CallKind::Service, "代行収納・宅配便"),
+                    Some(CallTopic::Service) => (CallKind::Service, "お支払い・荷物"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
                     None => (CallKind::CustomerHelp, "お客様からの呼び出し"),
                 };

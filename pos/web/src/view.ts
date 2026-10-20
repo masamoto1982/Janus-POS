@@ -164,7 +164,7 @@ function confiscatedCard(reg: number, v: StaffView): string {
 export function billCard(reg: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
-      <p>代行収納（公共料金）　<b>${yen(amount)}</b><br>払込票の内容・金額をご確認ください（お客様側の画面で押してください）</p>
+      <p>お支払い　<b>${yen(amount)}</b><br>払込票の内容・金額をご確認ください（お客様側の画面で押してください）</p>
       ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
@@ -535,7 +535,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     return `<div class="call-row">${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
-      callBtn("サービス", "代行収納・宅配便", { type: "call_staff", register: reg, topic: "service" }, a("call_staff"), "svc"),
+      callBtn("サービス", "お支払い・荷物", { type: "call_staff", register: reg, topic: "service" }, a("call_staff"), "svc"),
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
@@ -759,10 +759,10 @@ const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(
 const SHELVES: Shelf[] = [
   { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011") },
   { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073", "4900000000066") },
-  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134", "4900000000165") },
-  // 4 大分類の外：お客様が持ち込む払込票（代行収納）と宅配便の荷物、レジに置いてあるレジ袋
+  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134") },
+  // 4 大分類の外：お客様が持ち込む払込票・送る荷物と受け取る荷物、レジに置いてあるカトラリー・レジ袋
   { label: "サービス", match: (p) => p.category === "service" },
-  { label: "レジ袋", match: (p) => p.category === "bag" },
+  { label: "カトラリー＆レジ袋", match: (p) => p.category === "bag" },
 ];
 
 function item(code: string, name: string, sub: string, cls = ""): string {

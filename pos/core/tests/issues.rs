@@ -10,7 +10,6 @@ const BEER: &str = "4900000000103";
 /// 店舗ルールの初期値（20 歳）が付いている商品
 const LIGHTER: &str = "4900000000134";
 /// 年確ルールのない商品。店舗ルールで 18 歳にする例に使う
-const FIREWORKS: &str = "4900000000165";
 /// 年確ルールのない商品（オーナーが店舗ルールを付ける例に使う）
 const SANDWICH: &str = "4900000000028";
 const TEA: &str = "4900000000035";
@@ -1221,17 +1220,17 @@ fn void_lock_and_logout_from_the_store_menu() {
 
 /// 年確：年確商品があれば、まず店員が「年齢確認をする／しない」を選ぶ。
 /// 「する」なら身分証の生年月日を入力し、年齢に届かない年確商品は買い物から取り除いて
-/// 没収する商品と個数を店員に示す（18 歳以上の花火は買えるが酒は買えない等）。
+/// 没収する商品と個数を店員に示す（店舗判断で 18 歳以上にしたライターは買えるが酒は買えない等）。
 #[test]
 fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let mut s = Store::new(1, 2, 1);
-    // 店舗判断で花火を 18 歳以上にしておく
+    // 店舗判断でライターを 18 歳以上にしておく
     ok(
         &mut s,
-        json!({"type":"set_product_age","owner_id":"9001","password":"9999","code":FIREWORKS,"min_age":18}),
+        json!({"type":"set_product_age","owner_id":"9001","password":"9999","code":LIGHTER,"min_age":18}),
     );
     login(&mut s, 1);
-    for code in [BREAD, BEER, BEER, FIREWORKS] {
+    for code in [BREAD, BEER, BEER, LIGHTER] {
         scan(&mut s, 1, "staff", code);
     }
     advance(&mut s, 1_000);
@@ -1264,12 +1263,12 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
     assert!(run(&mut s, birth("20270101")).is_err());
-    // 19 歳：花火（18）は買えるが、アルコール（20）は買えない
+    // 19 歳：ライター（18）は買えるが、アルコール（20）は買えない
     let msg = run(&mut s, birth("20070501")).unwrap().unwrap();
     assert!(msg.contains("19歳") && msg.contains("アルコール"), "{msg}");
     let v = reg(&s, 1);
     let codes: Vec<&str> = v.staff.lines.iter().map(|l| l.line.code).collect();
-    assert!(!codes.contains(&BEER) && codes.contains(&FIREWORKS) && codes.contains(&BREAD));
+    assert!(!codes.contains(&BEER) && codes.contains(&LIGHTER) && codes.contains(&BREAD));
     assert_eq!(v.staff.confiscated.len(), 1);
     assert_eq!(v.staff.confiscated[0].qty, 2);
     assert!(!v.staff.id_pending && v.staff.phase == Phase::Paying);

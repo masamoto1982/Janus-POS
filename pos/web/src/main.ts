@@ -198,6 +198,9 @@ const FLASH_MS = 900;
 const seenQty = new Map<string, number>();
 const flashUntil = new Map<string, number>();
 
+/** 新しい動きがあったレジ（登録画面を一番上まで戻して、動いた行を見せる） */
+const movedRegs = new Set<number>();
+
 function trackFlashes(): void {
   const now = performance.now();
   const present = new Set<string>();
@@ -209,6 +212,7 @@ function trackFlashes(): void {
       if (seenQty.get(k) !== qty) {
         seenQty.set(k, qty);
         flashUntil.set(k, now + FLASH_MS);
+        movedRegs.add(r.id);
       }
     }
   }
@@ -223,6 +227,11 @@ function trackFlashes(): void {
 
 function render(): void {
   trackFlashes();
+  // 明細が表示エリアをはみ出してスクロールしていても、動きのあった行（一番上）が見えるように戻す
+  for (const reg of movedRegs) {
+    app.querySelectorAll<HTMLElement>(`[data-drop^="${reg}:"] .screen-main`).forEach((el) => (el.scrollTop = 0));
+  }
+  movedRegs.clear();
   for (const r of snap.registers) {
     // 店員ログインのセレクタは、操作中でなければ現在のログイン状態に合わせる
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);

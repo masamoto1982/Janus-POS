@@ -752,7 +752,7 @@ export function ownerPanel(s: Snapshot): string {
 type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean };
 
 /**
- * 売り場の棚。デモのため商品は抽象化し、コンビニの 4 大分類ごとに代表的な商品を二つずつ置く。
+ * 売り場の棚。デモのため商品は抽象化し、コンビニの 4 大分類ごとに代表的な商品を四つまで置く。
  * FF はバーコードがないので、落とすとレジ画面下のタブから登録したのと同じになる
  */
 const FF_SHELF = ["FF01", "FF05"];
@@ -760,7 +760,9 @@ const FF_SHELF = ["FF01", "FF05"];
 const SHELVES: Shelf[] = [
   { label: "日配食品", match: (p) => p.category === "food" },
   { label: "加工食品", match: (p) => p.category === "drink" || p.category === "alcohol" },
-  { label: "非食品", match: (p) => p.category === "adult_book" || p.category === "tobacco" },
+  { label: "非食品", match: (p) => ["adult_book", "tobacco", "smoking_goods", "fireworks"].includes(p.category) },
+  // 4 大分類の外：お客様が持ち込む払込票（代行収納）と宅配便の荷物
+  { label: "サービス", match: (p) => p.category === "service" },
   // 4 大分類の外：レジに置いてあるレジ袋
   { label: "レジ袋", match: (p) => p.category === "bag" },
 ];
@@ -802,9 +804,6 @@ export function walletPanel(): string {
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
     item("PC87654321", "ポイントアプリ", "スマホ", "card"),
-    // お客様が持ち込むもの：払込票（代行収納）と宅配便の荷物
-    item("2100000000021", "払込票", "公共料金", "card"),
-    item("2100000000014", "宅配便の荷物", "発送受付", "card"),
     item("CP0001", "引換券", "緑茶 500ml", "coupon"),
     item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),

@@ -1163,28 +1163,28 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 8_640 + 1_200);
 }
 
-/// 買い物点数は 5 点まで（数量の合計）。上限を超える商品は登録されず、FF も同じ。
+/// 買い物点数は 10 点まで（数量の合計）。上限を超える商品は登録されず、FF も同じ。
 #[test]
-fn shopping_is_limited_to_five_items() {
+fn shopping_is_limited_to_ten_items() {
     let mut s = Store::new(1, 2, 1);
-    for _ in 0..4 {
+    for _ in 0..9 {
         scan(&mut s, 1, "customer", ONIGIRI);
     }
     login(&mut s, 1);
     advance(&mut s, 1_000);
     let ff = |qty: u32| json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":qty});
     let e = run(&mut s, ff(2)).unwrap_err();
-    assert!(e.contains("5点"), "{e}");
+    assert!(e.contains("10点"), "{e}");
     ok(&mut s, ff(1));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 5);
+    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 10);
     assert!(!allowed(&v, Side::Staff, Action::RegisterFf));
     let e = run(
         &mut s,
         json!({"type":"scan","register":1,"side":"customer","code":ONIGIRI}),
     )
     .unwrap_err();
-    assert!(e.contains("5点"), "{e}");
+    assert!(e.contains("10点"), "{e}");
     // 取り消せば、また登録できる
     let id = reg(&s, 1).staff.lines[0].line.id;
     advance(&mut s, 1_000);
@@ -1399,7 +1399,7 @@ fn staff_or_customer_changes_a_line_quantity() {
     let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
     assert_eq!((top.name, top.qty), ("おにぎり", 3));
     assert_eq!(v.customer.total, 160 * 3 + 320);
-    assert!(run(&mut s, set(5)).is_err(), "over the 5-item limit");
+    assert!(run(&mut s, set(10)).is_err(), "over the 10-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
     ok(&mut s, set(1));
     assert_eq!(reg(&s, 1).customer.total, 160 + 320);

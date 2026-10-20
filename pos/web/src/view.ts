@@ -286,14 +286,6 @@ function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => Action
   return v.age_choice_pending || v.id_pending ? idCard(reg, age, v, a) : "";
 }
 
-function ageStatus(v: StaffView): string {
-  if (!v.required_age) return "不要";
-  const age = v.required_age;
-  if (v.age_choice_pending) return `<b class="warn">${age}歳以上：店員が確認方法を選んでいます</b>`;
-  if (v.id_pending) return `<b class="warn">${age}歳以上：身分証の確認中</b>`;
-  return `<span class="ok">確認済</span>`;
-}
-
 /** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい） */
 /** 登録した直後の行（レジ:明細番号）。一瞬目立つ色にする（main.ts が数量の変化から決める） */
 export const flashing = new Set<string>();
@@ -406,20 +398,22 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
 
-  // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる（有人モードでは店員側の画面だけで選ぶ）
+  // 会計ボタンの後は、年確 → ポイントカードの最終確認 → 決済手段の確認の順に進む
   const pointPending = paying && v.point_pending;
-  // 店員が年確をするか選んでいる間、お客様側にはその旨を出さない
-  const hideAgeChoice = side === "customer" && v.age_choice_pending;
-  const pay = pointPending
-    ? ""
-    : paying
-    ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
-        ${hideAgeChoice ? "" : `<div>年確：${ageStatus(v)}</div>`}
+  const agePending = paying && (v.age_choice_pending || v.id_pending);
+  // 決済手段の確認：登録画面と年確の状況は出さず、決済手段だけを示す（選ぶのは店員側の画面）
+  const payStage = paying && !pointPending && !agePending;
+  const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
+  const pay = payStage
+    ? `${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox pay-stage">
+        ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : methodList(v.method, v.inserted)}
-        ${hideAgeChoice ? "" : side === "staff" || v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : "<p>現金は入金ボックスに入れてください。ほかのお支払い方法は店員が選びます</p>"}
+        ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : ""}
       </div>`
-    : "";
+    : agePending
+      ? ageStep(reg, v, side, a)
+      : "";
 
   // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
   const top = regTop(
@@ -436,14 +430,17 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   );
   // 有人モードの最終確認は店員側だけ。登録画面を置き換えて出す（お客様側は明細のまま）
   if (pointPending && side === "staff") return `${top}${notice}${staffPointCheck(reg, side, a("confirm_point_card"))}`;
+  const cards = `${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
+    v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
+  }`;
+  // 決済手段の確認は登録画面を置き換えて出す（両方の画面とも）
+  if (payStage) return `${top}${notice}${cards}${pay}`;
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
     </div>
-    ${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
-      v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
-    }${pay}
+    ${cards}${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
@@ -563,6 +560,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   }
   // 有人モードの FF は店員側の画面から登録する（お客様側には出さない）
   if (r.mode === "attended" && side === "customer") return "";
+  // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
+  if (r.mode === "attended" && r.staff.phase === "paying") return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);

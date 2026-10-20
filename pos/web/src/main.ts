@@ -247,7 +247,6 @@ function render(): void {
       lamp.style.setProperty("--blink", `${(1.4 - 1.1 * r.ring_volume).toFixed(2)}s`);
       lamp.title = on ? `呼び出し中（${Math.floor((r.call_waiting_ms ?? 0) / 1000)}秒）` : "呼び出しランプ";
     }
-    const head = screenHead(r, new Date());
     // もう一方が触れている一瞬（またはお客様側に限られる場面）は、この画面の操作が利かない
     for (const side of ["staff", "customer"] as const) {
       const items = itemsPanel(r, snap, ffUi(r.id), side);
@@ -256,8 +255,8 @@ function render(): void {
       el?.classList.toggle("inactive", locked);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
-      // レジ画面のヘッダー（歯車は店員ログイン中だけ。時刻とベルは常時）
-      setRegion(`head-${r.id}-${side}`, head);
+      // レジ画面のヘッダー（☰ は店員ログイン中の店員側だけ。時刻とベルは常時）
+      setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side));
       setRegion(`items-${r.id}-${side}`, items);
       el?.classList.toggle("no-items", !items);
     }

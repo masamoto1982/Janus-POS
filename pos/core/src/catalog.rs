@@ -117,65 +117,38 @@ use Category::*;
 use TaxRate::*;
 
 pub const CATALOG: &[Product] = &[
-    p("4900000000011", "おにぎり 鮭", 160, Reduced8, Food),
-    p("4900000000028", "ミックスサンド", 320, Reduced8, Food),
-    p("4900000000035", "緑茶 600ml", 150, Reduced8, Drink),
-    p("4900000000042", "ボトルコーヒー", 180, Reduced8, Drink),
-    p("4900000000066", "カップ麺 しょうゆ", 214, Reduced8, Food),
-    p("4900000000073", "スポーツドリンク", 160, Reduced8, Drink),
-    p("4900000000059", "ボールペン 黒", 120, Standard10, Daily),
-    p(
-        "4910000000014",
-        "朝刊（全国紙）",
-        160,
-        Standard10,
-        Newspaper,
-    ),
-    p("4910000000021", "スポーツ新聞", 160, Standard10, Newspaper),
-    p("4910000000038", "週刊誌", 480, Standard10, Magazine),
-    p("4910000000045", "マンガ雑誌", 300, Standard10, Magazine),
-    p("4900000000103", "缶ビール 350ml", 248, Standard10, Alcohol),
-    p(
-        "4900000000110",
-        "レモンサワー 500ml",
-        228,
-        Standard10,
-        Alcohol,
-    ),
-    p("4900000000127", "たばこ A", 600, Standard10, Tobacco),
-    p(
-        "4900000000134",
-        "使い捨てライター",
-        110,
-        Standard10,
-        SmokingGoods,
-    ),
-    p("4900000000141", "成人向け雑誌", 980, Standard10, AdultBook),
-    p("4900000000158", "スクラッチくじ", 200, Standard10, Lottery),
-    p(
-        "4900000000165",
-        "手持ち花火セット",
-        598,
-        Standard10,
-        Fireworks,
-    ),
-    p("4900000000172", "線香花火", 220, Standard10, Fireworks),
+    // デモ用に商品名は抽象化し（将来 UI を英語にしても困らない一般名）、コンビニの 4 大分類ごとに代表的な商品を二つから四つ置く
+    // （FF は下のバーコードなしの商品。レジ画面下のタブから登録する）
+    // 日配食品
+    p("4900000000028", "サンドイッチ", 320, Reduced8, Food),
+    p("4900000000042", "牛乳", 198, Reduced8, Drink),
+    p("4900000000011", "パン", 160, Reduced8, Food),
+    // 加工食品
+    p("4900000000035", "ソフトドリンク", 150, Reduced8, Drink),
+    p("4900000000103", "アルコール", 248, Standard10, Alcohol),
+    p("4900000000073", "袋菓子", 150, Reduced8, Food),
+    p("4900000000066", "即席麺", 214, Reduced8, Food),
+    // 非食品
+    p("4910000000014", "新聞", 160, Standard10, Newspaper),
+    p("4910000000038", "雑誌", 480, Standard10, Magazine),
+    p("4900000000127", "たばこ", 600, Standard10, Tobacco),
+    // 店舗判断の年確のデモ：ライターは店舗ルールの初期値 20 歳
+    p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
+    // レジまわり（カトラリー・レジ袋）とサービス（お客様が持ち込む荷物・払込票）
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
-    p("2100000000014", "宅配便 発送受付", 0, Standard10, Service),
+    p("2000000000039", "フォーク", 3, Standard10, Bag),
+    p("2000000000046", "スプーン", 3, Standard10, Bag),
+    p("2000000000053", "お手拭き", 3, Standard10, Bag),
+    p("2100000000014", "荷物を送る", 0, Standard10, Service),
+    p("2100000000038", "荷物を受取る", 0, Standard10, Service),
     Product {
         customer_confirms: true,
-        ..p(
-            "2100000000021",
-            "代行収納（公共料金）",
-            0,
-            Standard10,
-            Service,
-        )
+        ..p("2100000000021", "お支払い", 0, Standard10, Service)
     },
     // FF（バーコードなし。レジ画面下のタブから登録する）
-    p("FF01", "チキン（プレーン）", 220, Reduced8, FastFood),
-    p("FF02", "チキン（スパイシー）", 220, Reduced8, FastFood),
+    p("FF01", "フライドチキン", 220, Reduced8, FastFood),
+    p("FF02", "スパイシーチキン", 220, Reduced8, FastFood),
     p("FF03", "アメリカンドック", 140, Reduced8, FastFood),
     p("FF04", "コロッケ", 110, Reduced8, FastFood),
     p("FF21", "焼き鳥（モモシオ）", 140, Reduced8, FastFood),
@@ -335,13 +308,13 @@ pub struct Coupon {
 pub const COUPONS: &[Coupon] = &[
     Coupon {
         code: "CP0001",
-        name: "おにぎり 鮭 引換券",
-        target: "4900000000011",
+        name: "引換券：ソフトドリンク",
+        target: "4900000000035",
         kind: CouponKind::Exchange,
     },
     Coupon {
         code: "CP0002",
-        name: "ミックスサンド 50円引き",
+        name: "割引券：サンドイッチ 50円引き",
         target: "4900000000028",
         kind: CouponKind::Discount(50),
     },

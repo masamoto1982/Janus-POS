@@ -164,7 +164,7 @@ function confiscatedCard(reg: number, v: StaffView): string {
 export function billCard(reg: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
-      <p>代行収納（公共料金）　<b>${yen(amount)}</b><br>払込票の内容・金額をご確認ください（お客様側の画面で押してください）</p>
+      <p>お支払い　<b>${yen(amount)}</b><br>払込票の内容・金額をご確認ください（お客様側の画面で押してください）</p>
       ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
@@ -204,12 +204,49 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
       <button data-form="service" data-reg="${reg}" data-line="${l.id}" ${a.allowed ? "" : "disabled"}>受付</button>
     </div>`;
   }
-  return `<tr class="${flash(reg, l.id)}">
+  return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${l.qty}${ffCheck(reg, l, find(v.actions, "check_ff"))}</td>
     <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>
-    <td>${btn("取消", { type: "remove_line", register: reg, side, line_id: l.id }, remove, "small ghost")}</td>
-  </tr>`;
+    <td>${editBtn(reg, side, l.id, l.qty, remove)}</td>
+  </tr>${lineEditor(reg, side, l, remove)}`;
+}
+
+/**
+ * 個数変更・取り消しのために広げている行（レジ:画面 → 明細番号と変更後の個数）。
+ * ポップアップは使わず、対象の行の下が一時的に広がって、登録画面の中で完結する
+ */
+export const editing = new Map<string, { id: number; qty: number }>();
+
+const editingRow = (reg: number, side: Side, id: number): string => (editing.get(`${reg}:${side}`)?.id === id ? "editing" : "");
+
+/** 取消ボタンに代わる「変更」ボタン。押すと行が広がる（もう一度押すと閉じる） */
+function editBtn(reg: number, side: Side, id: number, qty: number, st: ActionState): string {
+  const open = editing.get(`${reg}:${side}`)?.id === id;
+  const disabled = !st.allowed;
+  const title = disabled && st.reason ? ` title="${esc(st.reason)}"` : "";
+  return `<button class="small ghost ${open ? "on" : ""}" data-edit="${reg}:${side}:${id}:${qty}"${disabled ? " disabled" : ""}${title}>変更</button>`;
+}
+
+/** 広げた行の中身：個数の − ＋ と「個数変更」、それに「取り消し」 */
+function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind: string; state?: string }, st: ActionState): string {
+  const e = editing.get(`${reg}:${side}`);
+  if (!e || e.id !== l.id || !st.allowed) return "";
+  // サービス商品とお渡し済みの FF は個数を変えられない（取り消しだけ）
+  const fixed = l.kind === "service" || (l.kind === "ff" && l.state === "received");
+  const qty = fixed
+    ? `<span class="muted">この商品は個数を変えられません</span>`
+    : `<span class="qty-edit">
+        <button class="small" data-edit-step="${reg}:${side}:-1" ${e.qty <= 1 ? "disabled" : ""}>−</button>
+        <b>${e.qty}</b>
+        <button class="small" data-edit-step="${reg}:${side}:1">＋</button>
+      </span>
+      ${btn("個数変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`;
+  return editorRow(reg, side, `${qty}${btn("取り消し", { type: "remove_line", register: reg, side, line_id: l.id }, st, "small danger")}`);
+}
+
+function editorRow(reg: number, side: Side, body: string): string {
+  return `<tr class="edit-row"><td colspan="4"><div class="edit-box">${body}<button class="small ghost" data-edit-close="${reg}:${side}">閉じる</button></div></td></tr>`;
 }
 
 /** 呼び出しの種類の短い表示（店員側画面） */
@@ -264,14 +301,28 @@ function ageStatus(v: StaffView): string {
 export const flashing = new Set<string>();
 const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
 
-export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState): string {
-  return coupons
-    .map(
-      (c) =>
-        `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
-          c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
-        }</td><td>${removeCoupon(reg, side, c, st)}</td></tr>`,
-    )
+export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState): Row[] {
+  return coupons.map((c) => [
+    c.id,
+    `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
+      c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
+    }</td><td>${editBtn(reg, side, c.id, 1, st)}</td></tr>${
+      editing.get(`${reg}:${side}`)?.id === c.id && st.allowed ? editorRow(reg, side, btn("取り消し", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small danger")) : ""
+    }`,
+  ]);
+}
+
+/** 明細の 1 行（最後に動きのあった順番, HTML）。クーポンの番号は読んだ順番 */
+type Row = [number, string];
+
+/**
+ * 新しい動きのあった行ほど上に出す。同じ商品をまとめた行も、数量が増えれば一番上に来る
+ * （買い物が多いとき、最初の行の数量が表示エリアの外で増えて見えない、ということがない）
+ */
+function newestFirst(rows: Row[]): string {
+  return [...rows]
+    .sort((x, y) => y[0] - x[0])
+    .map(([, html]) => html)
     .join("");
 }
 
@@ -350,8 +401,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks();
-  // 新しく登録した商品ほど上に出す
-  const rows = couponRows(reg, side, v.coupons, a("remove_coupon")) + [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
+  // 新しい動きのあった行ほど上に出す
+  const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon")), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
 
   // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる
@@ -484,7 +535,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     return `<div class="call-row">${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
-      callBtn("サービス", "代行収納・宅配便", { type: "call_staff", register: reg, topic: "service" }, a("call_staff"), "svc"),
+      callBtn("サービス", "お支払い・荷物", { type: "call_staff", register: reg, topic: "service" }, a("call_staff"), "svc"),
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
@@ -593,20 +644,19 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (r.last_receipt && !c.lines.length) return notice + thanks();
 
 
-  // 新しく登録した商品ほど上に出す
-  const rows = [...c.lines]
-    .reverse()
-    .map((l) => {
+  // 新しい動きのあった行ほど上に出す
+  const lineRows = c.lines.map((l): Row => {
       const tag =
         l.kind === "ff"
           ? `<span class="tag ff-${l.state}">${{ waiting: "ご用意中", received: "お受け取り済" }[l.state]}</span>`
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
-      const rm = c.phase === "registering" ? btn("取消", { type: "remove_line", register: reg, side, line_id: l.id }, a("remove_line"), "small ghost") : "";
-      return `<tr class="${flash(reg, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>`;
-    })
-    .join("");
+      const rm = c.phase === "registering" ? editBtn(reg, side, l.id, l.qty, a("remove_line")) : "";
+      const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line")) : "";
+      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>${editor}`];
+    });
+  const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
   // 合計とお会計ボタンは登録画面の最上部に常に出す
   const top = regTop(
@@ -641,7 +691,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   return `${top}${notice}
     ${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}
     ${pay}
-    <table class="lines"><tbody>${couponRows(reg, side, c.coupons, a("remove_coupon"))}${rows}</tbody></table>
+    <table class="lines"><tbody>${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
 }
 
@@ -701,18 +751,18 @@ export function ownerPanel(s: Snapshot): string {
 
 type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean };
 
-/** 売り場の棚。並び順はご指示の順（食べ物・飲み物・新聞・雑誌・代行収納・宅配便・酒・ライター）に、そのほかを足したもの */
+/**
+ * 売り場の棚。デモのため商品は抽象化し（将来 UI を英語にしても困らない一般名）、
+ * コンビニの 4 大分類ごとに代表的な商品を置く（FF はレジ画面下のタブから登録するので置かない）
+ */
+const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(p.code);
 const SHELVES: Shelf[] = [
-  { label: "食べ物", match: (p) => p.category === "food" },
-  { label: "飲み物", match: (p) => p.category === "drink" },
-  { label: "新聞", match: (p) => p.category === "newspaper" },
-  { label: "雑誌", match: (p) => p.category === "magazine" || p.category === "adult_book" },
-  { label: "代行収納", match: (p) => p.category === "service" && p.name.includes("代行収納") },
-  { label: "宅配便", match: (p) => p.category === "service" && p.name.includes("宅配便") },
-  { label: "酒", match: (p) => p.category === "alcohol" },
-  { label: "ライター・たばこ", match: (p) => p.category === "smoking_goods" || p.category === "tobacco" },
-  { label: "花火", match: (p) => p.category === "fireworks" },
-  { label: "そのほか", match: (p) => ["daily", "lottery", "adult_goods", "bag"].includes(p.category) },
+  { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011") },
+  { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073", "4900000000066") },
+  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134") },
+  // 4 大分類の外：お客様が持ち込む払込票・送る荷物と受け取る荷物、レジに置いてあるカトラリー・レジ袋
+  { label: "サービス", match: (p) => p.category === "service" },
+  { label: "カトラリー＆レジ袋", match: (p) => p.category === "bag" },
 ];
 
 function item(code: string, name: string, sub: string, cls = ""): string {
@@ -720,12 +770,16 @@ function item(code: string, name: string, sub: string, cls = ""): string {
     <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
 }
 
-/** Item：カテゴリの見出しは付けず、棚の並び順のまま一つにまとめる（表示スペースの節約） */
+/** Item：4 大分類ごとに小さな見出しを付けて並べる */
 export function shelfPanel(s: Snapshot): string {
-  const items = [...new Set(SHELVES.flatMap((g) => s.catalog.filter(g.match)))];
-  return `<div class="shelf"><div class="items">${items
-    .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
-    .join("")}</div></div>`;
+  return SHELVES.map((g) => {
+    // 棚の並びは SHELVES に書いた順
+    const items = s.catalog.filter(g.match);
+    if (!items.length) return "";
+    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
+      .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
+      .join("")}</div></div>`;
+  }).join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -744,8 +798,8 @@ export function walletPanel(): string {
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
     item("PC87654321", "ポイントアプリ", "スマホ", "card"),
-    item("CP0001", "おにぎり 鮭", "引換券", "coupon"),
-    item("CP0002", "ミックスサンド", "50円引き", "coupon"),
+    item("CP0001", "引換券", "ソフトドリンク", "coupon"),
+    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
     walletItem("pay:emoney", "電子マネー", "端末にかざす", "pay"),

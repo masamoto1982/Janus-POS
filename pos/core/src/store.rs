@@ -139,6 +139,13 @@ pub enum Command {
         side: Side,
         line_id: u32,
     },
+    /// 明細の個数を手で変える（取り消しは RemoveLine）。変えた行は動きがあったので一番上に出る
+    SetQty {
+        register: u8,
+        side: Side,
+        line_id: u32,
+        qty: u32,
+    },
     /// 読み取ったクーポンを取り消す（お会計中でもよい）。取り消したクーポンはお客様に返す
     RemoveCoupon {
         register: u8,
@@ -307,6 +314,7 @@ impl Command {
             | C::CheckFf { register, .. }
             | C::CompleteService { register, .. }
             | C::RemoveLine { register, .. }
+            | C::SetQty { register, .. }
             | C::RemoveCoupon { register, .. }
             | C::DismissReturned { register }
             | C::Checkout { register, .. }
@@ -344,6 +352,7 @@ impl Command {
             C::RegisterFf { side, .. }
             | C::CheckFf { side, .. }
             | C::RemoveLine { side, .. }
+            | C::SetQty { side, .. }
             | C::RemoveCoupon { side, .. }
             | C::Checkout { side, .. }
             | C::BackToRegistering { side, .. }
@@ -406,6 +415,8 @@ pub enum LineKind {
 #[derive(Clone, Debug, Serialize)]
 pub struct Line {
     pub id: u32,
+    /// 最後に動きのあった順番（明細番号と同じ通し番号）。画面は動きの新しい行ほど上に出す
+    pub touched: u32,
     pub code: &'static str,
     pub name: &'static str,
     pub unit_price: u32,
@@ -571,16 +582,21 @@ impl Txn {
     }
 
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind) {
-        // 同じ商品はまとめる（FF は状態が同じお渡し前どうしだけ）
+        // 同じ商品はまとめる（FF は状態が同じお渡し前どうしだけ）。表示エリアの節約に欠かせない。
+        // まとめた行も動きがあったので一番上に出す（買い物が多いとき、最初の行の数量が
+        // 表示エリアの外で増えて誰にも見えない、ということが起きないように）
+        self.next_line += 1;
+        let touched = self.next_line;
         if let Some(l) = self.lines.iter_mut().find(|l| {
             l.code == p.code && l.kind == kind && !matches!(kind, LineKind::Service { .. })
         }) {
             l.qty += qty;
+            l.touched = touched;
             return;
         }
-        self.next_line += 1;
         self.lines.push(Line {
-            id: self.next_line,
+            id: touched,
+            touched,
             code: p.code,
             name: p.name,
             unit_price: p.price,
@@ -1089,6 +1105,12 @@ impl Store {
                 }
                 done(format!("{}を取り消しました", l.name))
             }
+            C::SetQty {
+                register,
+                side,
+                line_id,
+                qty,
+            } => self.set_qty(register, side, line_id, qty),
             C::Checkout { register, side } => self.checkout(register, side),
             C::BackToRegistering { register, side } => {
                 self.check(register, side, Action::BackToRegistering)?;
@@ -1225,7 +1247,7 @@ impl Store {
             C::CallStaff { register, topic } => {
                 self.check_active(register, Action::CallStaff)?;
                 let (kind, detail) = match topic {
-                    Some(CallTopic::Service) => (CallKind::Service, "代行収納・宅配便"),
+                    Some(CallTopic::Service) => (CallKind::Service, "お支払い・荷物"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
                     None => (CallKind::CustomerHelp, "お客様からの呼び出し"),
                 };
@@ -1426,6 +1448,65 @@ impl Store {
         Ok(())
     }
 
+    fn set_qty(
+        &mut self,
+        register: u8,
+        side: Side,
+        line_id: u32,
+        qty: u32,
+    ) -> Result<Outcome, String> {
+        // 取消と同じく、登録画面での明細の手直し
+        self.check(register, side, Action::RemoveLine)?;
+        if qty == 0 {
+            return Err("取り消すときは「取り消し」を押してください".into());
+        }
+        let r = self.reg(register).ok_or("レジがありません")?;
+        let l = r
+            .txn
+            .lines
+            .iter()
+            .find(|l| l.id == line_id)
+            .ok_or("明細が見つかりません")?;
+        let (code, name, old, kind) = (l.code, l.name, l.qty, l.kind);
+        match kind {
+            LineKind::Service { .. } => return Err("サービス商品の個数は変えられません".into()),
+            LineKind::Ff {
+                state: FfState::Received,
+            } => return Err("お渡し済みの FF は個数を変えられません".into()),
+            _ => {}
+        }
+        if qty > old && r.txn.item_count() - old + qty > MAX_ITEMS {
+            return Err(ITEMS_FULL.into());
+        }
+        // お渡し前の FF は、増やした分を在庫から取り、減らした分を在庫に戻す
+        if kind
+            == (LineKind::Ff {
+                state: FfState::Waiting,
+            })
+        {
+            if qty > old {
+                let stock = self
+                    .ff_stock
+                    .iter_mut()
+                    .find(|(c, _)| *c == code)
+                    .ok_or("在庫がありません")?;
+                if stock.1 < qty - old {
+                    return Err(format!("{name}は在庫が足りません（残り {}）", stock.1));
+                }
+                stock.1 -= qty - old;
+            } else {
+                self.restock(code, old - qty);
+            }
+        }
+        let t = &mut self.reg_mut(register)?.txn;
+        t.next_line += 1;
+        let touched = t.next_line;
+        let l = t.lines.iter_mut().find(|l| l.id == line_id).unwrap();
+        l.qty = qty;
+        l.touched = touched;
+        done(format!("{name}の個数を {qty} にしました"))
+    }
+
     fn restock(&mut self, code: &str, qty: u32) {
         if let Some(e) = self.ff_stock.iter_mut().find(|(c, _)| *c == code) {
             e.1 += qty;
@@ -1497,8 +1578,9 @@ impl Store {
                 done(format!("ポイントカードを読みました{back}"))
             }
             Scanned::Coupon(c) => {
-                let id = r.txn.next_line;
+                // 明細と同じ通し番号（先に進めてから使う。明細の番号と重ならない）
                 r.txn.next_line += 1;
+                let id = r.txn.next_line;
                 r.txn.coupons.push((id, c));
                 let waiting = r
                     .txn
@@ -2085,6 +2167,7 @@ impl Store {
             .iter()
             .map(|l| CustomerLine {
                 id: l.id,
+                touched: l.touched,
                 name: l.name,
                 qty: l.qty,
                 amount: l.amount(),
@@ -2188,6 +2271,7 @@ pub struct StaffLine {
 #[derive(Clone, Debug, Serialize)]
 pub struct CustomerLine {
     pub id: u32,
+    pub touched: u32,
     pub name: &'static str,
     pub qty: u32,
     pub amount: u32,

@@ -243,27 +243,27 @@ mod tests {
     #[test]
     fn store_rule_by_product_takes_the_strictest_age() {
         let mut r = AgeRules::default();
-        assert_eq!(r.age_for("4900000000158", Category::Lottery), None);
+        assert_eq!(r.age_for("4900000000028", Category::Food), None);
         r.add(
             RuleTarget::Product {
-                code: "4900000000158".into(),
+                code: "4900000000028".into(),
             },
             20,
             "オーナー",
             0,
         )
         .unwrap();
-        assert_eq!(r.age_for("4900000000158", Category::Lottery), Some(20));
+        assert_eq!(r.age_for("4900000000028", Category::Food), Some(20));
         r.add(
             RuleTarget::Category {
-                category: Category::Lottery,
+                category: Category::Food,
             },
             18,
             "オーナー",
             0,
         )
         .unwrap();
-        assert_eq!(r.age_for("4900000000158", Category::Lottery), Some(20));
+        assert_eq!(r.age_for("4900000000028", Category::Food), Some(20));
         assert_eq!(r.history.len(), 2);
     }
 

@@ -204,7 +204,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
       <button data-form="service" data-reg="${reg}" data-line="${l.id}" ${a.allowed ? "" : "disabled"}>受付</button>
     </div>`;
   }
-  return `<tr>
+  return `<tr class="${flash(reg, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${l.qty}${ffCheck(reg, l, find(v.actions, "check_ff"))}</td>
     <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>
@@ -260,11 +260,15 @@ function ageStatus(v: StaffView): string {
 }
 
 /** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい） */
+/** 登録した直後の行（レジ:明細番号）。一瞬目立つ色にする（main.ts が数量の変化から決める） */
+export const flashing = new Set<string>();
+const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
+
 export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState): string {
   return coupons
     .map(
       (c) =>
-        `<tr class="coupon"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
+        `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
           c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
         }</td><td>${removeCoupon(reg, side, c, st)}</td></tr>`,
     )
@@ -600,7 +604,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
       const rm = c.phase === "registering" ? btn("取消", { type: "remove_line", register: reg, side, line_id: l.id }, a("remove_line"), "small ghost") : "";
-      return `<tr><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>`;
+      return `<tr class="${flash(reg, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>`;
     })
     .join("");
 
@@ -697,14 +701,14 @@ export function ownerPanel(s: Snapshot): string {
 
 type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean };
 
-/** 売り場の棚。並び順はご指示の順（食べ物・飲み物・新聞・雑誌・代行収納・宅急便・酒・ライター）に、そのほかを足したもの */
+/** 売り場の棚。並び順はご指示の順（食べ物・飲み物・新聞・雑誌・代行収納・宅配便・酒・ライター）に、そのほかを足したもの */
 const SHELVES: Shelf[] = [
   { label: "食べ物", match: (p) => p.category === "food" },
   { label: "飲み物", match: (p) => p.category === "drink" },
   { label: "新聞", match: (p) => p.category === "newspaper" },
   { label: "雑誌", match: (p) => p.category === "magazine" || p.category === "adult_book" },
   { label: "代行収納", match: (p) => p.category === "service" && p.name.includes("代行収納") },
-  { label: "宅急便", match: (p) => p.category === "service" && p.name.includes("宅急便") },
+  { label: "宅配便", match: (p) => p.category === "service" && p.name.includes("宅配便") },
   { label: "酒", match: (p) => p.category === "alcohol" },
   { label: "ライター・たばこ", match: (p) => p.category === "smoking_goods" || p.category === "tobacco" },
   { label: "花火", match: (p) => p.category === "fireworks" },

@@ -909,7 +909,7 @@ fn shortcut_buttons_call_staff() {
     ok(&mut s, json!({"type":"release_call","register":1}));
     advance(&mut s, 60_000);
     assert_eq!(kinds(&s, 1).len(), 3);
-    // 宅急便のバーコードを直接読むと、サービスの呼び出しになる
+    // 宅配便のバーコードを直接読むと、サービスの呼び出しになる
     scan(&mut s, 2, "customer", PARCEL);
     assert!(kinds(&s, 2).contains(&CallKind::Service));
     // 店員が来ると、たばこ・サービスのボタン呼び出しは片付く（FF は登録するまで残る）

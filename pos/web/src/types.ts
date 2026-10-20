@@ -89,7 +89,6 @@ export interface StaffView {
   coupon_unmatched: boolean;
   /** 取り消して、お客様に返却するクーポン */
   returned: Returned[];
-  age_pending: boolean;
   /** 「する」を選び、店員の生年月日の入力待ち */
   id_pending: boolean;
   /** 会計時、お客様の確認待ちの代行収納の金額 */
@@ -117,7 +116,6 @@ export interface CustomerView {
   due: number;
   point_card: boolean;
   point_pending: boolean;
-  age_check: number | null;
   bill_check: number | null;
   staff_called: boolean;
   staff_present: boolean;

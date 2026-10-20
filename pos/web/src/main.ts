@@ -524,7 +524,7 @@ app.addEventListener("click", (e) => {
   if (b.dataset.cmd) {
     const cmd = JSON.parse(b.dataset.cmd) as Command;
     // 年齢確認は、押した画面（お客様側だけ受け付ける）をコアに伝える
-    if (cmd.type === "confirm_age" || cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
+    if (cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
     // 個数変更・取り消しが済んだら、広げた行を閉じる
     if (send(cmd) && ["set_qty", "remove_line", "remove_coupon"].includes(cmd.type)) editing.delete(`${cmd.register}:${cmd.side}`);
   }

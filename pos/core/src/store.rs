@@ -169,12 +169,6 @@ pub enum Command {
         side: Side,
         method: PaymentMethod,
     },
-    /// 年齢確認ボタン（「X歳以上です」）。店員が「しない」を選んだとき、お客様側の画面で押す
-    ConfirmAge {
-        register: u8,
-        #[serde(default = "customer_side")]
-        side: Side,
-    },
     /// 年確商品があるとき、店員が年齢確認を「する」（身分証の生年月日を入力）か「しない」か選ぶ
     ChooseAgeCheck {
         register: u8,
@@ -320,7 +314,6 @@ impl Command {
             | C::Checkout { register, .. }
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
-            | C::ConfirmAge { register, .. }
             | C::ChooseAgeCheck { register, .. }
             | C::CheckId { register, .. }
             | C::DismissConfiscated { register }
@@ -561,11 +554,6 @@ impl Txn {
         self.paying && !self.age_cleared() && self.age_method.is_none()
     }
 
-    /// 「しない」を選び、お客様の「X歳以上です」待ち
-    fn age_pending(&self) -> bool {
-        self.paying && !self.age_cleared() && self.age_method == Some(AgeMethod::Declare)
-    }
-
     /// 「する」を選び、店員の生年月日の入力待ち
     fn id_pending(&self) -> bool {
         self.paying && !self.age_cleared() && self.age_method == Some(AgeMethod::Id)
@@ -689,7 +677,6 @@ impl Register {
             staff: self.staff_state(),
             has_lines: !t.lines.is_empty(),
             age_choice_pending: t.age_choice_pending(),
-            age_pending: t.age_pending(),
             id_pending: t.id_pending(),
             ff_waiting: t.any_ff(FfState::Waiting),
             has_ff: t
@@ -701,7 +688,7 @@ impl Register {
             // 年確が先。年確で販売が成立しないこともあるので、ポイントカードの確認はその後
             point_pending: t.paying
                 && !t.point_checked
-                && !(t.age_choice_pending() || t.age_pending() || t.id_pending()),
+                && !(t.age_choice_pending() || t.id_pending()),
             has_coupons: !t.coupons.is_empty(),
             coupon_unmatched: t.paying && t.coupon_unmatched(),
             method: t.method,
@@ -754,8 +741,8 @@ fn customer_side() -> Side {
 /// 年確のやり方（店員が選ぶ）
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AgeMethod {
-    /// 「しない」：お客様の「X歳以上です」で済ませる
-    Declare,
+    /// 「しない」：店員の判断で年確を済ませる
+    Skip,
     /// 「する」：身分証の生年月日で判定する
     Id,
 }
@@ -1136,13 +1123,6 @@ impl Store {
                 r.txn.method = Some(method);
                 done(format!("{}を選びました", method.label()))
             }
-            C::ConfirmAge { register, side } => {
-                self.check(register, side, Action::ConfirmAge)?;
-                let r = self.reg_mut(register)?;
-                r.txn.verified_age = r.txn.required_age;
-                let age = r.txn.required_age.unwrap_or(0);
-                done(format!("{age}歳以上であることを確認しました"))
-            }
             C::ChooseAgeCheck {
                 register,
                 side,
@@ -1156,10 +1136,10 @@ impl Store {
                     r.txn.age_method = Some(AgeMethod::Id);
                     done("身分証の生年月日を入力してください")
                 } else {
-                    r.txn.age_method = Some(AgeMethod::Declare);
-                    done(format!(
-                        "お客様画面で「{age}歳以上です」の確認をお願いします"
-                    ))
+                    // 店員が見た目で判断して確認しないなら、年確はそこで済む（お客様のボタンは挟まない）
+                    r.txn.age_method = Some(AgeMethod::Skip);
+                    r.txn.verified_age = r.txn.required_age;
+                    done(format!("{age}歳以上の年齢確認を省略しました"))
                 }
             }
             C::CheckId {
@@ -2210,7 +2190,6 @@ impl Store {
                     .iter()
                     .map(|&(name, qty)| Confiscated { name, qty })
                     .collect(),
-                age_pending: c.age_pending,
                 id_pending: c.id_pending,
                 coupon_unmatched: c.coupon_unmatched,
                 returned: returned.clone(),
@@ -2237,7 +2216,6 @@ impl Store {
                 due: total.saturating_sub(inserted),
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
-                age_check: c.age_pending.then_some(t.required_age.unwrap_or(0)),
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 staff_called,
                 staff_present: c.staff == StaffState::Ready,
@@ -2304,7 +2282,6 @@ pub struct StaffView {
     pub coupon_unmatched: bool,
     /// 取り消して、お客様に返却するクーポン
     pub returned: Vec<ReturnedCoupon>,
-    pub age_pending: bool,
     /// 「する」を選び、店員の生年月日の入力待ち
     pub id_pending: bool,
     /// 会計時、お客様の確認待ちの代行収納の金額
@@ -2337,8 +2314,6 @@ pub struct CustomerView {
     pub due: u32,
     pub point_card: bool,
     pub point_pending: bool,
-    /// 年確中なら求める年齢
-    pub age_check: Option<u8>,
     /// お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
     pub staff_called: bool,

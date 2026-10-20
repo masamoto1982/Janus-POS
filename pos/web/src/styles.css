@@ -196,7 +196,6 @@ details summary h3 { display: inline; }
 .point-screen .big { font-size: 18px; font-weight: 700; }
 .point-choices { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .point-choices button { min-width: 180px; padding: 12px 16px; font-size: 14px; }
-.age-card { background: var(--warn-bg); color: var(--warn); }
 .bill-card { background: var(--warn-bg); color: var(--warn); }
 .ffcheck { display: inline-flex; vertical-align: middle; margin-left: 6px; }
 .ffcheck input { width: 18px; height: 18px; accent-color: var(--ff); cursor: pointer; }

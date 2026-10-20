@@ -1385,3 +1385,41 @@ fn a_merged_line_moves_to_the_top() {
     let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
     assert_eq!((top.name, top.qty), ("おにぎり 鮭", 2));
 }
+
+/// 明細の個数を手で変えられる。変えた行は一番上に出て、点数の上限も守る。
+#[test]
+fn staff_or_customer_changes_a_line_quantity() {
+    const SANDWICH: &str = "4900000000028";
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", SANDWICH);
+    let id = reg(&s, 1).customer.lines[0].id;
+    let set =
+        |qty: u32| json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":qty});
+    ok(&mut s, set(3));
+    let v = reg(&s, 1);
+    let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
+    assert_eq!((top.name, top.qty), ("おにぎり 鮭", 3));
+    assert_eq!(v.customer.total, 160 * 3 + 320);
+    assert!(run(&mut s, set(5)).is_err(), "over the 5-item limit");
+    assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
+    ok(&mut s, set(1));
+    assert_eq!(reg(&s, 1).customer.total, 160 + 320);
+}
+
+/// クーポンと明細の番号は重ならない（取消・変更の対象を取り違えない）。
+#[test]
+fn coupon_and_line_ids_never_collide() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", "4900000000028");
+    scan(&mut s, 1, "customer", "CP0002");
+    scan(&mut s, 1, "customer", "4900000000011");
+    let v = reg(&s, 1);
+    let mut ids: Vec<u32> = v.customer.lines.iter().map(|l| l.id).collect();
+    ids.extend(v.customer.coupons.iter().map(|c| c.id));
+    let n = ids.len();
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), n);
+}

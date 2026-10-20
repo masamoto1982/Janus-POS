@@ -14,6 +14,7 @@ import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 import {
   esc,
   FF_TABS,
+  editing,
   flashing,
   type FfUi,
   itemsPanel,
@@ -491,11 +492,33 @@ app.addEventListener("click", (e) => {
     frame();
     return;
   }
+  // 明細の「変更」：行を広げて個数変更・取り消し（登録画面の中で完結。コアには決めたときだけ送る）
+  if (b.dataset.edit) {
+    const [reg, side, id, qty] = b.dataset.edit.split(":");
+    const key = `${reg}:${side}`;
+    if (editing.get(key)?.id === Number(id)) editing.delete(key);
+    else editing.set(key, { id: Number(id), qty: Number(qty) });
+    frame();
+    return;
+  }
+  if (b.dataset.editStep) {
+    const [reg, side, d] = b.dataset.editStep.split(":");
+    const e = editing.get(`${reg}:${side}`);
+    if (e) e.qty = Math.max(1, e.qty + Number(d));
+    frame();
+    return;
+  }
+  if (b.dataset.editClose) {
+    editing.delete(b.dataset.editClose);
+    frame();
+    return;
+  }
   if (b.dataset.cmd) {
     const cmd = JSON.parse(b.dataset.cmd) as Command;
     // 年齢確認は、押した画面（お客様側だけ受け付ける）をコアに伝える
     if (cmd.type === "confirm_age" || cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
-    send(cmd);
+    // 個数変更・取り消しが済んだら、広げた行を閉じる
+    if (send(cmd) && ["set_qty", "remove_line", "remove_coupon"].includes(cmd.type)) editing.delete(`${cmd.register}:${cmd.side}`);
   }
   else if (b.dataset.form) form(b);
 });

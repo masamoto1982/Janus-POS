@@ -204,12 +204,49 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
       <button data-form="service" data-reg="${reg}" data-line="${l.id}" ${a.allowed ? "" : "disabled"}>受付</button>
     </div>`;
   }
-  return `<tr class="${flash(reg, l.id)}">
+  return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${l.qty}${ffCheck(reg, l, find(v.actions, "check_ff"))}</td>
     <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>
-    <td>${btn("取消", { type: "remove_line", register: reg, side, line_id: l.id }, remove, "small ghost")}</td>
-  </tr>`;
+    <td>${editBtn(reg, side, l.id, l.qty, remove)}</td>
+  </tr>${lineEditor(reg, side, l, remove)}`;
+}
+
+/**
+ * 個数変更・取り消しのために広げている行（レジ:画面 → 明細番号と変更後の個数）。
+ * ポップアップは使わず、対象の行の下が一時的に広がって、登録画面の中で完結する
+ */
+export const editing = new Map<string, { id: number; qty: number }>();
+
+const editingRow = (reg: number, side: Side, id: number): string => (editing.get(`${reg}:${side}`)?.id === id ? "editing" : "");
+
+/** 取消ボタンに代わる「変更」ボタン。押すと行が広がる（もう一度押すと閉じる） */
+function editBtn(reg: number, side: Side, id: number, qty: number, st: ActionState): string {
+  const open = editing.get(`${reg}:${side}`)?.id === id;
+  const disabled = !st.allowed;
+  const title = disabled && st.reason ? ` title="${esc(st.reason)}"` : "";
+  return `<button class="small ghost ${open ? "on" : ""}" data-edit="${reg}:${side}:${id}:${qty}"${disabled ? " disabled" : ""}${title}>変更</button>`;
+}
+
+/** 広げた行の中身：個数の − ＋ と「個数変更」、それに「取り消し」 */
+function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind: string; state?: string }, st: ActionState): string {
+  const e = editing.get(`${reg}:${side}`);
+  if (!e || e.id !== l.id || !st.allowed) return "";
+  // サービス商品とお渡し済みの FF は個数を変えられない（取り消しだけ）
+  const fixed = l.kind === "service" || (l.kind === "ff" && l.state === "received");
+  const qty = fixed
+    ? `<span class="muted">この商品は個数を変えられません</span>`
+    : `<span class="qty-edit">
+        <button class="small" data-edit-step="${reg}:${side}:-1" ${e.qty <= 1 ? "disabled" : ""}>−</button>
+        <b>${e.qty}</b>
+        <button class="small" data-edit-step="${reg}:${side}:1">＋</button>
+      </span>
+      ${btn("個数変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`;
+  return editorRow(reg, side, `${qty}${btn("取り消し", { type: "remove_line", register: reg, side, line_id: l.id }, st, "small danger")}`);
+}
+
+function editorRow(reg: number, side: Side, body: string): string {
+  return `<tr class="edit-row"><td colspan="4"><div class="edit-box">${body}<button class="small ghost" data-edit-close="${reg}:${side}">閉じる</button></div></td></tr>`;
 }
 
 /** 呼び出しの種類の短い表示（店員側画面） */
@@ -269,7 +306,9 @@ export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Actio
     c.id,
     `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
       c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
-    }</td><td>${removeCoupon(reg, side, c, st)}</td></tr>`,
+    }</td><td>${editBtn(reg, side, c.id, 1, st)}</td></tr>${
+      editing.get(`${reg}:${side}`)?.id === c.id && st.allowed ? editorRow(reg, side, btn("取り消し", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small danger")) : ""
+    }`,
   ]);
 }
 
@@ -613,8 +652,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
-      const rm = c.phase === "registering" ? btn("取消", { type: "remove_line", register: reg, side, line_id: l.id }, a("remove_line"), "small ghost") : "";
-      return [l.touched, `<tr class="${flash(reg, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>`];
+      const rm = c.phase === "registering" ? editBtn(reg, side, l.id, l.qty, a("remove_line")) : "";
+      const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line")) : "";
+      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>${editor}`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 

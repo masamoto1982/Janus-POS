@@ -403,3 +403,12 @@ body.dragging .drop-hint { display: inline; }
 @keyframes line-flash { from { background: rgba(251, 191, 36, .55); } to { background: transparent; } }
 .lines tr.flash td { animation: line-flash .9s ease-out; }
 @media (prefers-reduced-motion: reduce) { .lines tr.flash td { animation: none; background: rgba(251, 191, 36, .3); } }
+
+/* 明細の「変更」：対象の行の下が一時的に広がり、個数変更・取り消しをその場で行う */
+.lines tr.editing td { background: var(--accent-soft, rgba(37, 99, 235, .08)); }
+.lines tr.edit-row td { background: var(--accent-soft, rgba(37, 99, 235, .08)); padding: 4px 8px 8px; }
+.edit-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.qty-edit { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
+.qty-edit b { min-width: 2em; text-align: center; font-size: 15px; }
+.qty-edit button { min-width: 32px; }
+button.danger { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }

@@ -14,6 +14,7 @@ import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 import {
   esc,
   FF_TABS,
+  flashing,
   type FfUi,
   itemsPanel,
   screenHead,
@@ -94,7 +95,6 @@ function buildSkeleton(): void {
             <div class="screen-head" data-region="head-${r.id}-staff"></div>
             <div class="screen-main" data-region="staff-${r.id}"></div>
             <div class="screen-items" data-region="items-${r.id}-staff"></div>
-            <div class="toast" id="toast-${r.id}-staff"></div>
           </section>
         </div>
         <div class="screen-wrap" data-wrap="${r.id}:customer">
@@ -103,7 +103,6 @@ function buildSkeleton(): void {
             <div class="screen-head" data-region="head-${r.id}-customer"></div>
             <div class="screen-main" data-region="cust-${r.id}"></div>
             <div class="screen-items" data-region="items-${r.id}-customer"></div>
-            <div class="toast" id="toast-${r.id}-customer"></div>
           </section>
         </div>
       </div>
@@ -192,7 +191,37 @@ function setRegion(name: string, html: string): void {
   }
 }
 
+/** 登録した行を一瞬目立たせる時間 */
+const FLASH_MS = 900;
+/** 明細ごとの最後に見た数量（レジ:明細番号 → 数量）。新しい行や数量の変わった行を光らせる */
+const seenQty = new Map<string, number>();
+const flashUntil = new Map<string, number>();
+
+function trackFlashes(): void {
+  const now = performance.now();
+  const present = new Set<string>();
+  for (const r of snap.registers) {
+    const rows: [number, number][] = [...r.staff.lines.map((l): [number, number] => [l.id, l.qty]), ...r.staff.coupons.map((c): [number, number] => [c.id, 1])];
+    for (const [id, qty] of rows) {
+      const k = `${r.id}:${id}`;
+      present.add(k);
+      if (seenQty.get(k) !== qty) {
+        seenQty.set(k, qty);
+        flashUntil.set(k, now + FLASH_MS);
+      }
+    }
+  }
+  // 取引が終わると明細番号は振り直されるので、消えた行は忘れる
+  for (const k of seenQty.keys()) if (!present.has(k)) seenQty.delete(k);
+  flashing.clear();
+  for (const [k, t] of flashUntil) {
+    if (t <= now || !present.has(k)) flashUntil.delete(k);
+    else flashing.add(k);
+  }
+}
+
 function render(): void {
+  trackFlashes();
   for (const r of snap.registers) {
     // 店員ログインのセレクタは、操作中でなければ現在のログイン状態に合わせる
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);
@@ -305,14 +334,15 @@ function toast(where: string, text: string, error: boolean): void {
 function send(cmd: Command): boolean {
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
-  // 画面を指定しないコマンドの知らせは、そのレジの操作側の画面に出す
-  const active = typeof cmd.register === "number" && !cmd.side ? snap.registers.find((x) => x.id === cmd.register)?.active_side : undefined;
-  const side = sideOf(cmd) === "store" ? "store" : (active ?? sideOf(cmd));
-  const where = cmd.type === "set_product_age" ? "toast-rules" : ["cash_in", "cash_out", "open_menu", "insert", "finish_insert", "take_outlet"].includes(cmd.type) ? `toast-${cmd.register}-customer` : side === "store" ? "toast-store" : `toast-${cmd.register}-${side}`;
-  if (res.ok) {
-    if (res.message) toast(where, res.message, false);
-  } else {
-    toast(where, res.error ?? "操作できません", true);
+  // レジ画面には覆い隠すメッセージを出さない（登録した行が一瞬色を変えて知らせる）。
+  // 知らせを出すのは、レジ画面の外（年確ルールの設定・店舗全体の操作）だけ
+  const where = cmd.type === "set_product_age" ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
+  if (where) {
+    if (res.ok) {
+      if (res.message) toast(where, res.message, false);
+    } else toast(where, res.error ?? "操作できません", true);
+  }
+  if (!res.ok) {
     // 買い物点数の上限は表示エリアに合わせたシミュレーターだけの制約（実際のシステムでは起きない）
     if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
   }

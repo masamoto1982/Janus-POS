@@ -1292,6 +1292,7 @@ fn age_counts_the_birthday() {
 #[test]
 fn coupons_apply_whenever_the_target_is_registered() {
     const SANDWICH: &str = "4900000000028";
+    const TEA: &str = "4900000000035";
     let mut s = Store::new(1, 2, 1);
     // 商品より先にクーポン
     scan(&mut s, 1, "customer", "CP0001");
@@ -1299,23 +1300,23 @@ fn coupons_apply_whenever_the_target_is_registered() {
     assert_eq!(v.customer.coupons.len(), 1);
     assert_eq!(v.customer.coupons[0].discount, None);
     assert_eq!(v.customer.total, 0);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", TEA);
     let v = reg(&s, 1);
-    assert_eq!(v.customer.coupons[0].discount, Some(160));
+    assert_eq!(v.customer.coupons[0].discount, Some(150));
     assert_eq!(v.customer.total, 0);
     // 同じクーポンを 2 枚目も使える。対象商品 1 個につき 1 枚
     scan(&mut s, 1, "customer", "CP0001");
     assert_eq!(reg(&s, 1).customer.coupons[1].discount, None);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", TEA);
     let v = reg(&s, 1);
-    assert_eq!(v.customer.coupons[1].discount, Some(160));
+    assert_eq!(v.customer.coupons[1].discount, Some(150));
     assert_eq!(v.customer.total, 0);
-    // 商品の後にクーポン（割引券）。3 個目のおにぎりは定価
+    // 商品の後にクーポン（割引券）。3 本目の緑茶は定価
     scan(&mut s, 1, "customer", SANDWICH);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", TEA);
     scan(&mut s, 1, "customer", "CP0002");
     let v = reg(&s, 1);
-    assert_eq!(v.customer.total, 160 + 320 - 50);
+    assert_eq!(v.customer.total, 150 + 320 - 50);
     // クーポンは買い物点数に数えない
     assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 4);
     // クーポンを使ったまま会計できる
@@ -1329,13 +1330,13 @@ fn coupons_apply_whenever_the_target_is_registered() {
         json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
     );
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
-    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 430);
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 420);
 }
 
 #[test]
 fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     let mut s = Store::new(1, 2, 1);
-    // おにぎりの引換券のつもりで、別の商品をレジに通した
+    // 緑茶の引換券のつもりで、別の商品をレジに通した
     scan(&mut s, 1, "customer", "CP0001");
     scan(&mut s, 1, "customer", "4900000000028");
     ok(

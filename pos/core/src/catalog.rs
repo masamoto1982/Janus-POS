@@ -119,7 +119,7 @@ use TaxRate::*;
 pub const CATALOG: &[Product] = &[
     p("4900000000011", "おにぎり 鮭", 160, Reduced8, Food),
     p("4900000000028", "ミックスサンド", 320, Reduced8, Food),
-    p("4900000000035", "緑茶 600ml", 150, Reduced8, Drink),
+    p("4900000000035", "緑茶 500ml", 150, Reduced8, Drink),
     p("4900000000042", "ボトルコーヒー", 180, Reduced8, Drink),
     p("4900000000066", "カップ麺 しょうゆ", 214, Reduced8, Food),
     p("4900000000073", "スポーツドリンク", 160, Reduced8, Drink),
@@ -335,13 +335,13 @@ pub struct Coupon {
 pub const COUPONS: &[Coupon] = &[
     Coupon {
         code: "CP0001",
-        name: "おにぎり 鮭 引換券",
-        target: "4900000000011",
+        name: "引換券：緑茶 500ml",
+        target: "4900000000035",
         kind: CouponKind::Exchange,
     },
     Coupon {
         code: "CP0002",
-        name: "ミックスサンド 50円引き",
+        name: "割引券：サンドイッチ 50円引き",
         target: "4900000000028",
         kind: CouponKind::Discount(50),
     },

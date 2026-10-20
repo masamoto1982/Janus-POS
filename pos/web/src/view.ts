@@ -794,8 +794,8 @@ export function walletPanel(): string {
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
     item("PC87654321", "ポイントアプリ", "スマホ", "card"),
-    item("CP0001", "おにぎり 鮭", "引換券", "coupon"),
-    item("CP0002", "ミックスサンド", "50円引き", "coupon"),
+    item("CP0001", "引換券", "緑茶 500ml", "coupon"),
+    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
     walletItem("pay:emoney", "電子マネー", "端末にかざす", "pay"),

@@ -65,6 +65,8 @@ pub enum PaymentMethod {
     Emoney,
     Qr,
     Credit,
+    /// ポイント利用（ポイントカード・ポイントアプリを入金ボックスにかざす）
+    Points,
 }
 
 impl PaymentMethod {
@@ -74,6 +76,7 @@ impl PaymentMethod {
             PaymentMethod::Emoney => "電子マネー",
             PaymentMethod::Qr => "バーコード決済",
             PaymentMethod::Credit => "クレジットカード",
+            PaymentMethod::Points => "ポイント利用",
         }
     }
 }
@@ -104,7 +107,6 @@ pub enum Action {
     SelectPayment,
     /// 会計時のポイントカードの最終確認（「ポイントカードなしで進む」）
     ConfirmPointCard,
-    ConfirmAge,
     /// 年確商品があるとき、店員が「年齢確認をする／しない」を選ぶ
     ChooseAgeCheck,
     /// 「する」を選んだ後、店員が身分証の生年月日を入力して判定する
@@ -135,7 +137,6 @@ pub const ACTIONS: &[Action] = &[
     Action::BackToRegistering,
     Action::SelectPayment,
     Action::ConfirmPointCard,
-    Action::ConfirmAge,
     Action::ChooseAgeCheck,
     Action::CheckId,
     Action::ConfirmBillPayment,
@@ -159,8 +160,6 @@ pub struct Context {
     pub has_lines: bool,
     /// 会計時の年確で、店員がまだ「年齢確認をする／しない」を選んでいない
     pub age_choice_pending: bool,
-    /// 「しない」を選び、お客様の「X歳以上です」待ち
-    pub age_pending: bool,
     /// 「する」を選び、店員の生年月日の入力待ち
     pub id_pending: bool,
     /// お渡し確認のチェックが入っていない FF がある
@@ -200,14 +199,12 @@ pub const TOUCH_LOCK_MS: u64 = 1000;
 impl Context {
     /// 決済を止めている理由（なければ None）。決済の関門はここに集める。
     pub fn payment_blocker(&self) -> Option<&'static str> {
-        if self.point_pending {
-            Some(POINT_UNCONFIRMED)
-        } else if self.age_choice_pending {
+        if self.age_choice_pending {
             Some("店員が年齢確認をするか選んでいません")
-        } else if self.age_pending {
-            Some("年齢確認が済んでいません")
         } else if self.id_pending {
             Some("店員が身分証の生年月日を入力していません")
+        } else if self.point_pending {
+            Some(POINT_UNCONFIRMED)
         } else if self.coupon_unmatched {
             Some(COUPON_UNMATCHED)
         } else if self.bill_pending {
@@ -242,11 +239,11 @@ fn confirm_bill(c: &Context) -> Result<(), Denial> {
 /// お客様本人の意思表示・申告にあたる操作。お客様側の画面からしか押せず、
 /// どちらの画面が操作側でも押せる（画面の排他の例外）。
 ///
-/// いまは年齢確認と代行収納の内容・金額の確認の二つ。同じ性質の操作として、
+/// いまは代行収納の内容・金額の確認だけ（年確は店員が判断する）。同じ性質の操作として、
 /// クレジット・デビットの暗証番号入力（現実には専用端末で行うため扱わない）や
 /// 宅配便の危険物・禁制品がないことの申告（ラベル・ステッカーで行うため扱わない）がある。
 pub fn is_customer_only(action: Action) -> bool {
-    matches!(action, Action::ConfirmAge | Action::ConfirmBillPayment)
+    matches!(action, Action::ConfirmBillPayment)
 }
 
 /// 店員本人が判断・確認する操作。店員側の画面からしか押せず、どちらの画面が操作側でも押せる。
@@ -269,10 +266,7 @@ pub fn fixed_side(action: Action) -> Option<Side> {
 /// 年確をするか選ぶ（年確が済むまでは選び直せる）
 fn choose_age_check(c: &Context) -> Result<(), Denial> {
     require(c.phase == Phase::Paying, "お会計前です")?;
-    require(
-        c.age_choice_pending || c.age_pending || c.id_pending,
-        "年齢確認は不要です",
-    )
+    require(c.age_choice_pending || c.id_pending, "年齢確認は不要です")
 }
 
 /// 身分証の生年月日の入力（「する」を選んだ後）
@@ -282,9 +276,13 @@ fn check_id(c: &Context) -> Result<(), Denial> {
     require(c.id_pending, "生年月日の入力は不要です")
 }
 
-/// 会計ボタンの後のポイントカードの最終確認（どちらの画面からでも）
+/// 会計ボタンの後のポイントカードの最終確認。年確が先（年確で販売が成立しなければ無駄な手間になる）
 fn confirm_point(c: &Context) -> Result<(), Denial> {
     require(c.phase == Phase::Paying, "お会計前です")?;
+    require(
+        !(c.age_choice_pending || c.id_pending),
+        "先に年齢確認をしてください",
+    )?;
     require(c.point_pending, "ポイントカードの確認は済んでいます")
 }
 
@@ -321,7 +319,7 @@ pub fn is_device_action(action: Action) -> bool {
 ///
 /// 何ができるかは **モード（有人・セミセルフ）** だけで決まり、どちらの画面かは関係ない。
 /// 二つの画面は同じ内容を映し、操作は排他（操作側の画面だけが押せる）。
-/// 例外はお客様本人が押すボタン（年齢確認・代行収納の内容確認。`is_customer_only`）で、
+/// 例外はお客様本人が押すボタン（代行収納の内容確認。`is_customer_only`）で、
 /// これはお客様側の画面からしか押せない。
 pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> {
     rules(action, c)?;
@@ -332,8 +330,6 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Ok(())
         } else if is_staff_only(action) {
             Err("年齢確認は店員側の画面で行います")
-        } else if action == Action::ConfirmAge {
-            Err("年齢確認はお客様側の画面で押していただきます")
         } else {
             Err("支払い内容・金額の確認はお客様側の画面で押していただきます")
         };
@@ -385,7 +381,12 @@ fn pay_action(action: Action, c: &Context) -> Result<(), Denial> {
         require(
             matches!(
                 c.method,
-                Some(PaymentMethod::Emoney | PaymentMethod::Qr | PaymentMethod::Credit)
+                Some(
+                    PaymentMethod::Emoney
+                        | PaymentMethod::Qr
+                        | PaymentMethod::Credit
+                        | PaymentMethod::Points
+                )
             ),
             "キャッシュレスの支払方法が選ばれていません",
         )
@@ -430,11 +431,6 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
             require(!c.point_pending, POINT_UNCONFIRMED)
         }
         Action::ConfirmPointCard => confirm_point(c),
-        Action::ConfirmAge => {
-            require(paying, "年齢確認は不要です")?;
-            require(!c.age_choice_pending, "店員が年齢確認の方法を選んでいます")?;
-            require(c.age_pending, "年齢確認は不要です")
-        }
         Action::ChooseAgeCheck => choose_age_check(c),
         Action::CheckId => check_id(c),
         Action::ConfirmBillPayment => confirm_bill(c),
@@ -477,13 +473,6 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         }
         Action::ConfirmPointCard => confirm_point(c),
         // 年確は係員が来て（名札でログインして有人モードになって）から
-        Action::ConfirmAge => {
-            require(
-                paying && (c.age_choice_pending || c.age_pending),
-                "年齢確認は不要です",
-            )?;
-            Err("係員が向かっています。しばらくお待ちください")
-        }
         Action::ChooseAgeCheck | Action::CheckId => {
             choose_age_check(c)?;
             Err("年齢確認は係員が名札でログインしてから行います")
@@ -511,7 +500,7 @@ mod tests {
         for mode in [Mode::Attended, Mode::SemiSelf, Mode::FullSelf] {
             for phase in [Phase::Registering, Phase::Paying] {
                 for has_lines in b {
-                    for age_pending in b {
+                    for age_choice_pending in b {
                         for (ff_waiting, has_ff) in [(false, false), (false, true), (true, true)] {
                             for (service_pending, bill_pending) in
                                 [(false, false), (true, false), (false, true)]
@@ -532,9 +521,9 @@ mod tests {
                                             phase,
                                             staff: StaffState::Ready,
                                             has_lines,
-                                            age_pending: age_pending && phase == Phase::Paying,
                                             id_pending: false,
-                                            age_choice_pending: false,
+                                            age_choice_pending: age_choice_pending
+                                                && phase == Phase::Paying,
                                             ff_waiting,
                                             has_ff,
                                             service_pending,
@@ -571,21 +560,6 @@ mod tests {
                     })
                 };
                 assert!(!(any(Side::Staff) && any(Side::Customer)), "{c:?}");
-            }
-        }
-    }
-
-    /// 有人モードで年確が出ても、年確ボタンはお客様側の画面で押す（係員の画面からは押せない）。
-    /// 係員が触れている最中でも同じ。
-    #[test]
-    fn age_confirmation_is_pressed_on_the_customer_side() {
-        for base in contexts()
-            .into_iter()
-            .filter(|c| c.mode == Mode::Attended && !c.customer_turn && c.age_pending)
-        {
-            for c in touch_states(base) {
-                assert!(permitted(Side::Customer, Action::ConfirmAge, &c).is_ok());
-                assert!(permitted(Side::Staff, Action::ConfirmAge, &c).is_err());
             }
         }
     }
@@ -633,7 +607,8 @@ mod tests {
     #[test]
     fn payment_is_gated_until_blockers_clear() {
         for c in contexts().into_iter().filter(|c| c.phase == Phase::Paying) {
-            let blocked = c.age_pending || c.bill_pending || c.ff_waiting || c.service_pending;
+            let blocked =
+                c.age_choice_pending || c.bill_pending || c.ff_waiting || c.service_pending;
             for a in [Action::InsertCash, Action::TapEmoney] {
                 if blocked {
                     assert!(permitted(Side::Customer, a, &c).is_err());

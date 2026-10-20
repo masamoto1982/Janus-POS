@@ -524,7 +524,7 @@ app.addEventListener("click", (e) => {
   if (b.dataset.cmd) {
     const cmd = JSON.parse(b.dataset.cmd) as Command;
     // 年齢確認は、押した画面（お客様側だけ受け付ける）をコアに伝える
-    if (cmd.type === "confirm_age" || cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
+    if (cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
     // 個数変更・取り消しが済んだら、広げた行を閉じる
     if (send(cmd) && ["set_qty", "remove_line", "remove_coupon"].includes(cmd.type)) editing.delete(`${cmd.register}:${cmd.side}`);
   }
@@ -589,6 +589,9 @@ function setupDrag(): void {
     // 入金ボックスの周り（お客様側）に落としたときは、お客様側として扱う
     const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop!, "customer"];
     const register = Number(reg);
+    // ポイント利用を選んだあとは、ポイントカード・アプリを入金ボックスにかざすと決済になる
+    const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
+    if (d.code?.startsWith("PC") && el.dataset.cashDrop && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
     if (d.code) return void send({ type: "scan", register, side, code: d.code });
     const [kind, value] = d.wallet!.split(":");
     // お金は投入口（お客様側にしかない）へ、決済はお客様側の端末にかざす

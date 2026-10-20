@@ -55,8 +55,8 @@ function ffCheck(reg: number, l: { id: number; kind: string; state?: FfState }, 
   return `<label class="ffcheck" title="${esc(title)}"><input type="checkbox" data-ffcheck="${reg}:${l.id}"${l.state === "received" ? " checked" : ""}${a.allowed ? "" : " disabled"} aria-label="お渡し確認" /></label>`;
 }
 
-const METHOD_LABEL: Record<string, string> = { cash: "現金", emoney: "電子マネー", qr: "バーコード決済", credit: "クレジットカード" };
-const METHODS = ["cash", "emoney", "qr", "credit"] as const;
+const METHOD_LABEL: Record<string, string> = { cash: "現金", emoney: "電子マネー", qr: "バーコード決済", credit: "クレジットカード", points: "ポイント利用" };
+const METHODS = ["cash", "emoney", "qr", "credit", "points"] as const;
 
 // ---------------------------------------------------------------------------
 // レジ画面。店員側・お客様側の区別はなく、二つの画面に同じものを映す。
@@ -73,16 +73,6 @@ type Side = "staff" | "customer";
  */
 function thanks(): string {
   return `<div class="thanks"><div class="big">ありがとうございました</div><div>お忘れ物にご注意ください</div></div>`;
-}
-
-/** 年齢確認ボタン（店員が「しない」を選んだとき。例外：お客様側の画面からしか押せない） */
-function ageCard(reg: number, age: number, st: ActionState): string {
-  return `<div class="card age-card customer-only">
-      <div class="big">年齢確認</div>
-      <p>年齢確認が必要な商品があります（お客様側の画面で押してください）</p>
-      ${btn(`${age}歳以上です`, { type: "confirm_age", register: reg }, st, "primary big-btn")}
-      ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
-    </div>`;
 }
 
 /** 日付を YYYY-MM-DD で（レジの日付として生年月日の判定に使う） */
@@ -133,16 +123,14 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
   let body: string;
   if (v.age_choice_pending) {
     body = `<div class="id-head"><b>${age}歳以上の年齢確認をしますか？</b>${choose(true, "する", "primary")}${choose(false, "しない")}</div>
-      <p>「する」：身分証の生年月日を入力して判定します。「しない」：お客様が「${age}歳以上です」を押します。</p>`;
-  } else if (v.id_pending) {
+      <p>「する」：身分証の生年月日を入力して判定します。「しない」：店員の判断で年齢確認を済ませます。</p>`;
+  } else {
     const st = a("check_id");
     body = `<div class="id-head"><b>身分証の生年月日（西暦8桁）</b>
         <input type="text" inputmode="numeric" maxlength="8" placeholder="例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
         ${choose(false, "しないに変更", "small ghost")}</div>
       <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;
-  } else {
-    body = `<div class="id-head"><b>お客様の「${age}歳以上です」を待っています</b>${choose(true, "身分証で確認する", "small")}</div>`;
   }
   return `<div class="card id-card staff-only">${body}${ageChart(age)}</div>`;
 }
@@ -173,6 +161,7 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 /** 支払方法を選んだ後の案内 */
 function payHint(method: string | null, blocker: string | null, inserted: number): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
+  if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、入金ボックスにかざしてください</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
   if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
   if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
@@ -188,6 +177,15 @@ function methodRow(reg: number, side: Side, method: string | null, inserted: num
   return `<div class="row wrap ${cls}">${METHODS
     .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, st, `seg ${method === m ? "on" : ""}`))
     .join("")}</div>`;
+}
+
+/**
+ * 有人モードのお客様側：支払方法の一覧を見せるだけ（選ぶのは店員）。電子マネーとバーコード決済、
+ * 電子マネーとポイントを取り違えるお客様が多いので、現金以外は店員を介して決める
+ */
+function methodList(method: string | null, inserted: number): string {
+  if (method === "cash" && inserted) return "";
+  return `<div class="row wrap method-list">${METHODS.map((m) => `<span class="seg ${method === m ? "on" : ""}">${METHOD_LABEL[m]}</span>`).join("")}</div>`;
 }
 
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
@@ -281,21 +279,11 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
 }
 
-/** 会計時の年確。お客様側は「X歳以上です」、店員側は身分証の確認（はい・いいえ）と早見表 */
+/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、しない：店員の判断で済む）。早見表を添える */
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
   const age = v.required_age;
-  if (!age) return "";
-  if (side === "customer") return v.age_pending ? ageCard(reg, age, a("confirm_age")) : "";
-  return v.age_choice_pending || v.age_pending || v.id_pending ? idCard(reg, age, v, a) : "";
-}
-
-function ageStatus(v: StaffView): string {
-  if (!v.required_age) return "不要";
-  const age = v.required_age;
-  if (v.age_choice_pending) return `<b class="warn">${age}歳以上：店員が確認方法を選んでいます</b>`;
-  if (v.age_pending) return `<b class="warn">${age}歳以上：お客様の確認待ち</b>`;
-  if (v.id_pending) return `<b class="warn">${age}歳以上：身分証の確認中</b>`;
-  return `<span class="ok">確認済</span>`;
+  if (!age || side === "customer") return "";
+  return v.age_choice_pending || v.id_pending ? idCard(reg, age, v, a) : "";
 }
 
 /** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい） */
@@ -403,25 +391,32 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks();
-  // お客様側に出すボタンは、お客様本人が押すもの（年確・お支払い内容の確認・投入おわり）だけ。
+  // 有人モードの初期画面（まだ何も登録していない）は、あいさつとポイントカードの声かけの二行だけ
+  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length)
+    return `${notice}<div class="welcome"><div class="big">いらっしゃいませ</div><p>ポイントカードまたはポイントアプリはおもちですか？</p></div>`;
+  // お客様側に出すボタンは、お客様本人が押すもの（お支払い内容の確認・投入おわり）だけ。
   // ほかの操作（会計・変更・ポイントカード・支払方法など）は店員側の画面で行う
   const ro = side === "customer";
   // 新しい動きのあった行ほど上に出す
   const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
 
-  // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる（有人モードでは店員側の画面だけで選ぶ）
+  // 会計ボタンの後は、年確 → ポイントカードの最終確認 → 決済手段の確認の順に進む
   const pointPending = paying && v.point_pending;
-  const pay = pointPending
-    ? ""
-    : paying
-    ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
-        <div>年確：${ageStatus(v)}</div>
+  const agePending = paying && (v.age_choice_pending || v.id_pending);
+  // 決済手段の確認：登録画面と年確の状況は出さず、決済手段だけを示す（選ぶのは店員側の画面）
+  const payStage = paying && !pointPending && !agePending;
+  const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
+  const pay = payStage
+    ? `${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox pay-stage">
+        ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
-        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : ""}
-        ${side === "staff" || v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : "<p>現金は入金ボックスに入れてください。ほかのお支払い方法は店員が選びます</p>"}
+        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : methodList(v.method, v.inserted)}
+        ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : ""}
       </div>`
-    : "";
+    : agePending
+      ? ageStep(reg, v, side, a)
+      : "";
 
   // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
   const top = regTop(
@@ -438,14 +433,17 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   );
   // 有人モードの最終確認は店員側だけ。登録画面を置き換えて出す（お客様側は明細のまま）
   if (pointPending && side === "staff") return `${top}${notice}${staffPointCheck(reg, side, a("confirm_point_card"))}`;
+  const cards = `${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
+    v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
+  }`;
+  // 決済手段の確認は登録画面を置き換えて出す（両方の画面とも）
+  if (payStage) return `${top}${notice}${cards}${pay}`;
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
     </div>
-    ${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
-      v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
-    }${pay}
+    ${cards}${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
@@ -507,7 +505,7 @@ export function itemCount(lines: { qty: number }[]): number {
  * 二つの画面は、同じ内容を映す（情報空間は一つ）。中身はモードで決まり、
  * どちらの画面もカラーで、その画面から触れない操作だけをグレーにする。
  * 例外は呼び出し中の表示（`callNotice`）と、有人モードのお客様側の画面。
- * 有人モードのお客様側には、お客様本人が押すボタン（年確・お支払い内容の確認・投入おわり）だけを出す。
+ * 有人モードのお客様側には、お客様本人が押すボタン（お支払い内容の確認・投入おわり）だけを出す。
  */
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
   const notice = callNotice(r, snap.now, side);
@@ -565,6 +563,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   }
   // 有人モードの FF は店員側の画面から登録する（お客様側には出さない）
   if (r.mode === "attended" && side === "customer") return "";
+  // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
+  if (r.mode === "attended" && r.staff.phase === "paying") return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -702,11 +702,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 
   let pay = "";
   if (c.phase === "paying") {
-    const age =
-      (c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "") +
-      (c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "");
+    const bill = c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "";
     const methods = methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center");
-    pay = `${age}<div class="paybox center">
+    pay = `${bill}<div class="paybox center">
         <div>お支払い <b class="total">${yen(c.total)}</b></div>
         ${c.inserted ? `<div>お預かり ${yen(c.inserted)}　残り <b>${yen(c.due)}</b></div>` : ""}
         ${methods}${payHint(c.method, c.payment_blocker, c.inserted)}
@@ -836,7 +834,7 @@ export function walletPanel(): string {
 /** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */
 export function sideOf(cmd: Command): "staff" | "customer" | "store" {
   if (cmd.side === "staff" || cmd.side === "customer") return cmd.side;
-  if (["ff_button", "confirm_age", "confirm_bill_payment", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
+  if (["ff_button", "confirm_bill_payment", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
   if (typeof cmd.register === "number") return "staff";
   return "store";
 }

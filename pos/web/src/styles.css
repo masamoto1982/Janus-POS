@@ -153,6 +153,8 @@ button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { background: transparent; color: inherit; border-color: currentColor; padding: 4px 10px; opacity: .7; }
 button.seg.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); opacity: 1; }
+.method-list .seg { border: 1px solid currentColor; border-radius: 6px; padding: 4px 10px; opacity: .7; }
+.method-list .seg.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); opacity: 1; }
 button.ff { background: var(--ff); }
 .segs { display: inline-flex; gap: 4px; }
 
@@ -193,10 +195,9 @@ details summary h3 { display: inline; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }
 .point-screen { text-align: center; padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.point-screen .big { font-size: 18px; font-weight: 700; }
+.point-screen .big, .pay-stage .big { font-size: 18px; font-weight: 700; }
 .point-choices { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .point-choices button { min-width: 180px; padding: 12px 16px; font-size: 14px; }
-.age-card { background: var(--warn-bg); color: var(--warn); }
 .bill-card { background: var(--warn-bg); color: var(--warn); }
 .ffcheck { display: inline-flex; vertical-align: middle; margin-left: 6px; }
 .ffcheck input { width: 18px; height: 18px; accent-color: var(--ff); cursor: pointer; }

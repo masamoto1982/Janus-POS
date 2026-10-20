@@ -412,14 +412,16 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 
   // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる（有人モードでは店員側の画面だけで選ぶ）
   const pointPending = paying && v.point_pending;
+  // 店員が年確をするか選んでいる間、お客様側にはその旨を出さない
+  const hideAgeChoice = side === "customer" && v.age_choice_pending;
   const pay = pointPending
     ? ""
     : paying
     ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
-        <div>年確：${ageStatus(v)}</div>
+        ${hideAgeChoice ? "" : `<div>年確：${ageStatus(v)}</div>`}
         <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : ""}
-        ${side === "staff" || v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : "<p>現金は入金ボックスに入れてください。ほかのお支払い方法は店員が選びます</p>"}
+        ${hideAgeChoice ? "" : side === "staff" || v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : "<p>現金は入金ボックスに入れてください。ほかのお支払い方法は店員が選びます</p>"}
       </div>`
     : "";
 

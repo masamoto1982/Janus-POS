@@ -752,18 +752,16 @@ export function ownerPanel(s: Snapshot): string {
 type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean };
 
 /**
- * 売り場の棚。デモのため商品は抽象化し、コンビニの 4 大分類ごとに代表的な商品を四つまで置く。
- * FF はバーコードがないので、落とすとレジ画面下のタブから登録したのと同じになる
+ * 売り場の棚。デモのため商品は抽象化し（将来 UI を英語にしても困らない一般名）、
+ * コンビニの 4 大分類ごとに代表的な商品を置く（FF はレジ画面下のタブから登録するので置かない）
  */
-const FF_SHELF = ["FF01", "FF05"];
-
+const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(p.code);
 const SHELVES: Shelf[] = [
-  { label: "日配食品", match: (p) => p.category === "food" },
-  { label: "加工食品", match: (p) => p.category === "drink" || p.category === "alcohol" },
-  { label: "非食品", match: (p) => ["adult_book", "tobacco", "smoking_goods", "fireworks"].includes(p.category) },
-  // 4 大分類の外：お客様が持ち込む払込票（代行収納）と宅配便の荷物
+  { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011") },
+  { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073", "4900000000066") },
+  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134", "4900000000165") },
+  // 4 大分類の外：お客様が持ち込む払込票（代行収納）と宅配便の荷物、レジに置いてあるレジ袋
   { label: "サービス", match: (p) => p.category === "service" },
-  // 4 大分類の外：レジに置いてあるレジ袋
   { label: "レジ袋", match: (p) => p.category === "bag" },
 ];
 
@@ -774,12 +772,8 @@ function item(code: string, name: string, sub: string, cls = ""): string {
 
 /** Item：4 大分類ごとに小さな見出しを付けて並べる */
 export function shelfPanel(s: Snapshot): string {
-  // FF（フライドチキン・肉まん）はバーコードがない。落とすとタブから登録したのと同じになる
-  const ff = s.ff_stock
-    .filter((f) => FF_SHELF.includes(f.code))
-    .map((f) => item(f.code, f.name, `${yen(f.price)} ・FF`))
-    .join("");
-  return `<div class="shelf"><h3>ファーストフード</h3><div class="items">${ff}</div></div>` + SHELVES.map((g) => {
+  return SHELVES.map((g) => {
+    // 棚の並びは SHELVES に書いた順
     const items = s.catalog.filter(g.match);
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
@@ -804,7 +798,7 @@ export function walletPanel(): string {
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
     item("PC87654321", "ポイントアプリ", "スマホ", "card"),
-    item("CP0001", "引換券", "緑茶 500ml", "coupon"),
+    item("CP0001", "引換券", "ソフトドリンク", "coupon"),
     item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),

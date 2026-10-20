@@ -117,16 +117,20 @@ use Category::*;
 use TaxRate::*;
 
 pub const CATALOG: &[Product] = &[
-    // デモ用に商品名は抽象化し、コンビニの 4 大分類ごとに代表的な商品を二つから四つ置く
+    // デモ用に商品名は抽象化し（将来 UI を英語にしても困らない一般名）、コンビニの 4 大分類ごとに代表的な商品を二つから四つ置く
     // （FF は下のバーコードなしの商品。レジ画面下のタブから登録する）
     // 日配食品
-    p("4900000000011", "おにぎり", 160, Reduced8, Food),
     p("4900000000028", "サンドイッチ", 320, Reduced8, Food),
+    p("4900000000042", "牛乳", 198, Reduced8, Drink),
+    p("4900000000011", "パン", 160, Reduced8, Food),
     // 加工食品
-    p("4900000000035", "緑茶 500ml", 150, Reduced8, Drink),
-    p("4900000000103", "缶ビール", 248, Standard10, Alcohol),
+    p("4900000000035", "ソフトドリンク", 150, Reduced8, Drink),
+    p("4900000000103", "アルコール", 248, Standard10, Alcohol),
+    p("4900000000073", "袋菓子", 150, Reduced8, Food),
+    p("4900000000066", "即席麺", 214, Reduced8, Food),
     // 非食品
-    p("4900000000141", "成人向け雑誌", 980, Standard10, AdultBook),
+    p("4910000000014", "新聞", 160, Standard10, Newspaper),
+    p("4910000000038", "雑誌", 480, Standard10, Magazine),
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),
     // 店舗判断の年確のデモ：ライターは店舗ルールの初期値 20 歳、花火は初期値なし
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
@@ -307,7 +311,7 @@ pub struct Coupon {
 pub const COUPONS: &[Coupon] = &[
     Coupon {
         code: "CP0001",
-        name: "引換券：緑茶 500ml",
+        name: "引換券：ソフトドリンク",
         target: "4900000000035",
         kind: CouponKind::Exchange,
     },

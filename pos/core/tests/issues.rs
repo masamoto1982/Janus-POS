@@ -5,10 +5,12 @@ use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{Command, RegisterView, Store};
 use serde_json::{json, Value};
 
-const ONIGIRI: &str = "4900000000011";
+const BREAD: &str = "4900000000011";
 const BEER: &str = "4900000000103";
-/// 店舗ルールの初期値（18 歳）が付いている商品
-const MAGAZINE: &str = "4900000000141";
+/// 店舗ルールの初期値（20 歳）が付いている商品
+const LIGHTER: &str = "4900000000134";
+/// 年確ルールのない商品。店舗ルールで 18 歳にする例に使う
+const FIREWORKS: &str = "4900000000165";
 /// 年確ルールのない商品（オーナーが店舗ルールを付ける例に使う）
 const SANDWICH: &str = "4900000000028";
 const TEA: &str = "4900000000035";
@@ -96,10 +98,10 @@ fn advance(s: &mut Store, ms: u64) {
 fn any_barcode_is_accepted_in_any_order() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", ONIGIRI);
+    scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "customer", "PC12345678");
     scan(&mut s, 1, "staff", "2000000000015");
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
     assert_eq!(v.staff.lines.len(), 2);
     assert_eq!(v.staff.total, 160 * 2 + 3);
@@ -116,7 +118,7 @@ fn any_barcode_is_accepted_in_any_order() {
 fn scanning_on_payment_screen_returns_to_registering() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", ONIGIRI);
+    scan(&mut s, 1, "staff", BREAD);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
@@ -126,7 +128,7 @@ fn scanning_on_payment_screen_returns_to_registering() {
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":100,"count":1}),
     );
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
     assert_eq!(v.staff.phase, Phase::Registering);
     assert_eq!(v.staff.inserted, 100);
@@ -233,7 +235,7 @@ fn only_owner_changes_age_rules() {
     )
     .is_err());
     scan(&mut s, 1, "staff", SANDWICH);
-    scan(&mut s, 1, "staff", MAGAZINE);
+    scan(&mut s, 1, "staff", LIGHTER);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
@@ -249,7 +251,7 @@ fn only_owner_changes_age_rules() {
 fn customer_cannot_take_over_attended_register() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", ONIGIRI);
+    scan(&mut s, 1, "staff", BREAD);
     assert!(run(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"})
@@ -276,7 +278,7 @@ fn customer_cannot_take_over_attended_register() {
 #[test]
 fn fast_food_flow_in_semi_self_mode() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", ONIGIRI);
+    scan(&mut s, 2, "customer", BREAD);
     assert!(run(
         &mut s,
         json!({"type":"register_ff","register":2,"code":"FF01","qty":1})
@@ -463,7 +465,7 @@ fn customer_view_hides_staff_only_information() {
 #[test]
 fn staff_and_customer_screens_are_exclusive() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
     assert_eq!(v.active_side, Some(Side::Customer));
@@ -512,7 +514,7 @@ fn owner_sets_age_rule_per_product() {
     let set = |id: &str, pw: &str, code: &str, age: Option<u8>| json!({"type":"set_product_age","owner_id":id,"password":pw,"code":code,"min_age":age});
     assert!(run(&mut s, set("1001", "1111", SANDWICH, Some(20))).is_err());
     ok(&mut s, set("9001", "9999", SANDWICH, Some(20)));
-    ok(&mut s, set("9001", "9999", MAGAZINE, None));
+    ok(&mut s, set("9001", "9999", LIGHTER, None));
     // 酒・たばこは法令どおりで変更不可
     assert!(run(&mut s, set("9001", "9999", BEER, None)).is_err());
     assert!(run(&mut s, set("9001", "9999", BEER, Some(25))).is_err());
@@ -521,7 +523,7 @@ fn owner_sets_age_rule_per_product() {
     let cat = s.snapshot().catalog;
     let age = |c: &str| cat.iter().find(|p| p.code == c).unwrap().age;
     assert_eq!(age(SANDWICH), Some(20));
-    assert_eq!(age(MAGAZINE), None);
+    assert_eq!(age(LIGHTER), None);
     assert_eq!(age(BEER), Some(20));
     assert_eq!(age(TEA), Some(18));
 }
@@ -590,7 +592,7 @@ fn idle_register_returns_to_semi_self() {
     login(&mut s, 2);
     advance(&mut s, 4 * 60_000);
     // 途中で操作があれば数え直す
-    scan(&mut s, 2, "staff", ONIGIRI);
+    scan(&mut s, 2, "staff", BREAD);
     ok(&mut s, json!({"type":"void_transaction","register":2}));
     advance(&mut s, 4 * 60_000);
     assert_eq!(reg(&s, 2).mode, Mode::Attended);
@@ -601,7 +603,7 @@ fn idle_register_returns_to_semi_self() {
     assert!(v.idle_revert_in.is_none());
     // 取引中は戻さない
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", ONIGIRI);
+    scan(&mut s, 1, "staff", BREAD);
     advance(&mut s, 6 * 60_000);
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
 }
@@ -631,7 +633,7 @@ fn cash_in_needs_no_password_but_cash_out_does() {
         vec!["取引外入金", "釣銭補充", "釣銭機回収", "釣銭機回収"]
     );
     // 取引中は入出金できない
-    scan(&mut s, 1, "staff", ONIGIRI);
+    scan(&mut s, 1, "staff", BREAD);
     assert!(run(
         &mut s,
         json!({"type":"cash_in","register":1,"kind":"deposit","amount":100})
@@ -643,7 +645,7 @@ fn cash_in_needs_no_password_but_cash_out_does() {
 #[test]
 fn inlet_pays_and_change_waits_in_outlet() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     // お会計前は受け付けない
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
     ok(
@@ -827,7 +829,7 @@ fn called_register_lamp_lights_at_once_until_staff_arrives() {
 #[test]
 fn wallet_card_must_match_chosen_method() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -1168,7 +1170,7 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
 fn shopping_is_limited_to_ten_items() {
     let mut s = Store::new(1, 2, 1);
     for _ in 0..9 {
-        scan(&mut s, 1, "customer", ONIGIRI);
+        scan(&mut s, 1, "customer", BREAD);
     }
     login(&mut s, 1);
     advance(&mut s, 1_000);
@@ -1181,7 +1183,7 @@ fn shopping_is_limited_to_ten_items() {
     assert!(!allowed(&v, Side::Staff, Action::RegisterFf));
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":ONIGIRI}),
+        json!({"type":"scan","register":1,"side":"customer","code":BREAD}),
     )
     .unwrap_err();
     assert!(e.contains("10点"), "{e}");
@@ -1192,7 +1194,7 @@ fn shopping_is_limited_to_ten_items() {
         &mut s,
         json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
     );
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
 }
 
 /// 取引中止・ロック・ログアウトは店舗メニュー（☰）から行い、済んだらメニューは閉じる。
@@ -1200,7 +1202,7 @@ fn shopping_is_limited_to_ten_items() {
 fn void_lock_and_logout_from_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     let top = json!({"type":"open_menu","register":1,"screen":"top"});
     ok(&mut s, top.clone());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
@@ -1219,12 +1221,17 @@ fn void_lock_and_logout_from_the_store_menu() {
 
 /// 年確：年確商品があれば、まず店員が「年齢確認をする／しない」を選ぶ。
 /// 「する」なら身分証の生年月日を入力し、年齢に届かない年確商品は買い物から取り除いて
-/// 没収する商品と個数を店員に示す（18 禁雑誌は買えるが酒は買えない等）。
+/// 没収する商品と個数を店員に示す（18 歳以上の花火は買えるが酒は買えない等）。
 #[test]
 fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let mut s = Store::new(1, 2, 1);
+    // 店舗判断で花火を 18 歳以上にしておく
+    ok(
+        &mut s,
+        json!({"type":"set_product_age","owner_id":"9001","password":"9999","code":FIREWORKS,"min_age":18}),
+    );
     login(&mut s, 1);
-    for code in [ONIGIRI, BEER, BEER, MAGAZINE] {
+    for code in [BREAD, BEER, BEER, FIREWORKS] {
         scan(&mut s, 1, "staff", code);
     }
     advance(&mut s, 1_000);
@@ -1257,12 +1264,12 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
     assert!(run(&mut s, birth("20270101")).is_err());
-    // 19 歳：雑誌（18）は買えるが、ビール（20）は買えない
+    // 19 歳：花火（18）は買えるが、アルコール（20）は買えない
     let msg = run(&mut s, birth("20070501")).unwrap().unwrap();
-    assert!(msg.contains("19歳") && msg.contains("缶ビール"), "{msg}");
+    assert!(msg.contains("19歳") && msg.contains("アルコール"), "{msg}");
     let v = reg(&s, 1);
     let codes: Vec<&str> = v.staff.lines.iter().map(|l| l.line.code).collect();
-    assert!(!codes.contains(&BEER) && codes.contains(&MAGAZINE) && codes.contains(&ONIGIRI));
+    assert!(!codes.contains(&BEER) && codes.contains(&FIREWORKS) && codes.contains(&BREAD));
     assert_eq!(v.staff.confiscated.len(), 1);
     assert_eq!(v.staff.confiscated[0].qty, 2);
     assert!(!v.staff.id_pending && v.staff.phase == Phase::Paying);
@@ -1310,7 +1317,7 @@ fn coupons_apply_whenever_the_target_is_registered() {
     let v = reg(&s, 1);
     assert_eq!(v.customer.coupons[1].discount, Some(150));
     assert_eq!(v.customer.total, 0);
-    // 商品の後にクーポン（割引券）。3 本目の緑茶は定価
+    // 商品の後にクーポン（割引券）。3 本目のソフトドリンクは定価
     scan(&mut s, 1, "customer", SANDWICH);
     scan(&mut s, 1, "customer", TEA);
     scan(&mut s, 1, "customer", "CP0002");
@@ -1335,7 +1342,7 @@ fn coupons_apply_whenever_the_target_is_registered() {
 #[test]
 fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     let mut s = Store::new(1, 2, 1);
-    // 緑茶の引換券のつもりで、別の商品をレジに通した
+    // ソフトドリンクの引換券のつもりで、別の商品をレジに通した
     scan(&mut s, 1, "customer", "CP0001");
     scan(&mut s, 1, "customer", "4900000000028");
     ok(
@@ -1376,20 +1383,20 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
 #[test]
 fn a_merged_line_moves_to_the_top() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", SANDWICH);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
     assert_eq!(v.customer.lines.len(), 2, "same item stays one line");
     let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
-    assert_eq!((top.name, top.qty), ("おにぎり", 2));
+    assert_eq!((top.name, top.qty), ("パン", 2));
 }
 
 /// 明細の個数を手で変えられる。変えた行は一番上に出て、点数の上限も守る。
 #[test]
 fn staff_or_customer_changes_a_line_quantity() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", SANDWICH);
     let id = reg(&s, 1).customer.lines[0].id;
     let set =
@@ -1397,7 +1404,7 @@ fn staff_or_customer_changes_a_line_quantity() {
     ok(&mut s, set(3));
     let v = reg(&s, 1);
     let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
-    assert_eq!((top.name, top.qty), ("おにぎり", 3));
+    assert_eq!((top.name, top.qty), ("パン", 3));
     assert_eq!(v.customer.total, 160 * 3 + 320);
     assert!(run(&mut s, set(10)).is_err(), "over the 10-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
@@ -1409,7 +1416,7 @@ fn staff_or_customer_changes_a_line_quantity() {
 #[test]
 fn coupon_and_line_ids_never_collide() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", "4900000000028");
     scan(&mut s, 1, "customer", "CP0002");
     scan(&mut s, 1, "customer", "4900000000011");

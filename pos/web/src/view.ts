@@ -751,18 +751,18 @@ export function ownerPanel(s: Snapshot): string {
 
 type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean };
 
-/** 売り場の棚。並び順はご指示の順（食べ物・飲み物・新聞・雑誌・代行収納・宅配便・酒・ライター）に、そのほかを足したもの */
+/**
+ * 売り場の棚。デモのため商品は抽象化し、コンビニの 4 大分類ごとに代表的な商品を二つずつ置く。
+ * FF はバーコードがないので、落とすとレジ画面下のタブから登録したのと同じになる
+ */
+const FF_SHELF = ["FF01", "FF05"];
+
 const SHELVES: Shelf[] = [
-  { label: "食べ物", match: (p) => p.category === "food" },
-  { label: "飲み物", match: (p) => p.category === "drink" },
-  { label: "新聞", match: (p) => p.category === "newspaper" },
-  { label: "雑誌", match: (p) => p.category === "magazine" || p.category === "adult_book" },
-  { label: "代行収納", match: (p) => p.category === "service" && p.name.includes("代行収納") },
-  { label: "宅配便", match: (p) => p.category === "service" && p.name.includes("宅配便") },
-  { label: "酒", match: (p) => p.category === "alcohol" },
-  { label: "ライター・たばこ", match: (p) => p.category === "smoking_goods" || p.category === "tobacco" },
-  { label: "花火", match: (p) => p.category === "fireworks" },
-  { label: "そのほか", match: (p) => ["daily", "lottery", "adult_goods", "bag"].includes(p.category) },
+  { label: "日配食品", match: (p) => p.category === "food" },
+  { label: "加工食品", match: (p) => p.category === "drink" || p.category === "alcohol" },
+  { label: "非食品", match: (p) => p.category === "adult_book" || p.category === "tobacco" },
+  // 4 大分類の外：レジに置いてあるレジ袋
+  { label: "レジ袋", match: (p) => p.category === "bag" },
 ];
 
 function item(code: string, name: string, sub: string, cls = ""): string {
@@ -770,12 +770,20 @@ function item(code: string, name: string, sub: string, cls = ""): string {
     <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
 }
 
-/** Item：カテゴリの見出しは付けず、棚の並び順のまま一つにまとめる（表示スペースの節約） */
+/** Item：4 大分類ごとに小さな見出しを付けて並べる */
 export function shelfPanel(s: Snapshot): string {
-  const items = [...new Set(SHELVES.flatMap((g) => s.catalog.filter(g.match)))];
-  return `<div class="shelf"><div class="items">${items
-    .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
-    .join("")}</div></div>`;
+  // FF（フライドチキン・肉まん）はバーコードがない。落とすとタブから登録したのと同じになる
+  const ff = s.ff_stock
+    .filter((f) => FF_SHELF.includes(f.code))
+    .map((f) => item(f.code, f.name, `${yen(f.price)} ・FF`))
+    .join("");
+  return `<div class="shelf"><h3>ファーストフード</h3><div class="items">${ff}</div></div>` + SHELVES.map((g) => {
+    const items = s.catalog.filter(g.match);
+    if (!items.length) return "";
+    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
+      .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
+      .join("")}</div></div>`;
+  }).join("");
 }
 
 // ---------------------------------------------------------------------------
@@ -794,6 +802,9 @@ export function walletPanel(): string {
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
     item("PC87654321", "ポイントアプリ", "スマホ", "card"),
+    // お客様が持ち込むもの：払込票（代行収納）と宅配便の荷物
+    item("2100000000021", "払込票", "公共料金", "card"),
+    item("2100000000014", "宅配便の荷物", "発送受付", "card"),
     item("CP0001", "引換券", "緑茶 500ml", "coupon"),
     item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),

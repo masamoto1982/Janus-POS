@@ -243,39 +243,39 @@ mod tests {
     #[test]
     fn store_rule_by_product_takes_the_strictest_age() {
         let mut r = AgeRules::default();
-        assert_eq!(r.age_for("4900000000158", Category::Lottery), None);
+        assert_eq!(r.age_for("4900000000028", Category::Food), None);
         r.add(
             RuleTarget::Product {
-                code: "4900000000158".into(),
+                code: "4900000000028".into(),
             },
             20,
             "オーナー",
             0,
         )
         .unwrap();
-        assert_eq!(r.age_for("4900000000158", Category::Lottery), Some(20));
+        assert_eq!(r.age_for("4900000000028", Category::Food), Some(20));
         r.add(
             RuleTarget::Category {
-                category: Category::Lottery,
+                category: Category::Food,
             },
             18,
             "オーナー",
             0,
         )
         .unwrap();
-        assert_eq!(r.age_for("4900000000158", Category::Lottery), Some(20));
+        assert_eq!(r.age_for("4900000000028", Category::Food), Some(20));
         assert_eq!(r.history.len(), 2);
     }
 
     #[test]
     fn every_product_can_have_its_own_store_age() {
         let mut r = AgeRules::default();
-        let lighter = "4900000000134";
-        assert_eq!(r.store_age_for(lighter), Some(20));
-        r.set_product(lighter, Some(18), "オーナー", 0).unwrap();
-        assert_eq!(r.age_for(lighter, Category::SmokingGoods), Some(18));
-        r.set_product(lighter, None, "オーナー", 0).unwrap();
-        assert_eq!(r.age_for(lighter, Category::SmokingGoods), None);
+        let magazine = "4900000000141";
+        assert_eq!(r.store_age_for(magazine), Some(18));
+        r.set_product(magazine, Some(20), "オーナー", 0).unwrap();
+        assert_eq!(r.age_for(magazine, Category::AdultBook), Some(20));
+        r.set_product(magazine, None, "オーナー", 0).unwrap();
+        assert_eq!(r.age_for(magazine, Category::AdultBook), None);
         // 法令の対象（酒・たばこ）は法令どおりで、緩くも厳しくもできない
         let beer = "4900000000103";
         for age in [None, Some(18), Some(25)] {

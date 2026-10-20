@@ -581,6 +581,8 @@ function setupDrag(): void {
     // 入金ボックスの周り（お客様側）に落としたときは、お客様側として扱う
     const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop!, "customer"];
     const register = Number(reg);
+    // FF はバーコードがないので、タブから登録したのと同じ（セミセルフでは係員に頼む）
+    if (d.code?.startsWith("FF")) return void send({ type: "register_ff", register, side, code: d.code, qty: 1 });
     if (d.code) return void send({ type: "scan", register, side, code: d.code });
     const [kind, value] = d.wallet!.split(":");
     // お金は投入口（お客様側にしかない）へ、決済はお客様側の端末にかざす

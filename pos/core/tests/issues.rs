@@ -7,9 +7,11 @@ use serde_json::{json, Value};
 
 const ONIGIRI: &str = "4900000000011";
 const BEER: &str = "4900000000103";
-const LIGHTER: &str = "4900000000134";
-const LOTTERY: &str = "4900000000158";
-const FIREWORKS: &str = "4900000000165";
+/// 店舗ルールの初期値（18 歳）が付いている商品
+const MAGAZINE: &str = "4900000000141";
+/// 年確ルールのない商品（オーナーが店舗ルールを付ける例に使う）
+const SANDWICH: &str = "4900000000028";
+const TEA: &str = "4900000000035";
 const PARCEL: &str = "2100000000014";
 const BILL: &str = "2100000000021";
 
@@ -221,7 +223,7 @@ fn only_owner_changes_age_rules() {
     login(&mut s, 1);
     let add = |id: &str, pw: &str| {
         json!({"type":"add_age_rule","owner_id":id,"password":pw,
-               "target":{"kind":"product","code":LOTTERY},"min_age":20})
+               "target":{"kind":"product","code":SANDWICH},"min_age":20})
     };
     assert!(run(&mut s, add("1001", "1111")).is_err());
     ok(&mut s, add("9001", "9999"));
@@ -230,8 +232,8 @@ fn only_owner_changes_age_rules() {
         json!({"type":"remove_age_rule","owner_id":"9001","password":"9999","rule_id":1})
     )
     .is_err());
-    scan(&mut s, 1, "staff", LOTTERY);
-    scan(&mut s, 1, "staff", LIGHTER);
+    scan(&mut s, 1, "staff", SANDWICH);
+    scan(&mut s, 1, "staff", MAGAZINE);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
@@ -508,20 +510,20 @@ fn staff_and_customer_screens_are_exclusive() {
 fn owner_sets_age_rule_per_product() {
     let mut s = Store::new(1, 2, 1);
     let set = |id: &str, pw: &str, code: &str, age: Option<u8>| json!({"type":"set_product_age","owner_id":id,"password":pw,"code":code,"min_age":age});
-    assert!(run(&mut s, set("1001", "1111", LOTTERY, Some(20))).is_err());
-    ok(&mut s, set("9001", "9999", LOTTERY, Some(20)));
-    ok(&mut s, set("9001", "9999", LIGHTER, None));
+    assert!(run(&mut s, set("1001", "1111", SANDWICH, Some(20))).is_err());
+    ok(&mut s, set("9001", "9999", SANDWICH, Some(20)));
+    ok(&mut s, set("9001", "9999", MAGAZINE, None));
     // 酒・たばこは法令どおりで変更不可
     assert!(run(&mut s, set("9001", "9999", BEER, None)).is_err());
     assert!(run(&mut s, set("9001", "9999", BEER, Some(25))).is_err());
-    // 花火も売り場の商品として個別に設定できる
-    ok(&mut s, set("9001", "9999", FIREWORKS, Some(18)));
+    // どの商品にも個別に設定できる
+    ok(&mut s, set("9001", "9999", TEA, Some(18)));
     let cat = s.snapshot().catalog;
     let age = |c: &str| cat.iter().find(|p| p.code == c).unwrap().age;
-    assert_eq!(age(LOTTERY), Some(20));
-    assert_eq!(age(LIGHTER), None);
+    assert_eq!(age(SANDWICH), Some(20));
+    assert_eq!(age(MAGAZINE), None);
     assert_eq!(age(BEER), Some(20));
-    assert_eq!(age(FIREWORKS), Some(18));
+    assert_eq!(age(TEA), Some(18));
 }
 
 /// 運用モードは名札で決まる。手で有人／セミセルフは選べず、セルフは機能 OFF。
@@ -1220,7 +1222,6 @@ fn void_lock_and_logout_from_the_store_menu() {
 /// 没収する商品と個数を店員に示す（18 禁雑誌は買えるが酒は買えない等）。
 #[test]
 fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
-    const MAGAZINE: &str = "4900000000141";
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     for code in [ONIGIRI, BEER, BEER, MAGAZINE] {
@@ -1291,8 +1292,6 @@ fn age_counts_the_birthday() {
 /// 対象商品がなければ「対象商品待ち」のまま決済の邪魔はしない。
 #[test]
 fn coupons_apply_whenever_the_target_is_registered() {
-    const SANDWICH: &str = "4900000000028";
-    const TEA: &str = "4900000000035";
     let mut s = Store::new(1, 2, 1);
     // 商品より先にクーポン
     scan(&mut s, 1, "customer", "CP0001");
@@ -1376,7 +1375,6 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
 /// 同じ商品はまとめたまま、数量が増えた行も「動きがあった」として一番上に出す。
 #[test]
 fn a_merged_line_moves_to_the_top() {
-    const SANDWICH: &str = "4900000000028";
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", ONIGIRI);
     scan(&mut s, 1, "customer", SANDWICH);
@@ -1384,13 +1382,12 @@ fn a_merged_line_moves_to_the_top() {
     let v = reg(&s, 1);
     assert_eq!(v.customer.lines.len(), 2, "same item stays one line");
     let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
-    assert_eq!((top.name, top.qty), ("おにぎり 鮭", 2));
+    assert_eq!((top.name, top.qty), ("おにぎり", 2));
 }
 
 /// 明細の個数を手で変えられる。変えた行は一番上に出て、点数の上限も守る。
 #[test]
 fn staff_or_customer_changes_a_line_quantity() {
-    const SANDWICH: &str = "4900000000028";
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", ONIGIRI);
     scan(&mut s, 1, "customer", SANDWICH);
@@ -1400,7 +1397,7 @@ fn staff_or_customer_changes_a_line_quantity() {
     ok(&mut s, set(3));
     let v = reg(&s, 1);
     let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
-    assert_eq!((top.name, top.qty), ("おにぎり 鮭", 3));
+    assert_eq!((top.name, top.qty), ("おにぎり", 3));
     assert_eq!(v.customer.total, 160 * 3 + 320);
     assert!(run(&mut s, set(5)).is_err(), "over the 5-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");

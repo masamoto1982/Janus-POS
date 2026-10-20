@@ -117,49 +117,18 @@ use Category::*;
 use TaxRate::*;
 
 pub const CATALOG: &[Product] = &[
-    p("4900000000011", "おにぎり 鮭", 160, Reduced8, Food),
-    p("4900000000028", "ミックスサンド", 320, Reduced8, Food),
+    // デモ用に商品名は抽象化し、コンビニの 4 大分類ごとに代表的な商品を二つずつ置く
+    // （FF は下のバーコードなしの商品。レジ画面下のタブから登録する）
+    // 日配食品
+    p("4900000000011", "おにぎり", 160, Reduced8, Food),
+    p("4900000000028", "サンドイッチ", 320, Reduced8, Food),
+    // 加工食品
     p("4900000000035", "緑茶 500ml", 150, Reduced8, Drink),
-    p("4900000000042", "ボトルコーヒー", 180, Reduced8, Drink),
-    p("4900000000066", "カップ麺 しょうゆ", 214, Reduced8, Food),
-    p("4900000000073", "スポーツドリンク", 160, Reduced8, Drink),
-    p("4900000000059", "ボールペン 黒", 120, Standard10, Daily),
-    p(
-        "4910000000014",
-        "朝刊（全国紙）",
-        160,
-        Standard10,
-        Newspaper,
-    ),
-    p("4910000000021", "スポーツ新聞", 160, Standard10, Newspaper),
-    p("4910000000038", "週刊誌", 480, Standard10, Magazine),
-    p("4910000000045", "マンガ雑誌", 300, Standard10, Magazine),
-    p("4900000000103", "缶ビール 350ml", 248, Standard10, Alcohol),
-    p(
-        "4900000000110",
-        "レモンサワー 500ml",
-        228,
-        Standard10,
-        Alcohol,
-    ),
-    p("4900000000127", "たばこ A", 600, Standard10, Tobacco),
-    p(
-        "4900000000134",
-        "使い捨てライター",
-        110,
-        Standard10,
-        SmokingGoods,
-    ),
+    p("4900000000103", "缶ビール", 248, Standard10, Alcohol),
+    // 非食品
     p("4900000000141", "成人向け雑誌", 980, Standard10, AdultBook),
-    p("4900000000158", "スクラッチくじ", 200, Standard10, Lottery),
-    p(
-        "4900000000165",
-        "手持ち花火セット",
-        598,
-        Standard10,
-        Fireworks,
-    ),
-    p("4900000000172", "線香花火", 220, Standard10, Fireworks),
+    p("4900000000127", "たばこ", 600, Standard10, Tobacco),
+    // レジまわり（レジ袋）とサービス（お客様が持ち込む荷物・払込票）
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
     p("2100000000014", "宅配便 発送受付", 0, Standard10, Service),
@@ -174,8 +143,8 @@ pub const CATALOG: &[Product] = &[
         )
     },
     // FF（バーコードなし。レジ画面下のタブから登録する）
-    p("FF01", "チキン（プレーン）", 220, Reduced8, FastFood),
-    p("FF02", "チキン（スパイシー）", 220, Reduced8, FastFood),
+    p("FF01", "フライドチキン", 220, Reduced8, FastFood),
+    p("FF02", "スパイシーチキン", 220, Reduced8, FastFood),
     p("FF03", "アメリカンドック", 140, Reduced8, FastFood),
     p("FF04", "コロッケ", 110, Reduced8, FastFood),
     p("FF21", "焼き鳥（モモシオ）", 140, Reduced8, FastFood),

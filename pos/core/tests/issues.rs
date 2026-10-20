@@ -1371,3 +1371,17 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 320);
 }
+
+/// 同じ商品はまとめたまま、数量が増えた行も「動きがあった」として一番上に出す。
+#[test]
+fn a_merged_line_moves_to_the_top() {
+    const SANDWICH: &str = "4900000000028";
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "customer", SANDWICH);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.lines.len(), 2, "same item stays one line");
+    let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
+    assert_eq!((top.name, top.qty), ("おにぎり 鮭", 2));
+}

@@ -264,14 +264,26 @@ function ageStatus(v: StaffView): string {
 export const flashing = new Set<string>();
 const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
 
-export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState): string {
-  return coupons
-    .map(
-      (c) =>
-        `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
-          c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
-        }</td><td>${removeCoupon(reg, side, c, st)}</td></tr>`,
-    )
+export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState): Row[] {
+  return coupons.map((c) => [
+    c.id,
+    `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
+      c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
+    }</td><td>${removeCoupon(reg, side, c, st)}</td></tr>`,
+  ]);
+}
+
+/** 明細の 1 行（最後に動きのあった順番, HTML）。クーポンの番号は読んだ順番 */
+type Row = [number, string];
+
+/**
+ * 新しい動きのあった行ほど上に出す。同じ商品をまとめた行も、数量が増えれば一番上に来る
+ * （買い物が多いとき、最初の行の数量が表示エリアの外で増えて見えない、ということがない）
+ */
+function newestFirst(rows: Row[]): string {
+  return [...rows]
+    .sort((x, y) => y[0] - x[0])
+    .map(([, html]) => html)
     .join("");
 }
 
@@ -350,8 +362,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks();
-  // 新しく登録した商品ほど上に出す
-  const rows = couponRows(reg, side, v.coupons, a("remove_coupon")) + [...v.lines].reverse().map((l) => staffLine(reg, l, v, side)).join("");
+  // 新しい動きのあった行ほど上に出す
+  const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon")), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
 
   // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる
@@ -593,10 +605,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (r.last_receipt && !c.lines.length) return notice + thanks();
 
 
-  // 新しく登録した商品ほど上に出す
-  const rows = [...c.lines]
-    .reverse()
-    .map((l) => {
+  // 新しい動きのあった行ほど上に出す
+  const lineRows = c.lines.map((l): Row => {
       const tag =
         l.kind === "ff"
           ? `<span class="tag ff-${l.state}">${{ waiting: "ご用意中", received: "お受け取り済" }[l.state]}</span>`
@@ -604,9 +614,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
       const rm = c.phase === "registering" ? btn("取消", { type: "remove_line", register: reg, side, line_id: l.id }, a("remove_line"), "small ghost") : "";
-      return `<tr class="${flash(reg, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>`;
-    })
-    .join("");
+      return [l.touched, `<tr class="${flash(reg, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td></tr>`];
+    });
+  const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
   // 合計とお会計ボタンは登録画面の最上部に常に出す
   const top = regTop(
@@ -641,7 +651,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   return `${top}${notice}
     ${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}
     ${pay}
-    <table class="lines"><tbody>${couponRows(reg, side, c.coupons, a("remove_coupon"))}${rows}</tbody></table>
+    <table class="lines"><tbody>${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
 }
 

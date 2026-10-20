@@ -406,6 +406,8 @@ pub enum LineKind {
 #[derive(Clone, Debug, Serialize)]
 pub struct Line {
     pub id: u32,
+    /// 最後に動きのあった順番（明細番号と同じ通し番号）。画面は動きの新しい行ほど上に出す
+    pub touched: u32,
     pub code: &'static str,
     pub name: &'static str,
     pub unit_price: u32,
@@ -571,16 +573,21 @@ impl Txn {
     }
 
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind) {
-        // 同じ商品はまとめる（FF は状態が同じお渡し前どうしだけ）
+        // 同じ商品はまとめる（FF は状態が同じお渡し前どうしだけ）。表示エリアの節約に欠かせない。
+        // まとめた行も動きがあったので一番上に出す（買い物が多いとき、最初の行の数量が
+        // 表示エリアの外で増えて誰にも見えない、ということが起きないように）
+        self.next_line += 1;
+        let touched = self.next_line;
         if let Some(l) = self.lines.iter_mut().find(|l| {
             l.code == p.code && l.kind == kind && !matches!(kind, LineKind::Service { .. })
         }) {
             l.qty += qty;
+            l.touched = touched;
             return;
         }
-        self.next_line += 1;
         self.lines.push(Line {
-            id: self.next_line,
+            id: touched,
+            touched,
             code: p.code,
             name: p.name,
             unit_price: p.price,
@@ -2085,6 +2092,7 @@ impl Store {
             .iter()
             .map(|l| CustomerLine {
                 id: l.id,
+                touched: l.touched,
                 name: l.name,
                 qty: l.qty,
                 amount: l.amount(),
@@ -2188,6 +2196,7 @@ pub struct StaffLine {
 #[derive(Clone, Debug, Serialize)]
 pub struct CustomerLine {
     pub id: u32,
+    pub touched: u32,
     pub name: &'static str,
     pub qty: u32,
     pub amount: u32,

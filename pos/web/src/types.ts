@@ -35,6 +35,8 @@ export interface Returned {
 
 export type StaffLine = LineKind & {
   id: number;
+  /** 最後に動きのあった順番（クーポンの id と同じ通し番号） */
+  touched: number;
   code: string;
   name: string;
   unit_price: number;
@@ -44,7 +46,7 @@ export type StaffLine = LineKind & {
   age: number | null;
 };
 
-export type CustomerLine = LineKind & { id: number; name: string; qty: number; amount: number };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number };
 
 export interface Call {
   id: number;

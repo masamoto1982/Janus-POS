@@ -406,8 +406,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const paying = v.phase === "paying";
 
   // 会計ボタンの後は、まずポイントカードの最終確認。済むと支払方法を選べる
-  const pay = paying && v.point_pending
-    ? pointCheck(reg, side, a("confirm_point_card"))
+  const pointPending = paying && v.point_pending;
+  const pay = pointPending
+    ? ""
     : paying
     ? `${ageStep(reg, v, side, a)}${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox">
         <div>年確：${ageStatus(v)}</div>
@@ -428,6 +429,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
     r.max_items,
   );
+  // 有人モードの最終確認は店員側だけ。登録画面を置き換えて出す（お客様側は明細のまま）
+  if (pointPending && side === "staff") return `${top}${notice}${staffPointCheck(reg, side, a("confirm_point_card"))}`;
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
@@ -441,12 +444,25 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 `;
 }
 
-/** 会計ボタンの後のポイントカードの最終確認。ポイントカードを読むか「なしで進む」で支払方法へ */
-function pointCheck(reg: number, side: Side, st: ActionState): string {
-  return `<div class="card point-card">
+/** 有人モード：会計ボタンの後のポイントカードの最終確認（店員側だけ）。読み取るか「なしで進める」で支払方法へ */
+function staffPointCheck(reg: number, side: Side, st: ActionState): string {
+  return `<div class="point-screen">
+      <div class="big">ポイントカードの最終確認</div>
+      <p>お客様にポイントカードをお持ちか確認してください。読み取るとお支払い方法の選択に進みます。</p>
+      ${btn("ポイントカードなしで進める", { type: "confirm_point_card", register: reg, side }, st, "primary")}
+    </div>`;
+}
+
+/** セルフ：会計ボタンの後のポイントカードの最終確認。登録画面を置き換えて二択を出す */
+function customerPointCheck(reg: number, side: Side, st: ActionState): string {
+  const reading = scanGuide.get(`${reg}:${side}`) === "point";
+  return `<div class="point-screen">
       <div class="big">ポイントカードはお持ちですか？</div>
-      <p>お持ちの方は、ポイントカードを読み取ってください。読み取るとお支払い方法の選択に進みます。</p>
-      ${btn("ポイントカードなしで進む", { type: "confirm_point_card", register: reg, side }, st, "primary")}
+      <div class="point-choices">
+        <button type="button" class="primary ${reading ? "on" : ""}" data-guide="${reg}:${side}:point">ポイントカードを読み取る</button>
+        ${btn("ポイントカード無しで進める", { type: "confirm_point_card", register: reg, side }, st)}
+      </div>
+      ${reading ? `<p class="guide">ポイントカードまたはポイントアプリのバーコードをスキャンしてください</p>` : ""}
     </div>`;
 }
 
@@ -671,6 +687,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   );
 
   if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side)}`;
+  // 会計ボタンの後のポイントカードの最終確認は、登録画面を置き換えて出す
+  if (c.phase === "paying" && c.point_pending) return `${top}${notice}${customerPointCheck(reg, side, a("confirm_point_card"))}`;
   scanGuide.delete(`${reg}:${side}`);
 
   let pay = "";
@@ -679,9 +697,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
       (c.age_check !== null ? ageCard(reg, c.age_check, a("confirm_age")) : "") +
       (c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "");
     const methods = methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center");
-    pay = c.point_pending
-      ? `${pointCheck(reg, side, a("confirm_point_card"))}${age}`
-      : `${age}<div class="paybox center">
+    pay = `${age}<div class="paybox center">
         <div>お支払い <b class="total">${yen(c.total)}</b></div>
         ${c.inserted ? `<div>お預かり ${yen(c.inserted)}　残り <b>${yen(c.due)}</b></div>` : ""}
         ${methods}${payHint(c.method, c.payment_blocker, c.inserted)}

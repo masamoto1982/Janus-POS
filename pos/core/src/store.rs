@@ -698,7 +698,10 @@ impl Register {
                 .any(|l| matches!(l.kind, LineKind::Ff { .. })),
             service_pending: t.service_pending(),
             bill_pending: t.paying && t.bill_pending().is_some(),
-            point_pending: t.paying && !t.point_checked,
+            // 年確が先。年確で販売が成立しないこともあるので、ポイントカードの確認はその後
+            point_pending: t.paying
+                && !t.point_checked
+                && !(t.age_choice_pending() || t.age_pending() || t.id_pending()),
             has_coupons: !t.coupons.is_empty(),
             coupon_unmatched: t.paying && t.coupon_unmatched(),
             method: t.method,

@@ -200,14 +200,14 @@ pub const TOUCH_LOCK_MS: u64 = 1000;
 impl Context {
     /// 決済を止めている理由（なければ None）。決済の関門はここに集める。
     pub fn payment_blocker(&self) -> Option<&'static str> {
-        if self.point_pending {
-            Some(POINT_UNCONFIRMED)
-        } else if self.age_choice_pending {
+        if self.age_choice_pending {
             Some("店員が年齢確認をするか選んでいません")
         } else if self.age_pending {
             Some("年齢確認が済んでいません")
         } else if self.id_pending {
             Some("店員が身分証の生年月日を入力していません")
+        } else if self.point_pending {
+            Some(POINT_UNCONFIRMED)
         } else if self.coupon_unmatched {
             Some(COUPON_UNMATCHED)
         } else if self.bill_pending {
@@ -282,9 +282,13 @@ fn check_id(c: &Context) -> Result<(), Denial> {
     require(c.id_pending, "生年月日の入力は不要です")
 }
 
-/// 会計ボタンの後のポイントカードの最終確認（どちらの画面からでも）
+/// 会計ボタンの後のポイントカードの最終確認。年確が先（年確で販売が成立しなければ無駄な手間になる）
 fn confirm_point(c: &Context) -> Result<(), Denial> {
     require(c.phase == Phase::Paying, "お会計前です")?;
+    require(
+        !(c.age_choice_pending || c.age_pending || c.id_pending),
+        "先に年齢確認をしてください",
+    )?;
     require(c.point_pending, "ポイントカードの確認は済んでいます")
 }
 

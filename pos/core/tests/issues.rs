@@ -160,8 +160,9 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
     no_id_check(&mut s, 1);
+    // 年確が先。ポイントカードの最終確認は年確が済むまで出さない
+    assert!(!reg(&s, 1).staff.point_pending);
     let v = reg(&s, 1);
     assert_eq!(v.customer.age_check, Some(20));
     assert!(run(
@@ -175,6 +176,8 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         json!({"type":"choose_age_check","register":1,"id_check":false}),
     );
     ok(&mut s, json!({"type":"confirm_age","register":1}));
+    // 年確が済んでから、ポイントカードの最終確認
+    confirm_point(&mut s, 1);
     // 同じ取引で戻って追加しても、再確認はしない
     scan(&mut s, 1, "staff", BEER);
     ok(
@@ -198,7 +201,6 @@ fn self_mode_age_check_calls_staff() {
         &mut s,
         json!({"type":"checkout","register":2,"side":"customer"}),
     );
-    confirm_point(&mut s, 2);
     assert!(s
         .snapshot()
         .calls
@@ -239,7 +241,6 @@ fn only_owner_changes_age_rules() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
     no_id_check(&mut s, 1);
     assert_eq!(reg(&s, 1).customer.age_check, Some(20));
     assert_eq!(s.snapshot().age_rules.history.len(), 1);
@@ -803,7 +804,6 @@ fn called_register_lamp_lights_at_once_until_staff_arrives() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
-    confirm_point(&mut s, 1);
     assert!(reg(&s, 1).lamp);
     assert!(!reg(&s, 2).lamp, "only the calling register lights");
     ok(
@@ -866,14 +866,12 @@ fn neglected_calls_ring_louder() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
-    confirm_point(&mut s, 1);
     advance(&mut s, 20_000);
     scan(&mut s, 2, "customer", BEER);
     ok(
         &mut s,
         json!({"type":"checkout","register":2,"side":"customer"}),
     );
-    confirm_point(&mut s, 2);
     let (r1, r2) = (reg(&s, 1), reg(&s, 2));
     assert!(
         r1.ring_volume > r2.ring_volume,
@@ -1068,7 +1066,6 @@ fn either_screen_can_operate_except_age_confirmation() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
-    confirm_point(&mut s, 1);
     no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert!(v.staff.age_pending);
@@ -1093,7 +1090,6 @@ fn age_button_works_only_on_customer_screen_while_staff_holds() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
     no_id_check(&mut s, 1);
     let v = reg(&s, 1);
     assert!(v.staff.age_pending);
@@ -1109,6 +1105,9 @@ fn age_button_works_only_on_customer_screen_while_staff_holds() {
         json!({"type":"confirm_age","register":1,"side":"customer"}),
     );
     assert!(!reg(&s, 1).staff.age_pending);
+    // 年確が済んでから、ポイントカードの最終確認
+    assert!(reg(&s, 1).staff.point_pending);
+    confirm_point(&mut s, 1);
     assert_eq!(reg(&s, 1).active_side, Some(Side::Staff));
 }
 
@@ -1238,7 +1237,6 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
     advance(&mut s, 1_000);
     let v = reg(&s, 1);
     assert!(v.staff.age_choice_pending);
@@ -1275,6 +1273,7 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     ok(&mut s, json!({"type":"dismiss_confiscated","register":1}));
     assert!(reg(&s, 1).staff.confiscated.is_empty());
     advance(&mut s, 1_000);
+    confirm_point(&mut s, 1);
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),

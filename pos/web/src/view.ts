@@ -697,14 +697,14 @@ export function ownerPanel(s: Snapshot): string {
 
 type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean };
 
-/** 売り場の棚。並び順はご指示の順（食べ物・飲み物・新聞・雑誌・代行収納・宅急便・酒・ライター）に、そのほかを足したもの */
+/** 売り場の棚。並び順はご指示の順（食べ物・飲み物・新聞・雑誌・代行収納・宅配便・酒・ライター）に、そのほかを足したもの */
 const SHELVES: Shelf[] = [
   { label: "食べ物", match: (p) => p.category === "food" },
   { label: "飲み物", match: (p) => p.category === "drink" },
   { label: "新聞", match: (p) => p.category === "newspaper" },
   { label: "雑誌", match: (p) => p.category === "magazine" || p.category === "adult_book" },
   { label: "代行収納", match: (p) => p.category === "service" && p.name.includes("代行収納") },
-  { label: "宅急便", match: (p) => p.category === "service" && p.name.includes("宅急便") },
+  { label: "宅配便", match: (p) => p.category === "service" && p.name.includes("宅配便") },
   { label: "酒", match: (p) => p.category === "alcohol" },
   { label: "ライター・たばこ", match: (p) => p.category === "smoking_goods" || p.category === "tobacco" },
   { label: "花火", match: (p) => p.category === "fireworks" },

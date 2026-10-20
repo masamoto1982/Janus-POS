@@ -162,7 +162,7 @@ pub const CATALOG: &[Product] = &[
     p("4900000000172", "線香花火", 220, Standard10, Fireworks),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
-    p("2100000000014", "宅急便 発送受付", 0, Standard10, Service),
+    p("2100000000014", "宅配便 発送受付", 0, Standard10, Service),
     Product {
         customer_confirms: true,
         ..p(

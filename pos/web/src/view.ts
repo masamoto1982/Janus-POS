@@ -248,6 +248,30 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
 }
 
+/** セミセルフの呼び出し中の店員側の画面：呼び出しの理由（「年確」「FF＆煙草」など）を大きく */
+export function callScreen(r: RegisterView, now: number): string {
+  const v = r.staff;
+  const warn = v.mat_down.length
+    ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
+    : "";
+  const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
+  const details = [...new Set(v.calls.map((c) => c.detail).filter(Boolean))];
+  const oldest = Math.min(...v.calls.map((c) => c.created_at));
+  return `${warn}<div class="call-screen">
+      <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
+      ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
+      <p class="muted">${secs(now, oldest)}経過　店員証でログインすると対応を始めます</p>
+    </div>`;
+}
+
+/** セミセルフで年確の係員を待つ間のお客様側の案内（登録画面・支払画面の代わりに出す） */
+function ageWait(age: number): string {
+  return `<div class="point-screen">
+      <div class="big">年齢確認が必要な商品が含まれています。</div>
+      <p>${age}歳前後のお客様は身分証をご準備ください。</p>
+    </div>`;
+}
+
 /** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、しない：店員の判断で済む） */
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
   const age = v.required_age;
@@ -501,6 +525,9 @@ export function itemCount(lines: { qty: number }[]): number {
  * 有人モードのお客様側には、お客様本人が押すボタン（お支払い内容の確認・投入おわり）だけを出す。
  */
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
+  // セミセルフの呼び出し中、店員側の画面は呼び出しの理由だけを大きく出す（年確の工程などは出さない：
+  // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
+  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
@@ -694,6 +721,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 会計ボタンの後のポイントカードの最終確認は、登録画面を置き換えて出す
   if (c.phase === "paying" && c.point_pending) return `${top}${notice}${customerPointCheck(reg, side, a("confirm_point_card"))}`;
   scanGuide.delete(`${reg}:${side}`);
+  if (c.phase === "paying" && c.age_wait) return `${top}${notice}${ageWait(c.age_wait)}`;
 
   let pay = "";
   if (c.phase === "paying") {

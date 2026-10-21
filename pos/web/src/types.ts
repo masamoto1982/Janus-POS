@@ -118,6 +118,7 @@ export interface CustomerView {
   point_pending: boolean;
   bill_check: number | null;
   staff_called: boolean;
+  age_wait: number | null;
   staff_present: boolean;
   method: Method | null;
   payment_blocker: string | null;

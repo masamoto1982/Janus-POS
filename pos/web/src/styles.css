@@ -172,6 +172,9 @@ input, select {
 
 .banner { border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-weight: 600; }
 .banner.call { background: var(--call-bg); color: var(--call); }
+.call-screen { text-align: center; padding: 32px 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--call-bg); color: var(--call); border-radius: 10px; }
+.call-screen .call-reason { font-size: 44px; font-weight: 800; line-height: 1.2; }
+.call-screen p { margin: 0; font-size: 16px; }
 .banner.info { background: var(--line); }
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
 

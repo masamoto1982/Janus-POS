@@ -324,10 +324,6 @@ body.dragging .drop-hint { display: inline; }
 .confiscated { margin: 6px 0 0; padding-left: 20px; text-align: left; font-size: 14px; }
 .id-card p { margin: 4px 0 0; font-size: 11px; }
 .id-card.refused { background: var(--danger-bg); color: var(--danger); }
-.age-chart { width: 100%; margin: 6px 0 0; border-collapse: collapse; font-size: 11px; color: var(--ink); background: var(--panel); }
-.age-chart caption { font-size: 11px; padding-bottom: 4px; color: inherit; }
-.age-chart th, .age-chart td { border: 1px solid var(--line); padding: 1px 6px; text-align: left; }
-.age-chart tr.edge td { background: var(--warn-bg); }
 
 /* 店員画面に映すお客様画面の内容 */
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }

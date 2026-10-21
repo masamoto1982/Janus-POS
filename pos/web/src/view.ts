@@ -80,42 +80,9 @@ export function isoDate(t: Date): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
-/** 和暦（その日付の元号）。元年は「元年」と書く */
-export function wareki(y: number, m: number, d: number): string {
-  const ymd = y * 10000 + m * 100 + d;
-  const [era, start] =
-    ymd >= 20190501 ? ["令和", 2019] : ymd >= 19890108 ? ["平成", 1989] : ymd >= 19261225 ? ["昭和", 1926] : ["大正", 1912];
-  const n = y - start + 1;
-  return `${era}${n === 1 ? "元" : n}年`;
-}
-
-/**
- * 年確早見表。今日ちょうど age 歳になる生まれ年を中心に、前後 2 年（計 5 年）を並べる。
- * その年の今日の日付以前に生まれていれば age 歳以上
- */
-export function ageChart(age: number, today: Date = new Date()): string {
-  const ty = today.getFullYear();
-  const m = today.getMonth() + 1;
-  const d = today.getDate();
-  const y0 = ty - age;
-  const rows = [-2, -1, 0, 1, 2]
-    .map((k) => {
-      const y = y0 + k;
-      const verdict =
-        k < 0 ? `<span class="ok">購入できます</span>` : k === 0 ? `<b>${m}月${d}日以前の生まれなら購入できます</b>` : `<span class="warn">購入できません</span>`;
-      return `<tr class="${k === 0 ? "edge" : ""}"><td>${y}年（${wareki(y, m, d)}）</td><td>${ty - y - 1}〜${ty - y}歳</td><td>${verdict}</td></tr>`;
-    })
-    .join("");
-  return `<table class="age-chart">
-      <caption>年確早見表（${ty}年${m}月${d}日：${y0}年（${wareki(y0, m, d)}）${m}月${d}日以前の生まれが${age}歳以上）</caption>
-      <thead><tr><th>生まれ年</th><th>今日の年齢</th><th>判定</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-}
-
 /**
  * 店員側の年齢確認（例外：店員側の画面からしか押せない）。まず「する／しない」を選び、
- * 「する」なら身分証の生年月日を入力して判定する。早見表を添える
+ * 「する」なら身分証の生年月日を入力して判定する
  */
 function idCard(reg: number, age: number, v: StaffView, a: (n: string) => ActionState): string {
   const choose = (idCheck: boolean, label: string, cls = "") =>
@@ -132,7 +99,7 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
         ${choose(false, "しないに変更", "small ghost")}</div>
       <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;
   }
-  return `<div class="card id-card staff-only">${body}${ageChart(age)}</div>`;
+  return `<div class="card id-card staff-only">${body}</div>`;
 }
 
 /** 年確で販売できず取り除いた商品。店員がお客様から引き取る（没収する） */
@@ -279,7 +246,7 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
 }
 
-/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、しない：店員の判断で済む）。早見表を添える */
+/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、しない：店員の判断で済む） */
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
   const age = v.required_age;
   if (!age || side === "customer") return "";

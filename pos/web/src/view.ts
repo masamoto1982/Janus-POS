@@ -126,10 +126,12 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 }
 
 /** 支払方法を選んだ後の案内 */
-function payHint(method: string | null, blocker: string | null, inserted: number): string {
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、入金ボックスにかざしてください</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
+  // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
+  if (inserted && due > 0) return `<p>あと <b>${yen(due)}</b> 入れてください</p>`;
   if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
   if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
@@ -371,15 +373,15 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 会計ボタンの後は、年確 → ポイントカードの最終確認 → 決済手段の確認の順に進む
   const pointPending = paying && v.point_pending;
   const agePending = paying && (v.age_choice_pending || v.id_pending);
-  // 決済手段の確認：登録画面と年確の状況は出さず、決済手段だけを示す（選ぶのは店員側の画面）
+  // 決済手段の確認：登録画面と年確の状況は出さず、決済手段だけを示す（選ぶのは店員側の画面）。
+  // 同じ情報を複数個所に出さない：点数・合計は上の帯、投入額は入金ボックス、選んだ手段はボタンの強調で示す
   const payStage = paying && !pointPending && !agePending;
   const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
   const pay = payStage
     ? `${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
-        <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : methodList(v.method, v.inserted)}
-        ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : ""}
+        ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due) : ""}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -698,9 +700,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     const bill = c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "";
     const methods = methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center");
     pay = `${bill}<div class="paybox center">
-        <div>お支払い <b class="total">${yen(c.total)}</b></div>
-        ${c.inserted ? `<div>お預かり ${yen(c.inserted)}　残り <b>${yen(c.due)}</b></div>` : ""}
-        ${methods}${payHint(c.method, c.payment_blocker, c.inserted)}
+        ${methods}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}
       </div>`;
   }
 

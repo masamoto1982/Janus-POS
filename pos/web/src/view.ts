@@ -398,8 +398,10 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
           : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
     r.max_items,
   );
-  // 有人モードの最終確認は店員側だけ。登録画面を置き換えて出す（お客様側は明細のまま）
-  if (pointPending && side === "staff") return `${top}${notice}${staffPointCheck(reg, side, a("confirm_point_card"))}`;
+  // 有人モードの最終確認：店員側は二択、お客様側は案内文。どちらも登録画面を置き換えて出す
+  if (pointPending)
+    return `${top}${notice}${side === "staff" ? staffPointCheck(reg, side, a("confirm_point_card")) : customerPointAsk()}`;
+  scanGuide.delete(`${reg}:${side}`);
   const cards = `${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
   }`;
@@ -416,12 +418,34 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 `;
 }
 
-/** 有人モード：会計ボタンの後のポイントカードの最終確認（店員側だけ）。読み取るか「なしで進める」で支払方法へ */
+/**
+ * 有人モード：会計ボタンの後のポイントカードの最終確認。店員側に二択を出す。
+ * 「読み取る」を押さずにポイントカードをスキャンしても読める（会計前に読み取り済みなら出ない）
+ */
 function staffPointCheck(reg: number, side: Side, st: ActionState): string {
+  const reading = scanGuide.get(`${reg}:${side}`) === "point";
   return `<div class="point-screen">
       <div class="big">ポイントカードの最終確認</div>
-      <p>お客様にポイントカードをお持ちか確認してください。読み取るとお支払い方法の選択に進みます。</p>
-      ${btn("ポイントカードなしで進める", { type: "confirm_point_card", register: reg, side }, st, "primary")}
+      <p>お客様にポイントカードまたはポイントアプリをお持ちか確認してください</p>
+      <div class="point-choices">
+        <button type="button" class="primary ${reading ? "on" : ""}" data-guide="${reg}:${side}:point">ポイントカードを読み取る</button>
+        ${btn("ポイントカードなしで進める", { type: "confirm_point_card", register: reg, side }, st)}
+      </div>
+      ${reading ? `<p class="guide">ポイントカードまたはポイントアプリのバーコードをスキャンしてください</p>` : ""}
+    </div>`;
+}
+
+/** このお店で使えるポイントサービス（お客様側の最終確認に並べるアイコン） */
+const POINT_SERVICES: [string, string][] = [
+  ["💳", "ポイントカード"],
+  ["📱", "ポイントアプリ"],
+];
+
+/** 有人モード：ポイントカードの最終確認中のお客様側。案内文と使えるポイントサービスのアイコンだけ */
+function customerPointAsk(): string {
+  return `<div class="point-screen">
+      <div class="big">ポイントカードまたはポイントアプリはおもちですか？</div>
+      <div class="point-services">${POINT_SERVICES.map(([icon, name]) => `<span class="point-service"><span class="icon">${icon}</span>${name}</span>`).join("")}</div>
     </div>`;
 }
 

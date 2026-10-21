@@ -207,7 +207,11 @@ fn self_mode_age_check_calls_staff() {
         Side::Customer,
         Action::ChooseAgeCheck
     ));
+    // 係員を待つ間、お客様には身分証の準備を案内する（年齢つき）
+    assert_eq!(reg(&s, 2).customer.age_wait, Some(20));
     scan(&mut s, 2, "staff", "ST1002");
+    // 有人モードになったら案内は消え、店員が年確をするか選ぶ
+    assert_eq!(reg(&s, 2).customer.age_wait, None);
     no_id_check(&mut s, 2);
     // 名札を読んだので有人モード。モードはログアウトか 5 分の無操作でだけ戻る
     assert_eq!(reg(&s, 2).mode, Mode::Attended);

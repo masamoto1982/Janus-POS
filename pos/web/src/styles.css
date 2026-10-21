@@ -172,6 +172,9 @@ input, select {
 
 .banner { border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-weight: 600; }
 .banner.call { background: var(--call-bg); color: var(--call); }
+.call-screen { text-align: center; padding: 32px 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--call-bg); color: var(--call); border-radius: 10px; }
+.call-screen .call-reason { font-size: 44px; font-weight: 800; line-height: 1.2; }
+.call-screen p { margin: 0; font-size: 16px; }
 .banner.info { background: var(--line); }
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
 
@@ -197,6 +200,9 @@ details summary h3 { display: inline; }
 .point-screen { text-align: center; padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .point-screen .big, .pay-stage .big { font-size: 18px; font-weight: 700; }
 .point-choices { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.point-services { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.point-service { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+.point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { min-width: 180px; padding: 12px 16px; font-size: 14px; }
 .bill-card { background: var(--warn-bg); color: var(--warn); }
 .ffcheck { display: inline-flex; vertical-align: middle; margin-left: 6px; }
@@ -324,10 +330,6 @@ body.dragging .drop-hint { display: inline; }
 .confiscated { margin: 6px 0 0; padding-left: 20px; text-align: left; font-size: 14px; }
 .id-card p { margin: 4px 0 0; font-size: 11px; }
 .id-card.refused { background: var(--danger-bg); color: var(--danger); }
-.age-chart { width: 100%; margin: 6px 0 0; border-collapse: collapse; font-size: 11px; color: var(--ink); background: var(--panel); }
-.age-chart caption { font-size: 11px; padding-bottom: 4px; color: inherit; }
-.age-chart th, .age-chart td { border: 1px solid var(--line); padding: 1px 6px; text-align: left; }
-.age-chart tr.edge td { background: var(--warn-bg); }
 
 /* 店員画面に映すお客様画面の内容 */
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }

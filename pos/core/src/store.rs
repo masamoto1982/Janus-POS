@@ -2218,6 +2218,9 @@ impl Store {
                 point_pending: c.point_pending,
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 staff_called,
+                age_wait: t
+                    .required_age
+                    .filter(|_| c.age_choice_pending && r.mode != Mode::Attended),
                 staff_present: c.staff == StaffState::Ready,
                 method: t.method,
                 payment_blocker: c.payment_blocker(),
@@ -2317,6 +2320,8 @@ pub struct CustomerView {
     /// お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
     pub staff_called: bool,
+    /// セミセルフで年確の係員を待っている間の年齢（身分証の準備を案内する）
+    pub age_wait: Option<u8>,
     pub staff_present: bool,
     pub method: Option<PaymentMethod>,
     pub payment_blocker: Option<&'static str>,

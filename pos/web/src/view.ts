@@ -80,42 +80,9 @@ export function isoDate(t: Date): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
-/** 和暦（その日付の元号）。元年は「元年」と書く */
-export function wareki(y: number, m: number, d: number): string {
-  const ymd = y * 10000 + m * 100 + d;
-  const [era, start] =
-    ymd >= 20190501 ? ["令和", 2019] : ymd >= 19890108 ? ["平成", 1989] : ymd >= 19261225 ? ["昭和", 1926] : ["大正", 1912];
-  const n = y - start + 1;
-  return `${era}${n === 1 ? "元" : n}年`;
-}
-
-/**
- * 年確早見表。今日ちょうど age 歳になる生まれ年を中心に、前後 2 年（計 5 年）を並べる。
- * その年の今日の日付以前に生まれていれば age 歳以上
- */
-export function ageChart(age: number, today: Date = new Date()): string {
-  const ty = today.getFullYear();
-  const m = today.getMonth() + 1;
-  const d = today.getDate();
-  const y0 = ty - age;
-  const rows = [-2, -1, 0, 1, 2]
-    .map((k) => {
-      const y = y0 + k;
-      const verdict =
-        k < 0 ? `<span class="ok">購入できます</span>` : k === 0 ? `<b>${m}月${d}日以前の生まれなら購入できます</b>` : `<span class="warn">購入できません</span>`;
-      return `<tr class="${k === 0 ? "edge" : ""}"><td>${y}年（${wareki(y, m, d)}）</td><td>${ty - y - 1}〜${ty - y}歳</td><td>${verdict}</td></tr>`;
-    })
-    .join("");
-  return `<table class="age-chart">
-      <caption>年確早見表（${ty}年${m}月${d}日：${y0}年（${wareki(y0, m, d)}）${m}月${d}日以前の生まれが${age}歳以上）</caption>
-      <thead><tr><th>生まれ年</th><th>今日の年齢</th><th>判定</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
-}
-
 /**
  * 店員側の年齢確認（例外：店員側の画面からしか押せない）。まず「する／しない」を選び、
- * 「する」なら身分証の生年月日を入力して判定する。早見表を添える
+ * 「する」なら身分証の生年月日を入力して判定する
  */
 function idCard(reg: number, age: number, v: StaffView, a: (n: string) => ActionState): string {
   const choose = (idCheck: boolean, label: string, cls = "") =>
@@ -132,7 +99,7 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
         ${choose(false, "しないに変更", "small ghost")}</div>
       <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;
   }
-  return `<div class="card id-card staff-only">${body}${ageChart(age)}</div>`;
+  return `<div class="card id-card staff-only">${body}</div>`;
 }
 
 /** 年確で販売できず取り除いた商品。店員がお客様から引き取る（没収する） */
@@ -159,10 +126,12 @@ export function billCard(reg: number, amount: number, st: ActionState): string {
 }
 
 /** 支払方法を選んだ後の案内 */
-function payHint(method: string | null, blocker: string | null, inserted: number): string {
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、入金ボックスにかざしてください</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
+  // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
+  if (inserted && due > 0) return `<p>あと <b>${yen(due)}</b> 入れてください</p>`;
   if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
   if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
@@ -279,7 +248,31 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
 }
 
-/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、しない：店員の判断で済む）。早見表を添える */
+/** セミセルフの呼び出し中の店員側の画面：呼び出しの理由（「年確」「FF＆煙草」など）を大きく */
+export function callScreen(r: RegisterView, now: number): string {
+  const v = r.staff;
+  const warn = v.mat_down.length
+    ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
+    : "";
+  const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
+  const details = [...new Set(v.calls.map((c) => c.detail).filter(Boolean))];
+  const oldest = Math.min(...v.calls.map((c) => c.created_at));
+  return `${warn}<div class="call-screen">
+      <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
+      ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
+      <p class="muted">${secs(now, oldest)}経過　店員証でログインすると対応を始めます</p>
+    </div>`;
+}
+
+/** セミセルフで年確の係員を待つ間のお客様側の案内（登録画面・支払画面の代わりに出す） */
+function ageWait(age: number): string {
+  return `<div class="point-screen">
+      <div class="big">年齢確認が必要な商品が含まれています。</div>
+      <p>${age}歳前後のお客様は身分証をご準備ください。</p>
+    </div>`;
+}
+
+/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、しない：店員の判断で済む） */
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
   const age = v.required_age;
   if (!age || side === "customer") return "";
@@ -404,15 +397,15 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 会計ボタンの後は、年確 → ポイントカードの最終確認 → 決済手段の確認の順に進む
   const pointPending = paying && v.point_pending;
   const agePending = paying && (v.age_choice_pending || v.id_pending);
-  // 決済手段の確認：登録画面と年確の状況は出さず、決済手段だけを示す（選ぶのは店員側の画面）
+  // 決済手段の確認：登録画面と年確の状況は出さず、決済手段だけを示す（選ぶのは店員側の画面）。
+  // 同じ情報を複数個所に出さない：点数・合計は上の帯、投入額は入金ボックス、選んだ手段はボタンの強調で示す
   const payStage = paying && !pointPending && !agePending;
   const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
   const pay = payStage
     ? `${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
-        <div>支払方法：${v.method ? METHOD_LABEL[v.method] : "未選択"}　投入 ${yen(v.inserted)}　残り <b>${yen(v.due)}</b></div>
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : methodList(v.method, v.inserted)}
-        ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted) : ""}
+        ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due) : ""}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -431,30 +424,48 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
           : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
     r.max_items,
   );
-  // 有人モードの最終確認は店員側だけ。登録画面を置き換えて出す（お客様側は明細のまま）
-  if (pointPending && side === "staff") return `${top}${notice}${staffPointCheck(reg, side, a("confirm_point_card"))}`;
+  // 有人モードの最終確認：店員側は二択、お客様側は案内文。どちらも登録画面を置き換えて出す
+  if (pointPending)
+    return `${top}${notice}${side === "staff" ? staffPointCheck(reg, side, a("confirm_point_card")) : customerPointAsk()}`;
+  scanGuide.delete(`${reg}:${side}`);
   const cards = `${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
   }`;
-  // 決済手段の確認は登録画面を置き換えて出す（両方の画面とも）
-  if (payStage) return `${top}${notice}${cards}${pay}`;
+  // 確認画面（決済手段・年確・没収・クーポンの返却など）は登録画面を置き換えて出す。
+  // 登録画面と確認画面を同時には出さない（年確は店員側だけ。お客様側は明細のまま）
+  if (payStage || (agePending && side === "staff") || cards) return `${top}${notice}${cards}${pay}`;
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
     </div>
-    ${cards}${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
 }
 
-/** 有人モード：会計ボタンの後のポイントカードの最終確認（店員側だけ）。読み取るか「なしで進める」で支払方法へ */
+/**
+ * 有人モード：会計ボタンの後のポイントカードの最終確認（店員側）。読み取りを促し、なければ「スキップ」。
+ * 会計前に読み取り済みなら出ない
+ */
 function staffPointCheck(reg: number, side: Side, st: ActionState): string {
   return `<div class="point-screen">
-      <div class="big">ポイントカードの最終確認</div>
-      <p>お客様にポイントカードをお持ちか確認してください。読み取るとお支払い方法の選択に進みます。</p>
-      ${btn("ポイントカードなしで進める", { type: "confirm_point_card", register: reg, side }, st, "primary")}
+      <div class="big">ポイントサービスのバーコードを読み取ってください。</div>
+      ${btn("スキップ", { type: "confirm_point_card", register: reg, side }, st)}
+    </div>`;
+}
+
+/** このお店で使えるポイントサービス（お客様側の最終確認に並べるアイコン） */
+const POINT_SERVICES: [string, string][] = [
+  ["💳", "ポイントカード"],
+  ["📱", "ポイントアプリ"],
+];
+
+/** 有人モード：ポイントカードの最終確認中のお客様側。案内文と使えるポイントサービスのアイコンだけ */
+function customerPointAsk(): string {
+  return `<div class="point-screen">
+      <div class="big">ポイントカードまたはポイントアプリはおもちですか？</div>
+      <div class="point-services">${POINT_SERVICES.map(([icon, name]) => `<span class="point-service"><span class="icon">${icon}</span>${name}</span>`).join("")}</div>
     </div>`;
 }
 
@@ -508,6 +519,9 @@ export function itemCount(lines: { qty: number }[]): number {
  * 有人モードのお客様側には、お客様本人が押すボタン（お支払い内容の確認・投入おわり）だけを出す。
  */
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
+  // セミセルフの呼び出し中、店員側の画面は呼び出しの理由だけを大きく出す（年確の工程などは出さない：
+  // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
+  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
@@ -565,6 +579,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "attended" && side === "customer") return "";
   // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
+  // 確認画面（クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
+  if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length)) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -699,21 +715,21 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 会計ボタンの後のポイントカードの最終確認は、登録画面を置き換えて出す
   if (c.phase === "paying" && c.point_pending) return `${top}${notice}${customerPointCheck(reg, side, a("confirm_point_card"))}`;
   scanGuide.delete(`${reg}:${side}`);
+  if (c.phase === "paying" && c.age_wait) return `${top}${notice}${ageWait(c.age_wait)}`;
 
   let pay = "";
   if (c.phase === "paying") {
     const bill = c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "";
     const methods = methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center");
     pay = `${bill}<div class="paybox center">
-        <div>お支払い <b class="total">${yen(c.total)}</b></div>
-        ${c.inserted ? `<div>お預かり ${yen(c.inserted)}　残り <b>${yen(c.due)}</b></div>` : ""}
-        ${methods}${payHint(c.method, c.payment_blocker, c.inserted)}
+        ${methods}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}
       </div>`;
   }
 
+  // 確認画面（支払方法・クーポンの返却など）は登録画面を置き換えて出す（同時には出さない）
+  const cards = `${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}`;
+  if (cards || pay) return `${top}${notice}${cards}${pay}`;
   return `${top}${notice}
-    ${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}
-    ${pay}
     <table class="lines"><tbody>${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
 }

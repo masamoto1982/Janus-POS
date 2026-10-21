@@ -403,14 +403,14 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const cards = `${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
   }`;
-  // 決済手段の確認は登録画面を置き換えて出す（両方の画面とも）
-  if (payStage) return `${top}${notice}${cards}${pay}`;
+  // 確認画面（決済手段・年確・没収・クーポンの返却など）は登録画面を置き換えて出す。
+  // 登録画面と確認画面を同時には出さない（年確は店員側だけ。お客様側は明細のまま）
+  if (payStage || (agePending && side === "staff") || cards) return `${top}${notice}${cards}${pay}`;
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
     </div>
-    ${cards}${pay}
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
@@ -532,6 +532,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "attended" && side === "customer") return "";
   // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
+  // 確認画面（クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
+  if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length)) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -678,9 +680,10 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
       </div>`;
   }
 
+  // 確認画面（支払方法・クーポンの返却など）は登録画面を置き換えて出す（同時には出さない）
+  const cards = `${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}`;
+  if (cards || pay) return `${top}${notice}${cards}${pay}`;
   return `${top}${notice}
-    ${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}
-    ${pay}
     <table class="lines"><tbody>${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
 }

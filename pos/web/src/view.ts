@@ -445,19 +445,13 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 }
 
 /**
- * 有人モード：会計ボタンの後のポイントカードの最終確認。店員側に二択を出す。
- * 「読み取る」を押さずにポイントカードをスキャンしても読める（会計前に読み取り済みなら出ない）
+ * 有人モード：会計ボタンの後のポイントカードの最終確認（店員側）。読み取りを促し、なければ「スキップ」。
+ * 会計前に読み取り済みなら出ない
  */
 function staffPointCheck(reg: number, side: Side, st: ActionState): string {
-  const reading = scanGuide.get(`${reg}:${side}`) === "point";
   return `<div class="point-screen">
-      <div class="big">ポイントカードの最終確認</div>
-      <p>お客様にポイントカードまたはポイントアプリをお持ちか確認してください</p>
-      <div class="point-choices">
-        <button type="button" class="primary ${reading ? "on" : ""}" data-guide="${reg}:${side}:point">ポイントカードを読み取る</button>
-        ${btn("ポイントカードなしで進める", { type: "confirm_point_card", register: reg, side }, st)}
-      </div>
-      ${reading ? `<p class="guide">ポイントカードまたはポイントアプリのバーコードをスキャンしてください</p>` : ""}
+      <div class="big">ポイントサービスのバーコードを読み取ってください。</div>
+      ${btn("スキップ", { type: "confirm_point_card", register: reg, side }, st)}
     </div>`;
 }
 

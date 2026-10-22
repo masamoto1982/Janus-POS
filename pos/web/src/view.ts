@@ -94,13 +94,16 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
         <div class="point-choices">${choose(true, "する", "primary")}${choose(false, "スキップ", "skip")}</div>
       </div>`;
   }
+  // 生年月日の入力もポイントカードの確認と同じ形：問いを一行、入力欄、ボタンの行。どれも中央に
   const st = a("check_id");
-  const body = `<div class="id-head"><b>身分証の生年月日（西暦8桁）</b>
-        <input type="text" inputmode="numeric" maxlength="8" placeholder="例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
+  return `<div class="point-screen id-entry">
+      <div class="big">身分証の生年月日を入力してください</div>
+      <input type="text" inputmode="numeric" maxlength="8" placeholder="西暦8桁　例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
+      <div class="point-choices">
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
-        ${choose(false, "スキップ", "small skip")}</div>
-      <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;
-  return `<div class="card id-card staff-only">${body}</div>`;
+        ${choose(false, "スキップ", "skip")}
+      </div>
+    </div>`;
 }
 
 /** 年確で販売できず取り除いた商品。店員がお客様から引き取る（没収する） */

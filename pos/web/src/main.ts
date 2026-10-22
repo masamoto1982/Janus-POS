@@ -409,7 +409,7 @@ app.addEventListener("input", (e) => {
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.birth || e.key !== "Enter" || e.isComposing) return;
-  el.closest(".id-head")?.querySelector<HTMLButtonElement>('[data-form="birth"]')?.click();
+  el.closest(".id-entry")?.querySelector<HTMLButtonElement>('[data-form="birth"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;

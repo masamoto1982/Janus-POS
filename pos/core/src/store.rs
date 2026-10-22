@@ -433,6 +433,8 @@ impl Line {
 
 #[derive(Clone, Debug, Default)]
 struct Txn {
+    /// たばこボタンで呼ばれた店員がログインした（たばこを登録するまで Item のたばこを点滅させる）
+    tobacco_asked: bool,
     lines: Vec<Line>,
     next_line: u32,
     paying: bool,
@@ -1573,6 +1575,9 @@ impl Store {
             // 店員が来たら、ボタンでの呼び出しは片付く（サービス商品の受付待ちがあれば残す）
             let service_pending = r.txn.service_pending();
             self.calls.resolve(register, CallKind::CustomerHelp, now);
+            if self.calls.is_open(register, CallKind::Tobacco) {
+                self.reg_mut(register)?.txn.tobacco_asked = true;
+            }
             self.calls.resolve(register, CallKind::Tobacco, now);
             if !service_pending {
                 self.calls.resolve(register, CallKind::Service, now);
@@ -1654,6 +1659,9 @@ impl Store {
                 })
             }
             Scanned::Product(p) => {
+                if p.category == Category::Tobacco {
+                    r.txn.tobacco_asked = false;
+                }
                 r.txn.push(p, 1, LineKind::Item);
                 done(format!("{} {}円{back}", p.name, p.price))
             }
@@ -2221,6 +2229,7 @@ impl Store {
             lamp: waiting.is_some(),
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
+            tobacco_asked: r.mode == Mode::Attended && t.tobacco_asked,
             mode: r.mode,
             mode_label: r.mode.label(),
             outlet: r.outlet.total(),
@@ -2404,6 +2413,8 @@ pub struct RegisterView {
     pub call_waiting_ms: Option<u64>,
     /// 鳴動の音量（放置が長いほど大きい。呼び出しがなければ 0）
     pub ring_volume: f32,
+    /// たばこボタンの呼び出しで有人モードになり、まだたばこを登録していない
+    pub tobacco_asked: bool,
     pub mode: Mode,
     pub mode_label: &'static str,
     /// 排出口にたまっているお金

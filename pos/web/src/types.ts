@@ -141,6 +141,7 @@ export interface RegisterView {
   call_waiting_ms: number | null;
   /** 鳴動の音量 0〜1（放置が長いほど大きい） */
   ring_volume: number;
+  tobacco_asked: boolean;
   mode: Mode;
   mode_label: string;
   idle_revert_in: number | null;

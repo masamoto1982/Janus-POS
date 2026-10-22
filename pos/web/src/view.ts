@@ -91,14 +91,14 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
     // ポイントカードの確認と同じ形：問いを一行、ボタンをその下の行に、どちらも中央に
     return `<div class="point-screen">
         <div class="big">${age}歳以上の年齢確認をしますか？</div>
-        <div class="point-choices">${choose(true, "する", "primary")}${choose(false, "スキップ")}</div>
+        <div class="point-choices">${choose(true, "する", "primary")}${choose(false, "スキップ", "skip")}</div>
       </div>`;
   }
   const st = a("check_id");
   const body = `<div class="id-head"><b>身分証の生年月日（西暦8桁）</b>
         <input type="text" inputmode="numeric" maxlength="8" placeholder="例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
-        ${choose(false, "スキップ", "small ghost")}</div>
+        ${choose(false, "スキップ", "small skip")}</div>
       <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;
   return `<div class="card id-card staff-only">${body}</div>`;
 }
@@ -473,9 +473,15 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
  * 会計前に読み取り済みなら出ない
  */
 function staffPointCheck(reg: number, side: Side, st: ActionState): string {
+  // 年確と同じ形。「付与する」を押すと読み取りの案内を出す（押さずにスキャンしても読める）
+  const reading = scanGuide.get(`${reg}:${side}`) === "point";
   return `<div class="point-screen">
-      <div class="big">ポイントサービスのバーコードを読み取ってください。</div>
-      ${btn("スキップ", { type: "confirm_point_card", register: reg, side }, st)}
+      <div class="big">ポイントを付与しますか？</div>
+      <div class="point-choices">
+        <button type="button" class="primary ${reading ? "on" : ""}" data-guide="${reg}:${side}:point">付与する</button>
+        ${btn("スキップ", { type: "confirm_point_card", register: reg, side }, st, "skip")}
+      </div>
+      ${reading ? `<p class="guide">ポイントサービスのバーコードを読み取ってください。</p>` : ""}
     </div>`;
 }
 

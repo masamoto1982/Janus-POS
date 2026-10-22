@@ -148,6 +148,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost { background: transparent; color: inherit; border-color: currentColor; opacity: .85; }
 button.ghost:disabled { opacity: .3; }
+/* スキップは控えめに（年確はしたほうが、ポイントは付けたほうが商売上よいので） */
+button.skip { background: transparent; color: var(--muted, inherit); border-color: var(--line); font-weight: 400; opacity: .8; }
 button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }

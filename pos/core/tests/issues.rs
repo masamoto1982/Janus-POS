@@ -1433,7 +1433,8 @@ fn points_can_pay_once_staff_chooses_them() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
+    // ポイント利用にはポイントカードが要る（読まずに選ぶとポイントカードの確認に差し戻す）
+    scan(&mut s, 1, "staff", "PC12345678");
     // 選ぶ前にかざしても決済にならない
     assert!(run(
         &mut s,
@@ -1455,4 +1456,44 @@ fn points_can_pay_once_staff_chooses_them() {
         json!({"type":"tap_emoney","register":1,"method":"points"}),
     );
     assert!(reg(&s, 1).staff.lines.is_empty());
+}
+
+/// 決済手段でポイント利用を選んでも、ポイントカードが読まれていなければポイントカードの確認に差し戻す。
+/// 読めばポイント利用のまま支払いへ。読まずに「スキップ」ならポイント利用は取り消す。
+#[test]
+fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    let points = json!({"type":"select_payment","register":1,"side":"staff","method":"points"});
+    ok(&mut s, points.clone());
+    let v = reg(&s, 1);
+    assert!(v.staff.point_pending && v.customer.point_pending);
+    assert_eq!(v.staff.method, Some(PaymentMethod::Points));
+    // 読めばポイント利用のまま支払いへ
+    scan(&mut s, 1, "staff", "PC12345678");
+    let v = reg(&s, 1);
+    assert!(!v.staff.point_pending);
+    assert_eq!(v.staff.phase, Phase::Paying);
+    assert_eq!(v.staff.method, Some(PaymentMethod::Points));
+
+    // 別の会計：差し戻しでスキップすれば、ポイント利用は取り消す
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(&mut s, points);
+    confirm_point(&mut s, 1);
+    let v = reg(&s, 1);
+    assert!(!v.staff.point_pending);
+    assert_eq!(v.staff.method, None);
 }

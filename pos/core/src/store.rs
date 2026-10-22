@@ -1140,6 +1140,13 @@ impl Store {
                     return Err("現金が投入済みです。現金でお支払いください".into());
                 }
                 r.txn.method = Some(method);
+                // ポイント利用なのにポイントカードが読まれていなければ、ポイントカードの確認に差し戻す
+                if method == PaymentMethod::Points && r.txn.point_card.is_none() {
+                    r.txn.point_checked = false;
+                    return done(
+                        "ポイントカードが読まれていません。ポイントカードを読み取ってください",
+                    );
+                }
                 done(format!("{}を選びました", method.label()))
             }
             C::ChooseAgeCheck {
@@ -1263,7 +1270,12 @@ impl Store {
             }
             C::ConfirmPointCard { register, side } => {
                 self.check(register, side, Action::ConfirmPointCard)?;
-                self.reg_mut(register)?.txn.point_checked = true;
+                let t = &mut self.reg_mut(register)?.txn;
+                t.point_checked = true;
+                // ポイントカードなしなら、差し戻し前に選ばれていたポイント利用は取り消す
+                if t.method == Some(PaymentMethod::Points) {
+                    t.method = None;
+                }
                 done("ポイントカードなしで進みます。お支払い方法を選んでください")
             }
             C::ReleaseCall { register } => {

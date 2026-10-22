@@ -1219,7 +1219,7 @@ fn void_lock_and_logout_from_the_store_menu() {
 
 /// 年確：年確商品があれば、まず店員が「年齢確認をする／しない」を選ぶ。
 /// 「する」なら身分証の生年月日を入力し、年齢に届かない年確商品は買い物から取り除いて
-/// 没収する商品と個数を店員に示す（店舗判断で 18 歳以上にしたライターは買えるが酒は買えない等）。
+/// 回収する商品と個数を店員に示す（店舗判断で 18 歳以上にしたライターは買えるが酒は買えない等）。
 #[test]
 fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let mut s = Store::new(1, 2, 1);

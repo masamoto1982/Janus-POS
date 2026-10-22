@@ -184,7 +184,7 @@ pub enum Command {
         birth: String,
         today: String,
     },
-    /// 没収した商品の一覧を閉じる（店員が商品を引き取った）
+    /// 回収する商品の一覧を閉じる（店員が商品を引き取った）
     DismissConfiscated {
         register: u8,
     },
@@ -443,7 +443,7 @@ struct Txn {
     age_method: Option<AgeMethod>,
     /// 年確が済んだ年齢（「しない」ならお客様の申告、「する」なら身分証の年齢）
     verified_age: Option<u8>,
-    /// 年確で販売できず、買い物から取り除いた商品（店員が没収する）
+    /// 年確で販売できず、買い物から取り除いた商品（店員が回収する）
     confiscated: Vec<(&'static str, u32)>,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
@@ -1214,7 +1214,7 @@ impl Store {
             C::DismissConfiscated { register } => {
                 let r = self.reg_mut(register)?;
                 r.txn.confiscated.clear();
-                done("没収の確認を閉じました")
+                done("販売できない商品を回収しました")
             }
             C::ConfirmBillPayment { register, side } => {
                 self.check(register, side, Action::ConfirmBillPayment)?;
@@ -1694,7 +1694,7 @@ impl Store {
         ))
     }
 
-    /// 身分証の年齢で判定する。年齢に届かない年確商品は買い物から取り除き、没収の一覧に載せる
+    /// 身分証の年齢で判定する。年齢に届かない年確商品は買い物から取り除き、回収の一覧に載せる
     fn verify_age(&mut self, register: u8, age: u8) -> Result<Outcome, String> {
         let rules = &self.age_rules;
         let r = self
@@ -2312,7 +2312,7 @@ pub struct StaffView {
     pub required_age: Option<u8>,
     /// 店員の「年齢確認をする／しない」待ち
     pub age_choice_pending: bool,
-    /// 年確で販売できず取り除いた商品（店員が没収する）
+    /// 年確で販売できず取り除いた商品（店員が回収する）
     pub confiscated: Vec<Confiscated>,
     /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
     pub coupon_unmatched: bool,

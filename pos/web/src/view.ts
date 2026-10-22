@@ -106,13 +106,28 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
     </div>`;
 }
 
-/** 年確で販売できず取り除いた商品。店員がお客様から引き取る（没収する） */
+/** 回収リストでチェックを入れた行（レジごと）。画面の中だけの状態で、コアには「回収しました」だけを送る */
+export const collected = new Map<number, Set<number>>();
+
+/** 年確で販売できず取り除いた商品。店員がお客様から回収する。全部にチェックを入れると「回収しました」が押せる */
 function confiscatedCard(reg: number, v: StaffView): string {
-  if (!v.confiscated.length) return "";
-  const items = v.confiscated.map((c) => `<li><b>${esc(c.name)}</b> × ${c.qty}</li>`).join("");
-  return `<div class="card id-card refused staff-only">
-      <div class="id-head"><b>販売できない商品を没収してください</b>${btn("没収しました", { type: "dismiss_confiscated", register: reg }, undefined, "small")}</div>
-      <ul class="confiscated">${items}</ul>
+  if (!v.confiscated.length) {
+    collected.delete(reg);
+    return "";
+  }
+  const done = collected.get(reg) ?? new Set<number>();
+  const items = v.confiscated
+    .map(
+      (c, i) =>
+        `<li><label><input type="checkbox" data-collect="${reg}:${i}"${done.has(i) ? " checked" : ""} aria-label="${esc(c.name)}を回収" /><b>${esc(c.name)}</b> × ${c.qty}</label></li>`,
+    )
+    .join("");
+  const all = v.confiscated.every((_, i) => done.has(i));
+  const st = { action: "dismiss_confiscated", allowed: all, reason: all ? null : "回収した商品にチェックを入れてください" };
+  return `<div class="point-screen collect">
+      <div class="big">販売できない商品について回収してください</div>
+      <ul class="collect-list">${items}</ul>
+      <div class="point-choices">${btn("回収しました", { type: "dismiss_confiscated", register: reg }, st, "primary")}</div>
     </div>`;
 }
 
@@ -449,14 +464,14 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     r.max_items,
   );
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
-  // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞没収・クーポン＞ポイントカード＞決済手段
+  // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞回収・クーポン＞ポイントカード＞決済手段
   const screen = (body: string) => `${top}${notice}${confirm(body)}`;
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
   if (v.bill_check !== null)
     return screen(side === "customer" ? billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
-    side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("年齢確認の結果、お売りできない商品があります", "店員にお渡しください") : "",
+    side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);

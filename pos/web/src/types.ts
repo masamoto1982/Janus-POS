@@ -83,7 +83,7 @@ export interface StaffView {
   required_age: number | null;
   /** 店員の「年齢確認をする／しない」待ち */
   age_choice_pending: boolean;
-  /** 年確で販売できず取り除いた商品（店員が没収する） */
+  /** 年確で販売できず取り除いた商品（店員が回収する） */
   confiscated: { name: string; qty: number }[];
   /** 会計に進んだが、適用先のないクーポンが残っている（決済できない） */
   coupon_unmatched: boolean;

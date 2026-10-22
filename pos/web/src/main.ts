@@ -21,6 +21,7 @@ import {
   screenHead,
   isoDate,
   scanGuide,
+  collected,
   matPanel,
   ownerPanel,
   shelfPanel,
@@ -437,6 +438,17 @@ app.addEventListener("change", (e) => {
     const [reg, line] = box.dataset.ffcheck!.split(":").map(Number);
     const side = box.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "staff";
     if (!send({ type: "check_ff", register: reg, side, line_id: line, checked: box.checked })) box.checked = !box.checked;
+    return;
+  }
+  if (sel.dataset.collect) {
+    // 回収リストのチェック。画面の中だけで持ち、全部入ると「回収しました」が押せる
+    const box = sel as unknown as HTMLInputElement;
+    const [reg, i] = box.dataset.collect!.split(":").map(Number);
+    const set = collected.get(reg) ?? new Set<number>();
+    if (box.checked) set.add(i);
+    else set.delete(i);
+    collected.set(reg, set);
+    frame();
     return;
   }
   if (sel.dataset.age) {

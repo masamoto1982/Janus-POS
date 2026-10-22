@@ -1098,37 +1098,43 @@ fn staff_skipping_the_age_check_needs_no_customer_button() {
     assert_eq!(reg(&s, 1).staff.payment_blocker, None);
 }
 
-/// 代行収納：係員が受け付けた支払い内容・金額は、会計時にお客様が確認するまで決済できない。
-/// 確認ボタンは年確と同じく、お客様側の画面からしか押せない（係員が画面を持っていても）。
-/// 宅配便は確認の対象外。
+/// 代行収納：係員が支払い内容・金額を受け付けたら、すぐにお客様が金額と件数を確認する。
+/// 確認ボタンはお客様側の画面からしか押せない（係員が画面を持っていても）。宅配便は確認の対象外。
+/// 確認の優先順は 代行収納 ＞ 年確 ＞ ポイントカード ＞ 決済手段（一つの画面で一つの確認だけ）。
 #[test]
 fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BILL);
     scan(&mut s, 1, "staff", PARCEL);
-    for (i, amount) in [(0, 8_640), (1, 1_200)] {
-        let id = reg(&s, 1).staff.lines[i].line.id;
+    scan(&mut s, 1, "staff", BEER);
+    for code in [BILL, PARCEL] {
+        let v = reg(&s, 1);
+        let id = v
+            .staff
+            .lines
+            .iter()
+            .find(|l| l.line.code == code)
+            .unwrap()
+            .line
+            .id;
+        let amount = if code == BILL { 8_640 } else { 1_200 };
         ok(
             &mut s,
             json!({"type":"complete_service","register":1,"line_id":id,"amount":amount}),
         );
     }
-    // 登録中は確認を求めない
-    assert_eq!(reg(&s, 1).customer.bill_check, None);
+    // 受け付けたらすぐ確認を求める（宅配便は確認しない）
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.bill_check, Some(8_640));
+    assert_eq!(v.customer.bill_count, 1);
+    // 会計に進んでも、代行収納の確認が済むまで年確・ポイントカードの確認は始まらない
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
     let v = reg(&s, 1);
-    assert_eq!(v.customer.bill_check, Some(8_640), "宅配便は確認しない");
-    assert_eq!(v.active_side, Some(Side::Staff));
-    ok(
-        &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
-    );
-    assert!(run(&mut s, json!({"type":"tap_emoney","register":1})).is_err());
+    assert!(!v.staff.age_choice_pending && !v.staff.point_pending);
     let e = run(
         &mut s,
         json!({"type":"confirm_bill_payment","register":1,"side":"staff"}),
@@ -1141,13 +1147,20 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
     );
     let v = reg(&s, 1);
     assert_eq!(v.customer.bill_check, None);
+    assert!(v.staff.age_choice_pending, "次は年確");
     assert_eq!(
         v.active_side,
         Some(Side::Staff),
         "確認しても操作側は変わらない"
     );
+    no_id_check(&mut s, 1);
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+    );
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
-    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 8_640 + 1_200);
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 8_640 + 1_200 + 248);
 }
 
 /// 買い物点数は 10 点まで（数量の合計）。上限を超える商品は登録されず、FF も同じ。

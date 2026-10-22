@@ -113,17 +113,20 @@ function confiscatedCard(reg: number, v: StaffView): string {
 }
 
 /**
- * 代行収納の支払い内容・金額の確認。年確と同じく、お客様本人がお客様側の画面で押す
+ * 代行収納の支払い内容・件数・金額の確認。受け付けたらすぐ、お客様本人がお客様側の画面で押す
  * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
  */
-export function billCard(reg: number, amount: number, st: ActionState): string {
+export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
-      <p>お支払い　<b>${yen(amount)}</b><br>払込票の内容・金額をご確認ください（お客様側の画面で押してください）</p>
+      <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください（お客様側の画面で押してください）</p>
       ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
 }
+
+/** 確認のうち、出すべき最初の一つ（一つの画面で複数の確認をしない） */
+const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
 /** 支払方法を選んだ後の案内 */
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number): string {
@@ -402,7 +405,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const payStage = paying && !pointPending && !agePending;
   const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
   const pay = payStage
-    ? `${v.bill_check !== null ? billCard(reg, v.bill_check, a("confirm_bill_payment")) : ""}<div class="paybox pay-stage">
+    ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : methodList(v.method, v.inserted)}
         ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due) : ""}
@@ -424,16 +427,20 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
           : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
     r.max_items,
   );
-  // 有人モードの最終確認：店員側は二択、お客様側は案内文。どちらも登録画面を置き換えて出す
-  if (pointPending)
-    return `${top}${notice}${side === "staff" ? staffPointCheck(reg, side, a("confirm_point_card")) : customerPointAsk()}`;
+  // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
+  // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞没収・クーポン＞ポイントカード＞決済手段
+  const screen = (body: string) => `${top}${notice}${body}`;
+  if (v.bill_check !== null) return screen(billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")));
+  if (agePending && side === "staff") return screen(pay);
+  const card = firstOf([
+    side === "staff" ? confiscatedCard(reg, v) : "",
+    v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
+    returnedCard(reg, side, v.returned, side === "staff"),
+  ]);
+  if (card) return screen(card);
+  if (pointPending) return screen(side === "staff" ? staffPointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
-  const cards = `${side === "staff" ? confiscatedCard(reg, v) : ""}${returnedCard(reg, side, v.returned, side === "staff")}${
-    v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : ""
-  }`;
-  // 確認画面（決済手段・年確・没収・クーポンの返却など）は登録画面を置き換えて出す。
-  // 登録画面と確認画面を同時には出さない（年確は店員側だけ。お客様側は明細のまま）
-  if (payStage || (agePending && side === "staff") || cards) return `${top}${notice}${cards}${pay}`;
+  if (payStage) return screen(pay);
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
@@ -579,8 +586,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "attended" && side === "customer") return "";
   // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
-  // 確認画面（クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
-  if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length)) return "";
+  // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
+  if (r.mode === "attended" && (r.staff.bill_check !== null || r.staff.returned.length || r.staff.confiscated.length)) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -712,23 +719,21 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   );
 
   if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side)}`;
-  // 会計ボタンの後のポイントカードの最終確認は、登録画面を置き換えて出す
-  if (c.phase === "paying" && c.point_pending) return `${top}${notice}${customerPointCheck(reg, side, a("confirm_point_card"))}`;
+  // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）
+  const screen = (body: string) => `${top}${notice}${body}`;
+  if (c.bill_check !== null) return screen(billCard(reg, c.bill_count, c.bill_check, a("confirm_bill_payment")));
+  if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
+  const card = firstOf([
+    c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
+    returnedCard(reg, side, c.returned, true),
+  ]);
+  if (card) return screen(card);
+  if (c.phase === "paying" && c.point_pending) return screen(customerPointCheck(reg, side, a("confirm_point_card")));
   scanGuide.delete(`${reg}:${side}`);
-  if (c.phase === "paying" && c.age_wait) return `${top}${notice}${ageWait(c.age_wait)}`;
-
-  let pay = "";
-  if (c.phase === "paying") {
-    const bill = c.bill_check !== null ? billCard(reg, c.bill_check, a("confirm_bill_payment")) : "";
-    const methods = methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center");
-    pay = `${bill}<div class="paybox center">
-        ${methods}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}
-      </div>`;
-  }
-
-  // 確認画面（支払方法・クーポンの返却など）は登録画面を置き換えて出す（同時には出さない）
-  const cards = `${returnedCard(reg, side, c.returned, true)}${c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : ""}`;
-  if (cards || pay) return `${top}${notice}${cards}${pay}`;
+  if (c.phase === "paying")
+    return screen(`<div class="paybox center">
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center")}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}
+      </div>`);
   return `${top}${notice}
     <table class="lines"><tbody>${rows}</tbody></table>
     ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;

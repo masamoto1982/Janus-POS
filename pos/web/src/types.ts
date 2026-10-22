@@ -93,6 +93,7 @@ export interface StaffView {
   id_pending: boolean;
   /** 会計時、お客様の確認待ちの代行収納の金額 */
   bill_check: number | null;
+  bill_count: number;
   point_pending: boolean;
   method: Method | null;
   inserted: number;
@@ -117,6 +118,7 @@ export interface CustomerView {
   point_card: boolean;
   point_pending: boolean;
   bill_check: number | null;
+  bill_count: number;
   staff_called: boolean;
   age_wait: number | null;
   staff_present: boolean;

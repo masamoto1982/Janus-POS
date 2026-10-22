@@ -540,6 +540,22 @@ impl Txn {
         Some(pending.map(Line::amount).sum())
     }
 
+    /// お客様の確認待ちの代行収納の件数
+    fn bill_count(&self) -> u32 {
+        self.lines
+            .iter()
+            .filter(|l| {
+                matches!(
+                    l.kind,
+                    LineKind::Service {
+                        confirm_pending: true,
+                        ..
+                    }
+                )
+            })
+            .count() as u32
+    }
+
     /// 承認済みの年齢で、いまの年確商品がすべて足りている
     fn age_cleared(&self) -> bool {
         match (self.required_age, self.verified_age) {
@@ -676,18 +692,21 @@ impl Register {
             },
             staff: self.staff_state(),
             has_lines: !t.lines.is_empty(),
-            age_choice_pending: t.age_choice_pending(),
-            id_pending: t.id_pending(),
+            // 確認の優先順：代行収納の金額と件数（受付で即座に）＞年確＞ポイントカード＞決済手段。
+            // 一つの画面で複数の確認をしないよう、先の確認が済むまで後の確認は始めない
+            age_choice_pending: t.age_choice_pending() && t.bill_pending().is_none(),
+            id_pending: t.id_pending() && t.bill_pending().is_none(),
             ff_waiting: t.any_ff(FfState::Waiting),
             has_ff: t
                 .lines
                 .iter()
                 .any(|l| matches!(l.kind, LineKind::Ff { .. })),
             service_pending: t.service_pending(),
-            bill_pending: t.paying && t.bill_pending().is_some(),
+            bill_pending: t.bill_pending().is_some(),
             // 年確が先。年確で販売が成立しないこともあるので、ポイントカードの確認はその後
             point_pending: t.paying
                 && !t.point_checked
+                && t.bill_pending().is_none()
                 && !(t.age_choice_pending() || t.id_pending()),
             has_coupons: !t.coupons.is_empty(),
             coupon_unmatched: t.paying && t.coupon_unmatched(),
@@ -2194,6 +2213,7 @@ impl Store {
                 coupon_unmatched: c.coupon_unmatched,
                 returned: returned.clone(),
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
+                bill_count: t.bill_count(),
                 point_pending: c.point_pending,
                 method: t.method,
                 inserted,
@@ -2217,6 +2237,7 @@ impl Store {
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
+                bill_count: t.bill_count(),
                 staff_called,
                 age_wait: t
                     .required_age
@@ -2289,6 +2310,8 @@ pub struct StaffView {
     pub id_pending: bool,
     /// 会計時、お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
+    /// 確認待ちの代行収納の件数
+    pub bill_count: u32,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
     pub point_pending: bool,
     pub method: Option<PaymentMethod>,
@@ -2319,6 +2342,8 @@ pub struct CustomerView {
     pub point_pending: bool,
     /// お客様の確認待ちの代行収納の金額
     pub bill_check: Option<u32>,
+    /// 確認待ちの代行収納の件数
+    pub bill_count: u32,
     pub staff_called: bool,
     /// セミセルフで年確の係員を待っている間の年齢（身分証の準備を案内する）
     pub age_wait: Option<u8>,

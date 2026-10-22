@@ -81,24 +81,25 @@ export function isoDate(t: Date): string {
 }
 
 /**
- * 店員側の年齢確認（例外：店員側の画面からしか押せない）。まず「する／しない」を選び、
+ * 店員側の年齢確認（例外：店員側の画面からしか押せない）。まず「する／スキップ」を選び、
  * 「する」なら身分証の生年月日を入力して判定する
  */
 function idCard(reg: number, age: number, v: StaffView, a: (n: string) => ActionState): string {
   const choose = (idCheck: boolean, label: string, cls = "") =>
     btn(label, { type: "choose_age_check", register: reg, side: "staff", id_check: idCheck }, a("choose_age_check"), cls);
-  let body: string;
   if (v.age_choice_pending) {
-    body = `<div class="id-head"><b>${age}歳以上の年齢確認をしますか？</b>${choose(true, "する", "primary")}${choose(false, "しない")}</div>
-      <p>「する」：身分証の生年月日を入力して判定します。「しない」：店員の判断で年齢確認を済ませます。</p>`;
-  } else {
-    const st = a("check_id");
-    body = `<div class="id-head"><b>身分証の生年月日（西暦8桁）</b>
+    // ポイントカードの確認と同じ形：問いを一行、ボタンをその下の行に、どちらも中央に
+    return `<div class="point-screen">
+        <div class="big">${age}歳以上の年齢確認をしますか？</div>
+        <div class="point-choices">${choose(true, "する", "primary")}${choose(false, "スキップ")}</div>
+      </div>`;
+  }
+  const st = a("check_id");
+  const body = `<div class="id-head"><b>身分証の生年月日（西暦8桁）</b>
         <input type="text" inputmode="numeric" maxlength="8" placeholder="例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
-        ${choose(false, "しないに変更", "small ghost")}</div>
+        ${choose(false, "スキップ", "small ghost")}</div>
       <p>年齢に届かない年確商品は買い物から取り除き、没収する商品を表示します。</p>`;
-  }
   return `<div class="card id-card staff-only">${body}</div>`;
 }
 
@@ -119,10 +120,15 @@ function confiscatedCard(reg: number, v: StaffView): string {
 export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
-      <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください（お客様側の画面で押してください）</p>
+      <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください</p>
       ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
+}
+
+/** 確認の最中に、操作しない側に出す対のメッセージ */
+function pairNote(head: string, sub = ""): string {
+  return `<div class="point-screen pair-note"><div class="big">${esc(head)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}</div>`;
 }
 
 /** 確認のうち、出すべき最初の一つ（一つの画面で複数の確認をしない） */
@@ -237,17 +243,20 @@ const CALL_SHORT: Record<string, string> = {
  */
 export function callNotice(r: RegisterView, now: number, side: Side): string {
   const v = r.staff;
+  // 有人モードで年確の工程を出している間は、年確の呼び出しは表示しない（年確の画面そのものが知らせる）
+  const ageOnScreen = r.mode === "attended" && (v.age_choice_pending || v.id_pending);
+  const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
   if (side === "customer") {
-    return r.customer.staff_called
-      ? `<div class="banner call">係員を呼び出しています。しばらくお待ちください。</div>`
+    return r.customer.staff_called && (!ageOnScreen || calls.length)
+      ? `<div class="banner call">${r.mode === "attended" ? "店員が向かっています" : "係員を呼び出しています。しばらくお待ちください。"}</div>`
       : "";
   }
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  if (!v.calls.length) return warn;
-  const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
-  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}${elapsed(v.calls, now, " ")}</div>`;
+  if (!calls.length) return warn;
+  const kinds = [...new Set(calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
+  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}${elapsed(calls, now, " ")}</div>`;
 }
 
 /** 呼び出しの経過時間。年確の呼び出しは数えない（経過時間を出さない） */
@@ -281,7 +290,7 @@ function ageWait(age: number): string {
     </div>`;
 }
 
-/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、しない：店員の判断で済む） */
+/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、スキップ：店員の判断で済む） */
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
   const age = v.required_age;
   if (!age || side === "customer") return "";
@@ -436,10 +445,12 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞没収・クーポン＞ポイントカード＞決済手段
   const screen = (body: string) => `${top}${notice}${body}`;
-  if (v.bill_check !== null) return screen(billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")));
-  if (agePending && side === "staff") return screen(pay);
+  // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
+  if (v.bill_check !== null)
+    return screen(side === "customer" ? billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
+  if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
-    side === "staff" ? confiscatedCard(reg, v) : "",
+    side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("年齢確認の結果、お売りできない商品があります", "店員にお渡しください") : "",
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);

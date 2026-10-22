@@ -59,6 +59,16 @@ describe("view helpers", () => {
     expect(customer).not.toContain("FF");
   });
 
+  it("tells the customer that staff are on the way in attended mode", () => {
+    const r = {
+      mode: "attended",
+      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "" }], mat_down: [] },
+      customer: { staff_called: true },
+    } as unknown as RegisterView;
+    expect(callNotice(r, 6000, "customer")).toContain("店員が向かっています");
+    expect(callNotice(r, 6000, "staff")).toContain("年確");
+  });
+
   it("shows no elapsed time for an age-check call", () => {
     const r = {
       staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "20歳以上" }], mat_down: [] },

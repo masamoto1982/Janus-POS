@@ -126,6 +126,9 @@ export function billCard(reg: number, count: number, amount: number, st: ActionS
     </div>`;
 }
 
+/** 確認画面の入れ物：登録画面の領域いっぱいに広げ、中身を上下左右とも中央に置く */
+const confirm = (body: string): string => `<div class="confirm">${body}</div>`;
+
 /** 確認の最中に、操作しない側に出す対のメッセージ */
 function pairNote(head: string, sub = ""): string {
   return `<div class="point-screen pair-note"><div class="big">${esc(head)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}</div>`;
@@ -444,7 +447,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   );
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞没収・クーポン＞ポイントカード＞決済手段
-  const screen = (body: string) => `${top}${notice}${body}`;
+  const screen = (body: string) => `${top}${notice}${confirm(body)}`;
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
   if (v.bill_check !== null)
     return screen(side === "customer" ? billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
@@ -551,7 +554,7 @@ export function itemCount(lines: { qty: number }[]): number {
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
   // セミセルフの呼び出し中、店員側の画面は呼び出しの理由だけを大きく出す（年確の工程などは出さない：
   // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
-  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
+  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return confirm(callScreen(r, snap.now));
   const notice = callNotice(r, snap.now, side);
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
@@ -743,7 +746,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 
   if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side)}`;
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）
-  const screen = (body: string) => `${top}${notice}${body}`;
+  const screen = (body: string) => `${top}${notice}${confirm(body)}`;
   if (c.bill_check !== null) return screen(billCard(reg, c.bill_count, c.bill_check, a("confirm_bill_payment")));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   const card = firstOf([

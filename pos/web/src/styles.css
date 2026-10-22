@@ -181,6 +181,13 @@ input, select {
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; align-items: center; }
+/* 確認画面は上下左右とも中央に（登録画面の領域を置き換えて、残りの高さいっぱいに広げる） */
+.screen-main:has(> .confirm) { display: flex; flex-direction: column; }
+.screen-main > .reg-top, .screen-main > .banner { flex: none; }
+.confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 8px; }
+.confirm > * { max-width: 100%; }
+.confirm .row { justify-content: center; }
+.confirm .paybox { border: none; }
 .paybox { border: 1px dashed currentColor; border-radius: 8px; padding: 8px; margin: 6px 0; }
 .svc { display: flex; gap: 4px; margin-top: 4px; }
 .svc input { width: 7em; }

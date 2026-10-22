@@ -247,8 +247,15 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
     : "";
   if (!v.calls.length) return warn;
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
-  const oldest = Math.min(...v.calls.map((c) => c.created_at));
-  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}<span class="muted"> ${secs(now, oldest)}経過</span></div>`;
+  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}${elapsed(v.calls, now, " ")}</div>`;
+}
+
+/** 呼び出しの経過時間。年確の呼び出しは数えない（経過時間を出さない） */
+function elapsed(calls: { kind: string; created_at: number }[], now: number, before: string, after = ""): string {
+  const timed = calls.filter((c) => c.kind !== "age_check");
+  if (!timed.length) return "";
+  const oldest = Math.min(...timed.map((c) => c.created_at));
+  return `<span class="muted">${before}${secs(now, oldest)}経過${after}</span>`;
 }
 
 /** セミセルフの呼び出し中の店員側の画面：呼び出しの理由（「年確」「FF＆煙草」など）を大きく */
@@ -259,11 +266,10 @@ export function callScreen(r: RegisterView, now: number): string {
     : "";
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
   const details = [...new Set(v.calls.map((c) => c.detail).filter(Boolean))];
-  const oldest = Math.min(...v.calls.map((c) => c.created_at));
   return `${warn}<div class="call-screen">
       <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
       ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
-      <p class="muted">${secs(now, oldest)}経過　店員証でログインすると対応を始めます</p>
+      <p class="muted">${elapsed(v.calls, now, "", "　")}店員証でログインすると対応を始めます</p>
     </div>`;
 }
 

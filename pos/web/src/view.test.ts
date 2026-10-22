@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billCard, btn, callNotice, esc, itemCount, regTop, sideOf } from "./view";
+import { billCard, btn, callNotice, callScreen, esc, itemCount, regTop, sideOf } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -57,6 +57,16 @@ describe("view helpers", () => {
     const customer = callNotice(r, 6000, "customer");
     expect(customer).toContain("係員を呼び出しています。しばらくお待ちください。");
     expect(customer).not.toContain("FF");
+  });
+
+  it("shows no elapsed time for an age-check call", () => {
+    const r = {
+      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "20歳以上" }], mat_down: [] },
+      customer: { staff_called: true },
+    } as unknown as RegisterView;
+    expect(callNotice(r, 6000, "staff")).not.toContain("経過");
+    expect(callScreen(r, 6000)).toContain("年確");
+    expect(callScreen(r, 6000)).not.toContain("経過");
   });
 
   it("marks the item count when the limit is reached", () => {

@@ -119,10 +119,15 @@ function confiscatedCard(reg: number, v: StaffView): string {
 export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
-      <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください（お客様側の画面で押してください）</p>
+      <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください</p>
       ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
+}
+
+/** 確認の最中に、操作しない側に出す対のメッセージ */
+function pairNote(head: string, sub = ""): string {
+  return `<div class="point-screen pair-note"><div class="big">${esc(head)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}</div>`;
 }
 
 /** 確認のうち、出すべき最初の一つ（一つの画面で複数の確認をしない） */
@@ -239,7 +244,7 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   const v = r.staff;
   if (side === "customer") {
     return r.customer.staff_called
-      ? `<div class="banner call">係員を呼び出しています。しばらくお待ちください。</div>`
+      ? `<div class="banner call">${r.mode === "attended" ? "店員が向かっています" : "係員を呼び出しています。しばらくお待ちください。"}</div>`
       : "";
   }
   const warn = v.mat_down.length
@@ -436,10 +441,12 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞没収・クーポン＞ポイントカード＞決済手段
   const screen = (body: string) => `${top}${notice}${body}`;
-  if (v.bill_check !== null) return screen(billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")));
-  if (agePending && side === "staff") return screen(pay);
+  // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
+  if (v.bill_check !== null)
+    return screen(side === "customer" ? billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
+  if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
-    side === "staff" ? confiscatedCard(reg, v) : "",
+    side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("年齢確認の結果、お売りできない商品があります", "店員にお渡しください") : "",
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);

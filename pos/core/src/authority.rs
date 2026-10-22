@@ -199,7 +199,9 @@ pub const TOUCH_LOCK_MS: u64 = 1000;
 impl Context {
     /// 決済を止めている理由（なければ None）。決済の関門はここに集める。
     pub fn payment_blocker(&self) -> Option<&'static str> {
-        if self.age_choice_pending {
+        if self.bill_pending {
+            Some(BILL_UNCONFIRMED)
+        } else if self.age_choice_pending {
             Some("店員が年齢確認をするか選んでいません")
         } else if self.id_pending {
             Some("店員が身分証の生年月日を入力していません")
@@ -207,8 +209,6 @@ impl Context {
             Some(POINT_UNCONFIRMED)
         } else if self.coupon_unmatched {
             Some(COUPON_UNMATCHED)
-        } else if self.bill_pending {
-            Some(BILL_UNCONFIRMED)
         } else if self.ff_waiting {
             Some(FF_UNCHECKED)
         } else if self.service_pending {
@@ -228,12 +228,9 @@ const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります。対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
 
-/// 会計時の代行収納の内容・金額の確認（どちらのモードでも、お客様が押す）
+/// 代行収納の内容・金額・件数の確認。受け付けたらすぐ（どちらのモードでも、お客様が押す）
 fn confirm_bill(c: &Context) -> Result<(), Denial> {
-    require(
-        c.phase == Phase::Paying && c.bill_pending,
-        "確認が必要な代行収納はありません",
-    )
+    require(c.bill_pending, "確認が必要な代行収納はありません")
 }
 
 /// お客様本人の意思表示・申告にあたる操作。お客様側の画面からしか押せず、
@@ -527,7 +524,7 @@ mod tests {
                                             ff_waiting,
                                             has_ff,
                                             service_pending,
-                                            bill_pending: bill_pending && phase == Phase::Paying,
+                                            bill_pending,
                                             method,
                                         });
                                     }

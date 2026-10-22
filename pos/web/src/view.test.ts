@@ -38,9 +38,10 @@ describe("view helpers", () => {
   });
 
   it("marks the bill-payment confirmation as a customer-only button", () => {
-    const html = billCard(1, 8640, { action: "confirm_bill_payment", allowed: true, reason: null });
+    const html = billCard(1, 2, 8640, { action: "confirm_bill_payment", allowed: true, reason: null });
     expect(html).toContain("customer-only");
     expect(html).toContain("8,640");
+    expect(html).toContain("2件");
     expect(sideOf({ type: "confirm_bill_payment", register: 1 })).toBe("customer");
   });
 

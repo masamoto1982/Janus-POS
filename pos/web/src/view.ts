@@ -494,7 +494,7 @@ const POINT_SERVICES: [string, string][] = [
 /** 有人モード：ポイントカードの最終確認中のお客様側。案内文と使えるポイントサービスのアイコンだけ */
 function customerPointAsk(): string {
   return `<div class="point-screen">
-      <div class="big">ポイントカードまたはポイントアプリはおもちですか？</div>
+      <div class="big">ポイントをお付けします</div>
       <div class="point-services">${POINT_SERVICES.map(([icon, name]) => `<span class="point-service"><span class="icon">${icon}</span>${name}</span>`).join("")}</div>
     </div>`;
 }

@@ -149,7 +149,7 @@ button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost { background: transparent; color: inherit; border-color: currentColor; opacity: .85; }
 button.ghost:disabled { opacity: .3; }
 /* スキップは控えめに（年確はしたほうが、ポイントは付けたほうが商売上よいので） */
-button.skip { background: transparent; color: var(--muted, inherit); border-color: var(--line); font-weight: 400; opacity: .8; }
+button.skip { background: transparent; color: var(--ink); border: 1.5px solid var(--muted); font-weight: 500; }
 button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
@@ -371,7 +371,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io-cust > * { min-width: 0; }
 /* 投入口・排出口はただの箱。中に「入金」「出金」のプレースホルダー */
 .money-io .inlet, .money-io .outlet {
-  height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
+  height: 40px; padding: 0 12px; border: 1.5px solid var(--muted); border-radius: 8px;
   background: var(--panel); color: var(--ink); font: inherit; font-size: 16px; text-align: right;
 }
 .money-io .outlet { display: flex; align-items: center; justify-content: flex-end; }

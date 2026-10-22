@@ -423,9 +423,11 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks();
-  // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ
+  // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length)
-    return `${notice}<div class="welcome"><div class="big">いらっしゃいませ</div><p>ご用件をお申し付けください</p></div>`;
+    return side === "staff"
+      ? `${notice}<div class="welcome"><div class="big">お辞儀とご挨拶をしましょう</div><p>ご用件をお伺いしてください</p></div>`
+      : `${notice}<div class="welcome"><div class="big">いらっしゃいませ</div><p>ご用件をお申し付けください</p></div>`;
   // お客様側に出すボタンは、お客様本人が押すもの（お支払い内容の確認・投入おわり）だけ。
   // ほかの操作（会計・変更・ポイントカード・支払方法など）は店員側の画面で行う
   const ro = side === "customer";
@@ -874,12 +876,23 @@ function item(code: string, name: string, sub: string, cls = ""): string {
 
 /** Item：4 大分類ごとに小さな見出しを付けて並べる */
 export function shelfPanel(s: Snapshot): string {
+  // たばこはカウンターの内側の商品。有人モードのレジがあるときだけ並べ、
+  // たばこボタンで呼ばれて有人モードになったら（まだ登録していなければ）枠と文字を点滅させる
+  const attended = s.registers.some((r) => r.mode === "attended");
+  const asked = s.registers.some((r) => r.tobacco_asked);
   return SHELVES.map((g) => {
     // 棚の並びは SHELVES に書いた順
-    const items = s.catalog.filter(g.match);
+    const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || attended);
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
-      .map((p) => item(p.code, p.name, `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`))
+      .map((p) =>
+        item(
+          p.code,
+          p.name,
+          `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
+          p.category === "tobacco" && asked ? "call-blink" : "",
+        ),
+      )
       .join("")}</div></div>`;
   }).join("");
 }

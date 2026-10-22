@@ -295,6 +295,11 @@ button.emoney { background: #0ea5e9; }
 .item-name { font-weight: 600; font-size: 12px; }
 .item-sub { font-size: 11px; color: var(--muted); }
 .item-sub b { color: var(--warn); font-weight: 600; }
+/* たばこボタンの呼び出しで有人モードになったら、たばこの枠と文字を点滅させる */
+@keyframes item-call-blink { 50% { border-color: var(--line); color: var(--ink); } }
+.item.call-blink { border: 2px solid var(--call); color: var(--call); animation: item-call-blink 1s steps(1) infinite; }
+.item.call-blink .item-name, .item.call-blink .item-sub, .item.call-blink .item-sub b { color: inherit; }
+@media (prefers-reduced-motion: reduce) { .item.call-blink { animation: none; } }
 .item.staff { background: var(--staff-bg); color: var(--staff-ink); border-color: var(--staff-line); }
 .item.staff .item-sub { color: #9ca3af; }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }

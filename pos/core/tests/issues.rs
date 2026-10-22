@@ -1522,3 +1522,23 @@ fn handheld_and_store_computer_bells_can_be_turned_off() {
     advance(&mut s, 1_000);
     assert!(s.snapshot().mats[2].buzzing);
 }
+
+/// たばこボタンで呼ばれた店員がログインすると、たばこを登録するまで tobacco_asked が立つ（Item のたばこを点滅させる）。
+#[test]
+fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
+    let mut s = Store::new(1, 2, 1);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    assert!(!reg(&s, 1).tobacco_asked, "semi-self: not yet");
+    login(&mut s, 1);
+    assert!(reg(&s, 1).tobacco_asked);
+    scan(&mut s, 1, "staff", BREAD);
+    assert!(reg(&s, 1).tobacco_asked);
+    scan(&mut s, 1, "staff", "4900000000127");
+    assert!(!reg(&s, 1).tobacco_asked);
+    // ボタンを使わずにログインしただけなら立たない
+    login(&mut s, 2);
+    assert!(!reg(&s, 2).tobacco_asked);
+}

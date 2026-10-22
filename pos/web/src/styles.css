@@ -239,6 +239,12 @@ button.emoney { background: #0ea5e9; }
 .mat-id { font-weight: 600; }
 .mat-state, .mat-kind { font-size: 12px; color: var(--muted); }
 .mat.buzz { border-color: var(--call); background: var(--call-bg); }
+.mat.off { opacity: .5; }
+.mat-area .bell-open { margin-left: auto; }
+.bell-settings { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.bell-setting { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1.5px solid var(--muted); border-radius: 8px; }
+.bell-setting > span:first-child { flex: 1; font-weight: 600; }
+.bell-setting input { width: 20px; height: 20px; }
 .mat.buzz .bell { animation: ring .25s infinite alternate; }
 @keyframes ring { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
 @media (prefers-reduced-motion: reduce) { .mat.buzz .bell { animation: none; } }

@@ -784,15 +784,29 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 }
 
 // ---------------------------------------------------------------------------
-// Bell（呼び鈴：据え付け型と携帯型の検品端末）・店舗の設定
+// Bell（呼び鈴：据え付け型・携帯型の検品端末・ストアコンピューター）・店舗の設定
 // ---------------------------------------------------------------------------
+
+const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
+const BELL_KIND = { fixed: "据え付け", handheld: "携帯", store_computer: "事務所" } as const;
 
 export function matPanel(s: Snapshot): string {
   return s.mats
     .map(
-      (m) => `<div class="mat ${m.buzzing ? "buzz" : ""}">
-        <span class="bell">${m.kind === "fixed" ? "🔔" : "📱"}</span><span class="mat-id">${esc(m.id)}</span><span class="mat-kind">${m.kind === "fixed" ? "据え付け" : "携帯"}</span><span class="mat-state">${m.buzzing ? "鳴動中" : "待機"}</span>
+      (m) => `<div class="mat ${m.buzzing ? "buzz" : ""} ${m.bell_on ? "" : "off"}">
+        <span class="bell">${BELL_ICON[m.kind]}</span><span class="mat-id">${esc(m.id)}</span><span class="mat-kind">${BELL_KIND[m.kind]}</span><span class="mat-state">${!m.bell_on ? "呼び鈴OFF" : m.buzzing ? "鳴動中" : "待機"}</span>
       </div>`,
+    )
+    .join("");
+}
+
+/** Bell の設定：検品端末とストアコンピューターの呼び鈴機能の ON/OFF（据え付けの呼び鈴は常に ON） */
+export function bellSettings(s: Snapshot): string {
+  return s.mats
+    .map((m, i) =>
+      m.kind === "fixed"
+        ? `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" checked disabled aria-label="${esc(m.id)}の呼び鈴機能" /><span class="muted">常に ON</span></label>`
+        : `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" data-bell-on="${i}"${m.bell_on ? " checked" : ""} aria-label="${esc(m.id)}の呼び鈴機能" /><span>${m.bell_on ? "ON" : "OFF"}</span></label>`,
     )
     .join("");
 }

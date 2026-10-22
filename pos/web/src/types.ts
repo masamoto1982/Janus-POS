@@ -165,7 +165,7 @@ export interface AgeRule {
 export interface Snapshot {
   now: number;
   registers: RegisterView[];
-  mats: { id: string; kind: "fixed" | "handheld"; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean }[];
+  mats: { id: string; kind: "fixed" | "handheld" | "store_computer"; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean; bell_on: boolean }[];
   mat_links: { id: string; link_ok: boolean; acked_seq: number; sent: number; retries: number }[];
   bell: { seq: number; held: number; presses: number };
   calls: Call[];

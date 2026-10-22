@@ -184,7 +184,7 @@ pub enum Command {
         birth: String,
         today: String,
     },
-    /// 没収した商品の一覧を閉じる（店員が商品を引き取った）
+    /// 回収する商品の一覧を閉じる（店員が商品を引き取った）
     DismissConfiscated {
         register: u8,
     },
@@ -294,6 +294,11 @@ pub enum Command {
     SetMatOffline {
         mat: usize,
         offline: bool,
+    },
+    /// 検品端末・ストアコンピューターの呼び鈴機能の ON/OFF（Bell エリアの歯車から）
+    SetBellOn {
+        mat: usize,
+        on: bool,
     },
 }
 
@@ -443,7 +448,7 @@ struct Txn {
     age_method: Option<AgeMethod>,
     /// 年確が済んだ年齢（「しない」ならお客様の申告、「する」なら身分証の年齢）
     verified_age: Option<u8>,
-    /// 年確で販売できず、買い物から取り除いた商品（店員が没収する）
+    /// 年確で販売できず、買い物から取り除いた商品（店員が回収する）
     confiscated: Vec<(&'static str, u32)>,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
@@ -933,7 +938,8 @@ impl Store {
                 m.kick();
             }
         }
-        for m in &mut self.mats {
+        // 呼び鈴機能を OFF にした端末には鳴動状態を送らない
+        for m in self.mats.iter_mut().filter(|m| m.bell_on) {
             m.tick(now, self.bell, self.mat_loss, &mut self.rng);
         }
         // 無操作が 5 分続いたら、名札のログインを外してセミセルフに戻る
@@ -1214,7 +1220,7 @@ impl Store {
             C::DismissConfiscated { register } => {
                 let r = self.reg_mut(register)?;
                 r.txn.confiscated.clear();
-                done("没収の確認を閉じました")
+                done("販売できない商品を回収しました")
             }
             C::ConfirmBillPayment { register, side } => {
                 self.check(register, side, Action::ConfirmBillPayment)?;
@@ -1426,6 +1432,24 @@ impl Store {
             C::SetMatLoss { percent } => {
                 self.mat_loss = percent.min(100);
                 done(format!("MAT の通信ロスを {}% にしました", self.mat_loss))
+            }
+            C::SetBellOn { mat, on } => {
+                let bell = self.bell;
+                let m = self.mats.get_mut(mat).ok_or("MAT が見つかりません")?;
+                if bell_kind(mat as u8) == BellKind::Fixed {
+                    return Err("据え付けの呼び鈴は OFF にできません".into());
+                }
+                if on && !m.bell_on {
+                    // OFF の間の呼び出しを、ON にした途端に鳴らさない
+                    m.received.presses = bell.presses;
+                    m.buzz_until = 0;
+                }
+                m.bell_on = on;
+                done(format!(
+                    "{}の呼び鈴を{}にしました",
+                    m.id,
+                    if on { "ON" } else { "OFF" }
+                ))
             }
             C::SetMatOffline { mat, offline } => {
                 let m = self.mats.get_mut(mat).ok_or("MAT が見つかりません")?;
@@ -1694,7 +1718,7 @@ impl Store {
         ))
     }
 
-    /// 身分証の年齢で判定する。年齢に届かない年確商品は買い物から取り除き、没収の一覧に載せる
+    /// 身分証の年齢で判定する。年齢に届かない年確商品は買い物から取り除き、回収の一覧に載せる
     fn verify_age(&mut self, register: u8, age: u8) -> Result<Outcome, String> {
         let rules = &self.age_rules;
         let r = self
@@ -2047,6 +2071,7 @@ impl Store {
                     link_ok: m.rx_ok(now),
                     rings: m.rings,
                     offline: m.offline,
+                    bell_on: m.bell_on,
                 })
                 .collect(),
             mat_links: self
@@ -2162,7 +2187,7 @@ impl Store {
         let mat_down = self
             .mats
             .iter()
-            .filter(|m| !m.link_ok(self.now))
+            .filter(|m| m.bell_on && !m.link_ok(self.now))
             .map(|m| m.id.clone())
             .collect();
 
@@ -2312,7 +2337,7 @@ pub struct StaffView {
     pub required_age: Option<u8>,
     /// 店員の「年齢確認をする／しない」待ち
     pub age_choice_pending: bool,
-    /// 年確で販売できず取り除いた商品（店員が没収する）
+    /// 年確で販売できず取り除いた商品（店員が回収する）
     pub confiscated: Vec<Confiscated>,
     /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
     pub coupon_unmatched: bool,
@@ -2393,31 +2418,36 @@ pub struct RegisterView {
     pub last_receipt: Option<Receipt>,
 }
 
-/// 呼び鈴（Bell）の種類。据え付け型の呼び鈴が主で、携帯型の検品端末の呼び鈴は「あれば便利」。
+/// 呼び鈴（Bell）の種類。据え付け型の呼び鈴が主で、携帯型の検品端末と事務所のストアコンピューターの
+/// 呼び鈴は「あれば便利」（設定で OFF にできる）。
 /// スタッフが重い端末を常に持ち歩く前提は現実的でない（制服にポケットもない）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BellKind {
     /// 据え付け型の呼び鈴（1 台目）
     Fixed,
-    /// 携帯型の検品端末（2 台目以降）
+    /// 携帯型の検品端末（2 台目、4 台目以降）
     Handheld,
+    /// 事務所のストアコンピューター（3 台目）
+    StoreComputer,
 }
 
 fn bell_kind(i: u8) -> BellKind {
-    if i == 0 {
-        BellKind::Fixed
-    } else {
-        BellKind::Handheld
+    match i {
+        0 => BellKind::Fixed,
+        2 => BellKind::StoreComputer,
+        _ => BellKind::Handheld,
     }
 }
 
-/// 1 台目は据え付けの「呼び鈴」、2 台目以降は「検品端末」（2 台以上なら番号を付ける）
+/// 1 台目は据え付けの「呼び鈴」、2 台目は「検品端末」、3 台目は「ストアコンピューター」、
+/// 4 台目以降は番号付きの検品端末
 fn bell_name(i: u8) -> String {
     match i {
         0 => "呼び鈴".into(),
         1 => "検品端末".into(),
-        n => format!("検品端末{n}"),
+        2 => "ストアコンピューター".into(),
+        n => format!("検品端末{}", n - 1),
     }
 }
 
@@ -2430,6 +2460,7 @@ pub struct MatView {
     pub link_ok: bool,
     pub rings: u64,
     pub offline: bool,
+    pub bell_on: bool,
 }
 
 /// レジ側から見た MAT の通信状態（シミュレーター表示用）

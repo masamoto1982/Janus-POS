@@ -83,7 +83,7 @@ export interface StaffView {
   required_age: number | null;
   /** 店員の「年齢確認をする／しない」待ち */
   age_choice_pending: boolean;
-  /** 年確で販売できず取り除いた商品（店員が没収する） */
+  /** 年確で販売できず取り除いた商品（店員が回収する） */
   confiscated: { name: string; qty: number }[];
   /** 会計に進んだが、適用先のないクーポンが残っている（決済できない） */
   coupon_unmatched: boolean;
@@ -165,7 +165,7 @@ export interface AgeRule {
 export interface Snapshot {
   now: number;
   registers: RegisterView[];
-  mats: { id: string; kind: "fixed" | "handheld"; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean }[];
+  mats: { id: string; kind: "fixed" | "handheld" | "store_computer"; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean; bell_on: boolean }[];
   mat_links: { id: string; link_ok: boolean; acked_seq: number; sent: number; retries: number }[];
   bell: { seq: number; held: number; presses: number };
   calls: Call[];

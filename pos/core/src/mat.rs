@@ -66,6 +66,8 @@ pub struct Mat {
     pub offline: bool,
     pub buzz_until: u64,
     pub rings: u64,
+    /// 呼び鈴機能。OFF の端末は鳴らず、不通の警告も出さない（据え付けの呼び鈴は常に ON）
+    pub bell_on: bool,
 }
 
 impl Mat {
@@ -84,6 +86,7 @@ impl Mat {
             offline: false,
             buzz_until: 0,
             rings: 0,
+            bell_on: true,
         }
     }
 
@@ -100,7 +103,7 @@ impl Mat {
     /// 押されている間は鳴る。ただし受信が途絶えたら（「離した」が届かない恐れ）鳴り止む。
     /// 途絶えは不通としてレジ側に表示される
     pub fn buzzing(&self, now: u64) -> bool {
-        self.buzz_until > now || (self.received.held > 0 && self.rx_ok(now))
+        self.bell_on && (self.buzz_until > now || (self.received.held > 0 && self.rx_ok(now)))
     }
 
     pub fn tick(&mut self, now: u64, bell: Bell, loss_percent: u8, rng: &mut Rng) {

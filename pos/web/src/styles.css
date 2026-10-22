@@ -239,6 +239,12 @@ button.emoney { background: #0ea5e9; }
 .mat-id { font-weight: 600; }
 .mat-state, .mat-kind { font-size: 12px; color: var(--muted); }
 .mat.buzz { border-color: var(--call); background: var(--call-bg); }
+.mat.off { opacity: .5; }
+.mat-area .bell-open { margin-left: auto; }
+.bell-settings { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.bell-setting { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1.5px solid var(--muted); border-radius: 8px; }
+.bell-setting > span:first-child { flex: 1; font-weight: 600; }
+.bell-setting input { width: 20px; height: 20px; }
 .mat.buzz .bell { animation: ring .25s infinite alternate; }
 @keyframes ring { from { transform: rotate(-18deg); } to { transform: rotate(18deg); } }
 @media (prefers-reduced-motion: reduce) { .mat.buzz .bell { animation: none; } }
@@ -336,7 +342,9 @@ body.dragging .drop-hint { display: inline; }
 .id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
 .id-head button { min-width: 64px; }
 .id-entry input[data-birth] { width: 370px; max-width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; padding: 10px 12px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
-.confiscated { margin: 6px 0 0; padding-left: 20px; text-align: left; font-size: 14px; }
+.collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 370px; }
+.collect-list label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--muted); border-radius: 8px; font-size: 15px; cursor: pointer; text-align: left; }
+.collect-list input { width: 20px; height: 20px; cursor: pointer; }
 .id-card p { margin: 4px 0 0; font-size: 11px; }
 .id-card.refused { background: var(--danger-bg); color: var(--danger); }
 

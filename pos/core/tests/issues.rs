@@ -1219,7 +1219,7 @@ fn void_lock_and_logout_from_the_store_menu() {
 
 /// 年確：年確商品があれば、まず店員が「年齢確認をする／しない」を選ぶ。
 /// 「する」なら身分証の生年月日を入力し、年齢に届かない年確商品は買い物から取り除いて
-/// 没収する商品と個数を店員に示す（店舗判断で 18 歳以上にしたライターは買えるが酒は買えない等）。
+/// 回収する商品と個数を店員に示す（店舗判断で 18 歳以上にしたライターは買えるが酒は買えない等）。
 #[test]
 fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let mut s = Store::new(1, 2, 1);
@@ -1496,4 +1496,29 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     let v = reg(&s, 1);
     assert!(!v.staff.point_pending);
     assert_eq!(v.staff.method, None);
+}
+
+/// Bell は据え付けの呼び鈴・検品端末・ストアコンピューター。検品端末とストアコンピューターは
+/// 設定で呼び鈴機能を OFF にでき、OFF の端末は鳴らず不通の警告も出さない。据え付けは OFF にできない。
+#[test]
+fn handheld_and_store_computer_bells_can_be_turned_off() {
+    let mut s = Store::new(1, 2, 3);
+    let ids: Vec<String> = s.snapshot().mats.iter().map(|m| m.id.clone()).collect();
+    assert_eq!(ids, ["呼び鈴", "検品端末", "ストアコンピューター"]);
+    assert!(run(&mut s, json!({"type":"set_bell_on","mat":0,"on":false})).is_err());
+    ok(&mut s, json!({"type":"set_bell_on","mat":1,"on":false}));
+    ok(&mut s, json!({"type":"set_bell_on","mat":2,"on":false}));
+    ok(&mut s, json!({"type":"call_staff","register":1}));
+    advance(&mut s, 1_000);
+    let snap = s.snapshot();
+    assert!(snap.mats[0].buzzing);
+    assert!(!snap.mats[1].buzzing && !snap.mats[2].buzzing);
+    assert!(!snap.mats[1].bell_on);
+    // OFF の端末は不通として警告しない
+    advance(&mut s, 8_000);
+    assert!(reg(&s, 1).staff.mat_down.is_empty());
+    // ON に戻すと、押されている間は鳴る
+    ok(&mut s, json!({"type":"set_bell_on","mat":2,"on":true}));
+    advance(&mut s, 1_000);
+    assert!(s.snapshot().mats[2].buzzing);
 }

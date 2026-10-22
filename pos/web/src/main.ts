@@ -21,7 +21,9 @@ import {
   screenHead,
   isoDate,
   scanGuide,
+  collected,
   matPanel,
+  bellSettings,
   ownerPanel,
   shelfPanel,
   walletPanel,
@@ -53,8 +55,8 @@ function bytesFromB64(b64: string): Uint8Array {
 async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
-  // 呼び鈴は据え付け型 1 台と、携帯型の検品端末 1 台
-  reset(2, 2);
+  // 呼び鈴は据え付け型 1 台、携帯型の検品端末 1 台、事務所のストアコンピューター 1 台
+  reset(2, 3);
   setupDrag();
   window.setInterval(frame, 100);
 }
@@ -127,6 +129,7 @@ function buildSkeleton(): void {
         <section class="mat-area" aria-label="Bell（呼び鈴）">
           <h2>Bell</h2>
           <div class="mats" data-region="mats"></div>
+          <button type="button" class="icon-btn bell-open" data-open-bell aria-haspopup="dialog" aria-label="Bell の設定" title="Bell の設定">⚙</button>
           <div class="toast" id="toast-store"></div>
         </section>
         ${regs}
@@ -154,6 +157,11 @@ function buildSkeleton(): void {
       </div>
       <div class="toast" id="toast-rules"></div>
       <div data-region="owner"></div>
+    </dialog>
+    <dialog class="rules-dlg bell-dlg" id="bell-dlg" aria-labelledby="bell-title">
+      <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
+      <p class="muted">検品端末とストアコンピューターは、呼び鈴機能を OFF にできます。OFF の端末は鳴らず、不通の警告も出しません。据え付けの呼び鈴は常に ON です。</p>
+      <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
     <div class="drag-ghost" id="ghost" hidden></div>`;
 }
@@ -284,6 +292,7 @@ function render(): void {
     }
   }
   setRegion("mats", matPanel(snap));
+  setRegion("bell-settings", bellSettings(snap));
   setRegion("owner", ownerPanel(snap));
   setRegion("shelf", shelfPanel(snap));
   setRegion("wallet", walletPanel());
@@ -439,6 +448,22 @@ app.addEventListener("change", (e) => {
     if (!send({ type: "check_ff", register: reg, side, line_id: line, checked: box.checked })) box.checked = !box.checked;
     return;
   }
+  if (sel.dataset.bellOn) {
+    const box = sel as unknown as HTMLInputElement;
+    if (!send({ type: "set_bell_on", mat: Number(box.dataset.bellOn), on: box.checked })) box.checked = !box.checked;
+    return;
+  }
+  if (sel.dataset.collect) {
+    // 回収リストのチェック。画面の中だけで持ち、全部入ると「回収しました」が押せる
+    const box = sel as unknown as HTMLInputElement;
+    const [reg, i] = box.dataset.collect!.split(":").map(Number);
+    const set = collected.get(reg) ?? new Set<number>();
+    if (box.checked) set.add(i);
+    else set.delete(i);
+    collected.set(reg, set);
+    frame();
+    return;
+  }
   if (sel.dataset.age) {
     const owner = (k: string) => app.querySelector<HTMLInputElement>(`[data-owner="${k}"]`)?.value.trim() ?? "";
     const ok = send({
@@ -470,6 +495,8 @@ app.addEventListener("click", (e) => {
   if (!b || b.disabled) return;
   if (b.hasAttribute("data-open-rules")) return rulesDlg().showModal();
   if (b.hasAttribute("data-close-rules")) return rulesDlg().close();
+  if (b.hasAttribute("data-open-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).showModal();
+  if (b.hasAttribute("data-close-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).close();
   if (b.dataset.fftab) {
     const [reg, tab] = b.dataset.fftab.split(":");
     ffTabs.set(Number(reg), { tab, page: 0 });

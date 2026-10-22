@@ -423,9 +423,11 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks();
-  // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ
+  // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length)
-    return `${notice}<div class="welcome"><div class="big">いらっしゃいませ</div><p>ご用件をお申し付けください</p></div>`;
+    return side === "staff"
+      ? `${notice}<div class="welcome"><div class="big">お辞儀とご挨拶をしましょう</div><p>ご用件をお伺いしてください</p></div>`
+      : `${notice}<div class="welcome"><div class="big">いらっしゃいませ</div><p>ご用件をお申し付けください</p></div>`;
   // お客様側に出すボタンは、お客様本人が押すもの（お支払い内容の確認・投入おわり）だけ。
   // ほかの操作（会計・変更・ポイントカード・支払方法など）は店員側の画面で行う
   const ro = side === "customer";

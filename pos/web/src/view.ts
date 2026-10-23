@@ -551,7 +551,7 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  // ポイントカードの読み取り状況は点数・合計とは行を分けて控えめに出す（ほかの場所には出さない）
+  // ポイントカードの読み取り状況は点数・合計の上の段に控えめに出す（ほかの場所には出さない）
   const point =
     pointCard === undefined
       ? ""

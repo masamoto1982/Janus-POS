@@ -470,6 +470,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
           ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
           : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
     r.max_items,
+    !!v.point_card,
   );
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞回収・クーポン＞ポイントカード＞決済手段
@@ -490,7 +491,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
-      <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}　${v.point_card ? "ポイントカード 読み取り済" : "ポイントカードなし"}</span>
+      <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}</span>
     </div>
     <table class="lines"><thead><tr><th>品名</th><th>数</th><th>金額</th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
@@ -547,10 +548,15 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
   return btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary");
 }
 
-export function regTop(total: number, count: number, action: string, max = Infinity): string {
+export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  return `<div class="reg-top"><span class="count"><b>${count}</b> 点${full}</span><span>合計 <b class="total">${yen(total)}</b></span>${action}</div>`;
+  // ポイントカードの読み取り状況もこの帯に出す（ほかの場所には出さない）
+  const point =
+    pointCard === undefined
+      ? ""
+      : `<small class="point ${pointCard ? "read" : ""}">${pointCard ? "ポイント 読取済" : "ポイント 未読取"}</small>`;
+  return `<div class="reg-top"><span class="count"><b>${count}</b> 点${full}</span>${point}<span>合計 <b class="total">${yen(total)}</b></span>${action}</div>`;
 }
 
 /** 買い物点数（数量の合計） */
@@ -755,6 +761,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
         ? finishInsert(reg, c.inserted, c.due, a("insert_cash"))
         : btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost"),
     r.max_items,
+    !!c.point_card,
   );
 
   if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side)}`;
@@ -774,8 +781,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
         ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center")}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}
       </div>`);
   return `${top}${notice}
-    <table class="lines"><tbody>${rows}</tbody></table>
-    ${c.point_card ? `<div class="totals"><span class="muted">ポイントカード 読み取り済</span></div>` : ""}`;
+    <table class="lines"><tbody>${rows}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------------

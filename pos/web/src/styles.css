@@ -179,6 +179,7 @@ input, select {
 .call-screen p { margin: 0; font-size: 16px; }
 .banner.info { background: var(--line); }
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
+.banner.warn { background: var(--warn-bg); color: var(--warn); }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; align-items: center; }
 /* 確認画面は上下左右とも中央に（登録画面の領域を置き換えて、残りの高さいっぱいに広げる） */

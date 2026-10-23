@@ -255,6 +255,7 @@ const CALL_SHORT: Record<string, string> = {
   service: "サービス",
   customer_help: "呼び出し",
   age_check: "年確",
+  change_left: "釣銭忘れ",
 };
 
 /**
@@ -268,9 +269,14 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   const ageOnScreen = r.mode === "attended" && (v.age_choice_pending || v.id_pending);
   const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
   if (side === "customer") {
-    return r.customer.staff_called && (!ageOnScreen || calls.length)
-      ? `<div class="banner call">${r.mode === "attended" ? "店員が向かっています" : "係員を呼び出しています。しばらくお待ちください。"}</div>`
-      : "";
+    // 排出口に釣り銭が残ったまま 1 分たったら知らせる（2 分で店員を呼ぶ）
+    const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
+    return (
+      change +
+      (r.customer.staff_called && (!ageOnScreen || calls.length)
+        ? `<div class="banner call">${r.mode === "attended" ? "店員が向かっています" : "係員を呼び出しています。しばらくお待ちください。"}</div>`
+        : "")
+    );
   }
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`

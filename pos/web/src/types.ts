@@ -145,6 +145,7 @@ export interface RegisterView {
   mode: Mode;
   mode_label: string;
   idle_revert_in: number | null;
+  change_left: boolean;
   outlet: number;
   outlet_detail: [number, number][];
   menu: { screen: MenuScreen; exchange_to: number } | null;

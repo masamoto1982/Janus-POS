@@ -557,7 +557,7 @@ export function regTop(total: number, count: number, action: string, max = Infin
       ? ""
       : `<small class="point ${pointCard ? "read" : ""}">ポイントカード ${pointCard ? "読取済" : "未読取"}</small>`;
   // 点数と合計は会計ボタンの有無に関係なく同じ位置に出す（ボタンは右端の専用欄）
-  return `<div class="reg-top"><span class="count"><b>${count}</b> 点${full}</span><span class="sum">合計 <b class="total">${yen(total)}</b></span>${point}<span class="action">${action}</span></div>`;
+  return `<div class="reg-top"><span class="count">お買い上げ点数：<b>${count}</b>点${full}</span><span class="sum">お買い上げ合計額：<b class="total">${yen(total)}</b></span>${point}<span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

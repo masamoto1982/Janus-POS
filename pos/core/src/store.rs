@@ -651,6 +651,8 @@ struct Register {
     last_op: u64,
     /// 排出口（売り場側）にたまっているお金。取り出すまで残る
     outlet: Cash,
+    /// 排出口にお金が残り始めた時刻。残っている間は、無操作でセミセルフに戻るカウントダウンを止める
+    outlet_since: Option<u64>,
     /// お客様画面に開いている店舗メニュー
     menu: Option<Menu>,
     /// いま触れている側と、その一瞬が終わる時刻（その間だけもう一方は操作できない）
@@ -676,8 +678,30 @@ impl Register {
     }
 
     /// 取引も呼び出しもなく、待機に戻してよい状態か
+    /// 釣り銭の取り忘れ：お客様画面に案内するまでと、店員を呼ぶまで（ミリ秒）
+    fn change_timers(&self) -> (u64, u64) {
+        if self.mode == Mode::Attended {
+            (ATTENDED_CHANGE_REMIND_MS, ATTENDED_CHANGE_CALL_MS)
+        } else {
+            (CHANGE_REMIND_MS, CHANGE_CALL_MS)
+        }
+    }
+
     fn idle(&self) -> bool {
         self.txn.lines.is_empty() && !self.txn.paying
+    }
+
+    /// 排出口のお金が取り出されたら、止めていた無操作のカウントダウンを続きから再開する
+    fn resume_idle_countdown(&mut self, now: u64) {
+        if let Some(since) = self.outlet_since.take() {
+            self.last_op = (self.last_op + now.saturating_sub(since)).min(now);
+        }
+    }
+
+    /// 無操作でセミセルフに戻るまでの残り（排出口にお金が残っている間は止まって見える）
+    fn idle_revert_in(&self, now: u64) -> u64 {
+        let counted_until = self.outlet_since.unwrap_or(now).max(self.last_op);
+        IDLE_REVERT_MS.saturating_sub(counted_until - self.last_op)
     }
 
     fn staff_state(&self) -> StaffState {
@@ -850,6 +874,13 @@ fn staff_side() -> Side {
 pub const THANKS_MS: u64 = 3000;
 
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
+/// 排出口に釣り銭が残ったまま、お客様画面に「釣り銭が残っています」を出すまで（セミセルフ）
+pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
+/// 排出口に釣り銭が残ったまま、店員を呼ぶ（釣銭忘れ）まで（セミセルフ）
+pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
+/// 有人モードは店員がその場にいるので、早めに知らせる
+pub const ATTENDED_CHANGE_REMIND_MS: u64 = 30 * 1000;
+pub const ATTENDED_CHANGE_CALL_MS: u64 = 60 * 1000;
 /// 放置された呼び出しほど大きく鳴らす。最初は RING_MIN、RING_FULL_MS 放置で最大
 pub const RING_MIN: f32 = 0.25;
 pub const RING_FULL_MS: u64 = 60 * 1000;
@@ -878,6 +909,7 @@ impl Store {
                     last_receipt: None,
                     last_op: 0,
                     outlet: Cash::default(),
+                    outlet_since: None,
                     menu: None,
                     touch: None,
                     pressing: false,
@@ -917,9 +949,11 @@ impl Store {
             if r.touch.is_some_and(|(_, until)| until <= now) {
                 r.touch = None;
             }
-            if r.last_receipt
-                .as_ref()
-                .is_some_and(|rc| rc.at + THANKS_MS <= now)
+            // お礼の画面は、排出口の釣り銭が取り出されるまで初期画面に戻さない
+            if r.outlet.total() == 0
+                && r.last_receipt
+                    .as_ref()
+                    .is_some_and(|rc| rc.at + THANKS_MS <= now)
             {
                 r.last_receipt = None;
             }
@@ -944,11 +978,29 @@ impl Store {
         for m in self.mats.iter_mut().filter(|m| m.bell_on) {
             m.tick(now, self.bell, self.mat_loss, &mut self.rng);
         }
-        // 無操作が 5 分続いたら、名札のログインを外してセミセルフに戻る
+        // 排出口の釣り銭：残ったまま 2 分（有人モードは 1 分）で店員を呼ぶ（釣銭忘れ）。取り出せばカウントダウンを再開する
+        for r in &mut self.registers {
+            if r.outlet.total() > 0 {
+                let since = *r.outlet_since.get_or_insert(now);
+                if now.saturating_sub(since) >= r.change_timers().1 {
+                    self.calls.raise(
+                        r.id,
+                        CallKind::ChangeLeft,
+                        now,
+                        "排出口に釣り銭が残っています",
+                    );
+                }
+            } else {
+                r.resume_idle_countdown(now);
+                self.calls.resolve(r.id, CallKind::ChangeLeft, now);
+            }
+        }
+        // 無操作が 5 分続いたら、名札のログインを外してセミセルフに戻る（排出口にお金が残っている間は数えない）
         for r in &mut self.registers {
             let open = self.calls.open.iter().any(|c| c.register == r.id);
             if r.mode != Mode::SemiSelf
                 && r.idle()
+                && r.outlet_since.is_none()
                 && !open
                 && now.saturating_sub(r.last_op) >= IDLE_REVERT_MS
             {
@@ -1393,12 +1445,15 @@ impl Store {
             }
             C::Insert { register, amount } => self.insert(register, amount),
             C::TakeOutlet { register } => {
+                let now = self.now;
                 let r = self.reg_mut(register)?;
                 let total = r.outlet.total();
                 if total == 0 {
                     return Err("出金ボックスにお金はありません".into());
                 }
                 r.outlet = Cash::default();
+                r.resume_idle_countdown(now);
+                self.calls.resolve(register, CallKind::ChangeLeft, now);
                 done(format!("{total}円を取り出しました"))
             }
             C::Claim { register, side } => self.claim(register, side),
@@ -2236,7 +2291,10 @@ impl Store {
             outlet_detail: r.outlet.0.clone(),
             menu: r.menu,
             idle_revert_in: (r.mode != Mode::SemiSelf && r.idle())
-                .then(|| IDLE_REVERT_MS.saturating_sub(self.now.saturating_sub(r.last_op))),
+                .then(|| r.idle_revert_in(self.now)),
+            change_left: r
+                .outlet_since
+                .is_some_and(|t| self.now.saturating_sub(t) >= r.change_timers().0),
             staff: StaffView {
                 state: c.staff,
                 name: staff.map(|a| a.name),
@@ -2424,6 +2482,8 @@ pub struct RegisterView {
     pub menu: Option<Menu>,
     /// セミセルフ以外で待機中なら、セミセルフに戻るまでの残り時間（ミリ秒）
     pub idle_revert_in: Option<u64>,
+    /// 排出口に釣り銭が残ったまま 1 分（有人モードは 30 秒）たった（お客様画面に「釣り銭が残っています」）
+    pub change_left: bool,
     pub staff: StaffView,
     pub customer: CustomerView,
     pub last_receipt: Option<Receipt>,

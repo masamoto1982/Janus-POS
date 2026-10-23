@@ -20,7 +20,7 @@ describe("view helpers", () => {
     expect(sideOf({ type: "set_mat_loss", percent: 30 })).toBe("store");
   });
 
-  it("lays out the top bar as item count, total, checkout from the left", () => {
+  it("lays out the top bar as item count, then total, then checkout", () => {
     const html = regTop(1280, 3, `<button>会計</button>`);
     const at = (t: string) => html.indexOf(t);
     expect(at("お買い上げ点数：<b>3</b>点")).toBeGreaterThan(-1);

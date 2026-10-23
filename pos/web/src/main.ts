@@ -12,7 +12,7 @@ import type { Command, Snapshot } from "./types";
 import type { GuideKind } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 // 仮のロゴマーク（正式なロゴは後日差し替え）
-import logoUrl from "./logo-placeholder.svg";
+import logoUrl from "./logo.jpg";
 import {
   esc,
   FF_TABS,

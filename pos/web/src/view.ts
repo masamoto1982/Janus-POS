@@ -478,7 +478,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);
   if (card) return screen(card);
-  if (pointPending) return screen(side === "staff" ? staffPointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
+  if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
   return `${top}${notice}
@@ -492,10 +492,10 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 }
 
 /**
- * 有人モード：会計ボタンの後のポイントカードの最終確認（店員側）。読み取りを促し、なければ「スキップ」。
- * 会計前に読み取り済みなら出ない
+ * 会計ボタンの後のポイントカードの最終確認。有人モードの店員側と、セルフ・セミセルフのお客様側で同じ形。
+ * 読み取りを促し、なければ「スキップ」。会計前に読み取り済みなら出ない
  */
-function staffPointCheck(reg: number, side: Side, st: ActionState): string {
+function pointCheck(reg: number, side: Side, st: ActionState): string {
   // 年確と同じ形。「付与する」を押すと読み取りの案内を出す（押さずにスキャンしても読める）
   const reading = scanGuide.get(`${reg}:${side}`) === "point";
   return `<div class="point-screen">
@@ -519,19 +519,6 @@ function customerPointAsk(): string {
   return `<div class="point-screen">
       <div class="big">ポイントをお付けします</div>
       <div class="point-services">${POINT_SERVICES.map(([icon, name]) => `<span class="point-service"><span class="icon">${icon}</span>${name}</span>`).join("")}</div>
-    </div>`;
-}
-
-/** セルフ：会計ボタンの後のポイントカードの最終確認。登録画面を置き換えて二択を出す */
-function customerPointCheck(reg: number, side: Side, st: ActionState): string {
-  const reading = scanGuide.get(`${reg}:${side}`) === "point";
-  return `<div class="point-screen">
-      <div class="big">ポイントカードはお持ちですか？</div>
-      <div class="point-choices">
-        <button type="button" class="primary ${reading ? "on" : ""}" data-guide="${reg}:${side}:point">ポイントカードを読み取る</button>
-        ${btn("ポイントカード無しで進める", { type: "confirm_point_card", register: reg, side }, st)}
-      </div>
-      ${reading ? `<p class="guide">ポイントカードまたはポイントアプリのバーコードをスキャンしてください</p>` : ""}
     </div>`;
 }
 
@@ -774,7 +761,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     returnedCard(reg, side, c.returned, true),
   ]);
   if (card) return screen(card);
-  if (c.phase === "paying" && c.point_pending) return screen(customerPointCheck(reg, side, a("confirm_point_card")));
+  if (c.phase === "paying" && c.point_pending) return screen(pointCheck(reg, side, a("confirm_point_card")));
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
     return screen(`<div class="paybox center">

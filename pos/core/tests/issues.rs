@@ -670,14 +670,16 @@ fn inlet_pays_and_change_waits_in_outlet() {
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.outlet, 1100 - 160);
-    // 「ありがとうございました」は 3 秒で消え、新しいお客様の待ち受けに戻る
+    // 「ありがとうございました」は 3 秒で消え、新しいお客様の待ち受けに戻る。
+    // ただし排出口に釣り銭が残っている間は、取り出されるまで戻らない
     assert!(v.last_receipt.is_some());
-    s.tick(v.last_receipt.as_ref().unwrap().at + 2999);
+    let at = v.last_receipt.as_ref().unwrap().at;
+    s.tick(at + 3000);
     assert!(reg(&s, 1).last_receipt.is_some());
-    s.tick(v.last_receipt.as_ref().unwrap().at + 3000);
-    assert!(reg(&s, 1).last_receipt.is_none());
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).outlet, 0);
+    s.tick(at + 3001);
+    assert!(reg(&s, 1).last_receipt.is_none());
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
 }
 
@@ -1575,9 +1577,18 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     let v = reg(&s, 1);
     assert_eq!(v.staff.calls.len(), 1, "attended, 1 minute: call staff");
     assert_eq!(v.staff.calls[0].label, "釣銭忘れ");
+    assert!(
+        reg(&s, 1).last_receipt.is_some(),
+        "stays on the thank-you screen while change is left"
+    );
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     let v = reg(&s, 1);
     assert!(!v.change_left && v.staff.calls.is_empty());
+    advance(&mut s, 100);
+    assert!(
+        reg(&s, 1).last_receipt.is_none(),
+        "back to the initial screen"
+    );
     advance(&mut s, 10_000);
     assert!(
         reg(&s, 1).idle_revert_in.unwrap() < frozen,
@@ -1605,4 +1616,5 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     assert!(reg(&s, 1).staff.calls.is_empty());
     advance(&mut s, 60_000);
     assert_eq!(reg(&s, 1).staff.calls[0].label, "釣銭忘れ");
+    assert!(reg(&s, 1).last_receipt.is_some());
 }

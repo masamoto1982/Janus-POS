@@ -949,9 +949,11 @@ impl Store {
             if r.touch.is_some_and(|(_, until)| until <= now) {
                 r.touch = None;
             }
-            if r.last_receipt
-                .as_ref()
-                .is_some_and(|rc| rc.at + THANKS_MS <= now)
+            // お礼の画面は、排出口の釣り銭が取り出されるまで初期画面に戻さない
+            if r.outlet.total() == 0
+                && r.last_receipt
+                    .as_ref()
+                    .is_some_and(|rc| rc.at + THANKS_MS <= now)
             {
                 r.last_receipt = None;
             }

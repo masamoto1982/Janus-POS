@@ -678,6 +678,15 @@ impl Register {
     }
 
     /// 取引も呼び出しもなく、待機に戻してよい状態か
+    /// 釣り銭の取り忘れ：お客様画面に案内するまでと、店員を呼ぶまで（ミリ秒）
+    fn change_timers(&self) -> (u64, u64) {
+        if self.mode == Mode::Attended {
+            (ATTENDED_CHANGE_REMIND_MS, ATTENDED_CHANGE_CALL_MS)
+        } else {
+            (CHANGE_REMIND_MS, CHANGE_CALL_MS)
+        }
+    }
+
     fn idle(&self) -> bool {
         self.txn.lines.is_empty() && !self.txn.paying
     }
@@ -865,10 +874,13 @@ fn staff_side() -> Side {
 pub const THANKS_MS: u64 = 3000;
 
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
-/// 排出口に釣り銭が残ったまま、お客様画面に「釣り銭が残っています」を出すまで
+/// 排出口に釣り銭が残ったまま、お客様画面に「釣り銭が残っています」を出すまで（セミセルフ）
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
-/// 排出口に釣り銭が残ったまま、店員を呼ぶ（釣銭忘れ）まで
+/// 排出口に釣り銭が残ったまま、店員を呼ぶ（釣銭忘れ）まで（セミセルフ）
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
+/// 有人モードは店員がその場にいるので、早めに知らせる
+pub const ATTENDED_CHANGE_REMIND_MS: u64 = 30 * 1000;
+pub const ATTENDED_CHANGE_CALL_MS: u64 = 60 * 1000;
 /// 放置された呼び出しほど大きく鳴らす。最初は RING_MIN、RING_FULL_MS 放置で最大
 pub const RING_MIN: f32 = 0.25;
 pub const RING_FULL_MS: u64 = 60 * 1000;
@@ -964,11 +976,11 @@ impl Store {
         for m in self.mats.iter_mut().filter(|m| m.bell_on) {
             m.tick(now, self.bell, self.mat_loss, &mut self.rng);
         }
-        // 排出口の釣り銭：残ったまま 2 分で店員を呼ぶ（釣銭忘れ）。取り出せばカウントダウンを再開する
+        // 排出口の釣り銭：残ったまま 2 分（有人モードは 1 分）で店員を呼ぶ（釣銭忘れ）。取り出せばカウントダウンを再開する
         for r in &mut self.registers {
             if r.outlet.total() > 0 {
                 let since = *r.outlet_since.get_or_insert(now);
-                if now.saturating_sub(since) >= CHANGE_CALL_MS {
+                if now.saturating_sub(since) >= r.change_timers().1 {
                     self.calls.raise(
                         r.id,
                         CallKind::ChangeLeft,
@@ -2280,7 +2292,7 @@ impl Store {
                 .then(|| r.idle_revert_in(self.now)),
             change_left: r
                 .outlet_since
-                .is_some_and(|t| self.now.saturating_sub(t) >= CHANGE_REMIND_MS),
+                .is_some_and(|t| self.now.saturating_sub(t) >= r.change_timers().0),
             staff: StaffView {
                 state: c.staff,
                 name: staff.map(|a| a.name),
@@ -2468,7 +2480,7 @@ pub struct RegisterView {
     pub menu: Option<Menu>,
     /// セミセルフ以外で待機中なら、セミセルフに戻るまでの残り時間（ミリ秒）
     pub idle_revert_in: Option<u64>,
-    /// 排出口に釣り銭が残ったまま 1 分たった（お客様画面に「釣り銭が残っています」）
+    /// 排出口に釣り銭が残ったまま 1 分（有人モードは 30 秒）たった（お客様画面に「釣り銭が残っています」）
     pub change_left: bool,
     pub staff: StaffView,
     pub customer: CustomerView,

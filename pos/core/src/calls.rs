@@ -18,7 +18,7 @@ pub enum CallKind {
     Service,
     Tobacco,
     CustomerHelp,
-    /// 排出口に釣り銭が残ったまま 2 分たった（釣銭忘れ）
+    /// 排出口に釣り銭が残ったまま 2 分（有人モードは 1 分）たった（釣銭忘れ）
     ChangeLeft,
 }
 

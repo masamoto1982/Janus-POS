@@ -1543,7 +1543,8 @@ fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
     assert!(!reg(&s, 2).tobacco_asked);
 }
 
-/// 釣り銭を取り忘れたまま 1 分でお客様画面に案内、2 分で店員呼び出し（釣銭忘れ）。
+/// 釣り銭を取り忘れたまま一定時間でお客様画面に案内、さらにたつと店員呼び出し（釣銭忘れ）。
+/// 有人モードは 30 秒・1 分、セミセルフは 1 分・2 分。
 /// 残っている間は無操作でセミセルフに戻るカウントダウンを止め、取り出すと続きから再開する。
 #[test]
 fn change_left_in_the_outlet_reminds_then_calls_staff() {
@@ -1564,14 +1565,15 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     assert!(reg(&s, 1).outlet > 0);
     advance(&mut s, 10_000);
     let frozen = reg(&s, 1).idle_revert_in.unwrap();
-    advance(&mut s, 51_000);
+    assert!(!reg(&s, 1).change_left);
+    advance(&mut s, 21_000);
     let v = reg(&s, 1);
-    assert!(v.change_left, "1 minute: remind the customer");
+    assert!(v.change_left, "attended, 30 seconds: remind the customer");
     assert!(v.staff.calls.is_empty());
     assert_eq!(v.idle_revert_in, Some(frozen), "countdown is paused");
-    advance(&mut s, 60_000);
+    advance(&mut s, 30_000);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.calls.len(), 1);
+    assert_eq!(v.staff.calls.len(), 1, "attended, 1 minute: call staff");
     assert_eq!(v.staff.calls[0].label, "釣銭忘れ");
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     let v = reg(&s, 1);
@@ -1581,4 +1583,26 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
         reg(&s, 1).idle_revert_in.unwrap() < frozen,
         "countdown resumes"
     );
+
+    // セミセルフ：1 分で案内、2 分で呼び出し
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    advance(&mut s, 40_000);
+    assert!(!reg(&s, 1).change_left);
+    advance(&mut s, 21_000);
+    assert!(reg(&s, 1).change_left);
+    assert!(reg(&s, 1).staff.calls.is_empty());
+    advance(&mut s, 60_000);
+    assert_eq!(reg(&s, 1).staff.calls[0].label, "釣銭忘れ");
 }

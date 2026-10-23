@@ -608,12 +608,12 @@ impl Txn {
     }
 
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind) {
-        // 同じ商品はまとめる（FF は状態が同じお渡し前どうしだけ）。表示エリアの節約に欠かせない。
-        // まとめた行も動きがあったので一番上に出す（買い物が多いとき、最初の行の数量が
-        // 表示エリアの外で増えて誰にも見えない、ということが起きないように）
+        // 同じ商品を続けて読んだときだけ、一番上（直前に登録した）の行に足す。
+        // 間に別の商品をはさんだら、前に登録した行にはまとめず新しい行にする
+        // （個数を変える人が、ずっと前に登録した分まで覚えていなくて済むように）
         self.next_line += 1;
         let touched = self.next_line;
-        if let Some(l) = self.lines.iter_mut().find(|l| {
+        if let Some(l) = self.lines.iter_mut().max_by_key(|l| l.touched).filter(|l| {
             l.code == p.code && l.kind == kind && !matches!(kind, LineKind::Service { .. })
         }) {
             l.qty += qty;

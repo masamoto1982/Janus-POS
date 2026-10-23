@@ -425,7 +425,7 @@ body.dragging .drop-hint { display: inline; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; opacity: .9; }
 .call-btn.ff { background: var(--ff); }
-.call-btn.svc { background: #0f766e; }
+.call-btn.service { background: #0f766e; }
 .call-btn.tob { background: #6d28d9; }
 
 /* 適用先のないクーポンの注意と、取り消したクーポンの返却 */

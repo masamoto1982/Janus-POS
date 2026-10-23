@@ -1,49 +1,46 @@
-/* 色覚の多様性に配慮した Paul Tol 氏の Muted パレット（2026-10-23 採用）。
-   色はこの10色（と白・黒・背景との混色）だけを使い、意味ごとの変数に割り当てる。
-   文字は背景とのコントラストが取れる組み合わせだけにする（淡い色の上は濃い文字）。 */
+/* カラーユニバーサルデザイン（CUD）推奨の7色（2026-10-23 採用）。
+   色はこの7色（と白・黒・背景との混色）だけを使い、意味ごとの変数に割り当てる。
+   文字は背景とのコントラスト比 4.5:1 以上の組み合わせだけにする（明るい色の上は黒文字）。 */
 :root {
-  --tol-indigo: #332288;
-  --tol-cyan: #88ccee;
-  --tol-teal: #44aa99;
-  --tol-green: #117733;
-  --tol-olive: #999933;
-  --tol-sand: #ddcc77;
-  --tol-rose: #cc6677;
-  --tol-wine: #882255;
-  --tol-purple: #aa4499;
-  --tol-pale: #dddddd;
+  --cud-red: #ff4b00;
+  --cud-blue: #005aff;
+  --cud-green: #03af7a;
+  --cud-cyan: #4dc4ff;
+  --cud-orange: #f6aa00;
+  --cud-yellow: #fff100;
+  --cud-black: #000000;
 
   --bg: #f4f5f7;
   --panel: #ffffff;
   --ink: #1d2330;
   --muted: #6b7280;
   --line: #e2e5ea;
-  --accent: var(--tol-indigo);
+  --accent: var(--cud-blue);
   --accent-ink: #ffffff;
-  --accent-soft: color-mix(in srgb, var(--tol-indigo) 8%, transparent);
-  --reg-top-bg: var(--tol-cyan); /* パステル寄りの青。濃い文字で読む */
-  --reg-top-ink: #1d2330;
+  --accent-soft: color-mix(in srgb, var(--cud-blue) 8%, transparent);
+  --reg-top-bg: var(--cud-cyan); /* 明るい青。黒文字で読む */
+  --reg-top-ink: #000000;
   --staff-bg: #1f2937;
   --staff-ink: #f3f4f6;
   --staff-line: #374151;
   --cust-bg: #fffdf7;
-  --warn: color-mix(in srgb, var(--tol-olive) 60%, black);
-  --warn-bg: color-mix(in srgb, var(--tol-sand) 40%, white);
-  --danger: var(--tol-wine);
-  --danger-bg: color-mix(in srgb, var(--tol-rose) 20%, white);
-  --ok: var(--tol-green);
-  --call: color-mix(in srgb, var(--tol-purple) 80%, black);
-  --call-bg: color-mix(in srgb, var(--tol-purple) 14%, white);
-  --ff: var(--tol-rose);
-  --ff-ink: #000000; /* ローズの上で読める濃さ */
-  --service: var(--tol-teal);
-  --service-ink: #1d2330;
-  --tob: var(--tol-purple);
+  --warn: color-mix(in srgb, var(--cud-orange) 55%, black);
+  --warn-bg: color-mix(in srgb, var(--cud-orange) 22%, white);
+  --danger: color-mix(in srgb, var(--cud-red) 75%, black);
+  --danger-bg: color-mix(in srgb, var(--cud-red) 14%, white);
+  --ok: color-mix(in srgb, var(--cud-green) 70%, black);
+  --call: color-mix(in srgb, var(--cud-blue) 85%, black);
+  --call-bg: color-mix(in srgb, var(--cud-blue) 12%, white);
+  --ff: var(--cud-orange);
+  --ff-ink: #000000;
+  --service: var(--cud-green);
+  --service-ink: #000000;
+  --tob: var(--cud-blue);
   --tob-ink: #ffffff;
-  --flash: color-mix(in srgb, var(--tol-sand) 60%, transparent);
-  --bill-bg: color-mix(in srgb, var(--tol-green) 10%, white); --bill-line: color-mix(in srgb, var(--tol-green) 35%, white);
-  --coin-bg: color-mix(in srgb, var(--tol-sand) 25%, white); --coin-line: var(--tol-sand);
-  --pay-bg: color-mix(in srgb, var(--tol-cyan) 20%, white); --pay-line: var(--tol-cyan);
+  --flash: color-mix(in srgb, var(--cud-yellow) 70%, transparent);
+  --bill-bg: color-mix(in srgb, var(--cud-green) 12%, white); --bill-line: color-mix(in srgb, var(--cud-green) 45%, white);
+  --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, white); --coin-line: var(--cud-orange);
+  --pay-bg: color-mix(in srgb, var(--cud-cyan) 18%, white); --pay-line: var(--cud-cyan);
   color-scheme: light;
 }
 
@@ -54,25 +51,22 @@
     --ink: #e5e7eb;
     --muted: #9ca3af;
     --line: #2a2f38;
-    --bill-bg: color-mix(in srgb, var(--tol-green) 22%, #181b21); --bill-line: var(--tol-green);
-    --coin-bg: color-mix(in srgb, var(--tol-sand) 15%, #181b21); --coin-line: color-mix(in srgb, var(--tol-sand) 50%, #181b21);
-    --pay-bg: color-mix(in srgb, var(--tol-cyan) 15%, #181b21); --pay-line: color-mix(in srgb, var(--tol-cyan) 50%, #181b21);
-    --accent: var(--tol-cyan);
-    --accent-ink: #1d2330;
-    --accent-soft: color-mix(in srgb, var(--tol-cyan) 12%, transparent);
-    --reg-top-ink: #1d2330;
-    --ff-ink: #000000;
-    --service-ink: #1d2330;
+    --bill-bg: color-mix(in srgb, var(--cud-green) 20%, #181b21); --bill-line: var(--cud-green);
+    --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, #181b21); --coin-line: color-mix(in srgb, var(--cud-orange) 60%, #181b21);
+    --pay-bg: color-mix(in srgb, var(--cud-cyan) 15%, #181b21); --pay-line: color-mix(in srgb, var(--cud-cyan) 55%, #181b21);
+    --accent: var(--cud-cyan);
+    --accent-ink: #000000;
+    --accent-soft: color-mix(in srgb, var(--cud-cyan) 12%, transparent);
     --staff-bg: #111827;
     --staff-line: #2a3342;
     --cust-bg: #1d1b16;
-    --warn: var(--tol-sand);
-    --warn-bg: color-mix(in srgb, var(--tol-olive) 25%, #181b21);
-    --danger: color-mix(in srgb, var(--tol-rose) 80%, white);
-    --danger-bg: color-mix(in srgb, var(--tol-wine) 35%, #181b21);
-    --ok: var(--tol-teal);
-    --call: color-mix(in srgb, var(--tol-purple) 60%, white);
-    --call-bg: color-mix(in srgb, var(--tol-purple) 25%, #181b21);
+    --warn: var(--cud-orange);
+    --warn-bg: color-mix(in srgb, var(--cud-orange) 20%, #181b21);
+    --danger: color-mix(in srgb, var(--cud-red) 70%, white);
+    --danger-bg: color-mix(in srgb, var(--cud-red) 25%, #181b21);
+    --ok: var(--cud-green);
+    --call: var(--cud-cyan);
+    --call-bg: color-mix(in srgb, var(--cud-blue) 30%, #181b21);
     color-scheme: dark;
   }
 }
@@ -82,25 +76,22 @@
   --ink: #e5e7eb;
   --muted: #9ca3af;
   --line: #2a2f38;
-  --bill-bg: color-mix(in srgb, var(--tol-green) 22%, #181b21); --bill-line: var(--tol-green);
-  --coin-bg: color-mix(in srgb, var(--tol-sand) 15%, #181b21); --coin-line: color-mix(in srgb, var(--tol-sand) 50%, #181b21);
-  --pay-bg: color-mix(in srgb, var(--tol-cyan) 15%, #181b21); --pay-line: color-mix(in srgb, var(--tol-cyan) 50%, #181b21);
-  --accent: var(--tol-cyan);
-  --accent-ink: #1d2330;
-  --accent-soft: color-mix(in srgb, var(--tol-cyan) 12%, transparent);
-  --reg-top-ink: #1d2330;
-  --ff-ink: #000000;
-  --service-ink: #1d2330;
+  --bill-bg: color-mix(in srgb, var(--cud-green) 20%, #181b21); --bill-line: var(--cud-green);
+  --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, #181b21); --coin-line: color-mix(in srgb, var(--cud-orange) 60%, #181b21);
+  --pay-bg: color-mix(in srgb, var(--cud-cyan) 15%, #181b21); --pay-line: color-mix(in srgb, var(--cud-cyan) 55%, #181b21);
+  --accent: var(--cud-cyan);
+  --accent-ink: #000000;
+  --accent-soft: color-mix(in srgb, var(--cud-cyan) 12%, transparent);
   --staff-bg: #111827;
   --staff-line: #2a3342;
   --cust-bg: #1d1b16;
-  --warn: var(--tol-sand);
-  --warn-bg: color-mix(in srgb, var(--tol-olive) 25%, #181b21);
-  --danger: color-mix(in srgb, var(--tol-rose) 80%, white);
-  --danger-bg: color-mix(in srgb, var(--tol-wine) 35%, #181b21);
-  --ok: var(--tol-teal);
-  --call: color-mix(in srgb, var(--tol-purple) 60%, white);
-  --call-bg: color-mix(in srgb, var(--tol-purple) 25%, #181b21);
+  --warn: var(--cud-orange);
+  --warn-bg: color-mix(in srgb, var(--cud-orange) 20%, #181b21);
+  --danger: color-mix(in srgb, var(--cud-red) 70%, white);
+  --danger-bg: color-mix(in srgb, var(--cud-red) 25%, #181b21);
+  --ok: var(--cud-green);
+  --call: var(--cud-cyan);
+  --call-bg: color-mix(in srgb, var(--cud-blue) 30%, #181b21);
   color-scheme: dark;
 }
 
@@ -142,7 +133,7 @@ button { touch-action: manipulation; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
 .screen.no-items .screen-items { display: none; }
 .bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--line); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.bell-btn.pressing { background: var(--tol-sand); box-shadow: inset 0 2px 6px rgba(0,0,0,.3); }
+.bell-btn.pressing { background: var(--cud-yellow); box-shadow: inset 0 2px 6px rgba(0,0,0,.3); }
 /* FF タブ */
 .ff-tabs { display: flex; gap: 2px; align-items: center; flex: none; }
 .ff-tab { padding: 1px 6px; font-size: 10px; border-radius: 6px 6px 0 0; background: var(--line); color: var(--ink); border: 0; }
@@ -275,8 +266,8 @@ details summary h3 { display: inline; }
 
 button.cash { min-width: 56px; color: var(--ink); }
 button.cash.bill { background: var(--bill-bg); color: var(--ink); border: 1px solid var(--bill-line); }
-button.cash.coin { background: var(--tol-sand); color: #1d2330; border-radius: 999px; }
-button.emoney { background: var(--tol-cyan); color: #1d2330; }
+button.cash.coin { background: var(--cud-orange); color: #000000; border-radius: 999px; }
+button.emoney { background: var(--cud-cyan); color: #000000; }
 
 
 .mats { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -329,8 +320,8 @@ button.emoney { background: var(--tol-cyan); color: #1d2330; }
 .mat-area .toast.show { display: block; }
 /* レジ本体の呼び出しランプ（音ではなく光で知らせる）。放置が長いほど速く点滅（--blink） */
 .lamp { width: 16px; height: 16px; border-radius: 50%; background: var(--line); border: 2px solid var(--line); flex: none; }
-.lamp.on { background: var(--tol-sand); border-color: var(--tol-olive); box-shadow: 0 0 10px 3px color-mix(in srgb, var(--tol-sand) 70%, transparent); animation: lamp-blink var(--blink, 1s) steps(2, jump-none) infinite; }
-@keyframes lamp-blink { 50% { background: var(--tol-pale); box-shadow: none; } }
+.lamp.on { background: var(--cud-yellow); border-color: var(--cud-orange); box-shadow: 0 0 10px 3px color-mix(in srgb, var(--cud-yellow) 70%, transparent); animation: lamp-blink var(--blink, 1s) steps(2, jump-none) infinite; }
+@keyframes lamp-blink { 50% { background: color-mix(in srgb, var(--cud-yellow) 25%, white); box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .lamp.on { animation: none; } }
 
 /* 売り場：スクロールしてもドラッグ元が見えるよう追従させる */

@@ -288,6 +288,12 @@ pub enum Command {
         code: String,
         min_age: Option<u8>,
     },
+    SetSaleLimit {
+        owner_id: String,
+        password: String,
+        code: String,
+        limit: Option<u32>,
+    },
     SetMatLoss {
         percent: u8,
     },
@@ -590,6 +596,15 @@ impl Txn {
 
     fn item_count(&self) -> u32 {
         self.lines.iter().map(|l| l.qty).sum()
+    }
+
+    /// この商品をいくつ登録しているか（行が分かれていても合計する）
+    fn qty_of(&self, code: &str) -> u32 {
+        self.lines
+            .iter()
+            .filter(|l| l.code == code)
+            .map(|l| l.qty)
+            .sum()
     }
 
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind) {
@@ -1486,6 +1501,16 @@ impl Store {
                 self.age_rules.set_product(&code, min_age, by, self.now)?;
                 done("年確ルールを変更しました")
             }
+            C::SetSaleLimit {
+                owner_id,
+                password,
+                code,
+                limit,
+            } => {
+                let by = self.owner(&owner_id, &password)?;
+                self.age_rules.set_limit(&code, limit, by, self.now)?;
+                done("販売個数の上限を変更しました")
+            }
             C::SetMatLoss { percent } => {
                 self.mat_loss = percent.min(100);
                 done(format!("MAT の通信ロスを {}% にしました", self.mat_loss))
@@ -1523,6 +1548,19 @@ impl Store {
     fn owner(&mut self, id: &str, password: &str) -> Result<&'static str, String> {
         self.auth.verify_owner(id, password, self.now)?;
         Ok(auth::account(id).map_or("?", |a| a.name))
+    }
+
+    /// 商品ごとの販売個数の上限を超えないか（add 個増やすとき）
+    fn check_limit(&self, register: u8, code: &str, add: u32) -> Result<(), String> {
+        let Some(limit) = self.age_rules.limit_for(code) else {
+            return Ok(());
+        };
+        let have = self.reg(register).map_or(0, |r| r.txn.qty_of(code));
+        if have + add > limit {
+            let name = catalog::find(code).map_or(code, |p| p.name);
+            return Err(format!("{name}は1回のお会計で{limit}点までです"));
+        }
+        Ok(())
     }
 
     fn call(&mut self, register: u8, kind: CallKind, detail: &str) {
@@ -1572,6 +1610,9 @@ impl Store {
         }
         if qty > old && r.txn.item_count() - old + qty > MAX_ITEMS {
             return Err(ITEMS_FULL.into());
+        }
+        if qty > old {
+            self.check_limit(register, code, qty - old)?;
         }
         // お渡し前の FF は、増やした分を在庫から取り、減らした分を在庫に戻す
         if kind
@@ -1644,6 +1685,9 @@ impl Store {
             });
         }
         self.check(register, side, Action::Scan)?;
+        if let Scanned::Product(p) = &scanned {
+            self.check_limit(register, p.code, 1)?;
+        }
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
@@ -1739,6 +1783,7 @@ impl Store {
         if count + qty > MAX_ITEMS {
             return Err(ITEMS_FULL.into());
         }
+        self.check_limit(register, code, qty)?;
         let stock = self
             .ff_stock
             .iter_mut()
@@ -2179,6 +2224,7 @@ impl Store {
                     age: self.age_rules.age_for(p.code, p.category),
                     legal_age: self.age_rules.legal_age_for(p.code, p.category),
                     store_age: self.age_rules.store_age_for(p.code),
+                    limit: self.age_rules.limit_for(p.code),
                 })
                 .collect(),
             categories: Category::ALL.iter().map(|c| (*c, c.label())).collect(),
@@ -2578,6 +2624,8 @@ pub struct CatalogItem {
     pub age: Option<u8>,
     pub legal_age: Option<u8>,
     pub store_age: Option<u8>,
+    /// 1 回のお会計で売れる上限（なければ None）
+    pub limit: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize)]

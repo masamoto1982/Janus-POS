@@ -78,6 +78,7 @@ button, input, select { font: inherit; }
 button { touch-action: manipulation; }
 
 .top {
+  display: flex; align-items: center; gap: 12px;
   padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
   border-bottom: 1px solid var(--line); background: var(--panel);
 }
@@ -255,7 +256,14 @@ button.emoney { background: #0ea5e9; }
 
 /* ---- 画面構成：ヘッダー／アーティクル（左 2/3・右 1/3）／フッター ---- */
 .top h1 { font-size: 18px; margin: 0; }
-.top p { margin: 2px 0 0; }
+.top .logo { width: 100px; height: 100px; flex: none; }
+/* ビルド番号：白い文字が引き立つ濃い背景の角丸バッジ */
+.build-badge { font-size: 12px; font-weight: 600; color: #fff; background: #334155; padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
+/* ホバーで案内を出すタイトル（ⓘ で案内があることを示す） */
+.tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
+.info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--muted); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
+.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.tip:hover::after, .tip:focus-visible::after { opacity: 1; }
 .floor, .bottom {
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }

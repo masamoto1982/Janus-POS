@@ -139,7 +139,7 @@ function buildSkeleton(): void {
       </div>
       <div class="right-col">
         <aside class="right" aria-label="Item">
-          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="年確ルール設定" title="年確ルール設定">⚙</button></h2>
+          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="商品ルール設定" title="商品ルール設定">⚙</button></h2>
           <div data-region="shelf"></div>
         </aside>
         <aside class="right wallet" aria-label="Wallet">
@@ -152,8 +152,8 @@ function buildSkeleton(): void {
       <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>
     </footer>
     <dialog class="rules-dlg" id="rules-dlg" aria-labelledby="rules-title">
-      <div class="dlg-head"><h2 id="rules-title">年確ルール設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
-      <p class="muted">変えられるのはオーナーだけです。変更のたびにここのパスワードで認証し、閉じるとパスワードは消えます。酒・たばこは法令どおり 20歳以上で固定され、変更できません。年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います。</p>
+      <div class="dlg-head"><h2 id="rules-title">商品ルール設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
+      <p class="muted">変えられるのはオーナーだけです。変更のたびにここのパスワードで認証し、閉じるとパスワードは消えます。酒・たばこは法令どおり 20歳以上で固定され、変更できません。年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います。販売個数は1回のお会計で売れる上限で、超える分はスキャンしても登録されません。</p>
       <div class="row wrap">
         <input data-owner="id" placeholder="オーナーの従業員番号" value="9001" aria-label="オーナーの従業員番号" />
         <input data-owner="pw" type="password" placeholder="パスワード" autocomplete="off" aria-label="オーナーのパスワード" />
@@ -357,7 +357,7 @@ function send(cmd: Command): boolean {
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   // レジ画面には覆い隠すメッセージを出さない（登録した行が一瞬色を変えて知らせる）。
   // 知らせを出すのは、レジ画面の外（年確ルールの設定・店舗全体の操作）だけ
-  const where = cmd.type === "set_product_age" ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
+  const where = cmd.type === "set_product_age" || cmd.type === "set_sale_limit" ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {
       if (res.message) toast(where, res.message, false);
@@ -366,6 +366,8 @@ function send(cmd: Command): boolean {
   if (!res.ok) {
     // 買い物点数の上限は表示エリアに合わせたシミュレーターだけの制約（実際のシステムでは起きない）
     if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
+    // 販売個数の上限はオーナーが決めた売り方なので、登録できない理由をその場で知らせる
+    if (res.error?.includes("1回のお会計で")) setTimeout(() => alert(res.error), 0);
   }
   // スキャナーと FF 登録の音（読めたら「ピッ」、受け付けられなければ「ブッブー」）
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok ? beepScan : beepError)();
@@ -477,6 +479,18 @@ app.addEventListener("change", (e) => {
       min_age: sel.value ? Number(sel.value) : null,
     });
     // 認められなかったら表示を元の設定に戻す
+    if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
+    return;
+  }
+  if (sel.dataset.limit) {
+    const owner = (k: string) => app.querySelector<HTMLInputElement>(`[data-owner="${k}"]`)?.value.trim() ?? "";
+    const ok = send({
+      type: "set_sale_limit",
+      owner_id: owner("id"),
+      password: owner("pw"),
+      code: sel.dataset.limit,
+      limit: sel.value ? Number(sel.value) : null,
+    });
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }

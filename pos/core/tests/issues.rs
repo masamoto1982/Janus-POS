@@ -1618,3 +1618,52 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     assert_eq!(reg(&s, 1).staff.calls[0].label, "釣銭忘れ");
     assert!(reg(&s, 1).last_receipt.is_some());
 }
+
+/// 販売個数の上限：オーナーが商品ごとに「1 回のお会計で何点まで」を決める。
+/// 上限を超える登録（スキャン・個数の変更）は受け付けない。
+#[test]
+fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
+    let mut s = Store::new(1, 2, 1);
+    let limit = |pw: &str, n: Option<u32>| json!({"type":"set_sale_limit","owner_id":"9001","password":pw,"code":TEA,"limit":n});
+    // オーナーのパスワードでなければ変えられない
+    assert!(run(&mut s, limit("0000", Some(2))).is_err());
+    ok(&mut s, limit("9999", Some(2)));
+    let item = s
+        .snapshot()
+        .catalog
+        .into_iter()
+        .find(|p| p.code == TEA)
+        .unwrap();
+    assert_eq!(item.limit, Some(2));
+    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "customer", TEA);
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":TEA}),
+    )
+    .unwrap_err();
+    assert!(e.contains("2点まで"), "{e}");
+    // ほかの商品は買える。個数の変更でも上限を超えられない
+    scan(&mut s, 1, "customer", BREAD);
+    let id = reg(&s, 1)
+        .customer
+        .lines
+        .iter()
+        .find(|l| l.name == item.name)
+        .unwrap()
+        .id;
+    let set =
+        |qty: u32| json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":qty});
+    assert!(run(&mut s, set(3)).is_err());
+    ok(&mut s, set(1));
+    ok(&mut s, set(2));
+    // 上限を外せば、また買える
+    ok(&mut s, limit("9999", None));
+    scan(&mut s, 1, "customer", TEA);
+    assert!(s
+        .snapshot()
+        .age_rules
+        .history
+        .iter()
+        .any(|h| h.change.contains("2点まで → 制限なし")));
+}

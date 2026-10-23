@@ -807,8 +807,20 @@ export function bellSettings(s: Snapshot): string {
 }
 
 const AGE_CHOICES = [15, 18, 20];
+const LIMIT_CHOICES = [1, 2, 3, 4, 5];
 
-/** 年確ルール：売り場のすべての商品に、商品ごとの店舗ルールを付けられる */
+/** 販売個数の上限を選ぶ欄（1 回のお会計で何点まで） */
+function limitSelect(p: Snapshot["catalog"][number]): string {
+  const ns = LIMIT_CHOICES.slice();
+  if (p.limit && !ns.includes(p.limit)) ns.push(p.limit);
+  ns.sort((x, y) => x - y);
+  const opts = [`<option value="" ${p.limit ? "" : "selected"}>制限なし</option>`]
+    .concat(ns.map((n) => `<option value="${n}" ${p.limit === n ? "selected" : ""}>${n}点まで</option>`))
+    .join("");
+  return `<select data-limit="${esc(p.code)}" aria-label="${esc(p.name)}の販売個数の上限">${opts}</select>`;
+}
+
+/** 商品ルール：売り場のすべての商品に、商品ごとの年確ルールと販売個数の上限を付けられる */
 export function ownerPanel(s: Snapshot): string {
   const rows = SHELVES.map((g) => {
     const items = s.catalog.filter(g.match);
@@ -819,7 +831,8 @@ export function ownerPanel(s: Snapshot): string {
         if (p.legal_age)
           return `<tr><td>${esc(p.name)}</td><td><span class="tag">法令 ${p.legal_age}歳</span></td>
           <td><span class="muted">変更できません</span></td>
-          <td class="num"><b>${p.legal_age}歳以上</b></td></tr>`;
+          <td class="num"><b>${p.legal_age}歳以上</b></td>
+          <td>${limitSelect(p)}</td></tr>`;
         const ages = AGE_CHOICES.slice();
         if (p.store_age && !ages.includes(p.store_age)) ages.push(p.store_age);
         ages.sort((x, y) => x - y);
@@ -829,15 +842,16 @@ export function ownerPanel(s: Snapshot): string {
         return `<tr><td>${esc(p.name)}</td>
           <td><span class="muted">—</span></td>
           <td><select data-age="${esc(p.code)}" aria-label="${esc(p.name)}の店舗ルール">${opts}</select></td>
-          <td class="num">${p.age ? `<b>${p.age}歳以上</b>` : `<span class="muted">年確なし</span>`}</td></tr>`;
+          <td class="num">${p.age ? `<b>${p.age}歳以上</b>` : `<span class="muted">年確なし</span>`}</td>
+          <td>${limitSelect(p)}</td></tr>`;
       })
       .join("");
-    return `<tr class="grp"><th colspan="4">${esc(g.label)}</th></tr>${body}`;
+    return `<tr class="grp"><th colspan="5">${esc(g.label)}</th></tr>${body}`;
   }).join("");
   const hist = s.age_rules.history.length
     ? s.age_rules.history.map((h) => `<li>${esc(h.by)}：${esc(h.change)}</li>`).join("")
     : `<li class="muted">変更はまだありません</li>`;
-  return `<table class="lines rules"><thead><tr><th>商品</th><th>法令</th><th>店舗ルール</th><th class="num">会計時の年確</th></tr></thead>
+  return `<table class="lines rules"><thead><tr><th>商品</th><th>法令</th><th>店舗の年確</th><th class="num">会計時の年確</th><th>販売個数</th></tr></thead>
     <tbody>${rows}</tbody></table>
     <h4>変更履歴</h4><ul>${hist}</ul>`;
 }

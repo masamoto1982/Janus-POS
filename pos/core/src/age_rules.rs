@@ -6,6 +6,9 @@
 //!   分類単位でも、個別の商品単位でも指定できる。
 //! - 判定するのは会計ボタンを押した時点だけ。対象品が複数あれば、
 //!   最も厳しい年齢で 1 回だけ確認する。
+//! - あわせて、商品ごとの販売個数の上限（1 回のお会計で何点まで）もオーナーが決める。
+
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +42,8 @@ pub struct RuleChange {
 pub struct AgeRules {
     pub rules: Vec<AgeRule>,
     pub history: Vec<RuleChange>,
+    /// 商品コード → 1 回のお会計で売れる上限の個数
+    pub limits: BTreeMap<String, u32>,
     #[serde(skip)]
     next_id: u32,
 }
@@ -58,6 +63,7 @@ impl Default for AgeRules {
         let mut r = AgeRules {
             rules: vec![],
             history: vec![],
+            limits: BTreeMap::new(),
             next_id: 1,
         };
         r.push(
@@ -174,6 +180,42 @@ impl AgeRules {
             at: now,
             by: by.into(),
             change: format!("{}：{} → {}", p.name, fmt(before), fmt(min_age)),
+        });
+        Ok(())
+    }
+
+    /// この商品を 1 回のお会計で売れる上限（なければ None）
+    pub fn limit_for(&self, code: &str) -> Option<u32> {
+        self.limits.get(code).copied()
+    }
+
+    /// 商品ごとの販売個数の上限を設定する（None で外す）
+    pub fn set_limit(
+        &mut self,
+        code: &str,
+        limit: Option<u32>,
+        by: &str,
+        now: u64,
+    ) -> Result<(), String> {
+        let p = catalog::find(code).ok_or("商品が見つかりません")?;
+        if let Some(n) = limit {
+            if !(1..=99).contains(&n) {
+                return Err("販売個数の上限は 1〜99 で指定してください".into());
+            }
+        }
+        let before = self.limit_for(code);
+        if before == limit {
+            return Ok(());
+        }
+        match limit {
+            Some(n) => self.limits.insert(code.into(), n),
+            None => self.limits.remove(code),
+        };
+        let fmt = |n: Option<u32>| n.map_or("制限なし".to_string(), |n| format!("{n}点まで"));
+        self.history.push(RuleChange {
+            at: now,
+            by: by.into(),
+            change: format!("{}の販売個数：{} → {}", p.name, fmt(before), fmt(limit)),
         });
         Ok(())
     }

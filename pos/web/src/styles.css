@@ -256,7 +256,7 @@ button.emoney { background: #0ea5e9; }
 
 /* ---- 画面構成：ヘッダー／アーティクル（左 2/3・右 1/3）／フッター ---- */
 .top h1 { font-size: 18px; margin: 0; }
-.top .logo { width: 25px; height: 25px; flex: none; }
+.top .logo { width: 73px; height: 73px; flex: none; }
 /* ビルド番号：白い文字が引き立つ濃い背景の角丸バッジ */
 .build-badge { font-size: 12px; font-weight: 600; color: #fff; background: #334155; padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
 /* ホバーで案内を出すタイトル（ⓘ で案内があることを示す） */
@@ -340,6 +340,8 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
+/* セミセルフの店員側の画面：呼び出しが起きるまではグレーで待機し、呼び出しでカラーになる */
+.screen.dormant { filter: grayscale(1); }
 /* 操作できない側の画面（排他）：両方の画面ともカラーで表示し、その画面から触れない操作だけをグレーアウトする */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,

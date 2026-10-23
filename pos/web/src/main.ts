@@ -123,7 +123,7 @@ function buildSkeleton(): void {
 
   app.innerHTML = `
     <header class="top">
-      <img class="logo" src="${logoUrl}" width="25" height="25" alt="Janus POS ロゴ" />
+      <img class="logo" src="${logoUrl}" width="73" height="73" alt="Janus POS ロゴ" />
       <h1>Janus POS</h1>
       <span class="build-badge" title="ビルド番号">Build ${esc(String(import.meta.env.VITE_BUILD ?? "dev"))}</span>
     </header>
@@ -264,6 +264,8 @@ function render(): void {
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
+      // セミセルフの店員側の画面は、呼び出しが起きるまでグレーで待機する
+      el?.classList.toggle("dormant", side === "staff" && r.mode === "semi_self" && !r.staff.calls.length);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
       // レジ画面のヘッダー（☰ は店員ログイン中の店員側だけ。時刻とベルは常時）

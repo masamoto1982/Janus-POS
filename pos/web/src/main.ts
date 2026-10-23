@@ -11,6 +11,8 @@ import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { Command, Snapshot } from "./types";
 import type { GuideKind } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
+// 仮のロゴマーク（正式なロゴは後日差し替え）
+import logoUrl from "./logo-placeholder.svg";
 import {
   esc,
   FF_TABS,
@@ -121,8 +123,9 @@ function buildSkeleton(): void {
 
   app.innerHTML = `
     <header class="top">
+      <img class="logo" src="${logoUrl}" width="100" height="100" alt="Janus POS ロゴ" />
       <h1>Janus POS</h1>
-      <p class="muted">右の Item から商品をつかんで、レジの店員画面かお客様画面に落とすと、その側のスキャナーで読んだことになります。</p>
+      <span class="build-badge" title="ビルド番号">Build ${esc(String(import.meta.env.VITE_BUILD ?? "dev"))}</span>
     </header>
     <article class="floor">
       <div class="left">
@@ -136,7 +139,7 @@ function buildSkeleton(): void {
       </div>
       <div class="right-col">
         <aside class="right" aria-label="Item">
-          <h2>Item <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="年確ルール設定" title="年確ルール設定">⚙</button></h2>
+          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="年確ルール設定" title="年確ルール設定">⚙</button></h2>
           <div data-region="shelf"></div>
         </aside>
         <aside class="right wallet" aria-label="Wallet">

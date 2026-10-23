@@ -551,11 +551,11 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  // 上の段にポイントカードの読み取り状況と点数を控えめに、下の段に合計額を大きく出す
+  // 上の段に点数とポイントカードの読み取り状況を控えめに、下の段に合計額を大きく出す
   // （ポイントカードの状況はほかの場所には出さない。ボタンは合計額の右に出し、有無で点数・合計額の位置は動かない）
   const point =
-    pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイントカード ${pointCard ? "読取済" : "未読取"}</span>`;
-  return `<div class="reg-top"><small class="info">${point}<span class="count">お買い上げ点数：<b>${count}</b>点${full}</span></small><span class="sum">お買い上げ合計額：<b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
+    pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
+  return `<div class="reg-top"><small class="info"><span class="count">お買い上げ点数：<b>${count}</b>点${full}</span>${point}</small><span class="sum">お買い上げ合計額：<b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

@@ -551,12 +551,13 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  // ポイントカードの読み取り状況もこの帯に出す（ほかの場所には出さない）
+  // ポイントカードの読み取り状況は点数・合計とは行を分けて控えめに出す（ほかの場所には出さない）
   const point =
     pointCard === undefined
       ? ""
-      : `<small class="point ${pointCard ? "read" : ""}">${pointCard ? "ポイント 読取済" : "ポイント 未読取"}</small>`;
-  return `<div class="reg-top"><span class="count"><b>${count}</b> 点${full}</span>${point}<span>合計 <b class="total">${yen(total)}</b></span>${action}</div>`;
+      : `<small class="point ${pointCard ? "read" : ""}">ポイントカード ${pointCard ? "読取済" : "未読取"}</small>`;
+  // 点数と合計は会計ボタンの有無に関係なく同じ位置に出す（ボタンは右端の専用欄）
+  return `<div class="reg-top"><span class="count"><b>${count}</b> 点${full}</span><span class="sum">合計 <b class="total">${yen(total)}</b></span>${point}<span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

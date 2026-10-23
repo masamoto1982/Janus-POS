@@ -125,15 +125,15 @@ button { touch-action: manipulation; }
 .lines td, .lines th { padding: 4px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .num { text-align: right; white-space: nowrap; }
 
-.reg-top { position: sticky; top: -8px; z-index: 1; display: grid; grid-template-columns: 15em auto 1fr; grid-template-areas: "point point action" "count sum action"; align-items: center; column-gap: 16px; row-gap: 0; min-height: 44px; margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: #ffffff; border-bottom: 1px solid var(--line); }
+.reg-top { position: sticky; top: -8px; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; min-height: 44px; margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: #ffffff; border-bottom: 1px solid var(--line); }
 .reg-top button { border-color: #ffffff; }
-.reg-top .total { font-size: 22px; }
-.reg-top .count b { font-size: 18px; }
-.reg-top .count { grid-area: count; white-space: nowrap; }
-.reg-top .sum { grid-area: sum; white-space: nowrap; }
-.reg-top .action { grid-area: action; justify-self: end; }
-.reg-top .point { grid-area: point; font-size: 11px; opacity: .75; white-space: nowrap; }
-.reg-top .point.read { opacity: 1; }
+.reg-top .total { font-size: 28px; }
+.reg-top .info { flex: 1 0 100%; display: flex; flex-wrap: wrap; gap: 0 14px; min-width: 0; font-size: 12px; white-space: nowrap; }
+.reg-top .info .point { opacity: .75; }
+.reg-top .info .point.read { opacity: 1; }
+.reg-top .count b { font-size: 14px; }
+.reg-top .sum { white-space: nowrap; }
+.reg-top .action { margin-left: auto; }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: #ffffff; color: var(--reg-top-bg); font-weight: 700; }
 /* 登録の明細は表示エリアが狭いので小ぶりに */
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }

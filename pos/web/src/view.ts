@@ -551,13 +551,11 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  // ポイントカードの読み取り状況は点数・合計の上の段に控えめに出す（ほかの場所には出さない）
+  // 上の段にポイントカードの読み取り状況と点数を控えめに、下の段に合計額を大きく出す
+  // （ポイントカードの状況はほかの場所には出さない。ボタンは合計額の右に出し、有無で点数・合計額の位置は動かない）
   const point =
-    pointCard === undefined
-      ? ""
-      : `<small class="point ${pointCard ? "read" : ""}">ポイントカード ${pointCard ? "読取済" : "未読取"}</small>`;
-  // 点数と合計は会計ボタンの有無に関係なく同じ位置に出す（ボタンは右端の専用欄）
-  return `<div class="reg-top"><span class="count">お買い上げ点数：<b>${count}</b>点${full}</span><span class="sum">お買い上げ合計額：<b class="total">${yen(total)}</b></span>${point}<span class="action">${action}</span></div>`;
+    pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイントカード ${pointCard ? "読取済" : "未読取"}</span>`;
+  return `<div class="reg-top"><small class="info">${point}<span class="count">お買い上げ点数：<b>${count}</b>点${full}</span></small><span class="sum">お買い上げ合計額：<b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

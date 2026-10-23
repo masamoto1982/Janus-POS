@@ -102,7 +102,8 @@ fn any_barcode_is_accepted_in_any_order() {
     scan(&mut s, 1, "staff", "2000000000015");
     scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.len(), 2);
+    // 間にレジ袋をはさんだパンは、前のパンの行にまとめない
+    assert_eq!(v.staff.lines.len(), 3);
     assert_eq!(v.staff.total, 160 * 2 + 3);
     assert!(v.customer.point_card);
     assert!(run(
@@ -1375,17 +1376,22 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 320);
 }
 
-/// 同じ商品はまとめたまま、数量が増えた行も「動きがあった」として一番上に出す。
+/// 同じ商品は、続けて読んだときだけ一番上の行に足す。間に別の商品をはさんだら新しい行にし、
+/// 前に登録した行を一番上に積みなおさない（個数を変える人が前の分を覚えていなくて済む）。
 #[test]
-fn a_merged_line_moves_to_the_top() {
+fn same_item_merges_only_when_scanned_in_a_row() {
     let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", SANDWICH);
     scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
-    assert_eq!(v.customer.lines.len(), 2, "same item stays one line");
-    let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
-    assert_eq!((top.name, top.qty), ("パン", 2));
+    let mut lines: Vec<_> = v.customer.lines.iter().collect();
+    lines.sort_by_key(|l| std::cmp::Reverse(l.touched));
+    let rows: Vec<_> = lines.iter().map(|l| (l.name, l.qty)).collect();
+    assert_eq!(rows, [("パン", 3), ("サンドイッチ", 1), ("パン", 2)]);
 }
 
 /// 明細の個数を手で変えられる。変えた行は一番上に出て、点数の上限も守る。

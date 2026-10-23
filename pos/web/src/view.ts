@@ -344,7 +344,7 @@ export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Actio
 type Row = [number, string];
 
 /**
- * 新しい動きのあった行ほど上に出す。同じ商品をまとめた行も、数量が増えれば一番上に来る
+ * 新しい動きのあった行ほど上に出す。同じ商品は続けて読んだときだけ一番上の行に足す（前の行にはまとめない）
  * （買い物が多いとき、最初の行の数量が表示エリアの外で増えて見えない、ということがない）
  */
 function newestFirst(rows: Row[]): string {

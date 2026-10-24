@@ -443,10 +443,9 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
     match action {
         // 会計画面でも受け付け、登録画面に引き返して追加する
         Action::Scan => Ok(()),
-        Action::FfButton => {
-            require(c.mode == Mode::SemiSelf, "FF はタブから登録してください")?;
-            require(!paying, "お会計中です")
-        }
+        // 呼び出しボタンの一つ。サービス・たばこと同じく会計中（年確の呼び出し中も）押せる。
+        // 係員は「商品登録に戻る」で登録画面に引き返して FF を追加する
+        Action::FfButton => require(c.mode == Mode::SemiSelf, "FF はタブから登録してください"),
         Action::RegisterFf => {
             require(c.mode == Mode::FullSelf, "FF は係員にお申し付けください")?;
             require(!paying, "お会計中です")?;

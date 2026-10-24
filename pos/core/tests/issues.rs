@@ -220,6 +220,28 @@ fn self_mode_age_check_calls_staff() {
     assert!(s.snapshot().calls.is_empty());
 }
 
+/// 年確の呼び出し中（会計画面）でも、FF ボタンはサービス・たばこと同じく押せる
+#[test]
+fn ff_button_works_while_age_check_call_is_open() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", BEER);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"customer"}),
+    );
+    let v = reg(&s, 2);
+    assert!(allowed(&v, Side::Customer, Action::FfButton));
+    assert!(allowed(&v, Side::Customer, Action::CallStaff));
+    ok(&mut s, json!({"type":"ff_button","register":2}));
+    let calls = s.snapshot().calls;
+    assert!(calls
+        .iter()
+        .any(|c| c.register == 2 && c.kind == CallKind::AgeCheck));
+    assert!(calls
+        .iter()
+        .any(|c| c.register == 2 && c.kind == CallKind::FastFood));
+}
+
 /// 店舗ルール：オーナーだけが追加でき、法令ルールは外せない。
 #[test]
 fn only_owner_changes_age_rules() {

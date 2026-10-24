@@ -44,9 +44,10 @@ export type StaffLine = LineKind & {
   category: string;
   amount: number;
   age: number | null;
+  limit: number | null;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null };
 
 export interface Call {
   id: number;

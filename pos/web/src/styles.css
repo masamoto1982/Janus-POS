@@ -25,7 +25,7 @@
   --accent: var(--cud-blue);
   --accent-ink: #ffffff;
   --accent-soft: color-mix(in srgb, var(--cud-blue) 8%, transparent);
-  --reg-top-bg: #878787; /* 枠線と同じグレー。黒文字で読む */
+  --reg-top-bg: #aeaeae; /* 標準ボタンと同じ薄いグレー。黒文字で読む */
   --reg-top-ink: #000000;
   --staff-bg: #1f2937;
   --staff-ink: #f3f4f6;

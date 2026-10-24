@@ -249,7 +249,8 @@ details summary h3 { display: inline; }
 .welcome .big { font-size: 18px; font-weight: 700; }
 .welcome p { font-size: 12px; margin: 4px 0 0; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
-.guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--btn); color: var(--btn-ink); }
+/* 押さなくても困らない補助ボタンは塗らずに枠線だけ。選択中は通常の選択色 */
+.guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: transparent; color: var(--ink); border-color: var(--border); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }

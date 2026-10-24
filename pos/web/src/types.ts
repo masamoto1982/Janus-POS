@@ -114,6 +114,8 @@ export interface CustomerView {
   coupon_unmatched: boolean;
   returned: Returned[];
   total: number;
+  tax8: number;
+  tax10: number;
   inserted: number;
   due: number;
   point_card: boolean;

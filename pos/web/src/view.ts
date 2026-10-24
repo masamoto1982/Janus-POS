@@ -193,6 +193,11 @@ function methodList(method: string | null, inserted: number): string {
  */
 const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /><col class="c-edit" /><col class="c-warn" /></colgroup>`;
 
+// 内税の表示（有人・セミセルフ共通）
+function taxNote(v: { tax8: number; tax10: number }): string {
+  return `<span class="muted tax-note">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}</span>`;
+}
+
 function warnCell(l: { age: number | null; limit: number | null }): string {
   const marks = [l.age ? `<span class="tag age">年確${l.age}</span>` : "", l.limit ? `<span class="tag age">限定${l.limit}</span>` : ""];
   return `<td class="warn-cell"><div class="warn-marks">${marks.join("")}</div></td>`;
@@ -501,7 +506,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
-      <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}</span>
+      ${taxNote(v)}
     </div>
     <table class="lines cols5">${LINE_COLS}<thead><tr><th>品名</th><th class="num">点数</th><th class="num">小計</th><th></th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="5" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
@@ -791,6 +796,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
         ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center")}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}
       </div>`);
   return `${top}${notice}
+    <div class="staff-head">${taxNote(c)}</div>
     <table class="lines cols5">${LINE_COLS}<tbody>${rows}</tbody></table>`;
 }
 

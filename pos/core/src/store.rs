@@ -2307,6 +2307,7 @@ impl Store {
                 line: l.clone(),
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
+                limit: self.age_rules.limit_for(l.code),
             })
             .collect();
 
@@ -2319,6 +2320,8 @@ impl Store {
                 name: l.name,
                 qty: l.qty,
                 amount: l.amount(),
+                age: self.age_rules.age_for(l.code, l.category),
+                limit: self.age_rules.limit_for(l.code),
                 kind: l.kind,
             })
             .collect();
@@ -2418,11 +2421,14 @@ pub struct StaffLine {
     #[serde(flatten)]
     pub line: Line,
     pub amount: u32,
-    /// 年確ルールに該当する年齢（店員画面のみの参考表示。判定は会計時）
+    /// 年確ルールに該当する年齢（参考表示。判定は会計時）
     pub age: Option<u8>,
+    /// 1 回のお会計で買える個数の上限（店舗ルール）
+    pub limit: Option<u32>,
 }
 
-/// お客様画面に出してよい明細（分類・年確対象かどうか・商品コードは出さない）
+/// お客様画面に出してよい明細（分類・商品コードは出さない）。
+/// 年確と販売個数の上限は注意のしるしとして出す（有人モードの店員側と同じ見た目にする）
 #[derive(Clone, Debug, Serialize)]
 pub struct CustomerLine {
     pub id: u32,
@@ -2430,6 +2436,8 @@ pub struct CustomerLine {
     pub name: &'static str,
     pub qty: u32,
     pub amount: u32,
+    pub age: Option<u8>,
+    pub limit: Option<u32>,
     #[serde(flatten)]
     pub kind: LineKind,
 }

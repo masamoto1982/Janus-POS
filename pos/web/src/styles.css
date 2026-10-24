@@ -213,7 +213,8 @@ input, select {
 }
 
 .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }
-.tag.age { background: var(--warn-bg); color: var(--warn); }
+/* 年確は押せない注意のしるし：角を丸めず、枠線色の枠と文字だけ */
+.tag.age { background: transparent; color: var(--border); border: 1px solid var(--border); border-radius: 0; }
 .tag.warn, .tag.ff-waiting { background: var(--warn-bg); color: var(--warn); }
 .tag.ok, .tag.ff-received { background: transparent; color: var(--ok); border: 1px solid var(--border); }
 .warn { color: var(--warn); }

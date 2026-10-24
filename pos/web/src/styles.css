@@ -399,8 +399,8 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-/* セミセルフの店員側の画面：呼び出しが起きるまではグレーで待機し、呼び出しでカラーになる */
-.screen.dormant, .screen.mono { filter: grayscale(1); }
+/* レジの画面は有人・セミセルフ、店員側・お客様側を問わず色彩を使わない（ログインや呼び出しの有無でも変えない） */
+.screen { filter: grayscale(1); }
 /* 操作できない側の画面（排他）：両方の画面ともカラーで表示し、その画面から触れない操作だけをグレーアウトする */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,

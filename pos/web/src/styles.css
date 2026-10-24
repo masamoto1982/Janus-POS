@@ -25,7 +25,7 @@
   --accent: var(--cud-blue);
   --accent-ink: #ffffff;
   --accent-soft: color-mix(in srgb, var(--cud-blue) 8%, transparent);
-  --reg-top-bg: var(--cud-cyan); /* 明るい青。黒文字で読む */
+  --reg-top-bg: #878787; /* 枠線と同じグレー。黒文字で読む */
   --reg-top-ink: #000000;
   --staff-bg: #1f2937;
   --staff-ink: #f3f4f6;
@@ -167,7 +167,7 @@ button { touch-action: manipulation; }
 .num { text-align: right; white-space: nowrap; }
 
 .reg-top { position: sticky; top: -8px; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; min-height: 44px; margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); }
-.reg-top button { border-color: var(--border); }
+.reg-top button { background: var(--btn); color: var(--btn-ink); border-color: var(--border); }
 .reg-top .total { font-size: 28px; }
 .reg-top .info { flex: 1 0 100%; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 14px; min-width: 0; font-size: 12px; white-space: nowrap; }
 .reg-top .info .point { opacity: .75; }

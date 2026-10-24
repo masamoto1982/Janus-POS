@@ -15,10 +15,11 @@ use crate::authority::{
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
 use crate::catalog::{
-    self, Category, Coupon, FfTab, Product, Scanned, TaxRate, CATALOG, FF_MENU, INITIAL_FF_STOCK,
+    self, Category, Coupon, FfTab, Product, Scanned, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
 use crate::mat::{Bell, Mat};
 use crate::rng::Rng;
+use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 
 pub const MAX_REGISTERS: u8 = 10;
 pub const MAX_MATS: u8 = 5;
@@ -294,6 +295,37 @@ pub enum Command {
         code: String,
         limit: Option<u32>,
     },
+    /// 商品ルール設定を開くときのオーナー認証（変更は操作のたびにも認証する）
+    VerifyOwner {
+        owner_id: String,
+        password: String,
+    },
+    /// 税区分の税率を変える（0.01% 単位。1000 = 10%）
+    SetTaxRate {
+        owner_id: String,
+        password: String,
+        class_id: String,
+        rate_bp: u32,
+    },
+    AddTaxClass {
+        owner_id: String,
+        password: String,
+        name: String,
+        kind: TaxKind,
+        rate_bp: u32,
+    },
+    SetProductTax {
+        owner_id: String,
+        password: String,
+        code: String,
+        class_id: String,
+    },
+    SetInvoice {
+        owner_id: String,
+        password: String,
+        invoice_no: String,
+        rounding: Rounding,
+    },
     SetMatLoss {
         percent: u8,
     },
@@ -425,7 +457,9 @@ pub struct Line {
     pub name: &'static str,
     pub unit_price: u32,
     pub qty: u32,
-    pub tax: TaxRate,
+    /// 登録した時点の税区分と税率（あとで設定を変えても、登録済みの明細は変わらない）
+    pub tax: String,
+    pub rate_bp: u32,
     pub category: Category,
     #[serde(flatten)]
     pub kind: LineKind,
@@ -469,7 +503,7 @@ struct Txn {
 impl Txn {
     /// 読み取ったクーポンと、その値引き額（対象商品がまだなければ None）。
     /// 対象商品 1 個につきクーポン 1 枚。読んだ順番（商品より先か後か）は関係ない
-    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, TaxRate)>)> {
+    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, u32)>)> {
         let mut used: Vec<(&str, u32)> = vec![];
         self.coupons
             .iter()
@@ -488,13 +522,19 @@ impl Txn {
                     Some(e) => e.1 += 1,
                     None => used.push((c.target, 1)),
                 }
+                // 値引きは対象商品の税率の対象額から引く
                 let p = catalog::find(c.target);
-                (id, c, p.map(|p| (c.discount(p.price), p.tax)))
+                let rate = self
+                    .lines
+                    .iter()
+                    .find(|l| l.code == c.target && l.kind == LineKind::Item)
+                    .map_or(0, |l| l.rate_bp);
+                (id, c, p.map(|p| (c.discount(p.price), rate)))
             })
             .collect()
     }
 
-    fn discount_of(&self, rate: Option<TaxRate>) -> u32 {
+    fn discount_of(&self, rate: Option<u32>) -> u32 {
         self.coupon_uses()
             .iter()
             .filter_map(|(_, _, u)| *u)
@@ -508,18 +548,33 @@ impl Txn {
         gross.saturating_sub(self.discount_of(None))
     }
 
-    fn tax_of(&self, rate: TaxRate) -> u32 {
-        let gross: u32 = self
-            .lines
+    /// 税率ごとの対象額と内税額（インボイス：税率ごとに合計してから 1 回だけ端数処理する）。
+    /// `rates` は明細がなくても出す税率（表示が増えたり減ったりしないように）
+    fn taxes(&self, rates: &[u32], rounding: Rounding) -> Vec<TaxTotal> {
+        let mut all: Vec<u32> = rates
             .iter()
-            .filter(|l| l.tax == rate)
-            .map(Line::amount)
-            .sum::<u32>()
-            .saturating_sub(self.discount_of(Some(rate)));
-        match rate {
-            TaxRate::Reduced8 => gross * 8 / 108,
-            TaxRate::Standard10 => gross * 10 / 110,
-        }
+            .copied()
+            .chain(self.lines.iter().map(|l| l.rate_bp).filter(|r| *r > 0))
+            .collect();
+        all.sort_unstable();
+        all.dedup();
+        all.into_iter()
+            .map(|rate_bp| {
+                let base = self
+                    .lines
+                    .iter()
+                    .filter(|l| l.rate_bp == rate_bp)
+                    .map(Line::amount)
+                    .sum::<u32>()
+                    .saturating_sub(self.discount_of(Some(rate_bp)));
+                TaxTotal {
+                    rate_bp,
+                    rate: tax::rate_label(rate_bp),
+                    base,
+                    tax: tax::included_tax(base, rate_bp, rounding),
+                }
+            })
+            .collect()
     }
 
     fn any_ff(&self, s: FfState) -> bool {
@@ -607,7 +662,7 @@ impl Txn {
             .sum()
     }
 
-    fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind) {
+    fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind, tax: (String, u32)) {
         // 同じ商品を続けて読んだときだけ、一番上（直前に登録した）の行に足す。
         // 間に別の商品をはさんだら、前に登録した行にはまとめず新しい行にする
         // （個数を変える人が、ずっと前に登録した分まで覚えていなくて済むように）
@@ -627,7 +682,8 @@ impl Txn {
             name: p.name,
             unit_price: p.price,
             qty,
-            tax: p.tax,
+            tax: tax.0,
+            rate_bp: tax.1,
             category: p.category,
             kind,
         });
@@ -788,6 +844,7 @@ pub struct Store {
     mats: Vec<Mat>,
     calls: Calls,
     age_rules: AgeRules,
+    tax: TaxSettings,
     auth: Authenticator,
     ff_stock: Vec<(&'static str, u32)>,
     audit: Vec<AuditEntry>,
@@ -939,6 +996,7 @@ impl Store {
             mats: (0..mats).map(|i| Mat::new(&bell_name(i))).collect(),
             calls: Calls::default(),
             age_rules: AgeRules::default(),
+            tax: TaxSettings::default(),
             auth: Authenticator::default(),
             ff_stock: INITIAL_FF_STOCK.to_vec(),
             audit: vec![],
@@ -1511,6 +1569,55 @@ impl Store {
                 self.age_rules.set_limit(&code, limit, by, self.now)?;
                 done("販売個数の上限を変更しました")
             }
+            C::VerifyOwner { owner_id, password } => {
+                let by = self.owner(&owner_id, &password)?;
+                done(format!("{by}として認証しました"))
+            }
+            C::SetTaxRate {
+                owner_id,
+                password,
+                class_id,
+                rate_bp,
+            } => {
+                let by = self.owner(&owner_id, &password)?;
+                let change = self.tax.set_rate(&class_id, rate_bp)?;
+                self.age_rules.record(by, change, self.now);
+                done("税率を変更しました")
+            }
+            C::AddTaxClass {
+                owner_id,
+                password,
+                name,
+                kind,
+                rate_bp,
+            } => {
+                let by = self.owner(&owner_id, &password)?;
+                let change = self.tax.add_class(&name, kind, rate_bp)?;
+                self.age_rules.record(by, change, self.now);
+                done("税区分を追加しました")
+            }
+            C::SetProductTax {
+                owner_id,
+                password,
+                code,
+                class_id,
+            } => {
+                let by = self.owner(&owner_id, &password)?;
+                let change = self.tax.set_product(&code, &class_id)?;
+                self.age_rules.record(by, change, self.now);
+                done("商品の税区分を変更しました")
+            }
+            C::SetInvoice {
+                owner_id,
+                password,
+                invoice_no,
+                rounding,
+            } => {
+                let by = self.owner(&owner_id, &password)?;
+                let change = self.tax.set_invoice(&invoice_no, rounding)?;
+                self.age_rules.record(by, change, self.now);
+                done("インボイスの設定を変更しました")
+            }
             C::SetMatLoss { percent } => {
                 self.mat_loss = percent.min(100);
                 done(format!("MAT の通信ロスを {}% にしました", self.mat_loss))
@@ -1543,6 +1650,12 @@ impl Store {
                 ))
             }
         }
+    }
+
+    /// この商品の今の税区分と税率
+    fn tax_for(&self, code: &str) -> (String, u32) {
+        let c = self.tax.class_for(code);
+        (c.id.clone(), c.rate_bp)
     }
 
     fn owner(&mut self, id: &str, password: &str) -> Result<&'static str, String> {
@@ -1688,6 +1801,10 @@ impl Store {
         if let Scanned::Product(p) = &scanned {
             self.check_limit(register, p.code, 1)?;
         }
+        let tax = match &scanned {
+            Scanned::Product(p) => self.tax_for(p.code),
+            _ => (String::new(), 0),
+        };
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
@@ -1746,6 +1863,7 @@ impl Store {
                         done: false,
                         confirm_pending: false,
                     },
+                    tax,
                 );
                 let ready = r.staff_state() == StaffState::Ready;
                 if !ready {
@@ -1761,7 +1879,7 @@ impl Store {
                 if p.category == Category::Tobacco {
                     r.txn.tobacco_asked = false;
                 }
-                r.txn.push(p, 1, LineKind::Item);
+                r.txn.push(p, 1, LineKind::Item, tax);
                 done(format!("{} {}円{back}", p.name, p.price))
             }
         }
@@ -1793,6 +1911,7 @@ impl Store {
             return Err(format!("{}は在庫が足りません（残り {}）", p.name, stock.1));
         }
         stock.1 -= qty;
+        let tax = self.tax_for(p.code);
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
@@ -1809,6 +1928,7 @@ impl Store {
                 LineKind::Ff {
                     state: FfState::Received,
                 },
+                tax,
             );
             return done(format!("{} ×{qty} を登録しました", p.name));
         }
@@ -1818,6 +1938,7 @@ impl Store {
             LineKind::Ff {
                 state: FfState::Waiting,
             },
+            tax,
         );
         self.calls.resolve(register, CallKind::FastFood, now);
         done(format!(
@@ -2225,8 +2346,26 @@ impl Store {
                     legal_age: self.age_rules.legal_age_for(p.code, p.category),
                     store_age: self.age_rules.store_age_for(p.code),
                     limit: self.age_rules.limit_for(p.code),
+                    tax_class: self.tax.class_for(p.code).id.clone(),
                 })
                 .collect(),
+            tax: TaxView {
+                classes: self
+                    .tax
+                    .classes
+                    .iter()
+                    .map(|c| TaxClassView {
+                        id: c.id.clone(),
+                        name: c.name.clone(),
+                        kind: c.kind,
+                        kind_label: c.kind.label(),
+                        rate_bp: c.rate_bp,
+                        rate: tax::rate_label(c.rate_bp),
+                    })
+                    .collect(),
+                invoice_no: self.tax.invoice_no.clone(),
+                rounding: self.tax.rounding,
+            },
             categories: Category::ALL.iter().map(|c| (*c, c.label())).collect(),
         }
     }
@@ -2253,6 +2392,7 @@ impl Store {
     fn register_view(&self, r: &Register) -> RegisterView {
         let c = r.context();
         let t = &r.txn;
+        let taxes = t.taxes(&self.tax.display_rates(), self.tax.rounding);
         // どちらの画面にも同じボタンが並ぶ。触れている一瞬は、触れている側の画面だけが押せる
         let c_side = active_side(&c).unwrap_or(Side::Customer);
         let actions = |side: Side, list: &[Action]| {
@@ -2351,8 +2491,7 @@ impl Store {
                 phase: c.phase,
                 lines,
                 total,
-                tax8: t.tax_of(TaxRate::Reduced8),
-                tax10: t.tax_of(TaxRate::Standard10),
+                taxes: taxes.clone(),
                 coupons: coupons.clone(),
                 point_card: t.point_card.clone(),
                 required_age: t.required_age.filter(|_| t.paying),
@@ -2385,8 +2524,7 @@ impl Store {
                 coupon_unmatched: c.coupon_unmatched,
                 returned,
                 total,
-                tax8: t.tax_of(TaxRate::Reduced8),
-                tax10: t.tax_of(TaxRate::Standard10),
+                taxes: taxes.clone(),
                 inserted,
                 due: total.saturating_sub(inserted),
                 point_card: t.point_card.is_some(),
@@ -2452,8 +2590,7 @@ pub struct StaffView {
     pub phase: Phase,
     pub lines: Vec<StaffLine>,
     pub total: u32,
-    pub tax8: u32,
-    pub tax10: u32,
+    pub taxes: Vec<TaxTotal>,
     /// 読み取った引換券・割引券
     pub coupons: Vec<CouponView>,
     pub point_card: Option<String>,
@@ -2496,9 +2633,8 @@ pub struct CustomerView {
     /// 取り消して、お返しするクーポン
     pub returned: Vec<ReturnedCoupon>,
     pub total: u32,
-    /// 内税額（有人モードと同じ表示をセミセルフにも出す）
-    pub tax8: u32,
-    pub tax10: u32,
+    /// 税率ごとの内税額（有人モードと同じ表示をセミセルフにも出す）
+    pub taxes: Vec<TaxTotal>,
     pub inserted: u32,
     pub due: u32,
     pub point_card: bool,
@@ -2639,6 +2775,34 @@ pub struct CatalogItem {
     pub store_age: Option<u8>,
     /// 1 回のお会計で売れる上限（なければ None）
     pub limit: Option<u32>,
+    /// 今の税区分
+    pub tax_class: String,
+}
+
+/// 税率ごとの対象額（税込）と内税額
+#[derive(Clone, Debug, Serialize)]
+pub struct TaxTotal {
+    pub rate_bp: u32,
+    pub rate: String,
+    pub base: u32,
+    pub tax: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TaxClassView {
+    pub id: String,
+    pub name: String,
+    pub kind: TaxKind,
+    pub kind_label: &'static str,
+    pub rate_bp: u32,
+    pub rate: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct TaxView {
+    pub classes: Vec<TaxClassView>,
+    pub invoice_no: String,
+    pub rounding: Rounding,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2656,5 +2820,6 @@ pub struct Snapshot {
     pub mat_loss: u8,
     pub accounts: Vec<AccountView>,
     pub catalog: Vec<CatalogItem>,
+    pub tax: TaxView,
     pub categories: Vec<(Category, &'static str)>,
 }

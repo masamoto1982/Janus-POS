@@ -77,8 +77,7 @@ export interface StaffView {
   phase: Phase;
   lines: StaffLine[];
   total: number;
-  tax8: number;
-  tax10: number;
+  taxes: TaxTotal[];
   coupons: Coupon[];
   point_card: string | null;
   required_age: number | null;
@@ -114,8 +113,7 @@ export interface CustomerView {
   coupon_unmatched: boolean;
   returned: Returned[];
   total: number;
-  tax8: number;
-  tax10: number;
+  taxes: TaxTotal[];
   inserted: number;
   due: number;
   point_card: boolean;
@@ -167,6 +165,23 @@ export interface AgeRule {
   legal: boolean;
 }
 
+/** 税率ごとの対象額（税込）と内税額 */
+export interface TaxTotal {
+  rate_bp: number;
+  rate: string;
+  base: number;
+  tax: number;
+}
+
+export type TaxKind = "standard" | "reduced" | "zero" | "exempt";
+export type Rounding = "floor" | "half_up" | "ceil";
+
+export interface TaxView {
+  classes: { id: string; name: string; kind: TaxKind; kind_label: string; rate_bp: number; rate: string }[];
+  invoice_no: string;
+  rounding: Rounding;
+}
+
 export interface Snapshot {
   now: number;
   registers: RegisterView[];
@@ -180,7 +195,8 @@ export interface Snapshot {
   ff_stock: { code: string; name: string; price: number; stock: number; tab: string; tab_label: string }[];
   mat_loss: number;
   accounts: { id: string; barcode: string; name: string; role: string }[];
-  catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null }[];
+  catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string }[];
+  tax: TaxView;
   categories: [string, string][];
 }
 

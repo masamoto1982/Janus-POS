@@ -13,6 +13,7 @@ pub mod catalog;
 pub mod mat;
 pub mod rng;
 pub mod store;
+pub mod tax;
 
 #[cfg(feature = "wasm")]
 pub mod wasm;

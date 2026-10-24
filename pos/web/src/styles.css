@@ -181,7 +181,8 @@ button { touch-action: manipulation; }
 .reg-top .info { flex: 1 0 100%; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 14px; min-width: 0; font-size: 12px; white-space: nowrap; }
 .reg-top .info .point { color: var(--msg-weak); }
 .reg-top .info .point.read { color: inherit; }
-.reg-top .count b { font-size: 14px; }
+.reg-top .sum { font-size: 16px; }
+.reg-top .count b { font-size: 28px; }
 .reg-top .sum { white-space: nowrap; }
 .reg-top .action { margin-left: auto; }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }

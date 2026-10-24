@@ -23,9 +23,10 @@ describe("view helpers", () => {
   it("lays out the top bar as item count, then total, then checkout", () => {
     const html = regTop(1280, 3, `<button>会計</button>`);
     const at = (t: string) => html.indexOf(t);
-    expect(at("お買い上げ点数：<b>3</b>点")).toBeGreaterThan(-1);
-    expect(at("お買い上げ点数：<b>3</b>点")).toBeLessThan(at("お買い上げ合計額"));
-    expect(at("お買い上げ合計額")).toBeLessThan(at("<button>会計"));
+    expect(at("合計 ")).toBeGreaterThan(-1);
+    expect(at("合計 ")).toBeLessThan(at("<b>3</b>点"));
+    expect(at("<b>3</b>点")).toBeLessThan(at("1,280円"));
+    expect(at("1,280円")).toBeLessThan(at("<button>会計"));
   });
 
   it("counts items by quantity", () => {

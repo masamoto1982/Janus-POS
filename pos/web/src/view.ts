@@ -503,7 +503,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       <span class="muted">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}</span>
     </div>
-    <table class="lines cols5">${LINE_COLS}<thead><tr><th>品名</th><th class="num">数</th><th class="num">金額</th><th></th><th></th></tr></thead>
+    <table class="lines cols5">${LINE_COLS}<thead><tr><th>品名</th><th class="num">点数</th><th class="num">小計</th><th></th><th></th></tr></thead>
       <tbody>${rows || `<tr><td colspan="5" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
 }
@@ -561,11 +561,12 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  // 上の段に点数とポイントカードの読み取り状況を控えめに、下の段に合計額を大きく出す
+  // 上の段にポイントカードの読み取り状況を控えめに、下の段に「合計 x点 XXX円」を出す
   // （ポイントカードの状況はほかの場所には出さない。ボタンは合計額の右に出し、有無で点数・合計額の位置は動かない）
   const point =
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
-  return `<div class="reg-top"><small class="info"><span class="count">お買い上げ点数：<b>${count}</b>点${full}</span>${point}</small><span class="sum">お買い上げ合計額：<b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
+  const info = point ? `<small class="info">${point}</small>` : "";
+  return `<div class="reg-top">${info}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

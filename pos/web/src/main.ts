@@ -264,10 +264,6 @@ function render(): void {
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
-      // セミセルフの店員側の画面は、呼び出しが起きるまでグレーで待機する
-      el?.classList.toggle("dormant", side === "staff" && r.mode === "semi_self" && !r.staff.calls.length);
-      // セミセルフのお客様側の画面も、配色を決め直すあいだはグレーで表示する（操作はそのまま）
-      el?.classList.toggle("mono", side === "customer" && r.mode === "semi_self");
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
       // レジ画面のヘッダー（☰ は店員ログイン中の店員側だけ。時刻とベルは常時）

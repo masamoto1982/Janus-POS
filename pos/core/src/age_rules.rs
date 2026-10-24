@@ -190,6 +190,15 @@ impl AgeRules {
     }
 
     /// 商品ごとの販売個数の上限を設定する（None で外す）
+    /// ほかの商品ルール（税率設定など）の変更も、同じ変更履歴に残す
+    pub fn record(&mut self, by: &str, change: String, now: u64) {
+        self.history.push(RuleChange {
+            at: now,
+            by: by.into(),
+            change,
+        });
+    }
+
     pub fn set_limit(
         &mut self,
         code: &str,

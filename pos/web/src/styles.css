@@ -457,6 +457,10 @@ body.dragging .drop-hint { display: inline; }
 .gear, .icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .gear:hover, .icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: 14px; margin: 14px 0 6px; }
+.rules-dlg h4 { font-size: 13px; margin: 14px 0 6px; }
+.rules-dlg .rules-tab { display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; font-weight: 600; }
+.rules-dlg .rate-in { width: 6em; text-align: right; }
+.rules-dlg .owner-auth[hidden] { display: none; }
 /* お客様画面の店舗メニュー（一画面ずつ） */
 .menu-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .menu-head b { flex: 1; }

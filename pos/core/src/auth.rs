@@ -110,7 +110,7 @@ impl Authenticator {
     pub fn verify_owner(&mut self, staff_id: &str, password: &str, now: u64) -> Result<(), String> {
         let acc = account(staff_id).ok_or("従業員が見つかりません")?;
         if acc.role != Role::Owner {
-            return Err("年確ルールを変更できるのはオーナーだけです".into());
+            return Err("商品ルールを変更できるのはオーナーだけです".into());
         }
         let ok = constant_time_eq(password, acc.password);
         self.owner.check(ok, now)

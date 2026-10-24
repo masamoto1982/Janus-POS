@@ -9,7 +9,7 @@
 
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { Command, Snapshot } from "./types";
-import type { GuideKind } from "./view";
+import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 // 仮のロゴマーク（正式なロゴは後日差し替え）
 import logoUrl from "./logo.jpg";
@@ -69,11 +69,20 @@ function reset(registers: number, mats: number): void {
   t0 = performance.now();
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   buildSkeleton();
-  // 閉じたら（Esc でも）オーナーのパスワードを消す
-  rulesDlg().addEventListener("close", () => {
-    const pw = rulesDlg().querySelector<HTMLInputElement>(`[data-owner="pw"]`);
-    if (pw) pw.value = "";
-  });
+  // 閉じたら（Esc でも）認証を解除し、パスワードを消す
+  rulesDlg().addEventListener("close", lockRules);
+  rulesDlg()
+    .querySelector("[data-owner-auth]")
+    ?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-owner="${k}"]`);
+      const creds = { owner_id: field("id")?.value.trim() ?? "", password: field("pw")?.value ?? "" };
+      if (!send({ type: "verify_owner", ...creds })) return;
+      ownerAuth = creds;
+      field("pw")!.value = "";
+      rulesDlg().querySelector<HTMLElement>("[data-owner-auth]")!.hidden = true;
+      render();
+    });
   render();
 }
 
@@ -153,11 +162,14 @@ function buildSkeleton(): void {
     </footer>
     <dialog class="rules-dlg" id="rules-dlg" aria-labelledby="rules-title">
       <div class="dlg-head"><h2 id="rules-title">商品ルール設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
-      <p class="muted">変えられるのはオーナーだけです。変更のたびにここのパスワードで認証し、閉じるとパスワードは消えます。酒・たばこは法令どおり 20歳以上で固定され、変更できません。年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います。販売個数は1回のお会計で売れる上限で、超える分はスキャンしても登録されません。</p>
-      <div class="row wrap">
-        <input data-owner="id" placeholder="オーナーの従業員番号" value="9001" aria-label="オーナーの従業員番号" />
-        <input data-owner="pw" type="password" placeholder="パスワード" autocomplete="off" aria-label="オーナーのパスワード" />
-      </div>
+      <form class="owner-auth" data-owner-auth>
+        <p class="muted">商品ルールを変えられるのはオーナーだけです。オーナーの従業員番号とパスワードを入れてください。閉じると認証は解除されます。</p>
+        <div class="row wrap">
+          <input data-owner="id" placeholder="オーナーの従業員番号" value="9001" aria-label="オーナーの従業員番号" />
+          <input data-owner="pw" type="password" placeholder="パスワード" autocomplete="off" aria-label="オーナーのパスワード" />
+          <button type="submit">認証</button>
+        </div>
+      </form>
       <div class="toast" id="toast-rules"></div>
       <div data-region="owner"></div>
     </dialog>
@@ -296,7 +308,7 @@ function render(): void {
   }
   setRegion("mats", matPanel(snap));
   setRegion("bell-settings", bellSettings(snap));
-  setRegion("owner", ownerPanel(snap));
+  setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("shelf", shelfPanel(snap));
   setRegion("wallet", walletPanel());
 }
@@ -357,7 +369,7 @@ function send(cmd: Command): boolean {
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   // レジ画面には覆い隠すメッセージを出さない（登録した行が一瞬色を変えて知らせる）。
   // 知らせを出すのは、レジ画面の外（年確ルールの設定・店舗全体の操作）だけ
-  const where = cmd.type === "set_product_age" || cmd.type === "set_sale_limit" ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
+  const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {
       if (res.message) toast(where, res.message, false);
@@ -469,12 +481,27 @@ app.addEventListener("change", (e) => {
     frame();
     return;
   }
-  if (sel.dataset.age) {
-    const owner = (k: string) => app.querySelector<HTMLInputElement>(`[data-owner="${k}"]`)?.value.trim() ?? "";
+  if (sel.dataset.rulesTab !== undefined) {
+    rulesTab = sel.value as RulesTab;
+    render();
+    return;
+  }
+  if (sel.dataset.taxRate && ownerAuth) {
+    const rate = Number((sel as unknown as HTMLInputElement).value);
+    const ok = Number.isFinite(rate) && send({ type: "set_tax_rate", ...ownerAuth, class_id: sel.dataset.taxRate, rate_bp: Math.round(rate * 100) });
+    // 認められなかったら表示を元の税率に戻す
+    if (!ok) (sel as unknown as HTMLInputElement).value = (sel as unknown as HTMLInputElement).defaultValue;
+    return;
+  }
+  if (sel.dataset.taxClass && ownerAuth) {
+    const ok = send({ type: "set_product_tax", ...ownerAuth, code: sel.dataset.taxClass, class_id: sel.value });
+    if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
+    return;
+  }
+  if (sel.dataset.age && ownerAuth) {
     const ok = send({
       type: "set_product_age",
-      owner_id: owner("id"),
-      password: owner("pw"),
+      ...ownerAuth,
       code: sel.dataset.age,
       min_age: sel.value ? Number(sel.value) : null,
     });
@@ -482,12 +509,10 @@ app.addEventListener("change", (e) => {
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
-  if (sel.dataset.limit) {
-    const owner = (k: string) => app.querySelector<HTMLInputElement>(`[data-owner="${k}"]`)?.value.trim() ?? "";
+  if (sel.dataset.limit && ownerAuth) {
     const ok = send({
       type: "set_sale_limit",
-      owner_id: owner("id"),
-      password: owner("pw"),
+      ...ownerAuth,
       code: sel.dataset.limit,
       limit: sel.value ? Number(sel.value) : null,
     });
@@ -503,6 +528,20 @@ app.addEventListener("change", (e) => {
 
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
+// 商品ルール設定：開くときにオーナー認証し、閉じるまでの変更はその認証で送る（コアは操作のたびにも検証する）
+const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
+let ownerAuth: { owner_id: string; password: string } | null = null;
+let rulesTab: RulesTab = "age";
+
+function lockRules(): void {
+  ownerAuth = null;
+  const pw = rulesDlg().querySelector<HTMLInputElement>(`[data-owner="pw"]`);
+  if (pw) pw.value = "";
+  const form = rulesDlg().querySelector<HTMLElement>("[data-owner-auth]");
+  if (form) form.hidden = false;
+  render();
+}
+
 // ブラウザは操作があるまで音を出せないので、最初のタッチ・キー入力で音を準備する
 document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
@@ -512,6 +551,22 @@ app.addEventListener("click", (e) => {
   if (!b || b.disabled) return;
   if (b.hasAttribute("data-open-rules")) return rulesDlg().showModal();
   if (b.hasAttribute("data-close-rules")) return rulesDlg().close();
+  if (b.hasAttribute("data-add-tax") && ownerAuth) {
+    const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-new-tax="${k}"]`)!;
+    const rate = Number(field("rate").value || 0);
+    if (
+      send({ type: "add_tax_class", ...ownerAuth, name: field("name").value, kind: field("kind").value, rate_bp: Math.round(rate * 100) })
+    ) {
+      field("name").value = "";
+      field("rate").value = "";
+    }
+    return;
+  }
+  if (b.hasAttribute("data-save-invoice") && ownerAuth) {
+    const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-invoice="${k}"]`)!;
+    send({ type: "set_invoice", ...ownerAuth, invoice_no: field("no").value, rounding: field("rounding").value });
+    return;
+  }
   if (b.hasAttribute("data-open-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).showModal();
   if (b.hasAttribute("data-close-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).close();
   if (b.dataset.fftab) {

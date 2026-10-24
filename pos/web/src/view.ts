@@ -12,8 +12,11 @@ import type {
   MenuScreen,
   RegisterView,
   Snapshot,
+  Rounding,
   StaffLine,
   StaffView,
+  TaxKind,
+  TaxTotal,
 } from "./types";
 
 export function esc(s: unknown): string {
@@ -194,8 +197,8 @@ function methodList(method: string | null, inserted: number): string {
 const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /><col class="c-edit" /><col class="c-warn" /></colgroup>`;
 
 // 内税の表示（有人・セミセルフ共通）
-function taxNote(v: { tax8: number; tax10: number }): string {
-  return `<span class="muted tax-note">内税 8% ${yen(v.tax8)} / 10% ${yen(v.tax10)}</span>`;
+function taxNote(v: { taxes: TaxTotal[] }): string {
+  return `<span class="muted tax-note">内税 ${v.taxes.map((t) => `${esc(t.rate)} ${yen(t.tax)}`).join(" / ")}</span>`;
 }
 
 function warnCell(l: { age: number | null; limit: number | null }): string {
@@ -842,39 +845,115 @@ function limitSelect(p: Snapshot["catalog"][number]): string {
   return `<select data-limit="${esc(p.code)}" aria-label="${esc(p.name)}の販売個数の上限">${opts}</select>`;
 }
 
-/** 商品ルール：売り場のすべての商品に、商品ごとの年確ルールと販売個数の上限を付けられる */
-export function ownerPanel(s: Snapshot): string {
-  const rows = SHELVES.map((g) => {
+export type RulesTab = "age" | "limit" | "tax";
+
+const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
+  {
+    id: "age",
+    label: "年確設定",
+    note: "年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います。酒・たばこは法令どおり20歳以上で固定され、変更できません。",
+  },
+  { id: "limit", label: "制限設定", note: "1回のお会計で売れる販売個数の上限です。超える分はスキャンしても登録されません。" },
+  {
+    id: "tax",
+    label: "税率設定",
+    note: "税率は税区分ごとに持ちます。法改正で税率が変わったら区分の税率を変え、新しい税率ができたら区分を追加してください。価格は税込で、1回のお会計で税率ごとに合計してから1回だけ端数処理します。変更はこれから登録する商品から適用されます。",
+  },
+];
+
+/** 売り場の棚ごとに、商品 1 行ずつの表を作る */
+function shelfRows(s: Snapshot, cols: number, row: (p: Snapshot["catalog"][number]) => string): string {
+  return SHELVES.map((g) => {
     const items = s.catalog.filter(g.match);
     if (!items.length) return "";
-    const body = items
-      .map((p) => {
-        // 酒・たばこは法令どおりで固定。店舗ルールは付けられない
-        if (p.legal_age)
-          return `<tr><td>${esc(p.name)}</td><td><span class="tag">法令 ${p.legal_age}歳</span></td>
+    return `<tr class="grp"><th colspan="${cols}">${esc(g.label)}</th></tr>${items.map(row).join("")}`;
+  }).join("");
+}
+
+function ageRows(s: Snapshot): string {
+  return shelfRows(s, 4, (p) => {
+    // 酒・たばこは法令どおりで固定。店舗ルールは付けられない
+    if (p.legal_age)
+      return `<tr><td>${esc(p.name)}</td><td><span class="tag">法令 ${p.legal_age}歳</span></td>
           <td><span class="muted">変更できません</span></td>
-          <td class="num"><b>${p.legal_age}歳以上</b></td>
-          <td>${limitSelect(p)}</td></tr>`;
-        const ages = AGE_CHOICES.slice();
-        if (p.store_age && !ages.includes(p.store_age)) ages.push(p.store_age);
-        ages.sort((x, y) => x - y);
-        const opts = [`<option value="" ${p.store_age ? "" : "selected"}>なし</option>`]
-          .concat(ages.map((a) => `<option value="${a}" ${p.store_age === a ? "selected" : ""}>${a}歳以上</option>`))
-          .join("");
-        return `<tr><td>${esc(p.name)}</td>
+          <td class="num"><b>${p.legal_age}歳以上</b></td></tr>`;
+    const ages = AGE_CHOICES.slice();
+    if (p.store_age && !ages.includes(p.store_age)) ages.push(p.store_age);
+    ages.sort((x, y) => x - y);
+    const opts = [`<option value="" ${p.store_age ? "" : "selected"}>なし</option>`]
+      .concat(ages.map((a) => `<option value="${a}" ${p.store_age === a ? "selected" : ""}>${a}歳以上</option>`))
+      .join("");
+    return `<tr><td>${esc(p.name)}</td>
           <td><span class="muted">—</span></td>
           <td><select data-age="${esc(p.code)}" aria-label="${esc(p.name)}の店舗ルール">${opts}</select></td>
-          <td class="num">${p.age ? `<b>${p.age}歳以上</b>` : `<span class="muted">年確なし</span>`}</td>
-          <td>${limitSelect(p)}</td></tr>`;
-      })
-      .join("");
-    return `<tr class="grp"><th colspan="5">${esc(g.label)}</th></tr>${body}`;
-  }).join("");
+          <td class="num">${p.age ? `<b>${p.age}歳以上</b>` : `<span class="muted">年確なし</span>`}</td></tr>`;
+  });
+}
+
+const TAX_KINDS: { id: TaxKind; label: string }[] = [
+  { id: "standard", label: "標準税率" },
+  { id: "reduced", label: "軽減税率" },
+  { id: "zero", label: "ゼロ税率" },
+  { id: "exempt", label: "非課税・不課税" },
+];
+const ROUNDINGS: { id: Rounding; label: string }[] = [
+  { id: "floor", label: "切り捨て" },
+  { id: "half_up", label: "四捨五入" },
+  { id: "ceil", label: "切り上げ" },
+];
+const fixedZero = (k: TaxKind) => k === "zero" || k === "exempt";
+
+function taxPanel(s: Snapshot): string {
+  const t = s.tax;
+  const classes = t.classes
+    .map(
+      (c) => `<tr><td>${esc(c.name)}</td><td>${esc(c.kind_label)}</td>
+        <td class="num">${
+          fixedZero(c.kind)
+            ? `<span class="muted">0%（固定）</span>`
+            : `<input class="rate-in" type="number" min="0" max="100" step="0.01" value="${c.rate_bp / 100}" data-key="rate-${esc(c.id)}" data-tax-rate="${esc(c.id)}" aria-label="${esc(c.name)}の税率（%）" />%`
+        }</td></tr>`,
+    )
+    .join("");
+  const classOpts = (cur: string) => t.classes.map((c) => `<option value="${esc(c.id)}" ${c.id === cur ? "selected" : ""}>${esc(c.name)}（${esc(c.rate)}）</option>`).join("");
+  const products = shelfRows(
+    s,
+    2,
+    (p) => `<tr><td>${esc(p.name)}</td><td><select data-tax-class="${esc(p.code)}" aria-label="${esc(p.name)}の税区分">${classOpts(p.tax_class)}</select></td></tr>`,
+  );
+  return `<h4>税区分</h4>
+    <table class="lines rules"><thead><tr><th>区分</th><th>種類</th><th class="num">税率</th></tr></thead><tbody>${classes}</tbody></table>
+    <div class="row wrap tax-add">
+      <input data-key="new-tax-name" data-new-tax="name" placeholder="区分名（例：新軽減税率）" aria-label="追加する税区分の名前" />
+      <select data-key="new-tax-kind" data-new-tax="kind" aria-label="追加する税区分の種類">${TAX_KINDS.map((k) => `<option value="${k.id}">${k.label}</option>`).join("")}</select>
+      <input class="rate-in" type="number" min="0" max="100" step="0.01" data-key="new-tax-rate" data-new-tax="rate" placeholder="税率" aria-label="追加する税区分の税率（%）" />%
+      <button class="small" data-add-tax>区分を追加</button>
+    </div>
+    <h4>インボイス</h4>
+    <div class="row wrap">
+      <input data-key="invoice-no" data-invoice="no" value="${esc(t.invoice_no)}" placeholder="登録番号（T＋13桁）" aria-label="適格請求書発行事業者の登録番号" />
+      <label>端数処理 <select data-key="invoice-rounding" data-invoice="rounding" aria-label="消費税の端数処理">${ROUNDINGS.map((r) => `<option value="${r.id}" ${r.id === t.rounding ? "selected" : ""}>${r.label}</option>`).join("")}</select></label>
+      <button class="small" data-save-invoice>保存</button>
+    </div>
+    <h4>商品ごとの税区分</h4>
+    <table class="lines rules"><thead><tr><th>商品</th><th>税区分</th></tr></thead><tbody>${products}</tbody></table>`;
+}
+
+/** 商品ルール設定：オーナー認証のあと、年確・販売個数の制限・税率をセレクタで切り替えて設定する */
+export function ownerPanel(s: Snapshot, tab: RulesTab): string {
+  const cur = RULES_TABS.find((x) => x.id === tab) ?? RULES_TABS[0];
+  const body =
+    cur.id === "age"
+      ? `<table class="lines rules"><thead><tr><th>商品</th><th>法令</th><th>店舗の年確</th><th class="num">会計時の年確</th></tr></thead><tbody>${ageRows(s)}</tbody></table>`
+      : cur.id === "limit"
+        ? `<table class="lines rules"><thead><tr><th>商品</th><th>販売個数</th></tr></thead><tbody>${shelfRows(s, 2, (p) => `<tr><td>${esc(p.name)}</td><td>${limitSelect(p)}</td></tr>`)}</tbody></table>`
+        : taxPanel(s);
   const hist = s.age_rules.history.length
     ? s.age_rules.history.map((h) => `<li>${esc(h.by)}：${esc(h.change)}</li>`).join("")
     : `<li class="muted">変更はまだありません</li>`;
-  return `<table class="lines rules"><thead><tr><th>商品</th><th>法令</th><th>店舗の年確</th><th class="num">会計時の年確</th><th>販売個数</th></tr></thead>
-    <tbody>${rows}</tbody></table>
+  return `<label class="rules-tab">設定 <select data-rules-tab aria-label="設定する項目">${RULES_TABS.map((x) => `<option value="${x.id}" ${x.id === cur.id ? "selected" : ""}>${x.label}</option>`).join("")}</select></label>
+    <p class="muted">${cur.note}</p>
+    ${body}
     <h4>変更履歴</h4><ul>${hist}</ul>`;
 }
 

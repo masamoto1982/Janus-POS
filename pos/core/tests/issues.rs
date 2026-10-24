@@ -1695,3 +1695,81 @@ fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
         .iter()
         .any(|h| h.change.contains("2点まで → 制限なし")));
 }
+
+/// 税率設定：税率は区分のデータで持ち、法改正で税率が変わってもオーナーが区分を変えるだけで済む。
+/// 登録済みの明細は登録した時点の税率のまま。税率ごとに 1 回だけ端数処理する
+#[test]
+fn tax_rates_are_data_and_owner_only() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BEER);
+    let t = reg(&s, 1).staff.taxes;
+    assert_eq!(
+        t.iter()
+            .map(|x| (x.rate.as_str(), x.base, x.tax))
+            .collect::<Vec<_>>(),
+        vec![("8%", 0, 0), ("10%", 248, 22)]
+    );
+    // 店員は変えられない
+    assert!(run(
+        &mut s,
+        json!({"type":"set_tax_rate","owner_id":"1001","password":"1111","class_id":"standard","rate_bp":1200})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"set_tax_rate","owner_id":"9001","password":"9999","class_id":"standard","rate_bp":1200}),
+    );
+    // 登録済みのアルコールは 10% のまま、あとから登録した分は 12%
+    scan(&mut s, 1, "staff", TEA);
+    scan(&mut s, 1, "staff", BEER);
+    let t = reg(&s, 1).staff.taxes;
+    let rates: Vec<&str> = t.iter().map(|x| x.rate.as_str()).collect();
+    assert_eq!(rates, vec!["8%", "10%", "12%"]);
+    assert_eq!(t[2].tax, 248 * 1200 / 11200);
+    // ゼロ税率は 0% から変えられない。インボイスの端数処理を四捨五入に
+    assert!(run(
+        &mut s,
+        json!({"type":"set_tax_rate","owner_id":"9001","password":"9999","class_id":"zero","rate_bp":500})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"set_invoice","owner_id":"9001","password":"9999","invoice_no":"T1234567890123","rounding":"half_up"}),
+    );
+    assert_eq!(reg(&s, 1).staff.taxes[1].tax, 23);
+    assert_eq!(s.snapshot().tax.invoice_no, "T1234567890123");
+    assert_eq!(s.snapshot().age_rules.history.len(), 2);
+}
+
+/// 商品ごとに税区分を付け替えられる。代行収納（お支払い）は初めから消費税の対象外
+#[test]
+fn product_tax_class_can_be_changed() {
+    let mut s = Store::new(1, 2, 1);
+    let class = |s: &Store, code: &str| {
+        s.snapshot()
+            .catalog
+            .into_iter()
+            .find(|p| p.code == code)
+            .unwrap()
+            .tax_class
+    };
+    assert_eq!(class(&s, BILL), "exempt");
+    assert_eq!(class(&s, BREAD), "reduced");
+    ok(
+        &mut s,
+        json!({"type":"add_tax_class","owner_id":"9001","password":"9999","name":"新税率","kind":"reduced","rate_bp":500}),
+    );
+    let id = s.snapshot().tax.classes.last().unwrap().id.clone();
+    ok(
+        &mut s,
+        json!({"type":"set_product_tax","owner_id":"9001","password":"9999","code":BREAD,"class_id":id}),
+    );
+    assert_eq!(class(&s, BREAD), id);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    let t = reg(&s, 1).staff.taxes;
+    assert!(t
+        .iter()
+        .any(|x| x.rate == "5%" && x.base == 160 && x.tax == 7));
+}

@@ -2385,6 +2385,8 @@ impl Store {
                 coupon_unmatched: c.coupon_unmatched,
                 returned,
                 total,
+                tax8: t.tax_of(TaxRate::Reduced8),
+                tax10: t.tax_of(TaxRate::Standard10),
                 inserted,
                 due: total.saturating_sub(inserted),
                 point_card: t.point_card.is_some(),
@@ -2494,6 +2496,9 @@ pub struct CustomerView {
     /// 取り消して、お返しするクーポン
     pub returned: Vec<ReturnedCoupon>,
     pub total: u32,
+    /// 内税額（有人モードと同じ表示をセミセルフにも出す）
+    pub tax8: u32,
+    pub tax10: u32,
     pub inserted: u32,
     pub due: u32,
     pub point_card: bool,

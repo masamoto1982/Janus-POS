@@ -21,7 +21,7 @@
   --panel: #ffffff;
   --ink: #1d2330;
   --muted: #6b7280;
-  --line: #e2e5ea; --border: #878787;
+  --line: #e2e5ea; --border: #878787; --msg-strong: #535353; --msg-weak: #878787;
   --accent: var(--cud-blue);
   --accent-ink: #ffffff;
   --accent-soft: color-mix(in srgb, var(--cud-blue) 8%, transparent);
@@ -57,7 +57,7 @@
     --panel: #181b21;
     --ink: #e5e7eb;
     --muted: #9ca3af;
-    --line: #2a2f38; --border: #878787;
+    --line: #2a2f38; --border: #878787; --msg-strong: var(--ink); --msg-weak: #878787;
     --bill-bg: color-mix(in srgb, var(--cud-green) 20%, #181b21);
     --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, #181b21);
     --pay-bg: color-mix(in srgb, var(--cud-cyan) 15%, #181b21);
@@ -82,7 +82,7 @@
   --panel: #181b21;
   --ink: #e5e7eb;
   --muted: #9ca3af;
-  --line: #2a2f38; --border: #878787;
+  --line: #2a2f38; --border: #878787; --msg-strong: var(--ink); --msg-weak: #878787;
   --bill-bg: color-mix(in srgb, var(--cud-green) 20%, #181b21);
   --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, #181b21);
   --pay-bg: color-mix(in srgb, var(--cud-cyan) 15%, #181b21);
@@ -139,6 +139,11 @@ button { touch-action: manipulation; }
 .screen-main { flex: 4 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
 .screen.no-items .screen-items { display: none; }
+/* 文字の強弱：強いメッセージ #535353、補足の弱いメッセージは枠線と同じ #878787。強いほうが必ず大きい */
+.screen { --muted: var(--msg-weak); }
+.screen .big, .screen .guide { color: var(--msg-strong); }
+.screen .guide { font-size: 14px; }
+.screen .muted, .welcome p:not(.guide), .pair-note p, .thanks > div:not(.big) { color: var(--msg-weak); font-size: 12px; }
 .bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .bell-btn.pressing { background: var(--cud-yellow); box-shadow: inset 0 2px 6px rgba(0,0,0,.3); }
 /* FF タブ */
@@ -246,7 +251,7 @@ details summary h3 { display: inline; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
 .guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: var(--btn); color: var(--btn-ink); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
-.welcome .guide { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--accent); }
+.welcome .guide { margin-top: 8px; font-weight: 700; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }

@@ -69,6 +69,7 @@ function reset(registers: number, mats: number): void {
   t0 = performance.now();
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   buildSkeleton();
+  applyPalette(loadPalette());
   // 閉じたら（Esc でも）認証を解除し、パスワードを消す
   rulesDlg().addEventListener("close", lockRules);
   rulesDlg()
@@ -158,7 +159,10 @@ function buildSkeleton(): void {
       </div>
     </article>
     <footer class="bottom">
-      <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>
+      <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a>
+        <label class="palette-sel">お客様側の配色案 <select data-palette aria-label="お客様側の配色案">
+          <option value="a">A 空色と青</option><option value="b">B 黄緑と緑</option><option value="c">C 紫とピンク</option>
+        </select></label></p>
     </footer>
     <dialog class="rules-dlg" id="rules-dlg" aria-labelledby="rules-title">
       <div class="dlg-head"><h2 id="rules-title">商品ルール設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
@@ -455,8 +459,32 @@ app.addEventListener("keydown", (e) => {
   send({ type: "finish_insert", register });
 });
 
+// お客様側の配色案（ユーザーが選ぶまでの比較用。選んだ案はこのブラウザに覚えておく）
+function loadPalette(): string {
+  try {
+    return localStorage.getItem("janus-palette") ?? "a";
+  } catch {
+    return "a";
+  }
+}
+
+function applyPalette(p: string): void {
+  document.documentElement.dataset.palette = p;
+  const sel = app.querySelector<HTMLSelectElement>("[data-palette]");
+  if (sel) sel.value = p;
+}
+
 app.addEventListener("change", (e) => {
   const sel = e.target as HTMLSelectElement;
+  if (sel.dataset.palette !== undefined) {
+    applyPalette(sel.value);
+    try {
+      localStorage.setItem("janus-palette", sel.value);
+    } catch {
+      // 保存できなくても、この画面では切り替わる
+    }
+    return;
+  }
   if (sel.dataset.ffcheck) {
     // お渡し確認のチェック。押した画面の側からの操作になる
     const box = sel as unknown as HTMLInputElement;

@@ -171,21 +171,8 @@ button { touch-action: manipulation; }
 /* 店員画面とお客様画面は同じ内容・同じ見た目。操作している側だけ色がつく */
 .staff-screen { background: var(--cust-bg); border: 1px solid var(--border); }
 .customer-screen { background: var(--cust-bg); border: 1px solid var(--border); }
-/* お客様側の 4 段階のグレーの置き換え。
-   考え方：グレーを、同じ明るさ（L*）のパレット色に 1 対 1 で置き換える。色を抜けば元の 4 段階のグレーに戻るので、
-   色の見え方が違う人にも、明暗の段差で役割の違いがグレー版と同じように伝わる。色相は暖色の一系統（茶・朱・橙・ベージュ）にそろえる。
-   選択色 #535353（L*35）→ 茶 #804000（L*35）  選ばれている部品の地色（白文字 7.9:1）・強い文字
-   枠線色 #878787（L*56）→ 朱 #ff4b00（L*58）  枠線・弱い文字（白地 3.4:1。グレー版 3.6:1 と同じ段）
-   標準色 #aeaeae（L*71）→ 橙 #f6aa00（L*75）  押せる部品の地色（黒文字 10.7:1）
-   淡色　 #d4d4d4（L*85）→ ベージュ #ffca80（L*85）  合計エリア・薄い面・押せない部品の地色（黒文字 14:1） */
-.customer-screen {
-  --btn: var(--ac-orange); --btn-ink: #000000;
-  --btn-on: var(--ac-brown); --btn-on-ink: #ffffff;
-  --border: var(--ac-red);
-  --msg-strong: var(--ac-brown); --msg-weak: var(--ac-red);
-  --off-bg: var(--base-beige); --off-ink: var(--ac-red);
-  --reg-top-bg: var(--base-beige); --line: var(--base-beige);
-}
+/* お客様側も店員側と同じ 4 段階のグレーで表す（2026-10-25 ユーザー：色への置き換えは一旦取りやめ）。
+   パレットの変数（--base-* / --ac-*）は、次に色を当てるときのために残す */
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 /* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */
@@ -427,9 +414,8 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-/* 店員側の画面は 4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す。
-   お客様側の画面は、その 4 段階のグレーをパレットの色に置き換える */
-.staff-screen { filter: grayscale(1); }
+/* 店員側もお客様側も、4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す */
+.staff-screen, .customer-screen { filter: grayscale(1); }
 /* 操作できない側の画面（排他）：表示はそのまま（薄くしない）で、押せなくするだけ */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,

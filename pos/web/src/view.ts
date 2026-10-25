@@ -597,8 +597,9 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
 }
 
 // ---------------------------------------------------------------------------
-// レジ画面のヘッダー：左上に歯車（店員ログイン中だけ）、中央に日付と時刻、右上に呼び出しベル。
-// 時刻とベルは常に表示する。どちらが店員側・お客様側かは設置で自明なので画面には出さない
+// レジ画面のヘッダー：左上に稼働モードのバッジ、中央に日付と時刻、右上に呼び出しベル。
+// バッジは両方の画面に出す。有人モードの店員側では、バッジを押すと店舗メニュー（返品・返金、自動釣銭機など）が開く。
+// どちらが店員側・お客様側かは設置で自明なので画面には出さない
 // ---------------------------------------------------------------------------
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -610,8 +611,13 @@ export function clockText(d: Date): string {
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const call = find(r.customer.actions, "call_staff");
   const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="係員を呼ぶ（押している間鳴ります）" title="${esc(call.allowed ? "係員を呼ぶ（押している間鳴ります）" : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
-  const gear = `<button type="button" class="gear" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー"${r.staff.state === "ready" && side === "staff" ? "" : " hidden"}>☰</button>`;
-  return `<span class="head-l">${gear}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
+  const label = r.mode === "attended" ? "有人モード" : "セミセルフモード";
+  const cls = `mode-badge ${r.mode === "attended" ? "attended" : "semi"}`;
+  const badge =
+    r.mode === "attended" && r.staff.state === "ready" && side === "staff"
+      ? `<button type="button" class="${cls}" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー（返品・返金、自動釣銭機など）"${r.menu ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
+      : `<span class="${cls}">${label}</span>`;
+  return `<span class="head-l">${badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------

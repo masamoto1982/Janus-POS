@@ -278,7 +278,7 @@ function render(): void {
       el?.classList.toggle("inactive", locked);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
-      // レジ画面のヘッダー（☰ は店員ログイン中の店員側だけ。時刻とベルは常時）
+      // レジ画面のヘッダー（稼働モードのバッジ・時刻・ベル。有人モードの店員側ではバッジが店舗メニューを開く）
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side));
       setRegion(`items-${r.id}-${side}`, items);
       el?.classList.toggle("no-items", !items);

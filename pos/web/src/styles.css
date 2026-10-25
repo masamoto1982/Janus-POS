@@ -143,7 +143,8 @@ button { touch-action: manipulation; }
 .screen-cap::after { content: ""; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 /* レジ画面：ヘッダー ＋ 上 4/5 が登録画面 ＋ 下 1/5 がバーコードなしアイテム欄（複数のレジと MAT を一画面に収める） */
-.screen { position: relative; border-radius: 10px; min-width: 0; overflow: hidden; height: clamp(320px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
+/* レジ画面は角を丸めない（2026-10-25 ユーザー） */
+.screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(320px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; height: 34px; padding: 0 4px; border-bottom: 1px solid var(--border); }
 .screen-head .head-r { justify-self: end; }
 /* 稼働モードのバッジ：有人は濃いグレーの塗りに白文字、セミセルフは白地に濃いグレーの枠と文字。塗りの有無で一目で区別する */
@@ -490,9 +491,9 @@ body.dragging .drop-hint { display: inline; }
 .money-io { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust > * { min-width: 0; }
-/* 投入口・排出口はただの箱。中に「入金」「出金」のプレースホルダー */
+/* 投入口・排出口はただの箱（角は丸めない）。中に「入金」「出金」のプレースホルダー */
 .money-io .inlet, .money-io .outlet {
-  height: 40px; padding: 0 12px; border: 1.5px solid var(--border); border-radius: 8px;
+  height: 40px; padding: 0 12px; border: 1.5px solid var(--border); border-radius: 0;
   background: var(--panel); color: var(--ink); font: inherit; font-size: 16px; text-align: right;
 }
 .money-io .outlet { display: flex; align-items: center; justify-content: flex-end; }

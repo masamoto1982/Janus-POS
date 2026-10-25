@@ -1,14 +1,25 @@
-/* カラーユニバーサルデザイン（CUD）推奨の7色（2026-10-23 採用）。
-   色はこの7色（と白・黒・背景との混色）だけを使い、意味ごとの変数に割り当てる。
+/* 配色（2026-10-25 ユーザー指定）。色はこのパレット（と白・黒・背景との混色）だけを使い、意味ごとの変数に割り当てる。
+   ベースカラーは広い面積に、アクセントカラーは小さい面積に使う。
    文字は背景とのコントラスト比 4.5:1 以上の組み合わせだけにする（明るい色の上は黒文字）。 */
 :root {
-  --cud-red: #ff4b00;
-  --cud-blue: #005aff;
-  --cud-green: #03af7a;
-  --cud-cyan: #4dc4ff;
-  --cud-orange: #f6aa00;
-  --cud-yellow: #fff100;
-  --cud-black: #000000;
+  /* ベースカラー：広い面積に用いる */
+  --base-pink: #ffcabf;
+  --base-cream: #ffff80;
+  --base-lime: #d8f255;
+  --base-sky: #bfe4ff;
+  --base-beige: #ffca80;
+  --base-green: #77d9a8;
+  --base-purple: #c9ace6;
+  /* アクセントカラー：小さい面積に用いる */
+  --ac-red: #ff4b00;
+  --ac-yellow: #fff100;
+  --ac-green: #03af7a;
+  --ac-blue: #005aff;
+  --ac-sky: #4dc4ff;
+  --ac-pink: #ff8082;
+  --ac-orange: #f6aa00;
+  --ac-purple: #990099;
+  --ac-brown: #804000;
   /* ボタンの色（2026-10-24 ユーザー指定）。グレー表示の画面から色を載せ直す第一歩
      標準色 = 押せる部品すべての地色（旧「FF」ボタンの薄いグレー）
      選択色 = 選ばれている・押している部品の地色（旧「たばこ」ボタンのグレー） */
@@ -22,32 +33,32 @@
   --ink: #000000;
   --muted: #6b7280;
   --line: #d4d4d4; --border: #878787; --msg-strong: #535353; --msg-weak: #878787; --off-bg: #d4d4d4; --off-ink: #878787;
-  --accent: var(--cud-blue);
+  --accent: var(--ac-blue);
   --accent-ink: #ffffff;
-  --accent-soft: color-mix(in srgb, var(--cud-blue) 8%, transparent);
+  --accent-soft: color-mix(in srgb, var(--ac-blue) 8%, transparent);
   --reg-top-bg: #d4d4d4; /* ボタン（#aeaeae）より一段薄いグレー。黒文字で読む */
   --reg-top-ink: #000000;
   --staff-bg: #1f2937;
   --staff-ink: #f3f4f6;
   --staff-line: #374151;
   --cust-bg: #ffffff;
-  --warn: color-mix(in srgb, var(--cud-orange) 55%, black);
-  --warn-bg: color-mix(in srgb, var(--cud-orange) 22%, white);
-  --danger: color-mix(in srgb, var(--cud-red) 75%, black);
-  --danger-bg: color-mix(in srgb, var(--cud-red) 14%, white);
-  --ok: color-mix(in srgb, var(--cud-green) 70%, black);
-  --call: color-mix(in srgb, var(--cud-blue) 85%, black);
-  --call-bg: color-mix(in srgb, var(--cud-blue) 12%, white);
-  --ff: var(--cud-orange);
+  --warn: color-mix(in srgb, var(--ac-orange) 55%, black);
+  --warn-bg: color-mix(in srgb, var(--ac-orange) 22%, white);
+  --danger: color-mix(in srgb, var(--ac-red) 75%, black);
+  --danger-bg: color-mix(in srgb, var(--ac-red) 14%, white);
+  --ok: color-mix(in srgb, var(--ac-green) 70%, black);
+  --call: color-mix(in srgb, var(--ac-blue) 85%, black);
+  --call-bg: color-mix(in srgb, var(--ac-blue) 12%, white);
+  --ff: var(--ac-orange);
   --ff-ink: #000000;
-  --service: var(--cud-green);
+  --service: var(--ac-green);
   --service-ink: #000000;
-  --tob: var(--cud-blue);
+  --tob: var(--ac-blue);
   --tob-ink: #ffffff;
-  --flash: color-mix(in srgb, var(--cud-yellow) 70%, transparent);
-  --bill-bg: color-mix(in srgb, var(--cud-green) 12%, white);
-  --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, white);
-  --pay-bg: color-mix(in srgb, var(--cud-cyan) 18%, white);
+  --flash: color-mix(in srgb, var(--ac-yellow) 70%, transparent);
+  --bill-bg: color-mix(in srgb, var(--ac-green) 12%, white);
+  --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, white);
+  --pay-bg: color-mix(in srgb, var(--ac-sky) 18%, white);
   color-scheme: light;
 }
 
@@ -58,22 +69,22 @@
     --ink: #e5e7eb;
     --muted: #9ca3af;
     --line: #2a2f38; --border: #878787; --msg-strong: var(--ink); --msg-weak: #878787; --off-bg: #2a2f38; --off-ink: #878787;
-    --bill-bg: color-mix(in srgb, var(--cud-green) 20%, #181b21);
-    --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, #181b21);
-    --pay-bg: color-mix(in srgb, var(--cud-cyan) 15%, #181b21);
-    --accent: var(--cud-cyan);
+    --bill-bg: color-mix(in srgb, var(--ac-green) 20%, #181b21);
+    --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, #181b21);
+    --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, #181b21);
+    --accent: var(--ac-sky);
     --accent-ink: #000000;
-    --accent-soft: color-mix(in srgb, var(--cud-cyan) 12%, transparent);
+    --accent-soft: color-mix(in srgb, var(--ac-sky) 12%, transparent);
     --staff-bg: #111827;
     --staff-line: #2a3342;
     --cust-bg: #1d1b16;
-    --warn: var(--cud-orange);
-    --warn-bg: color-mix(in srgb, var(--cud-orange) 20%, #181b21);
-    --danger: color-mix(in srgb, var(--cud-red) 70%, white);
-    --danger-bg: color-mix(in srgb, var(--cud-red) 25%, #181b21);
-    --ok: var(--cud-green);
-    --call: var(--cud-cyan);
-    --call-bg: color-mix(in srgb, var(--cud-blue) 30%, #181b21);
+    --warn: var(--ac-orange);
+    --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, #181b21);
+    --danger: color-mix(in srgb, var(--ac-red) 70%, white);
+    --danger-bg: color-mix(in srgb, var(--ac-red) 25%, #181b21);
+    --ok: var(--ac-green);
+    --call: var(--ac-sky);
+    --call-bg: color-mix(in srgb, var(--ac-blue) 30%, #181b21);
     color-scheme: dark;
   }
 }
@@ -83,22 +94,22 @@
   --ink: #e5e7eb;
   --muted: #9ca3af;
   --line: #2a2f38; --border: #878787; --msg-strong: var(--ink); --msg-weak: #878787; --off-bg: #2a2f38; --off-ink: #878787;
-  --bill-bg: color-mix(in srgb, var(--cud-green) 20%, #181b21);
-  --coin-bg: color-mix(in srgb, var(--cud-orange) 18%, #181b21);
-  --pay-bg: color-mix(in srgb, var(--cud-cyan) 15%, #181b21);
-  --accent: var(--cud-cyan);
+  --bill-bg: color-mix(in srgb, var(--ac-green) 20%, #181b21);
+  --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, #181b21);
+  --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, #181b21);
+  --accent: var(--ac-sky);
   --accent-ink: #000000;
-  --accent-soft: color-mix(in srgb, var(--cud-cyan) 12%, transparent);
+  --accent-soft: color-mix(in srgb, var(--ac-sky) 12%, transparent);
   --staff-bg: #111827;
   --staff-line: #2a3342;
   --cust-bg: #1d1b16;
-  --warn: var(--cud-orange);
-  --warn-bg: color-mix(in srgb, var(--cud-orange) 20%, #181b21);
-  --danger: color-mix(in srgb, var(--cud-red) 70%, white);
-  --danger-bg: color-mix(in srgb, var(--cud-red) 25%, #181b21);
-  --ok: var(--cud-green);
-  --call: var(--cud-cyan);
-  --call-bg: color-mix(in srgb, var(--cud-blue) 30%, #181b21);
+  --warn: var(--ac-orange);
+  --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, #181b21);
+  --danger: color-mix(in srgb, var(--ac-red) 70%, white);
+  --danger-bg: color-mix(in srgb, var(--ac-red) 25%, #181b21);
+  --ok: var(--ac-green);
+  --call: var(--ac-sky);
+  --call-bg: color-mix(in srgb, var(--ac-blue) 30%, #181b21);
   color-scheme: dark;
 }
 
@@ -145,7 +156,7 @@ button { touch-action: manipulation; }
 .screen .guide { font-size: 14px; }
 .screen .muted, .welcome p:not(.guide), .pair-note p, .thanks > div:not(.big) { color: var(--msg-weak); font-size: 12px; }
 .bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.bell-btn.pressing { background: var(--cud-yellow); box-shadow: inset 0 2px 6px rgba(0,0,0,.3); }
+.bell-btn.pressing { background: var(--ac-yellow); box-shadow: inset 0 2px 6px rgba(0,0,0,.3); }
 /* FF タブ */
 .ff-tabs { display: flex; gap: 2px; align-items: center; flex: none; }
 .ff-tab { padding: 1px 6px; font-size: 10px; border-radius: 6px 6px 0 0; background: var(--btn); color: var(--btn-ink); border: 0; }
@@ -160,6 +171,20 @@ button { touch-action: manipulation; }
 /* 店員画面とお客様画面は同じ内容・同じ見た目。操作している側だけ色がつく */
 .staff-screen { background: var(--cust-bg); border: 1px solid var(--border); }
 .customer-screen { background: var(--cust-bg); border: 1px solid var(--border); }
+/* お客様側の 4 段階のグレーの置き換え。役割：
+   選択色（#535353）= 選ばれている・押している部品の地色と強い文字
+   枠線色（#878787）= 枠線と補足的な弱い文字（弱い文字は読めるよう文字色と同じ色にし、大きさで強弱をつける）
+   標準色（#aeaeae）= 押せる部品の地色
+   淡色（#d4d4d4）= 合計エリア・薄い面・押せない部品の地色
+   配色は空色と青（2026-10-25 ユーザーが案A を採用） */
+.customer-screen {
+  --btn: var(--base-sky); --btn-ink: #000000;
+  --btn-on: var(--ac-blue); --btn-on-ink: #ffffff;
+  --border: var(--ac-sky);
+  --msg-strong: var(--ac-blue); --msg-weak: var(--ac-blue);
+  --off-bg: var(--base-cream); --off-ink: var(--ac-blue);
+  --reg-top-bg: var(--base-cream); --line: var(--base-cream);
+}
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 /* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */
@@ -224,7 +249,7 @@ input, select {
 
 .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }
 /* 年確は押せない注意のしるし：角を丸めず、枠線色の枠と文字だけ */
-.tag.age { background: transparent; color: var(--border); border: 1px solid var(--border); border-radius: 0; }
+.tag.age { background: transparent; color: var(--msg-weak); border: 1px solid var(--border); border-radius: 0; }
 .tag.warn, .tag.ff-waiting { background: var(--warn-bg); color: var(--warn); }
 .tag.ok, .tag.ff-received { background: transparent; color: var(--ok); border: 1px solid var(--border); }
 .warn { color: var(--warn); }
@@ -292,8 +317,8 @@ details summary h3 { display: inline; }
 
 button.cash { min-width: 56px; color: var(--ink); }
 button.cash.bill { background: var(--bill-bg); color: var(--ink); border: 1px solid var(--border); }
-button.cash.coin { background: var(--cud-orange); color: #000000; border-radius: 999px; }
-button.emoney { background: var(--cud-cyan); color: #000000; }
+button.cash.coin { background: var(--ac-orange); color: #000000; border-radius: 999px; }
+button.emoney { background: var(--ac-sky); color: #000000; }
 
 
 .mats { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -346,8 +371,8 @@ button.emoney { background: var(--cud-cyan); color: #000000; }
 .mat-area .toast.show { display: block; }
 /* レジ本体の呼び出しランプ（音ではなく光で知らせる）。放置が長いほど速く点滅（--blink） */
 .lamp { width: 16px; height: 16px; border-radius: 50%; background: var(--line); border: 2px solid var(--border); flex: none; }
-.lamp.on { background: var(--cud-yellow); border-color: var(--border); box-shadow: 0 0 10px 3px color-mix(in srgb, var(--cud-yellow) 70%, transparent); animation: lamp-blink var(--blink, 1s) steps(2, jump-none) infinite; }
-@keyframes lamp-blink { 50% { background: color-mix(in srgb, var(--cud-yellow) 25%, white); box-shadow: none; } }
+.lamp.on { background: var(--ac-yellow); border-color: var(--border); box-shadow: 0 0 10px 3px color-mix(in srgb, var(--ac-yellow) 70%, transparent); animation: lamp-blink var(--blink, 1s) steps(2, jump-none) infinite; }
+@keyframes lamp-blink { 50% { background: color-mix(in srgb, var(--ac-yellow) 25%, white); box-shadow: none; } }
 @media (prefers-reduced-motion: reduce) { .lamp.on { animation: none; } }
 
 /* 売り場：スクロールしてもドラッグ元が見えるよう追従させる */
@@ -401,8 +426,9 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-/* レジの画面は有人・セミセルフ、店員側・お客様側を問わず色彩を使わない（ログインや呼び出しの有無でも変えない） */
-.screen { filter: grayscale(1); }
+/* 店員側の画面は 4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す。
+   お客様側の画面は、その 4 段階のグレーをパレットの色に置き換える */
+.staff-screen { filter: grayscale(1); }
 /* 操作できない側の画面（排他）：両方の画面ともカラーで表示し、その画面から触れない操作だけをグレーアウトする */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,

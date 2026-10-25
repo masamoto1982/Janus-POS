@@ -429,27 +429,24 @@ body.dragging .drop-hint { display: inline; }
 /* 店員側の画面は 4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す。
    お客様側の画面は、その 4 段階のグレーをパレットの色に置き換える */
 .staff-screen { filter: grayscale(1); }
-/* 操作できない側の画面（排他）：両方の画面ともカラーで表示し、その画面から触れない操作だけをグレーアウトする */
+/* 操作できない側の画面（排他）：表示はそのまま（薄くしない）で、押せなくするだけ */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
 .screen.inactive [data-region] select, .screen.inactive [data-region] summary {
   pointer-events: none;
 }
-.screen.inactive [data-region] input, .screen.inactive [data-region] select, .screen.inactive [data-region] summary { color: var(--off-ink); }
 /* 例外：お客様本人が押すボタン（年齢確認・代行収納の内容確認）はお客様側の画面でだけ、
    どちらが操作側でも押せる。係員側では押せない */
 .customer-screen.inactive [data-region] .customer-only button { pointer-events: auto; filter: none; opacity: 1; }
 .staff-screen .customer-only button { pointer-events: none; }
 /* 身分証の確認は店員本人が行う：店員側の画面でだけ押せる */
 .staff-screen.inactive [data-region] .staff-only button:not(:disabled) { pointer-events: auto; filter: none; opacity: 1; }
-/* 押せないボタンは半透明にせず、四色のグレーで描く（塗り #D4D4D4・文字 #878787）。枠線だけの補助ボタンは塗らない */
-.screen button:disabled,
-.customer-screen.inactive [data-region] button:not(.customer-only button),
-.staff-screen.inactive [data-region] button:not(.staff-only button:not(:disabled)),
-.staff-screen .customer-only button {
+/* 押せないボタン（売り切れなど）は半透明にせず、四色のグレーで描く（塗り #D4D4D4・文字 #878787）。枠線だけの補助ボタンは塗らない。
+   もう一方の画面が操作中で、この画面から触れないだけのボタンは、薄くせずふだんの色のまま表示する */
+.screen button:disabled {
   opacity: 1 !important; filter: none !important; background: var(--off-bg) !important; color: var(--off-ink) !important; border-color: var(--border);
 }
-.screen .guide-btn:disabled, .screen.inactive [data-region] .guide-btn { background: transparent !important; }
+.screen .guide-btn:disabled { background: transparent !important; }
 .id-card { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; }
 .id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
 .id-head button { min-width: 64px; }
@@ -515,8 +512,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-cust { grid-column: 1; } }
 /* 歯車は両方の画面に出る。操作できない側の歯車は押せない */
-.screen.inactive .gear { pointer-events: none; color: var(--off-ink); }
-.screen.inactive .gear { filter: grayscale(1); }
+.screen.inactive .gear { pointer-events: none; }
 
 /* セミセルフの店員呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ） */
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }

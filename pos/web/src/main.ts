@@ -302,15 +302,29 @@ function render(): void {
     // 入金ボックス：支払方法が決まったら中の文字を点滅させる。現金は投入額を積み上げて見せる
     const inlet = app.querySelector<HTMLInputElement>(`[data-inlet="${r.id}"]`);
     if (inlet) {
-      inlet.classList.toggle("blink", !r.menu && r.staff.phase === "paying" && r.staff.method !== null);
-      if (!inlet.dataset.typed) inlet.value = !r.menu && r.staff.inserted ? String(r.staff.inserted) : "";
+      const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null;
+      // 電子マネーのチャージ・残高確認の間は、その手続きの案内を出す
+      const emoney = r.menu ? null : r.emoney;
+      inlet.classList.toggle("blink", paying || (!!emoney && emoney.kind !== "menu"));
+      // 中の文字は、選んだ支払方法に合わせて何をすればよいかを示す
+      inlet.placeholder = emoney && emoney.kind !== "menu"
+        ? emoney.kind === "charge"
+          ? emoney.inserted
+            ? "電子マネーをかざす"
+            : "紙幣を入れる"
+          : "電子マネーをかざす"
+        : paying
+          ? (INLET_HINT[r.staff.method!] ?? "入金")
+          : "入金";
+      const shown = emoney ? emoney.inserted : !r.menu ? r.staff.inserted : 0;
+      if (!inlet.dataset.typed) inlet.value = shown ? String(shown) : "";
     }
   }
   setRegion("mats", matPanel(snap));
   setRegion("bell-settings", bellSettings(snap));
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("shelf", shelfPanel(snap));
-  setRegion("wallet", walletPanel());
+  setRegion("wallet", walletPanel(snap.emoney_balance));
 }
 
 
@@ -634,24 +648,25 @@ app.addEventListener("click", (e) => {
 // ドラッグ＆ドロップ（ポインターイベントで実装。マウスでもタッチでも同じに動く）
 // ---------------------------------------------------------------------------
 
+// 入金ボックスの中の文字（支払方法ごと）
+const INLET_HINT: Record<string, string> = {
+  cash: "現金を入れる",
+  emoney: "電子マネーをかざす",
+  qr: "バーコードをかざす",
+  credit: "カードをかざす",
+  points: "ポイントをかざす",
+};
+
 function setupDrag(): void {
   const ghost = document.getElementById("ghost")!;
   // code：レジで読むもの（商品・ポイントカード）、wallet：お金（cash:金額）とかざす決済（pay:方法）
   let drag: { code?: string; wallet?: string; label: string; x: number; y: number; moved: boolean; id: number } | null = null;
-  let over: Element | null = null;
 
   const target = (x: number, y: number): Element | null => document.elementFromPoint(x, y)?.closest("[data-drop], [data-cash-drop]") ?? null;
-  const highlight = (el: Element | null) => {
-    if (over === el) return;
-    over?.classList.remove("drop-over");
-    el?.classList.add("drop-over");
-    over = el;
-  };
   const end = () => {
     drag = null;
     ghost.hidden = true;
-    highlight(null);
-    document.body.classList.remove("dragging");
+    document.body.classList.remove("dragging", "dragging-wallet");
   };
 
   app.addEventListener("pointerdown", (e) => {
@@ -669,9 +684,10 @@ function setupDrag(): void {
       ghost.textContent = drag.label;
       ghost.hidden = false;
       document.body.classList.add("dragging");
+      // お金・決済は入金ボックスにも落とせる
+      document.body.classList.toggle("dragging-wallet", !!drag.wallet);
     }
     ghost.style.transform = `translate(${e.clientX + 8}px, ${e.clientY + 8}px)`;
-    highlight(target(e.clientX, e.clientY));
   });
 
   window.addEventListener("pointerup", (e) => {

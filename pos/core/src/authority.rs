@@ -122,6 +122,10 @@ pub enum Action {
     EndStaffMode,
     CashOut,
     CashIn,
+    /// 電子マネーのチャージ・残高確認を始める・やめる（お買い物の途中でもできる）
+    Emoney,
+    /// 電子マネーの残高が足りないときの選択（やめる・残りを現金で・チャージする）
+    ResolveEmoneyShort,
 }
 
 /// 画面のボタンになる操作。どちらの画面にも同じボタンが並ぶ（店員画面・お客様画面の区別はない）
@@ -149,6 +153,8 @@ pub const ACTIONS: &[Action] = &[
     Action::EndStaffMode,
     Action::CashOut,
     Action::CashIn,
+    Action::Emoney,
+    Action::ResolveEmoneyShort,
 ];
 
 /// 判定に必要な取引の状態。
@@ -185,6 +191,8 @@ pub struct Context {
     pub touching: Option<Side>,
     /// 買い物点数が上限（[`MAX_ITEMS`]）に達している
     pub items_full: bool,
+    /// 電子マネーで払おうとしたが残高が足りず、どうするか選んでいない
+    pub emoney_short: bool,
 }
 
 /// 一回のお買い物で登録できる点数（数量の合計）の上限。
@@ -199,7 +207,9 @@ pub const TOUCH_LOCK_MS: u64 = 1000;
 impl Context {
     /// 決済を止めている理由（なければ None）。決済の関門はここに集める。
     pub fn payment_blocker(&self) -> Option<&'static str> {
-        if self.bill_pending {
+        if self.emoney_short {
+            Some(EMONEY_SHORT)
+        } else if self.bill_pending {
             Some(BILL_UNCONFIRMED)
         } else if self.age_choice_pending {
             Some("店員が年齢確認をするか選んでいません")
@@ -227,6 +237,16 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります。対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
+const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";
+
+/// 電子マネーのチャージ・残高確認（残高不足の対応中は、その選択肢から）
+fn emoney(c: &Context) -> Result<(), Denial> {
+    require(!c.emoney_short, EMONEY_SHORT)
+}
+
+fn resolve_emoney_short(c: &Context) -> Result<(), Denial> {
+    require(c.emoney_short, "電子マネーの残高は足りています")
+}
 
 /// 代行収納の内容・金額・件数の確認。受け付けたらすぐ（どちらのモードでも、お客様が押す）
 fn confirm_bill(c: &Context) -> Result<(), Denial> {
@@ -434,6 +454,8 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
         Action::CallStaff => Err("係員が対応中です"),
+        Action::Emoney => emoney(c),
+        Action::ResolveEmoneyShort => resolve_emoney_short(c),
     }
 }
 
@@ -476,6 +498,8 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::ConfirmBillPayment => confirm_bill(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::CallStaff => Ok(()),
+        Action::Emoney => emoney(c),
+        Action::ResolveEmoneyShort => resolve_emoney_short(c),
         Action::CompleteService
         | Action::VoidTransaction
         | Action::SetMode
@@ -512,6 +536,7 @@ mod tests {
                                             coupon_unmatched: false,
                                             touching: None,
                                             items_full: false,
+                                            emoney_short: false,
                                             customer_turn,
                                             mode,
                                             phase,

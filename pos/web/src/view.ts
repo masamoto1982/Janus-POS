@@ -471,6 +471,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment")) : methodList(v.method, v.inserted)}
         ${v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due) : ""}
+        ${emoneyPaidNote(r)}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -593,7 +594,50 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
   // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
   if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return confirm(callScreen(r, snap.now));
   const notice = callNotice(r, snap.now, side);
+  if (!r.menu && (r.emoney || r.emoney_short !== null)) return notice + confirm(emoneyScreen(r, side));
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
+}
+
+/**
+ * 電子マネーの選択（チャージ・残高確認）・チャージ・残高確認・残高不足。登録画面を置き換えて一つだけ出す。
+ * ボタンを押すのはセミセルフではお客様、有人モードでは店員（お客様側には案内だけ）
+ */
+function emoneyScreen(r: RegisterView, side: Side): string {
+  const reg = r.id;
+  const ro = r.mode === "attended" && side === "customer";
+  const actions = r.mode === "semi_self" ? r.customer.actions : r.staff.actions;
+  const close = (label: string) => (ro ? "" : btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip"));
+  if (r.emoney_short !== null) {
+    const st = find(actions, "resolve_emoney_short");
+    const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
+    return `<div class="point-screen emoney-screen">
+        <div class="big">電子マネーの残高が足りません</div>
+        <p>残高 <b>${yen(r.emoney_short)}</b>・お支払い <b>${yen(r.staff.due)}</b></p>
+        ${ro ? "" : `<div class="emoney-choices">${choice("電子マネーを使うのをやめる", "cancel")}${choice("残りを現金で払う", "cash")}${choice("電子マネーをチャージする", "charge", "primary")}</div>`}
+      </div>`;
+  }
+  const e = r.emoney!;
+  if (e.kind === "menu") {
+    const go = (label: string, kind: string) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
+    return `<div class="point-screen emoney-screen">
+        <div class="big">チャージか残高確認を選んでください</div>
+        ${ro ? "" : `<div class="emoney-choices">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("やめる")}`}
+      </div>`;
+  }
+  if (e.kind === "inquiry")
+    return e.balance === null
+      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを入金ボックスにかざしてください</div>${close("やめる")}</div>`
+      : `<div class="point-screen emoney-screen"><p>電子マネーの残高</p><div class="big emoney-balance">${yen(e.balance)}</div>${close("閉じる")}</div>`;
+  return `<div class="point-screen emoney-screen">
+      <div class="big">チャージする紙幣を入れてください</div>
+      <p>${e.inserted ? "入れおわったら、電子マネーを入金ボックスにかざしてください" : "入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）"}</p>
+      ${close("やめる")}
+    </div>`;
+}
+
+/** 残りを現金で払うとき、電子マネーで払った分を知らせる */
+function emoneyPaidNote(r: RegisterView): string {
+  return r.emoney_paid ? `<p class="muted">電子マネーで ${yen(r.emoney_paid)} お支払い済みです。残りを現金でお支払いください</p>` : "";
 }
 
 // ---------------------------------------------------------------------------
@@ -623,13 +667,12 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
 // ---------------------------------------------------------------------------
 // バーコードなしアイテム欄（レジ画面の下 1/3）
 // - セミセルフ：店員呼び出しベルのショートカット（FF・サービス・たばこ）。触れている間だけ鳴る
-// - 有人・セルフ：FF をタブ（揚げ物・常温総菜・ドリンク・コールド・中華まん・おでん）で選ぶ。
+// - 有人・セルフ：FF をタブ（フライヤー・ドリンク・コールド・中華まん・おでん）で選ぶ。
 //   各タブはページを持ち、売れ筋順に並ぶので先頭ページの最上部に売れ筋が来る
 // ---------------------------------------------------------------------------
 
 export const FF_TABS = [
-  ["fried", "揚げ物"],
-  ["deli", "常温総菜"],
+  ["fried", "フライヤー"],
   ["drink", "ドリンク"],
   ["cold", "コールド"],
   ["bun", "中華まん"],
@@ -638,9 +681,25 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
+/**
+ * 最下段：FF・サービス・たばこ（有人モードの店員側は FF のタブ）と「電子マネー」ボタン
+ * （押してからチャージか残高確認を選ぶ。お買い物の途中でも使える）
+ */
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
+  if (r.menu || r.emoney || r.emoney_short !== null) return "";
+  // 有人モードのお客様側には出さない（店員側の画面から操作する）
+  if (r.mode === "attended" && side === "customer") return "";
+  const st = find(r.mode === "semi_self" ? r.customer.actions : r.staff.actions, "emoney");
+  // サービスボタン（二行目「お支払い・荷物」）と同じ意匠
+  const em = btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, st, "call-btn emoney").replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
+  // セミセルフは FF・サービス・たばこ・電子マネーの 4 つを同じ幅に並べる。
+  // 有人モードの店員側は FF タブの区画と電子マネーの区画を仕切る（電子マネーの幅はセミセルフと同じ 1/4）
+  if (r.mode === "semi_self") return itemsMain(r, snap, ui, side).replace(/<\/div>$/, `${em}</div>`);
+  return `<div class="items-split"><div class="items-main">${itemsMain(r, snap, ui, side)}</div><div class="emoney-area">${em}</div></div>`;
+}
+
+function itemsMain(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   const reg = r.id;
-  if (r.menu) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -651,8 +710,6 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
-  // 有人モードの FF は店員側の画面から登録する（お客様側には出さない）
-  if (r.mode === "attended" && side === "customer") return "";
   // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
   // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
@@ -802,7 +859,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
     return screen(`<div class="paybox center">
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center")}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center")}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}${emoneyPaidNote(r)}
       </div>`);
   return `${top}${notice}
     <div class="staff-head">${taxNote(c)}</div>
@@ -1021,7 +1078,7 @@ function walletItem(key: string, name: string, sub: string, cls: string): string
     <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
 }
 
-export function walletPanel(): string {
+export function walletPanel(emoneyBalance: number): string {
   const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "紙幣", "bill"));
   const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "硬貨", "coin"));
   const cards = [
@@ -1031,7 +1088,7 @@ export function walletPanel(): string {
     item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
     walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
     walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
-    walletItem("pay:emoney", "電子マネー", "端末にかざす", "pay"),
+    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay"),
   ];
   // 見出しなしの一つの並び（表示スペースの節約）
   return `<div class="shelf"><div class="items">${[...bills, ...coins, ...cards].join("")}</div></div>`;

@@ -1182,7 +1182,7 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
     );
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 8_640 + 1_200 + 248);
@@ -1772,4 +1772,176 @@ fn product_tax_class_can_be_changed() {
     assert!(t
         .iter()
         .any(|x| x.rate == "5%" && x.base == 160 && x.tax == 7));
+}
+
+fn emoney_balance(s: &Store) -> u32 {
+    s.snapshot().emoney_balance
+}
+
+/// 「電子マネー」ボタンでチャージか残高確認を選ぶ。残高確認はかざすと残高が出る。お買い物の途中でも開ける
+#[test]
+fn emoney_inquiry_shows_the_balance() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"customer","kind":"menu"}),
+    );
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"tap_emoney","register":1,"method":"emoney"})
+        )
+        .is_err(),
+        "先に選ぶ"
+    );
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),
+    );
+    assert_eq!(reg(&s, 1).emoney.unwrap().balance, None);
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    assert_eq!(reg(&s, 1).emoney.unwrap().balance, Some(1_000));
+    ok(
+        &mut s,
+        json!({"type":"close_emoney","register":1,"side":"customer"}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.emoney.is_none());
+    assert_eq!(v.customer.lines.len(), 1, "お買い物はそのまま");
+}
+
+/// チャージ：紙幣だけを入れてかざす。上限 20,000 円。やめると紙幣は排出口に戻る
+#[test]
+fn emoney_charge_takes_bills_up_to_the_limit() {
+    let mut s = Store::new(1, 2, 1);
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
+    );
+    assert!(
+        run(&mut s, json!({"type":"insert","register":1,"amount":500})).is_err(),
+        "硬貨は使えない"
+    );
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"tap_emoney","register":1,"method":"emoney"})
+        )
+        .is_err(),
+        "まだ入れていない"
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));
+    ok(&mut s, json!({"type":"insert","register":1,"amount":5000}));
+    assert!(
+        run(&mut s, json!({"type":"insert","register":1,"amount":5000})).is_err(),
+        "上限を超える"
+    );
+    assert_eq!(reg(&s, 1).emoney.unwrap().inserted, 15_000);
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    assert_eq!(emoney_balance(&s), 16_000);
+    assert!(reg(&s, 1).emoney.is_none());
+
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":2000}));
+    ok(
+        &mut s,
+        json!({"type":"close_emoney","register":1,"side":"customer"}),
+    );
+    assert_eq!(reg(&s, 1).outlet, 2000);
+    assert_eq!(emoney_balance(&s), 16_000);
+}
+
+/// 残高不足の会計に進めるまで（7 個 × 160 円 = 1,120 円、残高 1,000 円）
+fn short_checkout(s: &mut Store) {
+    for _ in 0..7 {
+        scan(s, 1, "customer", BREAD);
+    }
+    ok(s, json!({"type":"checkout","register":1,"side":"customer"}));
+    confirm_point(s, 1);
+    ok(
+        s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    ok(
+        s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    let v = reg(s, 1);
+    assert_eq!(v.emoney_short, Some(1_000));
+    assert!(v.last_receipt.is_none());
+    assert!(
+        !allowed(&v, Side::Customer, Action::InsertCash),
+        "選ぶまで払えない"
+    );
+}
+
+/// 残高不足は「使うのをやめる」「残りを現金で払う」「チャージする」に分かれる
+#[test]
+fn emoney_short_offers_three_choices() {
+    // やめる：支払方法の選び直しへ
+    let mut s = Store::new(1, 2, 1);
+    short_checkout(&mut s);
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.emoney_short, None);
+    assert_eq!(v.customer.method, None);
+    assert_eq!(emoney_balance(&s), 1_000);
+
+    // 残りを現金で：残高を使い切り、残り 120 円を現金で
+    let mut s = Store::new(1, 2, 1);
+    short_checkout(&mut s);
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.due, 120);
+    assert_eq!(v.emoney_paid, 1_000);
+    assert_eq!(emoney_balance(&s), 0);
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"back_to_registering","register":1,"side":"customer"})
+        )
+        .is_err(),
+        "電子マネーで払った後は登録に戻れない"
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.outlet, 880);
+    assert_eq!(v.last_receipt.unwrap().method, "電子マネー・現金");
+
+    // チャージ：入れてかざし、もう一度かざして払う
+    let mut s = Store::new(1, 2, 1);
+    short_checkout(&mut s);
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"charge"}),
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    assert_eq!(emoney_balance(&s), 2_000);
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 1_120);
+    assert_eq!(emoney_balance(&s), 880);
 }

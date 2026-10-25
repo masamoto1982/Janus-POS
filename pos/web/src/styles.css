@@ -146,6 +146,12 @@ button { touch-action: manipulation; }
 .screen { position: relative; border-radius: 10px; min-width: 0; overflow: hidden; height: clamp(320px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; height: 34px; padding: 0 4px; border-bottom: 1px solid var(--border); }
 .screen-head .head-r { justify-self: end; }
+/* 稼働モードのバッジ：有人は濃いグレーの塗りに白文字、セミセルフは白地に濃いグレーの枠と文字。塗りの有無で一目で区別する */
+.mode-badge { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 8px; border-radius: 0; font-size: 12px; font-weight: 700; line-height: 1; white-space: nowrap; }
+.mode-badge.attended { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
+.mode-badge.semi { background: #ffffff; color: var(--msg-strong); border: 1px solid var(--msg-strong); }
+button.mode-badge { min-height: 0; cursor: pointer; }
+.mode-badge .caret { font-size: 10px; }
 .screen-head .clock { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-main { flex: 4 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
@@ -464,8 +470,8 @@ body.dragging .drop-hint { display: inline; }
 .idle { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
 /* 店舗メニューの歯車（レジ画面ヘッダーの左上。店員ログイン中だけ） */
-.gear, .icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
-.gear:hover, .icon-btn:hover { color: var(--ink); }
+.icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+.icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: 14px; margin: 14px 0 6px; }
 .rules-dlg h4 { font-size: 13px; margin: 14px 0 6px; }
 .rules-dlg .rules-tab { display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; font-weight: 600; }
@@ -499,7 +505,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-cust { grid-column: 1; } }
 /* 歯車は両方の画面に出る。操作できない側の歯車は押せない */
-.screen.inactive .gear { pointer-events: none; }
+.screen.inactive .mode-badge { pointer-events: none; }
 
 /* セミセルフの店員呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ） */
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }

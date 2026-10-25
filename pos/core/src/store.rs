@@ -95,6 +95,42 @@ impl CashOutKind {
     }
 }
 
+/// 電子マネーの手続き（レジ画面の最下段の右のボタン）
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EmoneyKind {
+    /// チャージ：紙幣を入金ボックスに入れて、電子マネーをかざす
+    Charge,
+    /// 残高照会：電子マネーをかざすと残高を出す
+    Inquiry,
+}
+
+/// 電子マネーの残高が足りないときの選択
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShortChoice {
+    /// 電子マネーを使うのをやめる（支払方法を選び直す）
+    Cancel,
+    /// 残高をすべて使い、残りを現金で払う
+    Cash,
+    /// 電子マネーをチャージする（済んだらもう一度かざす）
+    Charge,
+}
+
+/// 電子マネーの残高の上限（チャージで超えられない）
+pub const EMONEY_MAX: u32 = 20_000;
+/// シミュレーターの電子マネー（財布に 1 枚）の最初の残高。残高不足を試しやすい額にしておく
+pub const EMONEY_INITIAL: u32 = 1_000;
+
+/// 開いている電子マネーの手続き
+#[derive(Clone, Debug)]
+enum EmoneyTask {
+    /// shown：かざして残高を出した
+    Inquiry { shown: bool },
+    /// inserted：チャージ用に入れた紙幣
+    Charge { inserted: Cash },
+}
+
 /// 店員呼び出しボタンのショートカット（FF は FfButton）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -210,6 +246,23 @@ pub enum Command {
         register: u8,
         #[serde(default)]
         method: Option<PaymentMethod>,
+    },
+    /// 電子マネーのチャージ・残高照会を始める（お買い物の途中でもよい）
+    StartEmoney {
+        register: u8,
+        side: Side,
+        kind: EmoneyKind,
+    },
+    /// 電子マネーの手続きをやめる・閉じる（チャージ用に入れた紙幣は出金ボックスに返す）
+    CloseEmoney {
+        register: u8,
+        side: Side,
+    },
+    /// 電子マネーの残高が足りないときの選択
+    ResolveEmoneyShort {
+        register: u8,
+        side: Side,
+        choice: ShortChoice,
     },
     /// 店員呼び出しボタンに触れた。topic はショートカットボタン（サービス・たばこ）。
     /// 省略時は「係員を呼ぶ」。離す（ReleaseCall）まで MAT が鳴る
@@ -364,6 +417,9 @@ impl Command {
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
             | C::TapEmoney { register, .. }
+            | C::StartEmoney { register, .. }
+            | C::CloseEmoney { register, .. }
+            | C::ResolveEmoneyShort { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
             | C::ConfirmPointCard { register, .. }
@@ -394,6 +450,9 @@ impl Command {
             | C::BackToRegistering { side, .. }
             | C::SelectPayment { side, .. }
             | C::ConfirmPointCard { side, .. }
+            | C::StartEmoney { side, .. }
+            | C::CloseEmoney { side, .. }
+            | C::ResolveEmoneyShort { side, .. }
             | C::Claim { side, .. } => Some(*side),
             // 店舗メニューと入出金はお客様画面で行う
             C::FfButton { .. }
@@ -498,6 +557,10 @@ struct Txn {
     inserted: Cash,
     /// セミセルフで店員が会計に進め、お客様に支払いを任せている（店員が名札を読むと解除）
     customer_turn: bool,
+    /// 電子マネーで先に払った額（残高不足で「残りを現金で払う」を選んだとき）
+    emoney_paid: u32,
+    /// 電子マネーで払おうとしたが残高が足りず、どうするか選んでいない
+    emoney_short: bool,
 }
 
 impl Txn {
@@ -546,6 +609,11 @@ impl Txn {
     fn total(&self) -> u32 {
         let gross: u32 = self.lines.iter().map(Line::amount).sum();
         gross.saturating_sub(self.discount_of(None))
+    }
+
+    /// これから払う額（電子マネーで先に払った分を除く）
+    fn due(&self) -> u32 {
+        self.total().saturating_sub(self.emoney_paid)
     }
 
     /// 税率ごとの対象額と内税額（インボイス：税率ごとに合計してから 1 回だけ端数処理する）。
@@ -730,6 +798,8 @@ struct Register {
     touch: Option<(Side, u64)>,
     /// お客様画面の呼び出しボタンが押されている（触れている間 MAT が鳴る）
     pressing: bool,
+    /// 開いている電子マネーの手続き（チャージ・残高照会）
+    emoney: Option<EmoneyTask>,
 }
 
 impl Register {
@@ -817,6 +887,7 @@ impl Register {
             menu_open: self.menu.is_some(),
             touching: self.touch.map(|(side, _)| side),
             items_full: t.item_count() >= MAX_ITEMS,
+            emoney_short: t.emoney_short,
         }
     }
 }
@@ -854,6 +925,8 @@ pub struct Store {
     /// MAT を鳴らした回数（ボタンを押した・呼び出しが起きた）
     presses: u64,
     receipts: u32,
+    /// 財布の電子マネーの残高
+    emoney_balance: u32,
 }
 
 fn customer_side() -> Side {
@@ -985,6 +1058,7 @@ impl Store {
                     menu: None,
                     touch: None,
                     pressing: false,
+                    emoney: None,
                 }
             })
             .collect();
@@ -1005,6 +1079,7 @@ impl Store {
             seen_raised: 0,
             presses: 0,
             receipts: 0,
+            emoney_balance: EMONEY_INITIAL,
         }
     }
 
@@ -1257,6 +1332,9 @@ impl Store {
             C::BackToRegistering { register, side } => {
                 self.check(register, side, Action::BackToRegistering)?;
                 let r = self.reg_mut(register)?;
+                if r.txn.emoney_paid > 0 {
+                    return Err("電子マネーで一部お支払い済みです。残りをお支払いください".into());
+                }
                 r.txn.paying = false;
                 r.txn.method = None;
                 r.txn.customer_turn = false;
@@ -1372,7 +1450,12 @@ impl Store {
             } => self.insert_cash(register, denomination, count),
             C::FinishInsert { register } => self.finish_insert(register),
             C::TapEmoney { register, method } => {
+                // チャージ・残高照会の手続き中なら、そちらに使う
+                if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
+                    return self.tap_emoney_task(register, method);
+                }
                 self.check(register, Side::Customer, Action::TapEmoney)?;
+                let balance = self.emoney_balance;
                 let r = self.reg_mut(register)?;
                 let chosen = r.txn.method.unwrap_or(PaymentMethod::Emoney);
                 if let Some(m) = method.filter(|&m| m != chosen) {
@@ -1383,8 +1466,88 @@ impl Store {
                     ));
                 }
                 let method = chosen;
-                let total = r.txn.total();
-                self.settle(register, method, total, Cash::default())
+                let due = r.txn.due();
+                if method == PaymentMethod::Emoney {
+                    if balance < due {
+                        // 残高不足：やめる・残りを現金で払う・チャージするから選んでもらう
+                        r.txn.emoney_short = true;
+                        return done(format!(
+                            "電子マネーの残高が足りません（残高 {balance}円・お支払い {due}円）"
+                        ));
+                    }
+                    self.emoney_balance -= due;
+                }
+                self.settle(register, method, due, Cash::default())
+            }
+            C::StartEmoney {
+                register,
+                side,
+                kind,
+            } => {
+                self.check(register, side, Action::Emoney)?;
+                let r = self.reg_mut(register)?;
+                if r.emoney.is_some() {
+                    return Err("電子マネーの手続き中です".into());
+                }
+                r.emoney = Some(match kind {
+                    EmoneyKind::Inquiry => EmoneyTask::Inquiry { shown: false },
+                    EmoneyKind::Charge => EmoneyTask::Charge {
+                        inserted: Cash::default(),
+                    },
+                });
+                done(match kind {
+                    EmoneyKind::Inquiry => "電子マネーを入金ボックスにかざしてください",
+                    EmoneyKind::Charge => {
+                        "チャージする金額の紙幣を入金ボックスに入れ、電子マネーをかざしてください"
+                    }
+                })
+            }
+            C::CloseEmoney { register, side } => {
+                self.check(register, side, Action::Emoney)?;
+                let r = self.reg_mut(register)?;
+                match r.emoney.take() {
+                    None => Err("電子マネーの手続きはしていません".into()),
+                    Some(EmoneyTask::Charge { inserted }) if inserted.total() > 0 => {
+                        let back = inserted.total();
+                        r.outlet.merge(&inserted);
+                        done(format!(
+                            "チャージをやめました。{back}円を出金ボックスから取り出してください"
+                        ))
+                    }
+                    Some(EmoneyTask::Charge { .. }) => done("チャージをやめました"),
+                    Some(EmoneyTask::Inquiry { .. }) => done("残高照会を閉じました"),
+                }
+            }
+            C::ResolveEmoneyShort {
+                register,
+                side,
+                choice,
+            } => {
+                self.check(register, side, Action::ResolveEmoneyShort)?;
+                let balance = self.emoney_balance;
+                let r = self.reg_mut(register)?;
+                r.txn.emoney_short = false;
+                match choice {
+                    ShortChoice::Cancel => {
+                        r.txn.method = None;
+                        done("電子マネーを使うのをやめました。お支払い方法を選んでください")
+                    }
+                    ShortChoice::Cash => {
+                        r.txn.emoney_paid += balance;
+                        r.txn.method = Some(PaymentMethod::Cash);
+                        let due = r.txn.due();
+                        self.emoney_balance = 0;
+                        done(format!(
+                            "電子マネーで {balance}円 お支払いしました。残り {due}円を現金でお支払いください"
+                        ))
+                    }
+                    ShortChoice::Charge => {
+                        r.emoney = Some(EmoneyTask::Charge {
+                            inserted: Cash::default(),
+                        });
+                        done("チャージする金額の紙幣を入金ボックスに入れ、電子マネーをかざしてください")
+                    }
+                }
             }
             C::CallStaff { register, topic } => {
                 self.check_active(register, Action::CallStaff)?;
@@ -1423,6 +1586,8 @@ impl Store {
                 r.menu = None;
                 let txn = std::mem::take(&mut r.txn);
                 let back = txn.inserted.total();
+                // 電子マネーで先に払った分は、電子マネーに戻す
+                self.emoney_balance += txn.emoney_paid;
                 for l in &txn.lines {
                     if l.kind
                         == (LineKind::Ff {
@@ -2042,13 +2207,75 @@ impl Store {
     }
 
     fn insert_cash(&mut self, register: u8, d: u32, count: u32) -> Result<Outcome, String> {
-        self.check(register, Side::Customer, Action::InsertCash)?;
         if !is_valid_denomination(d) {
             return Err("使えない金種です".into());
         }
         let mut c = Cash::default();
         c.add(d, count.max(1));
+        if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
+            return self.charge_cash(register, c);
+        }
+        self.check(register, Side::Customer, Action::InsertCash)?;
         self.pay_cash(register, c)
+    }
+
+    /// 電子マネーの手続き中に入金ボックスへ入れたお金（チャージは紙幣だけ）
+    fn charge_cash(&mut self, register: u8, c: Cash) -> Result<Outcome, String> {
+        let balance = self.emoney_balance;
+        let r = self.reg_mut(register)?;
+        let Some(EmoneyTask::Charge { inserted }) = &mut r.emoney else {
+            return Err("残高照会中です。お金は受け付けません".into());
+        };
+        if c.0.iter().any(|&(d, n)| n > 0 && d < 1000) {
+            return Err("チャージは千円札・紙幣で入れてください".into());
+        }
+        if balance + inserted.total() + c.total() > EMONEY_MAX {
+            return Err(format!(
+                "チャージすると残高の上限（{EMONEY_MAX}円）を超えます"
+            ));
+        }
+        inserted.merge(&c);
+        done(format!(
+            "チャージ {}円。電子マネーをかざしてください",
+            inserted.total()
+        ))
+    }
+
+    /// 電子マネーの手続き中にかざした：残高照会なら残高を出し、チャージなら入れた紙幣の分を足す
+    fn tap_emoney_task(
+        &mut self,
+        register: u8,
+        method: Option<PaymentMethod>,
+    ) -> Result<Outcome, String> {
+        if method.is_some_and(|m| m != PaymentMethod::Emoney) {
+            return Err("電子マネーをかざしてください".into());
+        }
+        let balance = self.emoney_balance;
+        let r = self.reg_mut(register)?;
+        let paying_emoney = r.txn.paying && r.txn.method == Some(PaymentMethod::Emoney);
+        match &mut r.emoney {
+            Some(EmoneyTask::Inquiry { shown }) => {
+                *shown = true;
+                done(format!("電子マネーの残高は {balance}円です"))
+            }
+            Some(EmoneyTask::Charge { inserted }) => {
+                let amount = inserted.total();
+                if amount == 0 {
+                    return Err("先にチャージする紙幣を入金ボックスに入れてください".into());
+                }
+                let cash = std::mem::take(inserted);
+                r.drawer.cash.merge(&cash);
+                r.emoney = None;
+                self.emoney_balance += amount;
+                let now = self.emoney_balance;
+                done(if paying_emoney {
+                    format!("{amount}円チャージしました（残高 {now}円）。もう一度電子マネーをかざしてください")
+                } else {
+                    format!("{amount}円チャージしました（残高 {now}円）")
+                })
+            }
+            None => Err("電子マネーの手続きはしていません".into()),
+        }
     }
 
     /// 投入口：店舗メニューの入金・両替画面が開いていればそちら、なければお会計の支払い
@@ -2080,6 +2307,9 @@ impl Store {
             Some((MenuScreen::Deposit, _)) => self.cash_in(register, CashInKind::Deposit, amount),
             Some((MenuScreen::Changer, to)) => self.exchange(register, amount, to),
             Some(_) => Err("この画面ではお金を受け付けません".into()),
+            None if self.reg(register).is_some_and(|r| r.emoney.is_some()) => {
+                self.charge_cash(register, Cash::from_amount(amount))
+            }
             None => {
                 self.check(register, Side::Customer, Action::InsertCash)?;
                 self.pay_cash(register, Cash::from_amount(amount))
@@ -2121,7 +2351,7 @@ impl Store {
         r.txn.method = Some(PaymentMethod::Cash);
         r.txn.inserted.merge(&c);
         let paid = r.txn.inserted.total();
-        let total = r.txn.total();
+        let total = r.txn.due();
         if paid < total {
             return done(format!("{paid}円 投入（あと {}円）", total - paid));
         }
@@ -2137,7 +2367,7 @@ impl Store {
         if paid == 0 {
             return Err("お金を入れてください".into());
         }
-        let total = r.txn.total();
+        let total = r.txn.due();
         if paid < total {
             return Err(format!("あと {}円 入れてください", total - paid));
         }
@@ -2157,11 +2387,12 @@ impl Store {
         let now = self.now;
         let r = self.reg_mut(register)?;
         let total = r.txn.total();
+        let due = r.txn.due();
         // 釣銭は紙幣・硬貨をそろえて一度に渡したものとする（排出タイミングは扱わない。cash.rs 参照）
         for (d, n) in &inserted.0 {
             r.drawer.cash.add(*d, *n);
         }
-        let change = match r.drawer.take(paid - total, true) {
+        let change = match r.drawer.take(paid - due, true) {
             Ok(c) => c,
             Err(e) => {
                 for (d, n) in &inserted.0 {
@@ -2180,7 +2411,11 @@ impl Store {
             no,
             at: now,
             total,
-            method: method.label(),
+            method: if txn.emoney_paid > 0 {
+                "電子マネー・現金"
+            } else {
+                method.label()
+            },
             paid,
             change_total: change.total(),
             change,
@@ -2367,6 +2602,7 @@ impl Store {
                 rounding: self.tax.rounding,
             },
             categories: Category::ALL.iter().map(|c| (*c, c.label())).collect(),
+            emoney_balance: self.emoney_balance,
         }
     }
 
@@ -2509,7 +2745,7 @@ impl Store {
                 point_pending: c.point_pending,
                 method: t.method,
                 inserted,
-                due: total.saturating_sub(inserted),
+                due: t.due().saturating_sub(inserted),
                 payment_blocker: c.payment_blocker(),
                 calls,
                 actions: actions(c_side, ACTIONS),
@@ -2526,7 +2762,7 @@ impl Store {
                 total,
                 taxes: taxes.clone(),
                 inserted,
-                due: total.saturating_sub(inserted),
+                due: t.due().saturating_sub(inserted),
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
@@ -2540,6 +2776,20 @@ impl Store {
                 payment_blocker: c.payment_blocker(),
                 actions: actions(c_side, ACTIONS),
             },
+            emoney: r.emoney.as_ref().map(|e| match e {
+                EmoneyTask::Inquiry { shown } => EmoneyView {
+                    kind: EmoneyKind::Inquiry,
+                    inserted: 0,
+                    balance: shown.then_some(self.emoney_balance),
+                },
+                EmoneyTask::Charge { inserted } => EmoneyView {
+                    kind: EmoneyKind::Charge,
+                    inserted: inserted.total(),
+                    balance: None,
+                },
+            }),
+            emoney_short: t.emoney_short.then_some(self.emoney_balance),
+            emoney_paid: t.emoney_paid,
             last_receipt: r.last_receipt.clone(),
         }
     }
@@ -2681,7 +2931,22 @@ pub struct RegisterView {
     pub change_left: bool,
     pub staff: StaffView,
     pub customer: CustomerView,
+    /// 開いている電子マネーの手続き（チャージ・残高照会）
+    pub emoney: Option<EmoneyView>,
+    /// 電子マネーの残高が足りず、どうするかを選んでもらう（値は残高）
+    pub emoney_short: Option<u32>,
+    /// このお会計で電子マネーから払った額（残りを現金で払うとき）
+    pub emoney_paid: u32,
     pub last_receipt: Option<Receipt>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct EmoneyView {
+    pub kind: EmoneyKind,
+    /// チャージ用に入れた紙幣の合計
+    pub inserted: u32,
+    /// 残高照会でかざしたあとの残高
+    pub balance: Option<u32>,
 }
 
 /// 呼び鈴（Bell）の種類。据え付け型の呼び鈴が主で、携帯型の検品端末と事務所のストアコンピューターの
@@ -2822,4 +3087,6 @@ pub struct Snapshot {
     pub catalog: Vec<CatalogItem>,
     pub tax: TaxView,
     pub categories: Vec<(Category, &'static str)>,
+    /// 財布の電子マネーの残高
+    pub emoney_balance: u32,
 }

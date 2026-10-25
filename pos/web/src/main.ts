@@ -302,18 +302,29 @@ function render(): void {
     // 入金ボックス：支払方法が決まったら中の文字を点滅させる。現金は投入額を積み上げて見せる
     const inlet = app.querySelector<HTMLInputElement>(`[data-inlet="${r.id}"]`);
     if (inlet) {
-      const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null;
-      inlet.classList.toggle("blink", paying);
+      const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null;
+      // 電子マネーのチャージ・残高照会の間は、その手続きの案内を出す
+      const emoney = r.menu ? null : r.emoney;
+      inlet.classList.toggle("blink", paying || !!emoney);
       // 中の文字は、選んだ支払方法に合わせて何をすればよいかを示す
-      inlet.placeholder = paying ? (INLET_HINT[r.staff.method!] ?? "入金") : "入金";
-      if (!inlet.dataset.typed) inlet.value = !r.menu && r.staff.inserted ? String(r.staff.inserted) : "";
+      inlet.placeholder = emoney
+        ? emoney.kind === "charge"
+          ? emoney.inserted
+            ? "電子マネーをかざす"
+            : "紙幣を入れる"
+          : "電子マネーをかざす"
+        : paying
+          ? (INLET_HINT[r.staff.method!] ?? "入金")
+          : "入金";
+      const shown = emoney ? emoney.inserted : !r.menu ? r.staff.inserted : 0;
+      if (!inlet.dataset.typed) inlet.value = shown ? String(shown) : "";
     }
   }
   setRegion("mats", matPanel(snap));
   setRegion("bell-settings", bellSettings(snap));
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("shelf", shelfPanel(snap));
-  setRegion("wallet", walletPanel());
+  setRegion("wallet", walletPanel(snap.emoney_balance));
 }
 
 

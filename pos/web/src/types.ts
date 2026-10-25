@@ -152,6 +152,12 @@ export interface RegisterView {
   menu: { screen: MenuScreen; exchange_to: number } | null;
   staff: StaffView;
   customer: CustomerView;
+  /** 開いている電子マネーの手続き（チャージ・残高照会） */
+  emoney: { kind: "charge" | "inquiry"; inserted: number; balance: number | null } | null;
+  /** 電子マネーの残高が足りないとき、その残高 */
+  emoney_short: number | null;
+  /** このお会計で電子マネーから払った額 */
+  emoney_paid: number;
   last_receipt: Receipt | null;
 }
 
@@ -198,6 +204,8 @@ export interface Snapshot {
   catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string }[];
   tax: TaxView;
   categories: [string, string][];
+  /** 財布の電子マネーの残高 */
+  emoney_balance: number;
 }
 
 export type Command = { type: string; [k: string]: unknown };

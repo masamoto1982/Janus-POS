@@ -302,7 +302,10 @@ function render(): void {
     // 入金ボックス：支払方法が決まったら中の文字を点滅させる。現金は投入額を積み上げて見せる
     const inlet = app.querySelector<HTMLInputElement>(`[data-inlet="${r.id}"]`);
     if (inlet) {
-      inlet.classList.toggle("blink", !r.menu && r.staff.phase === "paying" && r.staff.method !== null);
+      const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null;
+      inlet.classList.toggle("blink", paying);
+      // 中の文字は、選んだ支払方法に合わせて何をすればよいかを示す
+      inlet.placeholder = paying ? (INLET_HINT[r.staff.method!] ?? "入金") : "入金";
       if (!inlet.dataset.typed) inlet.value = !r.menu && r.staff.inserted ? String(r.staff.inserted) : "";
     }
   }
@@ -633,6 +636,15 @@ app.addEventListener("click", (e) => {
 // ---------------------------------------------------------------------------
 // ドラッグ＆ドロップ（ポインターイベントで実装。マウスでもタッチでも同じに動く）
 // ---------------------------------------------------------------------------
+
+// 入金ボックスの中の文字（支払方法ごと）
+const INLET_HINT: Record<string, string> = {
+  cash: "現金を入れる",
+  emoney: "電子マネーをかざす",
+  qr: "バーコードをかざす",
+  credit: "カードをかざす",
+  points: "ポイントをかざす",
+};
 
 function setupDrag(): void {
   const ghost = document.getElementById("ghost")!;

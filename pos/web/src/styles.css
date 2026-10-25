@@ -185,6 +185,35 @@ button { touch-action: manipulation; }
   --off-bg: var(--base-cream); --off-ink: var(--ac-blue);
   --reg-top-bg: var(--base-cream); --line: var(--base-cream);
 }
+/* 切り替えられる配色テーマ（実在のチェーン名・ロゴは使わず、色の組み合わせだけを用意する） */
+/* オレンジと緑 */
+:root[data-palette="orange"] .customer-screen {
+  --btn: var(--base-beige);
+  --btn-on: var(--ac-orange); --btn-on-ink: #000000;
+  --border: var(--ac-green);
+  --msg-strong: var(--ac-brown); --msg-weak: var(--ac-brown);
+  --off-bg: var(--base-cream); --off-ink: var(--ac-brown);
+  --reg-top-bg: var(--base-cream); --line: var(--base-cream);
+}
+/* 青と白 */
+:root[data-palette="blue"] .customer-screen {
+  --btn: var(--base-sky);
+  --btn-on: var(--ac-blue); --btn-on-ink: #ffffff;
+  --border: var(--ac-blue);
+  --msg-strong: var(--ac-blue); --msg-weak: var(--ac-blue);
+  --off-bg: color-mix(in srgb, var(--base-sky) 45%, white); --off-ink: var(--ac-blue);
+  --reg-top-bg: color-mix(in srgb, var(--base-sky) 45%, white); --line: color-mix(in srgb, var(--base-sky) 45%, white);
+}
+/* 緑と青 */
+:root[data-palette="green"] .customer-screen {
+  --btn: var(--base-green);
+  --btn-on: var(--ac-blue); --btn-on-ink: #ffffff;
+  --border: var(--ac-green);
+  --msg-strong: var(--ac-blue); --msg-weak: var(--ac-blue);
+  --off-bg: color-mix(in srgb, var(--base-green) 35%, white); --off-ink: var(--ac-blue);
+  --reg-top-bg: color-mix(in srgb, var(--base-green) 35%, white); --line: color-mix(in srgb, var(--base-green) 35%, white);
+}
+.palette-sel { display: inline-flex; gap: 6px; align-items: center; margin-left: 12px; font-size: 12px; color: var(--muted); }
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 /* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */

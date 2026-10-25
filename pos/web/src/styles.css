@@ -176,7 +176,7 @@ button { touch-action: manipulation; }
    枠線色（#878787）= 枠線と補足的な弱い文字（弱い文字は読めるよう文字色と同じ色にし、大きさで強弱をつける）
    標準色（#aeaeae）= 押せる部品の地色
    淡色（#d4d4d4）= 合計エリア・薄い面・押せない部品の地色
-   案A 空色と青（既定） */
+   配色は空色と青（2026-10-25 ユーザーが案A を採用） */
 .customer-screen {
   --btn: var(--base-sky); --btn-ink: #000000;
   --btn-on: var(--ac-blue); --btn-on-ink: #ffffff;
@@ -185,25 +185,6 @@ button { touch-action: manipulation; }
   --off-bg: var(--base-cream); --off-ink: var(--ac-blue);
   --reg-top-bg: var(--base-cream); --line: var(--base-cream);
 }
-/* 案B 黄緑と緑（緑の地には黒文字） */
-:root[data-palette="b"] .customer-screen {
-  --btn: var(--base-lime);
-  --btn-on: var(--ac-green); --btn-on-ink: #000000;
-  --border: var(--ac-green);
-  --msg-strong: var(--ac-brown); --msg-weak: var(--ac-brown);
-  --off-bg: var(--base-cream); --off-ink: var(--ac-brown);
-  --reg-top-bg: var(--base-cream); --line: var(--base-cream);
-}
-/* 案C 紫とピンク */
-:root[data-palette="c"] .customer-screen {
-  --btn: var(--base-purple);
-  --btn-on: var(--ac-purple); --btn-on-ink: #ffffff;
-  --border: var(--ac-pink);
-  --msg-strong: var(--ac-purple); --msg-weak: var(--ac-purple);
-  --off-bg: var(--base-pink); --off-ink: var(--ac-purple);
-  --reg-top-bg: var(--base-pink); --line: var(--base-pink);
-}
-.palette-sel { display: inline-flex; gap: 6px; align-items: center; margin-left: 12px; font-size: 12px; color: var(--muted); }
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 /* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */
@@ -446,7 +427,7 @@ body.dragging .drop-hint { display: inline; }
 .copyright a:hover { color: var(--accent); }
 
 /* 店員側の画面は 4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す。
-   お客様側の画面は、その 4 段階のグレーをパレットの色に置き換える（配色案は下の data-palette で切り替える） */
+   お客様側の画面は、その 4 段階のグレーをパレットの色に置き換える */
 .staff-screen { filter: grayscale(1); }
 /* 操作できない側の画面（排他）：両方の画面ともカラーで表示し、その画面から触れない操作だけをグレーアウトする */
 .banner.watch { background: var(--line); color: var(--ink); }

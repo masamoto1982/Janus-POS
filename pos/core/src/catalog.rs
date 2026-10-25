@@ -182,7 +182,6 @@ pub const CATALOG: &[Product] = &[
 #[serde(rename_all = "snake_case")]
 pub enum FfTab {
     Fried,
-    Deli,
     Drink,
     Cold,
     Bun,
@@ -192,8 +191,7 @@ pub enum FfTab {
 impl FfTab {
     pub fn label(self) -> &'static str {
         match self {
-            FfTab::Fried => "揚げ物",
-            FfTab::Deli => "常温総菜",
+            FfTab::Fried => "フライヤー",
             FfTab::Drink => "ドリンク",
             FfTab::Cold => "コールド",
             FfTab::Bun => "中華まん",
@@ -203,16 +201,17 @@ impl FfTab {
 }
 
 /// FF のタブ分けと並び順。各タブの中は売れ筋順で、先頭ページの最上部に売れ筋が来る。
-/// 画面に収めるため各タブ 4 品（1 ページ）。ドリンクだけはページ送りを見せるため 8 品（2 ページ）
+/// 画面に収めるため各タブ 4 品（1 ページ）。フライヤーとドリンクは 8 品（2 ページ）。
+/// フライヤーの 2 ページ目は、廃止した常温総菜タブの商品
 pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF01", FfTab::Fried),
     ("FF02", FfTab::Fried),
     ("FF03", FfTab::Fried),
     ("FF04", FfTab::Fried),
-    ("FF21", FfTab::Deli),
-    ("FF22", FfTab::Deli),
-    ("FF23", FfTab::Deli),
-    ("FF24", FfTab::Deli),
+    ("FF21", FfTab::Fried),
+    ("FF22", FfTab::Fried),
+    ("FF23", FfTab::Fried),
+    ("FF24", FfTab::Fried),
     ("FF31", FfTab::Drink),
     ("FF32", FfTab::Drink),
     ("FF33", FfTab::Drink),
@@ -358,17 +357,24 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ff_tabs_fit_one_page_except_drinks() {
+    fn ff_tabs_fit_one_page_except_fryer_and_drinks() {
         for tab in [
             FfTab::Fried,
-            FfTab::Deli,
             FfTab::Drink,
             FfTab::Cold,
             FfTab::Bun,
             FfTab::Oden,
         ] {
             let n = FF_MENU.iter().filter(|(_, t)| *t == tab).count();
-            assert_eq!(n, if tab == FfTab::Drink { 8 } else { 4 }, "{tab:?}");
+            assert_eq!(
+                n,
+                if matches!(tab, FfTab::Drink | FfTab::Fried) {
+                    8
+                } else {
+                    4
+                },
+                "{tab:?}"
+            );
         }
         for (code, _) in FF_MENU {
             assert!(

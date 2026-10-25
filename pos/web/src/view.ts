@@ -667,13 +667,12 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
 // ---------------------------------------------------------------------------
 // バーコードなしアイテム欄（レジ画面の下 1/3）
 // - セミセルフ：店員呼び出しベルのショートカット（FF・サービス・たばこ）。触れている間だけ鳴る
-// - 有人・セルフ：FF をタブ（揚げ物・常温総菜・ドリンク・コールド・中華まん・おでん）で選ぶ。
+// - 有人・セルフ：FF をタブ（フライヤー・ドリンク・コールド・中華まん・おでん）で選ぶ。
 //   各タブはページを持ち、売れ筋順に並ぶので先頭ページの最上部に売れ筋が来る
 // ---------------------------------------------------------------------------
 
 export const FF_TABS = [
-  ["fried", "揚げ物"],
-  ["deli", "常温総菜"],
+  ["fried", "フライヤー"],
   ["drink", "ドリンク"],
   ["cold", "コールド"],
   ["bun", "中華まん"],
@@ -683,8 +682,8 @@ export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
 /**
- * 最下段は 4:1 に分ける。4 に FF・サービス・たばこ（有人モードの店員側は FF のタブ）、
- * 1 に「電子マネー」ボタン（押してからチャージか残高確認を選ぶ。お買い物の途中でも使える）
+ * 最下段：FF・サービス・たばこ（有人モードの店員側は FF のタブ）と「電子マネー」ボタン
+ * （押してからチャージか残高確認を選ぶ。お買い物の途中でも使える）
  */
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   if (r.menu || r.emoney || r.emoney_short !== null) return "";
@@ -693,7 +692,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const st = find(r.mode === "semi_self" ? r.customer.actions : r.staff.actions, "emoney");
   // サービスボタン（二行目「お支払い・荷物」）と同じ意匠
   const em = btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, st, "call-btn emoney").replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
-  return `<div class="items-split"><div class="items-main">${itemsMain(r, snap, ui, side)}</div>${em}</div>`;
+  // セミセルフは FF・サービス・たばこ・電子マネーの 4 つを同じ幅に並べる。
+  // 有人モードの店員側は FF タブの区画と電子マネーの区画を仕切る（電子マネーの幅はセミセルフと同じ 1/4）
+  if (r.mode === "semi_self") return itemsMain(r, snap, ui, side).replace(/<\/div>$/, `${em}</div>`);
+  return `<div class="items-split"><div class="items-main">${itemsMain(r, snap, ui, side)}</div><div class="emoney-area">${em}</div></div>`;
 }
 
 function itemsMain(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {

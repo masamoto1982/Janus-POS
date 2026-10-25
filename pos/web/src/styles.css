@@ -171,19 +171,20 @@ button { touch-action: manipulation; }
 /* 店員画面とお客様画面は同じ内容・同じ見た目。操作している側だけ色がつく */
 .staff-screen { background: var(--cust-bg); border: 1px solid var(--border); }
 .customer-screen { background: var(--cust-bg); border: 1px solid var(--border); }
-/* お客様側の 4 段階のグレーの置き換え。役割：
-   選択色（#535353）= 選ばれている・押している部品の地色と強い文字
-   枠線色（#878787）= 枠線と補足的な弱い文字（弱い文字は読めるよう文字色と同じ色にし、大きさで強弱をつける）
-   標準色（#aeaeae）= 押せる部品の地色
-   淡色（#d4d4d4）= 合計エリア・薄い面・押せない部品の地色
-   配色は空色と青（2026-10-25 ユーザーが案A を採用） */
+/* お客様側の 4 段階のグレーの置き換え。
+   考え方：グレーを、同じ明るさ（L*）のパレット色に 1 対 1 で置き換える。色を抜けば元の 4 段階のグレーに戻るので、
+   色の見え方が違う人にも、明暗の段差で役割の違いがグレー版と同じように伝わる。色相は暖色の一系統（茶・朱・橙・ベージュ）にそろえる。
+   選択色 #535353（L*35）→ 茶 #804000（L*35）  選ばれている部品の地色（白文字 7.9:1）・強い文字
+   枠線色 #878787（L*56）→ 朱 #ff4b00（L*58）  枠線・弱い文字（白地 3.4:1。グレー版 3.6:1 と同じ段）
+   標準色 #aeaeae（L*71）→ 橙 #f6aa00（L*75）  押せる部品の地色（黒文字 10.7:1）
+   淡色　 #d4d4d4（L*85）→ ベージュ #ffca80（L*85）  合計エリア・薄い面・押せない部品の地色（黒文字 14:1） */
 .customer-screen {
-  --btn: var(--base-sky); --btn-ink: #000000;
-  --btn-on: var(--ac-blue); --btn-on-ink: #ffffff;
-  --border: var(--ac-sky);
-  --msg-strong: var(--ac-blue); --msg-weak: var(--ac-blue);
-  --off-bg: var(--base-cream); --off-ink: var(--ac-blue);
-  --reg-top-bg: var(--base-cream); --line: var(--base-cream);
+  --btn: var(--ac-orange); --btn-ink: #000000;
+  --btn-on: var(--ac-brown); --btn-on-ink: #ffffff;
+  --border: var(--ac-red);
+  --msg-strong: var(--ac-brown); --msg-weak: var(--ac-red);
+  --off-bg: var(--base-beige); --off-ink: var(--ac-red);
+  --reg-top-bg: var(--base-beige); --line: var(--base-beige);
 }
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }

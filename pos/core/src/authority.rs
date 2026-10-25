@@ -122,7 +122,7 @@ pub enum Action {
     EndStaffMode,
     CashOut,
     CashIn,
-    /// 電子マネーのチャージ・残高照会を始める・やめる（お買い物の途中でもできる）
+    /// 電子マネーのチャージ・残高確認を始める・やめる（お買い物の途中でもできる）
     Emoney,
     /// 電子マネーの残高が足りないときの選択（やめる・残りを現金で・チャージする）
     ResolveEmoneyShort,
@@ -239,7 +239,7 @@ const COUPON_UNMATCHED: Denial =
 const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";
 
-/// 電子マネーのチャージ・残高照会（残高不足の対応中は、その選択肢から）
+/// 電子マネーのチャージ・残高確認（残高不足の対応中は、その選択肢から）
 fn emoney(c: &Context) -> Result<(), Denial> {
     require(!c.emoney_short, EMONEY_SHORT)
 }

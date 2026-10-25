@@ -303,11 +303,11 @@ function render(): void {
     const inlet = app.querySelector<HTMLInputElement>(`[data-inlet="${r.id}"]`);
     if (inlet) {
       const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null;
-      // 電子マネーのチャージ・残高照会の間は、その手続きの案内を出す
+      // 電子マネーのチャージ・残高確認の間は、その手続きの案内を出す
       const emoney = r.menu ? null : r.emoney;
-      inlet.classList.toggle("blink", paying || !!emoney);
+      inlet.classList.toggle("blink", paying || (!!emoney && emoney.kind !== "menu"));
       // 中の文字は、選んだ支払方法に合わせて何をすればよいかを示す
-      inlet.placeholder = emoney
+      inlet.placeholder = emoney && emoney.kind !== "menu"
         ? emoney.kind === "charge"
           ? emoney.inserted
             ? "電子マネーをかざす"

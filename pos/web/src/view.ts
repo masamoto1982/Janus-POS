@@ -599,7 +599,7 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
 }
 
 /**
- * 電子マネーのチャージ・残高照会・残高不足。登録画面を置き換えて一つだけ出す。
+ * 電子マネーの選択（チャージ・残高確認）・チャージ・残高確認・残高不足。登録画面を置き換えて一つだけ出す。
  * ボタンを押すのはセミセルフではお客様、有人モードでは店員（お客様側には案内だけ）
  */
 function emoneyScreen(r: RegisterView, side: Side): string {
@@ -617,6 +617,13 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       </div>`;
   }
   const e = r.emoney!;
+  if (e.kind === "menu") {
+    const go = (label: string, kind: string) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
+    return `<div class="point-screen emoney-screen">
+        <div class="big">チャージか残高確認を選んでください</div>
+        ${ro ? "" : `<div class="emoney-choices">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("やめる")}`}
+      </div>`;
+  }
   if (e.kind === "inquiry")
     return e.balance === null
       ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを入金ボックスにかざしてください</div>${close("やめる")}</div>`
@@ -677,15 +684,16 @@ export type FfUi = { tab: string; page: number };
 
 /**
  * 最下段は 4:1 に分ける。4 に FF・サービス・たばこ（有人モードの店員側は FF のタブ）、
- * 1 に電子マネーのチャージと残高照会（お買い物の途中でも使える）
+ * 1 に「電子マネー」ボタン（押してからチャージか残高確認を選ぶ。お買い物の途中でも使える）
  */
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   if (r.menu || r.emoney || r.emoney_short !== null) return "";
   // 有人モードのお客様側には出さない（店員側の画面から操作する）
   if (r.mode === "attended" && side === "customer") return "";
   const st = find(r.mode === "semi_self" ? r.customer.actions : r.staff.actions, "emoney");
-  const em = (label: string, kind: string) => btn(label, { type: "start_emoney", register: r.id, side, kind }, st, "emoney-btn");
-  return `<div class="items-split"><div class="items-main">${itemsMain(r, snap, ui, side)}</div><div class="emoney-col">${em("チャージ", "charge")}${em("残高照会", "inquiry")}</div></div>`;
+  // サービスボタン（二行目「お支払い・荷物」）と同じ意匠
+  const em = btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, st, "call-btn emoney").replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
+  return `<div class="items-split"><div class="items-main">${itemsMain(r, snap, ui, side)}</div>${em}</div>`;
 }
 
 function itemsMain(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {

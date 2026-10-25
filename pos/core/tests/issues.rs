@@ -1778,11 +1778,23 @@ fn emoney_balance(s: &Store) -> u32 {
     s.snapshot().emoney_balance
 }
 
-/// 残高照会：かざすと残高が出る。お買い物の途中でも開ける
+/// 「電子マネー」ボタンでチャージか残高確認を選ぶ。残高確認はかざすと残高が出る。お買い物の途中でも開ける
 #[test]
 fn emoney_inquiry_shows_the_balance() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"customer","kind":"menu"}),
+    );
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"tap_emoney","register":1,"method":"emoney"})
+        )
+        .is_err(),
+        "先に選ぶ"
+    );
     ok(
         &mut s,
         json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),

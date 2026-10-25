@@ -638,20 +638,12 @@ function setupDrag(): void {
   const ghost = document.getElementById("ghost")!;
   // code：レジで読むもの（商品・ポイントカード）、wallet：お金（cash:金額）とかざす決済（pay:方法）
   let drag: { code?: string; wallet?: string; label: string; x: number; y: number; moved: boolean; id: number } | null = null;
-  let over: Element | null = null;
 
   const target = (x: number, y: number): Element | null => document.elementFromPoint(x, y)?.closest("[data-drop], [data-cash-drop]") ?? null;
-  const highlight = (el: Element | null) => {
-    if (over === el) return;
-    over?.classList.remove("drop-over");
-    el?.classList.add("drop-over");
-    over = el;
-  };
   const end = () => {
     drag = null;
     ghost.hidden = true;
-    highlight(null);
-    document.body.classList.remove("dragging");
+    document.body.classList.remove("dragging", "dragging-wallet");
   };
 
   app.addEventListener("pointerdown", (e) => {
@@ -669,9 +661,10 @@ function setupDrag(): void {
       ghost.textContent = drag.label;
       ghost.hidden = false;
       document.body.classList.add("dragging");
+      // お金・決済は入金ボックスにも落とせる
+      document.body.classList.toggle("dragging-wallet", !!drag.wallet);
     }
     ghost.style.transform = `translate(${e.clientX + 8}px, ${e.clientY + 8}px)`;
-    highlight(target(e.clientX, e.clientY));
   });
 
   window.addEventListener("pointerup", (e) => {

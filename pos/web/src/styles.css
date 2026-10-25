@@ -402,9 +402,11 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 /* ドロップ先 */
 .drop-hint { display: none; margin-left: 8px; letter-spacing: 0; }
 body.dragging, body.dragging * { cursor: grabbing !important; }
-body.dragging .screen { outline: 2px dashed var(--muted); outline-offset: -2px; }
+/* アプリ全体の原則：枠線を点線にする＝操作を受け付けている、枠線の点滅＝注意喚起。
+   ドラッグ中は、落とせる先（レジ画面、お金・決済なら入金ボックス）の枠線を点線にする。太さは変えない */
+body.dragging .screen { border-style: dashed; }
+body.dragging-wallet .money-io .inlet { border-style: dashed; }
 body.dragging .drop-hint { display: inline; }
-.screen.drop-over { outline: 3px solid var(--accent) !important; outline-offset: -3px; }
 .drag-ghost {
   position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none;
   background: var(--accent); color: var(--accent-ink); padding: 6px 10px; border-radius: 8px; font-weight: 600;

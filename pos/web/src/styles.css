@@ -568,6 +568,8 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 /* セミセルフの待ち受け：右下の角を頂点に最も明るくなる背景。その明るい角に電子マネーの文字リンクを置く
    （バーコードを読む案内ボタンから離し、電子マネーにスキャンが要ると誤解させない） */
 .scan-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px 36px;
-  background: radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--cust-bg) 70%, #ffffff) 0%, color-mix(in srgb, var(--cust-bg) 70%, #ffffff) 12%, color-mix(in srgb, var(--cust-bg) 86%, var(--ink)) 80%); }
+  --glow: color-mix(in srgb, var(--cust-bg) 70%, #ffffff); --dim: color-mix(in srgb, var(--cust-bg) 88%, var(--ink));
+  /* 右下の角を中心にした円。円の中は角に向かって明るくなり、円の外は一様に少し暗い */
+  background: radial-gradient(circle 240px at 100% 100%, var(--glow) 0%, var(--glow) 35%, var(--dim) 100%) var(--dim); }
 .scan-welcome .emoney-link { position: absolute; right: 14px; bottom: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .screen .scan-welcome .emoney-link:disabled { background: none !important; }

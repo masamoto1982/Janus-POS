@@ -406,17 +406,16 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .item.staff .item-sub { color: #9ca3af; }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }
 .lines tr.coupon td { color: var(--danger); }
-.item.card { background: var(--call-bg); color: var(--call); }
+.item.card { background: var(--call-bg); color: var(--call); margin: 0; }
 /* お金は金額だけ。紙幣は横長の札、硬貨は真円 */
 .item.bill { background: var(--bill-bg); border-color: var(--border); justify-content: center; min-height: 34px; }
 .item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; text-align: center; }
 .item.coin .item-name { font-size: 11px; white-space: nowrap; }
 .item.pay { background: var(--pay-bg); border-color: var(--border); }
-/* お金以外（ポイントカード・クーポン・決済手段）は同じ大きさ。補足のないものは文字を縦横とも中央に */
-.wallet-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); margin-top: 4px; }
-.wallet-cards .item { height: 44px; justify-content: center; min-width: 0; }
+/* お金以外（ポイントカード・クーポン・決済手段）は同じ大きさ（いちばん長い補足が収まる幅）。文字は縦横とも中央に */
+.wallet-cards { margin-top: 4px; }
+.wallet-cards .item { box-sizing: border-box; width: 136px; height: 44px; justify-content: center; align-items: center; text-align: center; }
 .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.wallet-cards .item:not(:has(.item-sub)) { align-items: center; text-align: center; }
 
 /* ドロップ先 */
 .drop-hint { display: none; margin-left: 8px; letter-spacing: 0; }

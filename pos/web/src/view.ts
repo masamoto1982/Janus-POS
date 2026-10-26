@@ -673,6 +673,11 @@ export function itemCount(lines: { qty: number }[]): number {
  * 有人モードのお客様側には、お客様本人が押すボタン（お支払い内容の確認・投入おわり）だけを出す。
  */
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
+  // レジ休止中：どちらの画面も休止の案内だけ（店員側には再開のしかた）
+  if (r.paused)
+    return confirm(`<div class="point-screen paused-screen"><div class="big">レジ休止中</div><p>${
+      side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します"
+    }</p></div>`);
   // セミセルフの呼び出し中、店員側の画面は呼び出しの理由だけを大きく出す（年確の工程などは出さない：
   // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
   if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return confirm(callScreen(r, snap.now));
@@ -747,7 +752,8 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
     r.mode === "attended" && r.staff.state === "ready"
       ? `<button type="button" class="${cls}" data-gear="${r.id}:${side}" aria-label="レジ${r.id}の店舗メニュー" title="${open ? "店舗メニューを閉じる" : `店舗メニュー（${what}）`}"${open ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
       : `<span class="${cls}">${label}</span>`;
-  return `<span class="head-l">${badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
+  // 休止中は画面の「レジ休止中」と重ねて出さない（稼働モードのバッジは出さない）
+  return `<span class="head-l">${r.paused ? "" : badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -771,7 +777,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const reg = r.id;
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
-  if (r.menu || r.menu_code || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
+  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -885,8 +891,11 @@ export function storeMenu(r: RegisterView): string {
             return `<button type="button" class="menu-item"${st.allowed ? ` data-void-ask="${reg}:staff"` : ` disabled title="${esc(st.reason ?? "")}"`}>取引中止</button>`;
           })()}
           ${btn("ロック", { type: "lock", register: reg }, find(v.actions, "lock"), "menu-item")}
+        </div>`}
+        <div class="menu-list">
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
-        </div>`}`;
+          ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
+        </div>`;
     case "journal":
     case "waste":
     case "ff_fresh":

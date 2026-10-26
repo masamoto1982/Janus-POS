@@ -325,6 +325,10 @@ pub enum Command {
     EndStaffMode {
         register: u8,
     },
+    /// レジ休止中にする：ログアウトし、スタッフバーコードを読むまでどの操作も受け付けない
+    Pause {
+        register: u8,
+    },
     /// 出金（お客様側の店舗メニューに入っていれば、パスワードは要らない）
     CashOut {
         register: u8,
@@ -468,6 +472,7 @@ impl Command {
             | C::SetMode { register, .. }
             | C::Lock { register, .. }
             | C::EndStaffMode { register, .. }
+            | C::Pause { register }
             | C::CashOut { register, .. }
             | C::CashIn { register, .. }
             | C::OpenMenu { register, .. }
@@ -839,6 +844,8 @@ struct Register {
     menu: Option<Menu>,
     /// お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す）
     menu_code: Option<String>,
+    /// レジ休止中（スタッフバーコードを読むまで、どの操作も受け付けない）
+    paused: bool,
     /// いま触れている側と、その一瞬が終わる時刻（その間だけもう一方は操作できない）
     touch: Option<(Side, u64)>,
     /// お客様画面の呼び出しボタンが押されている（触れている間 MAT が鳴る）
@@ -1111,6 +1118,7 @@ impl Store {
                     outlet_since: None,
                     menu: None,
                     menu_code: None,
+                    paused: false,
                     touch: None,
                     pressing: false,
                     emoney: None,
@@ -1296,6 +1304,19 @@ impl Store {
     }
 
     pub fn dispatch(&mut self, cmd: Command) -> Result<Outcome, String> {
+        // レジ休止中は、スタッフバーコード（再開）と出金ボックスのお金の取り出しだけを受け付ける
+        if let Some(id) = cmd.register() {
+            let resume = match &cmd {
+                Command::Scan { code, .. } => {
+                    matches!(catalog::classify(code), Scanned::Staff(_))
+                }
+                Command::TakeOutlet { .. } => true,
+                _ => false,
+            };
+            if !resume && self.reg(id).is_some_and(|r| r.paused) {
+                return Err("このレジは休止中です（スタッフバーコードで再開）".into());
+            }
+        }
         // 成否にかかわらず、触られたレジは「操作あり」
         if let Some(id) = cmd.register() {
             let now = self.now;
@@ -1735,6 +1756,16 @@ impl Store {
                 }
                 done("画面をロックしました（スタッフバーコードで解除）")
             }
+            C::Pause { register } => {
+                self.check_active(register, Action::Pause)?;
+                let r = self.reg_mut(register)?;
+                r.staff = None;
+                r.menu = None;
+                r.menu_code = None;
+                r.touch = None;
+                r.paused = true;
+                done("レジ休止中にしました（スタッフバーコードで再開）")
+            }
             C::EndStaffMode { register } => {
                 self.check_active(register, Action::EndStaffMode)?;
                 let r = self.reg_mut(register)?;
@@ -2026,6 +2057,7 @@ impl Store {
             let now = self.now;
             let r = self.reg_mut(register)?;
             let was = r.staff_state();
+            let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.customer_turn;
             r.staff = Some(StaffSession {
                 account: acc,
@@ -2048,6 +2080,7 @@ impl Store {
                 self.calls.resolve(register, CallKind::Service, now);
             }
             return done(match was {
+                _ if resumed => format!("{}さんがレジを再開しました（有人モード）", acc.name),
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),
                 StaffState::Locked => format!("{}さんがロックを解除しました", acc.name),
                 _ => format!("{}さんがログインしました（有人モード）", acc.name),
@@ -2902,6 +2935,7 @@ impl Store {
             outlet_detail: r.outlet.0.clone(),
             menu: r.menu,
             menu_code: r.menu_code.clone(),
+            paused: r.paused,
             idle_voids: !r.idle(),
             idle_revert_in: (r.mode != Mode::SemiSelf || !r.idle())
                 .then(|| r.idle_revert_in(self.now)),
@@ -3120,6 +3154,8 @@ pub struct RegisterView {
     pub menu: Option<Menu>,
     /// お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す）
     pub menu_code: Option<String>,
+    /// レジ休止中（スタッフバーコードで再開）
+    pub paused: bool,
     /// セミセルフ以外で待機中なら、セミセルフに戻るまでの残り時間（ミリ秒）
     pub idle_revert_in: Option<u64>,
     /// 無操作が続くと、登録中の取引を中止する（取引があるとき）

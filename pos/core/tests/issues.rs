@@ -2091,3 +2091,45 @@ fn customer_voids_and_money_comes_back() {
     assert_eq!(v.outlet, 100);
     assert_eq!(v.customer.inserted, 0);
 }
+
+/// 店員側・お客様側どちらの店舗メニューにも「ログアウト」と「レジ休止中」がある（お客様側はパスワードで入った後）。
+/// ログアウトでセミセルフに戻る。休止中はスタッフバーコードを読むまでどの操作も受け付けない。
+#[test]
+fn logout_and_pause_from_either_store_menu() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    open_customer_menu(&mut s, 1);
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SemiSelf);
+    assert!(v.menu.is_none());
+    // 取引中は休止できない
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    open_customer_menu(&mut s, 1);
+    ok(&mut s, json!({"type":"pause","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.paused);
+    assert_eq!(v.mode, Mode::SemiSelf);
+    assert!(v.menu.is_none());
+    // 休止中はお客様が読んでも、呼び出しボタンを押しても受け付けない
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":BREAD})
+    )
+    .is_err());
+    assert!(run(&mut s, json!({"type":"call_staff","register":1})).is_err());
+    // 店員側の店舗メニューからも休止できる。スタッフバーコードで再開して有人モードになる
+    scan(&mut s, 1, "staff", "ST1001");
+    let v = reg(&s, 1);
+    assert!(!v.paused);
+    assert_eq!(v.mode, Mode::Attended);
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"top"}),
+    );
+    ok(&mut s, json!({"type":"pause","register":1}));
+    assert!(reg(&s, 1).paused);
+}

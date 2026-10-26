@@ -120,6 +120,8 @@ pub enum Action {
     SetMode,
     Lock,
     EndStaffMode,
+    /// レジ休止中にする（店舗メニューから。スタッフバーコードで再開する）
+    Pause,
     CashOut,
     CashIn,
     /// 電子マネーのチャージ・残高確認を始める・やめる（お買い物の途中でもできる）
@@ -151,6 +153,7 @@ pub const ACTIONS: &[Action] = &[
     Action::SetMode,
     Action::Lock,
     Action::EndStaffMode,
+    Action::Pause,
     Action::CashOut,
     Action::CashIn,
     Action::Emoney,
@@ -432,6 +435,10 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "お会計中です")?;
             require(!c.items_full, ITEMS_FULL)
         }
+        Action::Pause => require(
+            !c.has_lines && !c.has_coupons,
+            "取引中は休止できません（取引を終えるか中止してください）",
+        ),
         Action::CashOut => require(!c.has_lines, "取引中は出金操作ができません"),
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
         Action::CheckFf => check_ff(c),
@@ -511,6 +518,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         | Action::SetMode
         | Action::Lock
         | Action::EndStaffMode
+        | Action::Pause
         | Action::CashOut
         | Action::CashIn => Err("係員の操作です（名札でログインしてください）"),
     }

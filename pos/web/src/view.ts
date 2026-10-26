@@ -885,12 +885,6 @@ export function storeMenu(r: RegisterView): string {
         <div class="menu-list">${MENU_ITEMS[side]
           .map((k) => btn(MENU_LABEL[k], go(k), side === "customer" ? busy : undefined, "menu-item"))
           .join("")}</div>
-        ${side === "customer" ? "" : `<div class="menu-list">
-          ${(() => {
-            const st = find(v.actions, "void_transaction");
-            return `<button type="button" class="menu-item"${st.allowed ? ` data-void-ask="${reg}:staff"` : ` disabled title="${esc(st.reason ?? "")}"`}>取引中止</button>`;
-          })()}
-        </div>`}
         <div class="menu-list">
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
           ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}

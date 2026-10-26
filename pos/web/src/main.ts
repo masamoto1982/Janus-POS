@@ -661,7 +661,6 @@ app.addEventListener("click", (e) => {
   if (b.dataset.voidAsk) {
     const [reg, side] = b.dataset.voidAsk.split(":");
     const r = Number(reg);
-    if (snap.registers.find((x) => x.id === r)?.menu) send({ type: "open_menu", register: r, screen: null });
     voidAsk.set(r, side as "staff" | "customer");
     return frame();
   }

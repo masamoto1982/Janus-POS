@@ -1688,7 +1688,7 @@ impl Store {
                 self.check_active(register, Action::VoidTransaction)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
-                // 店舗メニューから行うので、済んだらメニューを閉じる
+                // 開いていた店舗メニューは閉じる
                 r.menu = None;
                 let back = self.void_txn(register, now);
                 if back > 0 {

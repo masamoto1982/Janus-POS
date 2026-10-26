@@ -581,3 +581,7 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 .attended-welcome { --spot: 50% 50%; }
 .scan-welcome .emoney-link { position: absolute; right: 14px; bottom: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .screen .scan-welcome .emoney-link:disabled { background: none !important; }
+/* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
+.menu-code-value { font-size: 40px; letter-spacing: .25em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; margin: 4px 0; padding-left: .25em; }
+.menu-code-form { justify-content: center; gap: 8px; }
+.menu-code-form input { width: 7.5em; font-size: 20px; letter-spacing: .2em; text-align: center; text-transform: uppercase; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }

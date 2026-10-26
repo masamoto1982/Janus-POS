@@ -150,7 +150,9 @@ export interface RegisterView {
   change_left: boolean;
   outlet: number;
   outlet_detail: [number, number][];
-  menu: { screen: MenuScreen; exchange_to: number } | null;
+  menu: { side: Side; screen: MenuScreen; exchange_to: number } | null;
+  /** お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す） */
+  menu_code: string | null;
   staff: StaffView;
   customer: CustomerView;
   /** 開いている電子マネーの手続き（チャージ・残高確認） */
@@ -162,7 +164,7 @@ export interface RegisterView {
   last_receipt: Receipt | null;
 }
 
-export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer";
+export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer" | "journal" | "waste" | "ff_fresh";
 
 export interface AgeRule {
   id: number;

@@ -8,7 +8,7 @@
 //   店員画面に落とせば店員側スキャナー、お客様画面に落とせばお客様側スキャナーで読んだことになる。
 
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { Command, Snapshot } from "./types";
+import type { Command, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 // 仮のロゴマーク（正式なロゴは後日差し替え）
@@ -462,9 +462,12 @@ function form(b: HTMLElement): void {
         register: reg,
         kind: b.dataset.kind,
         amount: Number(val(`mo-amt-${reg}`) || 0),
-        password: val(`mo-pw-${reg}`),
       });
-      clear(`mo-pw-${reg}`);
+      clear(`mo-amt-${reg}`);
+      break;
+    case "menucode":
+      send({ type: "open_menu", register: reg, side: "customer", screen: "top", code: val(`mc-${reg}`) });
+      clear(`mc-${reg}`);
       break;
   }
 }
@@ -477,7 +480,19 @@ app.addEventListener("input", (e) => {
     el.dataset.typed = "1";
   }
   // 生年月日：西暦 8 桁。全角の数字は半角に直す
+  // 店舗メニューのパスワード：英大文字と数字の 4 桁（小文字・全角は直す）
+  if (el.dataset.menucode)
+    el.value = el.value
+      .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 4);
   if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
+});
+app.addEventListener("keydown", (e) => {
+  const el = e.target as HTMLInputElement;
+  if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
+  el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
@@ -627,10 +642,15 @@ app.addEventListener("click", (e) => {
     ffTabs.set(reg, { tab: u.tab, page: Math.max(0, u.page + d) });
     return frame();
   }
+  // 稼働モードのバッジ：開いた側の画面で店舗メニューを開く・閉じる。
+  // お客様側は、店員画面に出る使い捨てパスワードを入力して開く
   if (b.dataset.gear) {
-    const reg = Number(b.dataset.gear);
-    const open = snap.registers.find((x) => x.id === reg)?.menu;
-    send({ type: "open_menu", register: reg, screen: open ? null : "top" });
+    const [reg, side] = b.dataset.gear.split(":") as [string, Side];
+    const r = snap.registers.find((x) => x.id === Number(reg));
+    const open = r?.menu?.side === side || (side === "customer" && !!r?.menu_code);
+    if (open) send({ type: "open_menu", register: Number(reg), side, screen: null });
+    else if (side === "customer") send({ type: "request_menu_code", register: Number(reg) });
+    else send({ type: "open_menu", register: Number(reg), side, screen: "top" });
     return;
   }
   if (b.dataset.outlet) {

@@ -516,7 +516,10 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
-  if (r.menu) return notice + storeMenu(r);
+  // 店舗メニューは開いた側の画面にだけ出す。お客様側から開くときは、店員画面にパスワード・お客様画面に入力欄
+  if (r.menu?.side === side) return notice + storeMenu(r);
+  if (r.menu_code) return notice + menuCode(r, side);
+  if (r.menu && side === "staff") return notice + pairNote("お客様側の画面で店舗メニューを操作しています");
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
@@ -737,9 +740,12 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="係員を呼ぶ（押している間鳴ります）" title="${esc(call.allowed ? "係員を呼ぶ（押している間鳴ります）" : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
   const label = r.mode === "attended" ? "有人モード" : "セミセルフモード";
   const cls = `mode-badge ${r.mode === "attended" ? "attended" : "semi"}`;
+  // 店舗メニューは両方の画面のバッジから開ける。開いた側の画面にだけ、その側の項目を出す
+  const open = r.menu?.side === side || (side === "customer" && !!r.menu_code);
+  const what = side === "staff" ? "ジャーナル確認・廃棄登録・FF鮮度管理など" : "自動釣銭機へのお金の出し入れ。店員画面に出るパスワードで開く";
   const badge =
-    r.mode === "attended" && r.staff.state === "ready" && side === "staff"
-      ? `<button type="button" class="${cls}" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="${r.menu ? "店舗メニューを閉じる" : "店舗メニュー（返品・返金、自動釣銭機など）"}"${r.menu ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
+    r.mode === "attended" && r.staff.state === "ready"
+      ? `<button type="button" class="${cls}" data-gear="${r.id}:${side}" aria-label="レジ${r.id}の店舗メニュー" title="${open ? "店舗メニューを閉じる" : `店舗メニュー（${what}）`}"${open ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
       : `<span class="${cls}">${label}</span>`;
   return `<span class="head-l">${badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
@@ -765,7 +771,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const reg = r.id;
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
-  if (r.menu || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
+  if (r.menu || r.menu_code || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -823,47 +829,84 @@ const MENU_LABEL: Record<MenuScreen, string> = {
   deposit: "取引外入金",
   expense: "経費支出",
   changer: "自動釣銭機（両替）",
+  journal: "ジャーナル確認",
+  waste: "廃棄登録",
+  ff_fresh: "FF鮮度管理",
 };
+
+/** 店舗メニューの項目：お客様側は自動釣銭機へのお金の出し入れ、店員側はそれ以外 */
+const MENU_ITEMS: Record<Side, MenuScreen[]> = {
+  customer: ["refund", "emergency", "deposit", "expense", "changer"],
+  staff: ["journal", "waste", "ff_fresh"],
+};
+
+/**
+ * お客様側から店舗メニューを開くときの使い捨てパスワード。店員画面にだけパスワードを出し、
+ * お客様側の画面で入力する（パスワードを見た人でなければ開けない）
+ */
+function menuCode(r: RegisterView, side: Side): string {
+  const reg = r.id;
+  if (side === "staff")
+    return confirm(`<div class="point-screen menu-code-show">
+      <p>お客様側の画面から店舗メニューを開こうとしています</p>
+      <div class="big menu-code-value" aria-label="パスワード">${esc(r.menu_code ?? "")}</div>
+      <p class="muted">このパスワードをお客様側の画面で入力してください。一度きり有効です</p>
+    </div>`);
+  return confirm(`<div class="point-screen menu-code">
+      <div class="big">店舗メニューのパスワード</div>
+      <p>店員側の画面に出ている 4 桁を入力してください</p>
+      <div class="row menu-code-form">
+        <input type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例 U8X3" data-menucode="1" data-key="mc-${reg}" aria-label="パスワード" />
+        <button class="primary" data-form="menucode" data-reg="${reg}">開く</button>
+      </div>
+      <div class="pay-choices">${btn("やめる", { type: "open_menu", register: reg, side: "customer", screen: null }, undefined, "ghost")}</div>
+    </div>`);
+}
 
 /** 一度に一つの画面だけを出す：一覧 → 各項目の画面 */
 export function storeMenu(r: RegisterView): string {
   const v = r.staff;
   const reg = r.id;
   const m = r.menu!;
-  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
+  const side = m.side;
+  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side, screen, ...extra });
   const head = (title: string) =>
     `<div class="menu-head">${btn("‹ 戻る", go("top"), undefined, "small ghost")}<b>${esc(title)}</b></div>`;
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   switch (m.screen) {
     case "top":
       return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
-        <div class="menu-list">${(["refund", "emergency", "deposit", "expense", "changer"] as const)
-          .map((k) => btn(MENU_LABEL[k], go(k), busy, "menu-item"))
+        <div class="menu-list">${MENU_ITEMS[side]
+          .map((k) => btn(MENU_LABEL[k], go(k), side === "customer" ? busy : undefined, "menu-item"))
           .join("")}</div>
-        <div class="menu-list">
+        ${side === "customer" ? "" : `<div class="menu-list">
           ${(() => {
             const st = find(v.actions, "void_transaction");
             return `<button type="button" class="menu-item"${st.allowed ? ` data-void-ask="${reg}:staff"` : ` disabled title="${esc(st.reason ?? "")}"`}>取引中止</button>`;
           })()}
           ${btn("ロック", { type: "lock", register: reg }, find(v.actions, "lock"), "menu-item")}
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
-        </div>`;
+        </div>`}`;
+    case "journal":
+    case "waste":
+    case "ff_fresh":
+      return `${head(MENU_LABEL[m.screen])}
+        <p class="muted">準備中です（今後つくりこみます）。</p>`;
     case "refund":
     case "emergency":
     case "expense": {
       const cout = find(v.actions, "cash_out");
       return `${head(MENU_LABEL[m.screen])}
-        <p class="muted">お金を抜く操作です。店舗パスワードが毎回必要で、お金は下の「出金」ボックスに出ます。</p>
+        <p class="muted">お金を抜く操作です。お金は下の「出金」ボックスに出ます。記録は担当者名つきで残ります。</p>
         <div class="menu-form">
           <input type="number" inputmode="numeric" min="1" placeholder="金額" data-key="mo-amt-${reg}" />
-          <input type="password" inputmode="numeric" placeholder="店舗パスワード" data-key="mo-pw-${reg}" autocomplete="off" />
           <button class="primary" data-form="cashout" data-reg="${reg}" data-kind="${m.screen}" ${cout.allowed ? "" : `disabled title="${esc(cout.reason ?? "")}"`}>出金</button>
         </div>`;
     }
     case "deposit":
       return `${head(MENU_LABEL.deposit)}
         <p>入金する金額を下の<b>「入金」ボックス</b>に入れて Enter を押してください。</p>
-        <p class="muted">お金を入れる操作なのでパスワードは要りません。記録は担当者名つきで残ります。</p>`;
+        <p class="muted">記録は担当者名つきで残ります。</p>`;
     case "changer": {
       const have = (d: number) => v.drawer.find(([x]) => x === d)?.[1] ?? 0;
       const segs = [1000, 500, 100, 50, 10]
@@ -882,7 +925,7 @@ export function storeMenu(r: RegisterView): string {
 // ---------------------------------------------------------------------------
 
 export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
-  if (r.menu) return notice + storeMenu(r);
+  if (r.menu?.side === side) return notice + storeMenu(r);
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);

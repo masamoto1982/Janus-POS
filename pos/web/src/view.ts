@@ -681,25 +681,10 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
-/**
- * 最下段：FF・サービス・たばこ（有人モードの店員側は FF のタブ）と「電子マネー」ボタン
- * （押してからチャージか残高確認を選ぶ。お買い物の途中でも使える）
- */
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
-  if (r.menu || r.emoney || r.emoney_short !== null) return "";
-  // 有人モードのお客様側には出さない（店員側の画面から操作する）
-  if (r.mode === "attended" && side === "customer") return "";
-  const st = find(r.mode === "semi_self" ? r.customer.actions : r.staff.actions, "emoney");
-  // サービスボタン（二行目「お支払い・荷物」）と同じ意匠
-  const em = btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, st, "call-btn emoney").replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
-  // セミセルフは FF・サービス・たばこ・電子マネーの 4 つを同じ幅に並べる。
-  // 有人モードの店員側は FF タブの区画と電子マネーの区画を仕切る（電子マネーの幅はセミセルフと同じ 1/4）
-  if (r.mode === "semi_self") return itemsMain(r, snap, ui, side).replace(/<\/div>$/, `${em}</div>`);
-  return `<div class="items-split"><div class="items-main">${itemsMain(r, snap, ui, side)}</div><div class="emoney-area">${em}</div></div>`;
-}
-
-function itemsMain(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   const reg = r.id;
+  // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
+  if (r.menu || r.emoney || r.emoney_short !== null) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -710,6 +695,8 @@ function itemsMain(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): strin
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
+  // 有人モードの FF は店員側の画面から登録する（お客様側には出さない）
+  if (r.mode === "attended" && side === "customer") return "";
   // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
   // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない

@@ -58,7 +58,7 @@ function bytesFromB64(b64: string): Uint8Array {
 async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
-  // 呼び鈴は据え付け型 1 台、携帯型の検品端末 1 台、事務所のストアコンピューター 1 台
+  // Bell は据え付け端末 1 台、可搬性端末 1 台、事務所のストアコンピューター 1 台
   reset(2, 3);
   setupDrag();
   window.setInterval(frame, 100);
@@ -176,7 +176,7 @@ function buildSkeleton(): void {
     </dialog>
     <dialog class="rules-dlg bell-dlg" id="bell-dlg" aria-labelledby="bell-title">
       <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
-      <p class="muted">検品端末とストアコンピューターは、呼び鈴機能を OFF にできます。OFF の端末は鳴らず、不通の警告も出しません。据え付けの呼び鈴は常に ON です。</p>
+      <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます。OFF の端末は鳴らず、不通の警告も出しません。据え付け端末は常に ON です。</p>
       <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
     <div class="drag-ghost" id="ghost" hidden></div>`;

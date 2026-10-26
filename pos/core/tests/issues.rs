@@ -562,7 +562,7 @@ fn mat_rings_despite_loss_and_reports_link_down() {
     advance(&mut s, 8_000);
     let snap = s.snapshot();
     assert!(!snap.mats[0].link_ok);
-    assert_eq!(snap.registers[0].staff.mat_down, vec!["呼び鈴".to_string()]);
+    assert_eq!(snap.registers[0].staff.mat_down, vec!["据え付け端末".to_string()]);
 }
 
 /// お客様画面には分類や年確対象の情報を出さない（店員画面にだけ出す）。
@@ -1621,7 +1621,7 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
 fn handheld_and_store_computer_bells_can_be_turned_off() {
     let mut s = Store::new(1, 2, 3);
     let ids: Vec<String> = s.snapshot().mats.iter().map(|m| m.id.clone()).collect();
-    assert_eq!(ids, ["呼び鈴", "検品端末", "ストアコンピューター"]);
+    assert_eq!(ids, ["据え付け端末", "可搬性端末", "ストアコンピューター"]);
     assert!(run(&mut s, json!({"type":"set_bell_on","mat":0,"on":false})).is_err());
     ok(&mut s, json!({"type":"set_bell_on","mat":1,"on":false}));
     ok(&mut s, json!({"type":"set_bell_on","mat":2,"on":false}));

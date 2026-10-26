@@ -991,19 +991,18 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 // ---------------------------------------------------------------------------
 
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
-const BELL_KIND = { fixed: "据え付け", handheld: "携帯", store_computer: "事務所" } as const;
 
 export function matPanel(s: Snapshot): string {
   return s.mats
     .map(
       (m) => `<div class="mat ${m.buzzing ? "buzz" : ""} ${m.bell_on ? "" : "off"}">
-        <span class="bell">${BELL_ICON[m.kind]}</span><span class="mat-id">${esc(m.id)}</span><span class="mat-kind">${BELL_KIND[m.kind]}</span><span class="mat-state">${!m.bell_on ? "呼び鈴OFF" : m.buzzing ? "鳴動中" : "待機"}</span>
+        <span class="bell">${BELL_ICON[m.kind]}</span><span class="mat-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="mat-state">呼び鈴OFF</span>` : m.buzzing ? `<span class="mat-state">鳴動中</span>` : ""}
       </div>`,
     )
     .join("");
 }
 
-/** Bell の設定：検品端末とストアコンピューターの呼び鈴機能の ON/OFF（据え付けの呼び鈴は常に ON） */
+/** Bell の設定：可搬性端末とストアコンピューターの呼び鈴機能の ON/OFF（据え付け端末は常に ON） */
 export function bellSettings(s: Snapshot): string {
   return s.mats
     .map((m, i) =>

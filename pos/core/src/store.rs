@@ -1856,7 +1856,7 @@ impl Store {
                 let bell = self.bell;
                 let m = self.mats.get_mut(mat).ok_or("MAT が見つかりません")?;
                 if bell_kind(mat as u8) == BellKind::Fixed {
-                    return Err("据え付けの呼び鈴は OFF にできません".into());
+                    return Err("据え付け端末は OFF にできません".into());
                 }
                 if on && !m.bell_on {
                     // OFF の間の呼び出しを、ON にした途端に鳴らさない
@@ -3131,14 +3131,14 @@ fn bell_kind(i: u8) -> BellKind {
     }
 }
 
-/// 1 台目は据え付けの「呼び鈴」、2 台目は「検品端末」、3 台目は「ストアコンピューター」、
-/// 4 台目以降は番号付きの検品端末
+/// 1 台目は「据え付け端末」、2 台目は「可搬性端末」、3 台目は「ストアコンピューター」、
+/// 4 台目以降は番号付きの可搬性端末
 fn bell_name(i: u8) -> String {
     match i {
-        0 => "呼び鈴".into(),
-        1 => "検品端末".into(),
+        0 => "据え付け端末".into(),
+        1 => "可搬性端末".into(),
         2 => "ストアコンピューター".into(),
-        n => format!("検品端末{}", n - 1),
+        n => format!("可搬性端末{}", n - 1),
     }
 }
 

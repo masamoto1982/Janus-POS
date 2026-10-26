@@ -430,14 +430,17 @@ const GUIDES: [GuideKind, string, string][] = [
 export function welcome(reg: number, side: Side, emoney?: ActionState): string {
   const on = scanGuide.get(`${reg}:${side}`);
   const guide = GUIDES.find(([k]) => k === on);
-  return `<div class="welcome">
+  return `<div class="welcome${emoney ? " scan-welcome" : ""}">
       <div class="big">バーコードをスキャンしてください</div>
       <p>すべてのバーコードを受け付けます</p>
       <div class="guide-row">${GUIDES.map(
         ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
       ).join("")}</div>
-      ${emoney ? `<div class="guide-row">${emoneyEntry(reg, side, emoney, "call-btn emoney-guide")}</div>` : ""}
       ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
+      ${
+        // 電子マネーはバーコードを読まない用件なので、案内ボタンから離して右下の明るい角に文字リンクで置く
+        emoney ? btn("電子マネーのチャージ・残高確認", { type: "start_emoney", register: reg, side, kind: "menu" }, emoney, "emoney-link") : ""
+      }
     </div>`;
 }
 

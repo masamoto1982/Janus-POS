@@ -564,3 +564,10 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 .hold-confirm.holding .hold-fill { width: 100%; transition: width 1.5s linear; }
 .hold-confirm .hold-label { position: relative; }
 .hold-confirm.holding .hold-label { color: var(--btn-on-ink); }
+
+/* セミセルフの待ち受け：右下の角を頂点に最も明るくなる背景。その明るい角に電子マネーの文字リンクを置く
+   （バーコードを読む案内ボタンから離し、電子マネーにスキャンが要ると誤解させない） */
+.scan-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px 36px;
+  background: radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--cust-bg) 70%, #ffffff) 0%, color-mix(in srgb, var(--cust-bg) 70%, #ffffff) 12%, color-mix(in srgb, var(--cust-bg) 86%, var(--ink)) 80%); }
+.scan-welcome .emoney-link { position: absolute; right: 14px; bottom: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.screen .scan-welcome .emoney-link:disabled { background: none !important; }

@@ -244,6 +244,11 @@ fn emoney(c: &Context) -> Result<(), Denial> {
     require(!c.emoney_short, EMONEY_SHORT)
 }
 
+/// 取引中止：登録した商品かクーポンがあるときだけ
+fn void_transaction(c: &Context) -> Result<(), Denial> {
+    require(c.has_lines || c.has_coupons, "中止する取引はありません")
+}
+
 fn resolve_emoney_short(c: &Context) -> Result<(), Denial> {
     require(c.emoney_short, "電子マネーの残高は足りています")
 }
@@ -436,7 +441,7 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
             require(c.has_lines, "明細がありません")
         }
         Action::RemoveCoupon => require(c.has_coupons, "クーポンはありません"),
-        Action::VoidTransaction => require(c.has_lines, "明細がありません"),
+        Action::VoidTransaction => void_transaction(c),
         Action::Checkout => {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
@@ -500,8 +505,9 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CallStaff => Ok(()),
         Action::Emoney => emoney(c),
         Action::ResolveEmoneyShort => resolve_emoney_short(c),
+        // 取引中止はお客様もできる（誤操作を防ぐため、画面で確認と長押しを挟む）
+        Action::VoidTransaction => void_transaction(c),
         Action::CompleteService
-        | Action::VoidTransaction
         | Action::SetMode
         | Action::Lock
         | Action::EndStaffMode

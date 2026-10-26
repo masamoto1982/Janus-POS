@@ -491,7 +491,7 @@ fn staff_and_customer_screens_are_exclusive() {
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
     assert_eq!(v.active_side, Some(Side::Customer));
-    assert!(run(&mut s, json!({"type":"void_transaction","register":1})).is_err());
+    assert!(run(&mut s, json!({"type":"lock","register":1})).is_err());
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -607,7 +607,7 @@ fn customer_registers_ff_in_self_mode() {
 }
 
 /// 名札でログインした有人モードも、5 分間操作がなければログアウトしてセミセルフに戻る。
-/// 混雑時に急に切り替わらないよう、取引中は戻さない。
+/// 商品を登録していても、5 分間操作がなければ取引を中止して戻る（取引の保留機能は持たない）。
 #[test]
 fn idle_register_returns_to_semi_self() {
     let mut s = Store::new(1, 2, 1);
@@ -623,11 +623,36 @@ fn idle_register_returns_to_semi_self() {
     assert_eq!(v.mode, Mode::SemiSelf);
     assert_eq!(v.staff.state, StaffState::Absent);
     assert!(v.idle_revert_in.is_none());
-    // 取引中は戻さない
+    // 取引中でも 5 分間操作がなければ、取引を中止してセミセルフに戻る。入れたお金は出金ボックスへ
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
-    advance(&mut s, 6 * 60_000);
-    assert_eq!(reg(&s, 1).mode, Mode::Attended);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    let v = reg(&s, 1);
+    assert!(v.idle_voids);
+    assert!(v.idle_revert_in.is_some());
+    advance(&mut s, 4 * 60_000);
+    assert_eq!(
+        reg(&s, 1).mode,
+        Mode::Attended,
+        "財布を取りに行くくらいは待つ"
+    );
+    advance(&mut s, 61_000);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SemiSelf);
+    assert!(v.customer.lines.is_empty());
+    assert_eq!(v.customer.inserted, 0);
+    assert_eq!(v.outlet, 100);
+    // セミセルフで登録したまま離れた取引も、5 分で中止する
+    scan(&mut s, 2, "customer", BREAD);
+    assert!(reg(&s, 2).idle_voids);
+    advance(&mut s, 5 * 60_000 + 1_000);
+    assert!(reg(&s, 2).customer.lines.is_empty());
+    assert!(reg(&s, 2).idle_revert_in.is_none());
 }
 
 /// 店舗メニュー：お金を入れる操作はパスワード不要、抜く操作は店舗パスワードが要る。どちらも記録が残る。
@@ -1944,4 +1969,26 @@ fn emoney_short_offers_three_choices() {
     );
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 1_120);
     assert_eq!(emoney_balance(&s), 880);
+}
+
+/// 取引中止はセミセルフのお客様もできる。入れたお金は出金ボックスに戻り、電子マネーで払った分は残高に戻る
+#[test]
+fn customer_voids_and_money_comes_back() {
+    let mut s = Store::new(1, 2, 1);
+    assert!(
+        run(&mut s, json!({"type":"void_transaction","register":1})).is_err(),
+        "取引がない"
+    );
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.customer.lines.is_empty());
+    assert_eq!(v.outlet, 100);
+    assert_eq!(v.customer.inserted, 0);
 }

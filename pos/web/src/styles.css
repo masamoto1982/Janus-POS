@@ -205,7 +205,11 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .reg-top .sum { font-size: 16px; }
 .reg-top .count b { font-size: 28px; }
 .reg-top .sum { white-space: nowrap; }
-.reg-top .action { margin-left: auto; }
+.reg-top .action { margin-left: auto; display: flex; align-items: stretch; gap: 8px; }
+/* 電子マネー（チャージ・残高確認）は会計ボタンと同じ高さで、塗らずに枠線だけの控えめな表現 */
+.reg-top .emoney-top { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 10px; line-height: 1.2; background: transparent; color: var(--ink); border: 1px solid var(--border); font-weight: 400; }
+.reg-top .emoney-top b { font-size: 12px; font-weight: 400; }
+.reg-top .emoney-top small { font-size: 9px; color: var(--msg-weak); }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 /* 登録の明細は表示エリアが狭いので小ぶりに */
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
@@ -286,6 +290,12 @@ details summary h3 { display: inline; }
 .guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: transparent; color: var(--ink); border-color: var(--border); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
+/* 有人モードの初期画面：二段目の電子マネーも、お買い物などと同じ枠線だけの丸い形と色 */
+.welcome .emoney-guide { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.25; padding: 4px 16px; }
+.welcome .emoney-guide b { font-weight: inherit; }
+.welcome .emoney-guide small { font-size: 10px; }
+/* お客様側は押せないが、薄くせず店員側と同じ見た目で映す（選んだ用件も同じく塗る） */
+.attended-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }
@@ -545,3 +555,26 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 
 .emoney-choices { display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: min(100%, 280px); margin: 0 auto; }
 .emoney-screen .emoney-balance { font-size: 28px; font-variant-numeric: tabular-nums; }
+
+/* 取引中止：明細の上の帯に控えめに置く（会計ボタンから離す）。確認画面で「長押しで中止」を押し続けて決まる */
+.void-btn { font-size: 11px; padding: 2px 8px; background: transparent; color: var(--msg-weak); border: 1px solid var(--border); }
+.staff-head { gap: 8px; }
+.void-choices { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.void-choices > button { min-width: 140px; min-height: 44px; }
+.hold-confirm { position: relative; overflow: hidden; background: transparent; color: var(--ink); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hold-confirm .hold-fill { position: absolute; inset: 0; width: 0; background: var(--btn-on); }
+.hold-confirm.holding .hold-fill { width: 100%; transition: width 1.5s linear; }
+.hold-confirm .hold-label { position: relative; }
+.hold-confirm.holding .hold-label { color: var(--btn-on-ink); }
+
+/* セミセルフの待ち受け：右下の角を頂点に最も明るくなる背景。その明るい角に電子マネーの文字リンクを置く
+   （バーコードを読む案内ボタンから離し、電子マネーにスキャンが要ると誤解させない） */
+/* 待ち受け画面の背景：明るい点を中心に、外へいくほど暗くなる円形グラデーション。
+   セミセルフは右下の角（電子マネーの文字リンク）へ、有人は画面中央へ視線を集める */
+.scan-welcome, .attended-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
+  --glow: color-mix(in srgb, var(--cust-bg) 65%, #ffffff); --dark: color-mix(in srgb, var(--cust-bg) 78%, var(--ink));
+  background: radial-gradient(circle farthest-corner at var(--spot), var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
+.scan-welcome { --spot: 100% 100%; padding-bottom: 36px; }
+.attended-welcome { --spot: 50% 50%; }
+.scan-welcome .emoney-link { position: absolute; right: 14px; bottom: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.screen .scan-welcome .emoney-link:disabled { background: none !important; }

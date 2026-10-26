@@ -832,8 +832,12 @@ impl Register {
         }
     }
 
+    /// 取引がない（明細・クーポン・会計・電子マネーの手続きのどれもない）
     fn idle(&self) -> bool {
-        self.txn.lines.is_empty() && !self.txn.paying
+        self.txn.lines.is_empty()
+            && self.txn.coupons.is_empty()
+            && !self.txn.paying
+            && self.emoney.is_none()
     }
 
     /// 排出口のお金が取り出されたら、止めていた無操作のカウントダウンを続きから再開する
@@ -1147,21 +1151,71 @@ impl Store {
                 self.calls.resolve(r.id, CallKind::ChangeLeft, now);
             }
         }
-        // 無操作が 5 分続いたら、名札のログインを外してセミセルフに戻る（排出口にお金が残っている間は数えない）
-        for r in &mut self.registers {
-            let open = self.calls.open.iter().any(|c| c.register == r.id);
-            if r.mode != Mode::SemiSelf
-                && r.idle()
-                && r.outlet_since.is_none()
-                && !open
-                && now.saturating_sub(r.last_op) >= IDLE_REVERT_MS
-            {
-                r.staff = None;
-                r.mode = Mode::SemiSelf;
+        // 無操作が 5 分続いたら、登録中の取引も中止し、名札のログインを外してセミセルフに戻る。
+        // 5 分あれば、財布を車に取りに行くくらいは待てる（取引の保留機能はあえて持たない）。
+        // 排出口にお金が残っている間と、係員を呼んでいる間は数えない
+        let due: Vec<u8> = self
+            .registers
+            .iter()
+            .filter(|r| {
+                (r.mode != Mode::SemiSelf || !r.idle())
+                    && r.outlet_since.is_none()
+                    && !self.calls.open.iter().any(|c| c.register == r.id)
+                    && now.saturating_sub(r.last_op) >= IDLE_REVERT_MS
+            })
+            .map(|r| r.id)
+            .collect();
+        for id in due {
+            if !self.reg(id).is_some_and(|r| r.idle()) {
+                self.void_txn(id, now);
+            }
+            if let Ok(r) = self.reg_mut(id) {
+                if r.mode != Mode::SemiSelf {
+                    r.staff = None;
+                    r.mode = Mode::SemiSelf;
+                }
                 r.menu = None;
                 r.last_op = now;
             }
         }
+    }
+
+    /// 取引を中止する。入れたお金とチャージ用の紙幣は出金ボックスへ、電子マネーで払った分は残高へ戻す。
+    /// 戻したお金の額を返す
+    fn void_txn(&mut self, register: u8, now: u64) -> u32 {
+        let Some(r) = self.registers.iter_mut().find(|r| r.id == register) else {
+            return 0;
+        };
+        r.menu = None;
+        let txn = std::mem::take(&mut r.txn);
+        // 入れたお金と、チャージ用に入れた紙幣は出金ボックスに戻す
+        r.outlet.merge(&txn.inserted);
+        let mut back = txn.inserted.total();
+        if let Some(EmoneyTask::Charge { inserted }) = r.emoney.take() {
+            back += inserted.total();
+            r.outlet.merge(&inserted);
+        }
+        r.emoney = None;
+        // 電子マネーで先に払った分は、電子マネーに戻す
+        self.emoney_balance += txn.emoney_paid;
+        for l in &txn.lines {
+            if l.kind
+                == (LineKind::Ff {
+                    state: FfState::Waiting,
+                })
+            {
+                self.restock(l.code, l.qty);
+            }
+        }
+        for k in [
+            CallKind::AgeCheck,
+            CallKind::FastFood,
+            CallKind::Service,
+            CallKind::Tobacco,
+        ] {
+            self.calls.resolve(register, k, now);
+        }
+        back
     }
 
     // ---- コマンド --------------------------------------------------------
@@ -1596,29 +1650,11 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 // 店舗メニューから行うので、済んだらメニューを閉じる
                 r.menu = None;
-                let txn = std::mem::take(&mut r.txn);
-                let back = txn.inserted.total();
-                // 電子マネーで先に払った分は、電子マネーに戻す
-                self.emoney_balance += txn.emoney_paid;
-                for l in &txn.lines {
-                    if l.kind
-                        == (LineKind::Ff {
-                            state: FfState::Waiting,
-                        })
-                    {
-                        self.restock(l.code, l.qty);
-                    }
-                }
-                for k in [
-                    CallKind::AgeCheck,
-                    CallKind::FastFood,
-                    CallKind::Service,
-                    CallKind::Tobacco,
-                ] {
-                    self.calls.resolve(register, k, now);
-                }
+                let back = self.void_txn(register, now);
                 if back > 0 {
-                    done(format!("取引を中止しました。投入金 {back}円を返却します"))
+                    done(format!(
+                        "取引を中止しました。{back}円を出金ボックスから取り出してください"
+                    ))
                 } else {
                     done("取引を中止しました")
                 }
@@ -2728,7 +2764,8 @@ impl Store {
             outlet: r.outlet.total(),
             outlet_detail: r.outlet.0.clone(),
             menu: r.menu,
-            idle_revert_in: (r.mode != Mode::SemiSelf && r.idle())
+            idle_voids: !r.idle(),
+            idle_revert_in: (r.mode != Mode::SemiSelf || !r.idle())
                 .then(|| r.idle_revert_in(self.now)),
             change_left: r
                 .outlet_since
@@ -2945,6 +2982,8 @@ pub struct RegisterView {
     pub menu: Option<Menu>,
     /// セミセルフ以外で待機中なら、セミセルフに戻るまでの残り時間（ミリ秒）
     pub idle_revert_in: Option<u64>,
+    /// 無操作が続くと、登録中の取引を中止する（取引があるとき）
+    pub idle_voids: bool,
     /// 排出口に釣り銭が残ったまま 1 分（有人モードは 30 秒）たった（お客様画面に「釣り銭が残っています」）
     pub change_left: bool,
     pub staff: StaffView,

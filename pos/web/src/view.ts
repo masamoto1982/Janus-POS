@@ -1219,8 +1219,8 @@ export function walletPanel(emoneyBalance: number): string {
     walletItem("pay:credit", "クレジットカード", "", "pay", HINT_PAY),
     walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay", HINT_EMONEY),
   ];
-  // 見出しなしの一つの並び（表示スペースの節約）
-  return `<div class="shelf"><div class="items">${[...bills, ...coins, ...cards].join("")}</div></div>`;
+  // 見出しなし（表示スペースの節約）。お金以外は同じ大きさのボタンに揃える
+  return `<div class="shelf"><div class="items">${[...bills, ...coins].join("")}</div><div class="items wallet-cards">${cards.join("")}</div></div>`;
 }
 
 /** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */

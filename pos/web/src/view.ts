@@ -510,16 +510,23 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       : "";
 
   // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
+  // 電子マネーのチャージ・残高確認は、お買い物の途中でも（会計中でも）店員側から始められる。
+  // 「すべての操作はやりたいときにできる」：待ち受けに戻らなくてよいよう、会計ボタンの左に常に置く
+  // 支払方法の「電子マネー」と取り違えないよう、二行目に「チャージ・残高確認」を添える（初期画面のボタンと同じ意匠）
+  const emoney = ro
+    ? ""
+    : btn("", { type: "start_emoney", register: reg, side, kind: "menu" }, a("emoney"), "emoney-top").replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
   const top = regTop(
     v.total,
     itemCount(v.lines),
-    paying && v.method === "cash"
+    emoney +
+    (paying && v.method === "cash"
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro
         ? ""
         : paying
           ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
-          : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary"),
+          : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.max_items,
     !!v.point_card,
   );

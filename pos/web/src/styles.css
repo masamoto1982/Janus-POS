@@ -205,7 +205,10 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .reg-top .sum { font-size: 16px; }
 .reg-top .count b { font-size: 28px; }
 .reg-top .sum { white-space: nowrap; }
-.reg-top .action { margin-left: auto; }
+.reg-top .action { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.reg-top .emoney-top { display: flex; flex-direction: column; align-items: center; padding: 3px 10px; line-height: 1.2; }
+.reg-top .emoney-top b { font-size: 12px; }
+.reg-top .emoney-top small { font-size: 9px; }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 /* 登録の明細は表示エリアが狭いので小ぶりに */
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }

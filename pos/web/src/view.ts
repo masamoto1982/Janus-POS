@@ -890,7 +890,6 @@ export function storeMenu(r: RegisterView): string {
             const st = find(v.actions, "void_transaction");
             return `<button type="button" class="menu-item"${st.allowed ? ` data-void-ask="${reg}:staff"` : ` disabled title="${esc(st.reason ?? "")}"`}>取引中止</button>`;
           })()}
-          ${btn("ロック", { type: "lock", register: reg }, find(v.actions, "lock"), "menu-item")}
         </div>`}
         <div class="menu-list">
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}

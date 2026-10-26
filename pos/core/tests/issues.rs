@@ -201,7 +201,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
 
 /// セミセルフでは年確が店員呼び出しになり、店員が来るまでお客様は確認できない。
 #[test]
-fn self_mode_age_check_calls_staff() {
+fn semi_self_age_check_calls_staff() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", BEER);
     ok(
@@ -587,7 +587,7 @@ fn staff_and_customer_screens_are_exclusive() {
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
     assert_eq!(v.active_side, Some(Side::Customer));
-    assert!(run(&mut s, json!({"type":"lock","register":1})).is_err());
+    assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -657,49 +657,20 @@ fn mode_follows_staff_badge() {
         .all(|r| r.mode == Mode::SemiSelf && r.staff.state == StaffState::Absent));
     login(&mut s, 1);
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
-    for m in ["attended", "semi_self", "full_self"] {
-        assert!(run(&mut s, json!({"type":"set_mode","register":1,"mode":m})).is_err());
-    }
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
-    assert!(run(
-        &mut s,
-        json!({"type":"set_mode","register":1,"mode":"full_self"})
-    )
-    .is_err());
 }
 
-/// セルフモード（将来の拡張）：有効にすると、お客様が FF も自分で登録できる。
+/// セミセルフでは、お客様は FF を登録できない（FF ボタンで係員を呼ぶ）。
 #[test]
-fn customer_registers_ff_in_self_mode() {
+fn customer_cannot_register_ff_in_semi_self() {
     let mut s = Store::new(1, 2, 1);
-    let ff =
-        |r: u8| json!({"type":"register_ff","register":r,"side":"customer","code":"FF01","qty":1});
-    // セミセルフでは FF は店員の登録
-    assert!(run(&mut s, ff(2)).is_err());
-    s.set_self_mode_enabled(true);
-    ok(
+    assert!(run(
         &mut s,
-        json!({"type":"set_mode","register":2,"mode":"full_self"}),
-    );
-    ok(&mut s, ff(2));
-    let v = reg(&s, 2);
-    assert_eq!(v.customer.lines.len(), 1);
-    assert!(
-        s.snapshot().calls.is_empty(),
-        "no staff call for self-picked FF"
-    );
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"}),
-    );
-    confirm_point(&mut s, 2);
-    ok(
-        &mut s,
-        json!({"type":"insert_cash","register":2,"denomination":1000,"count":1}),
-    );
-    ok(&mut s, json!({"type":"finish_insert","register":2}));
-    assert!(reg(&s, 2).customer.lines.is_empty(), "paid and settled");
+        json!({"type":"register_ff","register":2,"side":"customer","code":"FF01","qty":1})
+    )
+    .is_err());
+    ok(&mut s, json!({"type":"ff_button","register":2}));
 }
 
 /// 名札でログインした有人モードも、5 分間操作がなければログアウトしてセミセルフに戻る。
@@ -1197,7 +1168,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     assert!(!reg(&s, 1).customer.point_pending);
 }
 
-/// 店員側・お客様側の区別はない。有人モードでは操作側の画面なら取引中止もロックもできる。
+/// 店員側・お客様側の区別はない。有人モードでは操作側の画面なら取引中止もできる。
 /// 年確の「する／しない」は店員側の画面にだけ効く。
 #[test]
 fn either_screen_can_operate_except_age_confirmation() {
@@ -1224,8 +1195,6 @@ fn either_screen_can_operate_except_age_confirmation() {
     no_id_check(&mut s, 1);
     // 取引中止もお客様側の画面から（操作側なので）できる
     ok(&mut s, json!({"type":"void_transaction","register":1}));
-    ok(&mut s, json!({"type":"lock","register":1}));
-    assert_eq!(reg(&s, 1).staff.state, StaffState::Locked);
 }
 
 /// 有人モードで店員が年確を「しない」を選ぶと、年確はそこで済む。
@@ -1344,9 +1313,9 @@ fn shopping_is_limited_to_ten_items() {
     scan(&mut s, 1, "customer", BREAD);
 }
 
-/// 取引中止・ロック・ログアウトは店舗メニュー（☰）から行い、済んだらメニューは閉じる。
+/// 取引中止・ログアウトは店舗メニューから行い、済んだらメニューは閉じる。ロックはない。
 #[test]
-fn void_lock_and_logout_from_the_store_menu() {
+fn void_and_logout_from_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
@@ -1355,12 +1324,6 @@ fn void_lock_and_logout_from_the_store_menu() {
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     let v = reg(&s, 1);
     assert!(v.menu.is_none() && v.staff.lines.is_empty());
-    ok(&mut s, top.clone());
-    ok(&mut s, json!({"type":"lock","register":1}));
-    let v = reg(&s, 1);
-    assert!(v.menu.is_none());
-    assert_eq!(v.staff.state, StaffState::Locked);
-    scan(&mut s, 1, "staff", "ST1001");
     ok(&mut s, top);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);

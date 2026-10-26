@@ -182,7 +182,7 @@ pub enum Command {
     },
     RegisterFf {
         register: u8,
-        /// 省略時は店員側。セルフモードではお客様側からも登録できる
+        /// 省略時は店員側。有人モードではお客様側の画面からも登録できる
         #[serde(default = "staff_side")]
         side: Side,
         code: String,
@@ -313,13 +313,6 @@ pub enum Command {
         register: u8,
     },
     VoidTransaction {
-        register: u8,
-    },
-    SetMode {
-        register: u8,
-        mode: Mode,
-    },
-    Lock {
         register: u8,
     },
     EndStaffMode {
@@ -469,8 +462,6 @@ impl Command {
             | C::ReleaseCall { register }
             | C::ConfirmPointCard { register, .. }
             | C::VoidTransaction { register, .. }
-            | C::SetMode { register, .. }
-            | C::Lock { register, .. }
             | C::EndStaffMode { register, .. }
             | C::Pause { register }
             | C::CashOut { register, .. }
@@ -508,10 +499,7 @@ impl Command {
             | C::RequestMenuCode { .. }
             | C::CashOut { .. }
             | C::CashIn { .. } => Some(Side::Customer),
-            C::CompleteService { .. }
-            | C::VoidTransaction { .. }
-            | C::SetMode { .. }
-            | C::Lock { .. } => Some(Side::Staff),
+            C::CompleteService { .. } | C::VoidTransaction { .. } => Some(Side::Staff),
             _ => None,
         }
     }
@@ -823,7 +811,6 @@ pub struct Receipt {
 #[derive(Clone, Copy, Debug)]
 struct StaffSession {
     account: &'static auth::StaffAccount,
-    locked: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -855,17 +842,14 @@ struct Register {
 }
 
 impl Register {
-    /// 運用モードは名札で決まる：名札でログイン中なら有人、いなければセミセルフ。
-    /// セルフ（将来の拡張）は、有効なときに明示的に選んだ場合だけ。
-    fn sync_mode(&mut self, self_mode_enabled: bool) {
+    /// 運用モードは名札で決まる：名札でログイン中なら有人、いなければセミセルフ
+    fn sync_mode(&mut self) {
         if self.staff_state() != StaffState::Ready {
             self.menu = None;
             self.menu_code = None;
         }
         self.mode = if self.staff.is_some() {
             Mode::Attended
-        } else if self_mode_enabled && self.mode == Mode::FullSelf {
-            Mode::FullSelf
         } else {
             Mode::SemiSelf
         };
@@ -905,7 +889,6 @@ impl Register {
     fn staff_state(&self) -> StaffState {
         match self.staff {
             None => StaffState::Absent,
-            Some(s) if s.locked => StaffState::Locked,
             Some(_) => StaffState::Ready,
         }
     }
@@ -969,8 +952,6 @@ pub struct AuditEntry {
 
 pub struct Store {
     now: u64,
-    /// セルフモード（お客様が FF も自分で登録する）は将来の拡張用。既定は OFF
-    self_mode_enabled: bool,
     rng: Rng,
     registers: Vec<Register>,
     mats: Vec<Mat>,
@@ -1127,7 +1108,6 @@ impl Store {
             .collect();
         Store {
             now: 0,
-            self_mode_enabled: false,
             rng: Rng::new(seed),
             registers: regs,
             mats: (0..mats).map(|i| Mat::new(&bell_name(i))).collect(),
@@ -1332,19 +1312,10 @@ impl Store {
                 r.touch = Some((side, now + TOUCH_LOCK_MS));
             }
         }
-        let self_ok = self.self_mode_enabled;
         for r in &mut self.registers {
-            r.sync_mode(self_ok);
+            r.sync_mode();
         }
         res
-    }
-
-    /// セルフモード（将来の拡張）を使えるようにする
-    pub fn set_self_mode_enabled(&mut self, on: bool) {
-        self.self_mode_enabled = on;
-        for r in &mut self.registers {
-            r.sync_mode(on);
-        }
     }
 
     fn apply(&mut self, cmd: Command) -> Result<Outcome, String> {
@@ -1728,34 +1699,6 @@ impl Store {
                     done("取引を中止しました")
                 }
             }
-            C::SetMode { register, mode } => {
-                // 有人／セミセルフは名札で切り替わる。選べるのはセルフ（有効なときだけ）
-                if mode != Mode::FullSelf {
-                    return Err(
-                        "運用モードは名札で切り替わります（名札あり＝有人、なし＝セミセルフ）"
-                            .into(),
-                    );
-                }
-                if !self.self_mode_enabled {
-                    return Err("セルフモードは使えません（将来の拡張用）".into());
-                }
-                let r = self.reg_mut(register)?;
-                if r.staff.is_some() || !r.txn.lines.is_empty() {
-                    return Err("ログアウトして取引のない状態で切り替えてください".into());
-                }
-                r.mode = Mode::FullSelf;
-                done("セルフモードにしました")
-            }
-            C::Lock { register } => {
-                self.check_active(register, Action::Lock)?;
-                let r = self.reg_mut(register)?;
-                r.menu = None;
-                r.menu_code = None;
-                if let Some(s) = &mut r.staff {
-                    s.locked = true;
-                }
-                done("画面をロックしました（スタッフバーコードで解除）")
-            }
             C::Pause { register } => {
                 self.check_active(register, Action::Pause)?;
                 let r = self.reg_mut(register)?;
@@ -2051,7 +1994,7 @@ impl Store {
 
     fn scan(&mut self, register: u8, side: Side, code: &str) -> Result<Outcome, String> {
         let scanned = catalog::classify(code);
-        // スタッフバーコードは、ロック中・未ログインでも読む（ログイン・解除）
+        // スタッフバーコードは、未ログインでも・休止中でも読む（ログイン・再開）
         if let Scanned::Staff(id) = &scanned {
             let acc = auth::account(id).ok_or("登録されていないスタッフバーコードです")?;
             let now = self.now;
@@ -2059,10 +2002,7 @@ impl Store {
             let was = r.staff_state();
             let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.customer_turn;
-            r.staff = Some(StaffSession {
-                account: acc,
-                locked: false,
-            });
+            r.staff = Some(StaffSession { account: acc });
             // ログイン後は両方の画面が操作できる（触れている一瞬だけ排他）
             r.touch = None;
             // ログインで店員側が操作できるようになる（お客様の支払い中でも）
@@ -2082,7 +2022,6 @@ impl Store {
             return done(match was {
                 _ if resumed => format!("{}さんがレジを再開しました（有人モード）", acc.name),
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),
-                StaffState::Locked => format!("{}さんがロックを解除しました", acc.name),
                 _ => format!("{}さんがログインしました（有人モード）", acc.name),
             });
         }
@@ -2208,18 +2147,6 @@ impl Store {
             r.txn.paying = false;
             r.txn.method = None;
             r.txn.customer_turn = false;
-        }
-        if side == Side::Customer && r.mode == Mode::FullSelf {
-            // セルフモードでお客様が自分で取った FF。お渡し・受取確認はない
-            r.txn.push(
-                p,
-                qty,
-                LineKind::Ff {
-                    state: FfState::Received,
-                },
-                tax,
-            );
-            return done(format!("{} ×{qty} を登録しました", p.name));
         }
         r.txn.push(
             p,

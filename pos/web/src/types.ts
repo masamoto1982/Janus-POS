@@ -1,10 +1,10 @@
 // コアの Snapshot（core/src/store.rs）を TypeScript から読むための型。
 
 export type Side = "staff" | "customer";
-export type Mode = "attended" | "semi_self" | "full_self";
+export type Mode = "attended" | "semi_self";
 export type Phase = "registering" | "paying";
 export type Method = "cash" | "emoney" | "qr" | "credit" | "points";
-export type StaffState = "absent" | "locked" | "ready";
+export type StaffState = "absent" | "ready";
 export type FfState = "waiting" | "received";
 
 export interface ActionState {

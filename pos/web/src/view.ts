@@ -1184,7 +1184,7 @@ export function shelfPanel(s: Snapshot): string {
     // 棚の並びは SHELVES に書いた順
     const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || attended);
     if (!items.length) return "";
-    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
+    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
         item(
           p.code,

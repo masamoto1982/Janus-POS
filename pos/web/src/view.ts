@@ -414,7 +414,7 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
 
 /** 初期画面のボタンで選んだ案内（レジ:画面 → 種類）。選ばなくても、どのバーコードでも読める */
 export const scanGuide = new Map<string, GuideKind>();
-export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon";
+export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon" | "shop" | "parcel" | "bill";
 const GUIDES: [GuideKind, string, string][] = [
   ["item", "商品", "商品のバーコードをスキャンしてください"],
   ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
@@ -440,6 +440,40 @@ export function welcome(reg: number, side: Side): string {
     </div>`;
 }
 
+/** 有人モードの初期画面の案内ボタン（店員側で押す。お客様側には同じボタンを押せない形で映す） */
+const ATTENDED_GUIDES: [GuideKind, string, string][] = [
+  ["shop", "お買い物", "商品のバーコードをスキャンしてください"],
+  ["parcel", "宅配便", "宅配便の伝票のバーコードをスキャンしてください"],
+  ["bill", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
+];
+
+/**
+ * 有人モードの初期画面。あいさつと声かけの二行に、ご用件の案内ボタンを添える。
+ * 一段目は お買い物・宅配便・お支払い（押すと読むバーコードを案内）、二段目は電子マネーのチャージ・残高確認。
+ * 両方の画面に出し、操作できるのは店員側だけ（お客様側はどの用件を受け付けているかを見せる）
+ */
+function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
+  const reg = r.id;
+  const on = scanGuide.get(`${reg}:staff`);
+  const ro = side === "customer";
+  const guide = ATTENDED_GUIDES.find(([k]) => k === on);
+  const guides = ATTENDED_GUIDES.map(
+    ([k, label]) =>
+      `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
+  ).join("");
+  // サービスボタン（二行目「お支払い・荷物」）と同じ意匠
+  const label = "<b>電子マネー</b><small>チャージ・残高確認</small>";
+  const emoney = ro
+    ? `<button type="button" class="call-btn emoney-guide mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`
+    : btn("", { type: "start_emoney", register: reg, side: "staff", kind: "menu" }, find(r.staff.actions, "emoney"), "call-btn emoney-guide").replace("></button>", `>${label}</button>`);
+  const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
+  return `${notice}<div class="welcome attended-welcome"><div class="big">${head}</div><p>${sub}</p>
+      <div class="guide-row">${guides}</div>
+      <div class="guide-row">${emoney}</div>
+      ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
+    </div>`;
+}
+
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
   if (r.menu) return notice + storeMenu(r);
@@ -448,10 +482,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const a = (n: string) => find(v.actions, n);
   if (r.last_receipt && !v.lines.length) return notice + thanks();
   // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
-  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length)
-    return side === "staff"
-      ? `${notice}<div class="welcome"><div class="big">お辞儀とご挨拶をしましょう</div><p>ご用件をお伺いしてください</p></div>`
-      : `${notice}<div class="welcome"><div class="big">いらっしゃいませ</div><p>ご用件をお申し付けください</p></div>`;
+  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length) return attendedWelcome(r, notice, side);
   // お客様側に出すボタンは、お客様本人が押すもの（お支払い内容の確認・投入おわり）だけ。
   // ほかの操作（会計・変更・ポイントカード・支払方法など）は店員側の画面で行う
   const ro = side === "customer";

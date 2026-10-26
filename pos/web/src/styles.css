@@ -286,6 +286,10 @@ details summary h3 { display: inline; }
 .guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: transparent; color: var(--ink); border-color: var(--border); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
+/* 有人モードの初期画面：二段目の電子マネー（サービスボタンと同じ二行の意匠） */
+.attended-welcome .emoney-guide { min-width: 180px; padding: 6px 18px; background: var(--btn); color: var(--btn-ink); }
+/* お客様側は押せないが、薄くせず店員側と同じ見た目で映す（選んだ用件も同じく塗る） */
+.attended-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }

@@ -740,8 +740,13 @@ export function clockText(d: Date): string {
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
+  // 有人モードでは、店員側のベルは仲間に SOS を出すのに使う（お客様側は店員がいるので押せない）
   const call = find(r.customer.actions, "call_staff");
-  const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="係員を呼ぶ（押している間鳴ります）" title="${esc(call.allowed ? "係員を呼ぶ（押している間鳴ります）" : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
+  const sos = r.mode === "attended";
+  const on = call.allowed && !(sos && side === "customer");
+  const bellTip = sos ? "仲間の店員を呼ぶ（押している間鳴ります）" : "係員を呼ぶ（押している間鳴ります）";
+  const reason = sos && side === "customer" ? "店員が対応中です" : (call.reason ?? "");
+  const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}>🔔</button>`;
   const label = r.mode === "attended" ? "有人モード" : "セミセルフモード";
   const cls = `mode-badge ${r.mode === "attended" ? "attended" : "semi"}`;
   // 店舗メニューは両方の画面のバッジから開ける。開いた側の画面にだけ、その側の項目を出す

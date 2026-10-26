@@ -562,7 +562,10 @@ fn mat_rings_despite_loss_and_reports_link_down() {
     advance(&mut s, 8_000);
     let snap = s.snapshot();
     assert!(!snap.mats[0].link_ok);
-    assert_eq!(snap.registers[0].staff.mat_down, vec!["据え付け端末".to_string()]);
+    assert_eq!(
+        snap.registers[0].staff.mat_down,
+        vec!["据え付け端末".to_string()]
+    );
 }
 
 /// お客様画面には分類や年確対象の情報を出さない（店員画面にだけ出す）。
@@ -1035,12 +1038,11 @@ fn shortcut_buttons_call_staff() {
     // 店員が来ると、たばこ・サービスのボタン呼び出しは片付く（FF は登録するまで残る）
     login(&mut s, 1);
     assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
-    // 有人モードではボタンで呼ばない
-    assert!(run(
-        &mut s,
-        json!({"type":"call_staff","register":1,"topic":"tobacco"})
-    )
-    .is_err());
+    // 有人モードでは、店員が仲間に SOS を出すのに使う。Bell は鳴るが、呼び出しの記録は増えない
+    ok(&mut s, json!({"type":"call_staff","register":1}));
+    advance(&mut s, 1_000);
+    assert!(s.snapshot().mats[0].buzzing, "SOS rings the bell");
+    assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
 }
 
 /// 呼び出しボタンは触れている間だけ MAT を鳴らす。短く押して「押した」電文が失われても、

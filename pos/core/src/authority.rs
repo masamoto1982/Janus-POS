@@ -450,7 +450,8 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::ConfirmBillPayment => confirm_bill(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
-        Action::CallStaff => Err("係員が対応中です"),
+        // 一人で手に負えないとき、店員が仲間に SOS を出す（Bell を鳴らすだけで、呼び出しの記録・画面表示はなし）
+        Action::CallStaff => Ok(()),
         Action::Emoney => emoney(c),
         Action::ResolveEmoneyShort => resolve_emoney_short(c),
     }

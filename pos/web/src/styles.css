@@ -290,8 +290,10 @@ details summary h3 { display: inline; }
 .guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: transparent; color: var(--ink); border-color: var(--border); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
-/* 有人モードの初期画面：二段目の電子マネー（サービスボタンと同じ二行の意匠） */
-.welcome .emoney-guide { min-width: 180px; padding: 6px 18px; background: var(--btn); color: var(--btn-ink); }
+/* 有人モードの初期画面：二段目の電子マネーも、お買い物などと同じ枠線だけの丸い形と色 */
+.welcome .emoney-guide { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.25; padding: 4px 16px; }
+.welcome .emoney-guide b { font-weight: inherit; }
+.welcome .emoney-guide small { font-size: 10px; }
 /* お客様側は押せないが、薄くせず店員側と同じ見た目で映す（選んだ用件も同じく塗る） */
 .attended-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
@@ -567,9 +569,12 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 
 /* セミセルフの待ち受け：右下の角を頂点に最も明るくなる背景。その明るい角に電子マネーの文字リンクを置く
    （バーコードを読む案内ボタンから離し、電子マネーにスキャンが要ると誤解させない） */
-.scan-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px 36px;
-  --glow: color-mix(in srgb, var(--cust-bg) 70%, #ffffff); --dim: color-mix(in srgb, var(--cust-bg) 88%, var(--ink));
-  /* 右下の角を中心にした円。円の中は角に向かって明るくなり、円の外は一様に少し暗い */
-  background: radial-gradient(circle 240px at 100% 100%, var(--glow) 0%, var(--glow) 35%, var(--dim) 100%) var(--dim); }
+/* 待ち受け画面の背景：明るい点を中心に、外へいくほど暗くなる円形グラデーション。
+   セミセルフは右下の角（電子マネーの文字リンク）へ、有人は画面中央へ視線を集める */
+.scan-welcome, .attended-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
+  --glow: color-mix(in srgb, var(--cust-bg) 65%, #ffffff); --dark: color-mix(in srgb, var(--cust-bg) 78%, var(--ink));
+  background: radial-gradient(circle farthest-corner at var(--spot), var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
+.scan-welcome { --spot: 100% 100%; padding-bottom: 36px; }
+.attended-welcome { --spot: 50% 50%; }
 .scan-welcome .emoney-link { position: absolute; right: 14px; bottom: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .screen .scan-welcome .emoney-link:disabled { background: none !important; }

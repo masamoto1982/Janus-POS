@@ -502,10 +502,10 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
     ([k, label]) =>
       `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
   ).join("");
-  // サービスボタン（二行目「お支払い・荷物」）と同じ意匠
+  // お買い物・宅配便・お支払いと同じ形と色（二行目に「チャージ・残高確認」）
   const emoney = ro
-    ? `<button type="button" class="call-btn emoney-guide mirror-only" tabindex="-1" aria-disabled="true"><b>電子マネー</b><small>チャージ・残高確認</small></button>`
-    : emoneyEntry(reg, "staff", find(r.staff.actions, "emoney"), "call-btn emoney-guide");
+    ? `<button type="button" class="guide-btn emoney-guide mirror-only" tabindex="-1" aria-disabled="true"><b>電子マネー</b><small>チャージ・残高確認</small></button>`
+    : emoneyEntry(reg, "staff", find(r.staff.actions, "emoney"), "guide-btn emoney-guide");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
   return `${notice}<div class="welcome attended-welcome"><div class="big">${head}</div><p>${sub}</p>
       <div class="guide-row">${guides}</div>

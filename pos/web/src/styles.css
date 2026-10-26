@@ -132,7 +132,6 @@ button { touch-action: manipulation; }
 
 
 .mode { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--line); }
-.mode-full_self { background: var(--call-bg); color: var(--call); }
 
 .screens { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 760px) { .screens { grid-template-columns: 1fr; } }
@@ -258,7 +257,9 @@ input, select {
 
 .banner { border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-weight: 600; }
 .banner.call { background: var(--call-bg); color: var(--call); }
-.call-screen { text-align: center; padding: 32px 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--call-bg); color: var(--call); border-radius: 10px; }
+/* 呼び出し中の店員側：登録画面の領域いっぱいに広げる（角は丸めない） */
+.call-screen { box-sizing: border-box; margin: -8px -12px; min-height: calc(100% + 16px); text-align: center; padding: 16px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: var(--call-bg); color: var(--call); }
+.call-screen .banner { align-self: stretch; }
 .call-screen .call-reason { font-size: 44px; font-weight: 800; line-height: 1.2; }
 .call-screen p { margin: 0; font-size: 16px; }
 .banner.info { background: var(--line); }
@@ -281,7 +282,7 @@ details summary { cursor: pointer; margin-top: 6px; }
 details summary h3 { display: inline; }
 .ffmenu button.ff { background: var(--btn); color: var(--btn-ink); }
 
-.locked, .welcome, .thanks { text-align: center; padding: 40px 8px; }
+.welcome, .thanks { text-align: center; padding: 40px 8px; }
 .welcome { box-sizing: border-box; min-height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 8px; }
 .welcome .big { font-size: 18px; font-weight: 700; }
 .welcome p { font-size: 12px; margin: 4px 0 0; }
@@ -331,7 +332,7 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .mat { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 4px 12px; border: 2px solid var(--border); }
 .mat .bell { font-size: 18px; display: inline-block; }
 .mat-id { font-weight: 600; }
-.mat-state, .mat-kind { font-size: 12px; color: var(--muted); }
+.mat-state { font-size: 12px; color: var(--muted); }
 .mat.buzz { border-color: var(--call); background: var(--call-bg); }
 .mat.off { opacity: .5; }
 .mat-area .bell-open { margin-left: auto; }
@@ -405,10 +406,18 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .item.staff .item-sub { color: #9ca3af; }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }
 .lines tr.coupon td { color: var(--danger); }
-.item.card { background: var(--call-bg); color: var(--call); }
-.item.bill { background: var(--bill-bg); border-color: var(--border); }
-.item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 999px; }
+.item.card { background: var(--call-bg); color: var(--call); margin: 0; }
+/* お金は金額だけ。紙幣は横長の札、硬貨は真円 */
+.item.bill { background: var(--bill-bg); border-color: var(--border); justify-content: center; min-height: 34px; }
+.item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; text-align: center; }
+.item.coin .item-name { font-size: 11px; white-space: nowrap; }
 .item.pay { background: var(--pay-bg); border-color: var(--border); }
+/* Item の商品と、Wallet のお金以外（ポイントカード・クーポン・決済手段）は、それぞれ同じ大きさ
+   （いちばん長い名前・補足が収まる幅で、引き延ばさない）。文字は縦横とも中央に */
+.wallet-cards { margin-top: 4px; }
+.items.uniform .item, .wallet-cards .item { box-sizing: border-box; width: 108px; height: 44px; justify-content: center; align-items: center; text-align: center; }
+.wallet-cards .item { width: 136px; }
+.items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* ドロップ先 */
 .drop-hint { display: none; margin-left: 8px; letter-spacing: 0; }
@@ -519,8 +528,11 @@ body.dragging .drop-hint { display: inline; }
 .money-io .inlet.blink::placeholder { color: var(--ink); font-weight: 700; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-cust { grid-column: 1; } }
-/* 歯車は両方の画面に出る。操作できない側の歯車は押せない */
+/* 歯車は両方の画面に出る。操作できない側の歯車は押せない。
+   ただし店舗メニューを開いたバッジは、開いている間も押して閉じられる（開いた所で閉じる） */
 .screen.inactive .mode-badge { pointer-events: none; }
+.screen.inactive .mode-badge[aria-expanded="true"] { pointer-events: auto; }
+.mode-badge[aria-expanded="true"] .caret { display: inline-block; transform: rotate(180deg); }
 
 /* セミセルフの店員呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ） */
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -578,3 +590,10 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 .attended-welcome { --spot: 50% 50%; }
 .scan-welcome .emoney-link { position: absolute; right: 14px; bottom: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
 .screen .scan-welcome .emoney-link:disabled { background: none !important; }
+/* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
+.menu-code-value { font-size: 40px; letter-spacing: .25em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; margin: 4px 0; padding-left: .25em; }
+.menu-code-form { justify-content: center; gap: 8px; }
+.menu-code-form input { width: 7.5em; font-size: 20px; letter-spacing: .2em; text-align: center; text-transform: uppercase; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+/* 使い方の説明（Item・Wallet のボタンにカーソルを重ねると出る）。画面に固定して置くので横スクロールを生まない */
+.hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
+.hover-tip[hidden] { display: none; }

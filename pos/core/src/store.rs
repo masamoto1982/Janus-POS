@@ -43,7 +43,8 @@ pub enum CashOutKind {
     ChangerCollect,
 }
 
-/// お客様画面の店舗メニュー（歯車から開く）。一度に一つの画面だけを出す
+/// 店舗メニュー（稼働モードのバッジから開く）。一度に一つの画面だけを、開いた側の画面に出す。
+/// 自動釣銭機へのお金の出し入れはお客様側（出し入れ口が売り場側にある）、それ以外は店員側
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MenuScreen {
@@ -55,10 +56,37 @@ pub enum MenuScreen {
     Expense,
     /// 自動釣銭機（両替）
     Changer,
+    /// ジャーナル確認（店員側。仮設）
+    Journal,
+    /// 廃棄登録（店員側。仮設）
+    Waste,
+    /// FF 鮮度管理：作成数の登録（店員側。仮設）
+    FfFresh,
 }
+
+impl MenuScreen {
+    /// この画面を出せる側（一覧はどちらにもある）
+    fn side(self) -> Option<Side> {
+        match self {
+            MenuScreen::Top => None,
+            MenuScreen::Refund
+            | MenuScreen::Emergency
+            | MenuScreen::Deposit
+            | MenuScreen::Expense
+            | MenuScreen::Changer => Some(Side::Customer),
+            MenuScreen::Journal | MenuScreen::Waste | MenuScreen::FfFresh => Some(Side::Staff),
+        }
+    }
+}
+
+/// お客様側から店舗メニューを開くためのパスワードの文字（英大文字と数字）と桁数
+const MENU_CODE_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+const MENU_CODE_LEN: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Menu {
+    /// 開いた側の画面（その画面にだけ出す）
+    pub side: Side,
     pub screen: MenuScreen,
     /// 両替で受け取る金種
     pub exchange_to: u32,
@@ -154,7 +182,7 @@ pub enum Command {
     },
     RegisterFf {
         register: u8,
-        /// 省略時は店員側。セルフモードではお客様側からも登録できる
+        /// 省略時は店員側。有人モードではお客様側の画面からも登録できる
         #[serde(default = "staff_side")]
         side: Side,
         code: String,
@@ -287,33 +315,39 @@ pub enum Command {
     VoidTransaction {
         register: u8,
     },
-    SetMode {
-        register: u8,
-        mode: Mode,
-    },
-    Lock {
-        register: u8,
-    },
     EndStaffMode {
         register: u8,
     },
+    /// レジ休止中にする：ログアウトし、スタッフバーコードを読むまでどの操作も受け付けない
+    Pause {
+        register: u8,
+    },
+    /// 出金（お客様側の店舗メニューに入っていれば、パスワードは要らない）
     CashOut {
         register: u8,
         kind: CashOutKind,
         amount: u32,
-        password: String,
     },
     CashIn {
         register: u8,
         kind: CashInKind,
         amount: u32,
     },
-    /// 店舗メニューを開く・画面を切り替える（None で閉じる）
+    /// 店舗メニューを開く・画面を切り替える（None で閉じる）。店員側はパスワード不要。
+    /// お客様側は、開くときだけ店員画面に出た使い捨てのパスワード（`code`）が要る
     OpenMenu {
         register: u8,
         screen: Option<MenuScreen>,
+        #[serde(default = "staff_side")]
+        side: Side,
+        #[serde(default)]
+        code: Option<String>,
         #[serde(default)]
         exchange_to: Option<u32>,
+    },
+    /// お客様側から店舗メニューを開こうとする：使い捨てのパスワードを作り、店員画面にだけ出す
+    RequestMenuCode {
+        register: u8,
     },
     /// 投入口にお金を入れる（金額で指定）。店舗メニューの入金・両替画面ならそちらに使う
     Insert {
@@ -428,12 +462,12 @@ impl Command {
             | C::ReleaseCall { register }
             | C::ConfirmPointCard { register, .. }
             | C::VoidTransaction { register, .. }
-            | C::SetMode { register, .. }
-            | C::Lock { register, .. }
             | C::EndStaffMode { register, .. }
+            | C::Pause { register }
             | C::CashOut { register, .. }
             | C::CashIn { register, .. }
             | C::OpenMenu { register, .. }
+            | C::RequestMenuCode { register }
             | C::Insert { register, .. }
             | C::TakeOutlet { register, .. }
             | C::Claim { register, .. } => Some(*register),
@@ -457,17 +491,15 @@ impl Command {
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
             | C::ResolveEmoneyShort { side, .. }
-            | C::Claim { side, .. } => Some(*side),
-            // 店舗メニューと入出金はお客様画面で行う
+            | C::Claim { side, .. }
+            | C::OpenMenu { side, .. } => Some(*side),
+            // 自動釣銭機への入出金はお客様画面の店舗メニューで行う
             C::FfButton { .. }
             | C::CallStaff { .. }
-            | C::OpenMenu { .. }
+            | C::RequestMenuCode { .. }
             | C::CashOut { .. }
             | C::CashIn { .. } => Some(Side::Customer),
-            C::CompleteService { .. }
-            | C::VoidTransaction { .. }
-            | C::SetMode { .. }
-            | C::Lock { .. } => Some(Side::Staff),
+            C::CompleteService { .. } | C::VoidTransaction { .. } => Some(Side::Staff),
             _ => None,
         }
     }
@@ -779,7 +811,6 @@ pub struct Receipt {
 #[derive(Clone, Copy, Debug)]
 struct StaffSession {
     account: &'static auth::StaffAccount,
-    locked: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -798,6 +829,10 @@ struct Register {
     outlet_since: Option<u64>,
     /// お客様画面に開いている店舗メニュー
     menu: Option<Menu>,
+    /// お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す）
+    menu_code: Option<String>,
+    /// レジ休止中（スタッフバーコードを読むまで、どの操作も受け付けない）
+    paused: bool,
     /// いま触れている側と、その一瞬が終わる時刻（その間だけもう一方は操作できない）
     touch: Option<(Side, u64)>,
     /// お客様画面の呼び出しボタンが押されている（触れている間 MAT が鳴る）
@@ -807,16 +842,14 @@ struct Register {
 }
 
 impl Register {
-    /// 運用モードは名札で決まる：名札でログイン中なら有人、いなければセミセルフ。
-    /// セルフ（将来の拡張）は、有効なときに明示的に選んだ場合だけ。
-    fn sync_mode(&mut self, self_mode_enabled: bool) {
+    /// 運用モードは名札で決まる：名札でログイン中なら有人、いなければセミセルフ
+    fn sync_mode(&mut self) {
         if self.staff_state() != StaffState::Ready {
             self.menu = None;
+            self.menu_code = None;
         }
         self.mode = if self.staff.is_some() {
             Mode::Attended
-        } else if self_mode_enabled && self.mode == Mode::FullSelf {
-            Mode::FullSelf
         } else {
             Mode::SemiSelf
         };
@@ -856,7 +889,6 @@ impl Register {
     fn staff_state(&self) -> StaffState {
         match self.staff {
             None => StaffState::Absent,
-            Some(s) if s.locked => StaffState::Locked,
             Some(_) => StaffState::Ready,
         }
     }
@@ -892,7 +924,11 @@ impl Register {
             coupon_unmatched: t.paying && t.coupon_unmatched(),
             method: t.method,
             customer_turn: t.customer_turn,
-            menu_open: self.menu.is_some(),
+            // パスワードの入力を待つ間は、お客様側で入力する
+            menu_side: self
+                .menu
+                .map(|m| m.side)
+                .or(self.menu_code.as_ref().map(|_| Side::Customer)),
             touching: self.touch.map(|(side, _)| side),
             items_full: t.item_count() >= MAX_ITEMS,
             emoney_short: t.emoney_short,
@@ -916,8 +952,6 @@ pub struct AuditEntry {
 
 pub struct Store {
     now: u64,
-    /// セルフモード（お客様が FF も自分で登録する）は将来の拡張用。既定は OFF
-    self_mode_enabled: bool,
     rng: Rng,
     registers: Vec<Register>,
     mats: Vec<Mat>,
@@ -1064,6 +1098,8 @@ impl Store {
                     outlet: Cash::default(),
                     outlet_since: None,
                     menu: None,
+                    menu_code: None,
+                    paused: false,
                     touch: None,
                     pressing: false,
                     emoney: None,
@@ -1072,7 +1108,6 @@ impl Store {
             .collect();
         Store {
             now: 0,
-            self_mode_enabled: false,
             rng: Rng::new(seed),
             registers: regs,
             mats: (0..mats).map(|i| Mat::new(&bell_name(i))).collect(),
@@ -1175,6 +1210,7 @@ impl Store {
                     r.mode = Mode::SemiSelf;
                 }
                 r.menu = None;
+                r.menu_code = None;
                 r.last_op = now;
             }
         }
@@ -1248,6 +1284,19 @@ impl Store {
     }
 
     pub fn dispatch(&mut self, cmd: Command) -> Result<Outcome, String> {
+        // レジ休止中は、スタッフバーコード（再開）と出金ボックスのお金の取り出しだけを受け付ける
+        if let Some(id) = cmd.register() {
+            let resume = match &cmd {
+                Command::Scan { code, .. } => {
+                    matches!(catalog::classify(code), Scanned::Staff(_))
+                }
+                Command::TakeOutlet { .. } => true,
+                _ => false,
+            };
+            if !resume && self.reg(id).is_some_and(|r| r.paused) {
+                return Err("このレジは休止中です（スタッフバーコードで再開）".into());
+            }
+        }
         // 成否にかかわらず、触られたレジは「操作あり」
         if let Some(id) = cmd.register() {
             let now = self.now;
@@ -1263,19 +1312,10 @@ impl Store {
                 r.touch = Some((side, now + TOUCH_LOCK_MS));
             }
         }
-        let self_ok = self.self_mode_enabled;
         for r in &mut self.registers {
-            r.sync_mode(self_ok);
+            r.sync_mode();
         }
         res
-    }
-
-    /// セルフモード（将来の拡張）を使えるようにする
-    pub fn set_self_mode_enabled(&mut self, on: bool) {
-        self.self_mode_enabled = on;
-        for r in &mut self.registers {
-            r.sync_mode(on);
-        }
     }
 
     fn apply(&mut self, cmd: Command) -> Result<Outcome, String> {
@@ -1648,7 +1688,7 @@ impl Store {
                 self.check_active(register, Action::VoidTransaction)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
-                // 店舗メニューから行うので、済んだらメニューを閉じる
+                // 開いていた店舗メニューは閉じる
                 r.menu = None;
                 let back = self.void_txn(register, now);
                 if back > 0 {
@@ -1659,46 +1699,29 @@ impl Store {
                     done("取引を中止しました")
                 }
             }
-            C::SetMode { register, mode } => {
-                // 有人／セミセルフは名札で切り替わる。選べるのはセルフ（有効なときだけ）
-                if mode != Mode::FullSelf {
-                    return Err(
-                        "運用モードは名札で切り替わります（名札あり＝有人、なし＝セミセルフ）"
-                            .into(),
-                    );
-                }
-                if !self.self_mode_enabled {
-                    return Err("セルフモードは使えません（将来の拡張用）".into());
-                }
+            C::Pause { register } => {
+                self.check_active(register, Action::Pause)?;
                 let r = self.reg_mut(register)?;
-                if r.staff.is_some() || !r.txn.lines.is_empty() {
-                    return Err("ログアウトして取引のない状態で切り替えてください".into());
-                }
-                r.mode = Mode::FullSelf;
-                done("セルフモードにしました")
-            }
-            C::Lock { register } => {
-                self.check_active(register, Action::Lock)?;
-                let r = self.reg_mut(register)?;
+                r.staff = None;
                 r.menu = None;
-                if let Some(s) = &mut r.staff {
-                    s.locked = true;
-                }
-                done("画面をロックしました（スタッフバーコードで解除）")
+                r.menu_code = None;
+                r.touch = None;
+                r.paused = true;
+                done("レジ休止中にしました（スタッフバーコードで再開）")
             }
             C::EndStaffMode { register } => {
                 self.check_active(register, Action::EndStaffMode)?;
                 let r = self.reg_mut(register)?;
                 r.staff = None;
                 r.menu = None;
+                r.menu_code = None;
                 done("ログアウトしました（セミセルフモード）")
             }
             C::CashOut {
                 register,
                 kind,
                 amount,
-                password,
-            } => self.cash_out(register, kind, amount, &password),
+            } => self.cash_out(register, kind, amount),
             C::CashIn {
                 register,
                 kind,
@@ -1707,27 +1730,21 @@ impl Store {
             C::OpenMenu {
                 register,
                 screen,
+                side,
+                code,
                 exchange_to,
-            } => {
-                let r = self.reg_mut(register)?;
+            } => self.open_menu(register, side, screen, code, exchange_to),
+            C::RequestMenuCode { register } => {
+                let r = self.reg(register).ok_or("レジがありません")?;
                 if r.staff_state() != StaffState::Ready {
                     return Err("店舗メニューは名札でログインした店員だけが使えます".into());
                 }
-                // 取引中は一覧（取引中止・ロック・ログアウト）だけを開ける
-                if screen.is_some_and(|s| s != MenuScreen::Top) && !r.txn.lines.is_empty() {
-                    return Err("取引中は店舗メニューを開けません".into());
+                if r.menu.is_some() {
+                    return Err("店舗メニューを開いています".into());
                 }
-                let to = exchange_to
-                    .or(r.menu.map(|m| m.exchange_to))
-                    .unwrap_or(1_000);
-                if !is_valid_denomination(to) {
-                    return Err("使えない金種です".into());
-                }
-                r.menu = screen.map(|screen| Menu {
-                    screen,
-                    exchange_to: to,
-                });
-                Ok(Outcome::default())
+                let code = self.new_menu_code();
+                self.reg_mut(register)?.menu_code = Some(code);
+                done("店員画面に表示されたパスワードを入力してください")
             }
             C::Insert { register, amount } => self.insert(register, amount),
             C::TakeOutlet { register } => {
@@ -1839,7 +1856,7 @@ impl Store {
                 let bell = self.bell;
                 let m = self.mats.get_mut(mat).ok_or("MAT が見つかりません")?;
                 if bell_kind(mat as u8) == BellKind::Fixed {
-                    return Err("据え付けの呼び鈴は OFF にできません".into());
+                    return Err("据え付け端末は OFF にできません".into());
                 }
                 if on && !m.bell_on {
                     // OFF の間の呼び出しを、ON にした途端に鳴らさない
@@ -1977,17 +1994,15 @@ impl Store {
 
     fn scan(&mut self, register: u8, side: Side, code: &str) -> Result<Outcome, String> {
         let scanned = catalog::classify(code);
-        // スタッフバーコードは、ロック中・未ログインでも読む（ログイン・解除）
+        // スタッフバーコードは、未ログインでも・休止中でも読む（ログイン・再開）
         if let Scanned::Staff(id) = &scanned {
             let acc = auth::account(id).ok_or("登録されていないスタッフバーコードです")?;
             let now = self.now;
             let r = self.reg_mut(register)?;
             let was = r.staff_state();
+            let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.customer_turn;
-            r.staff = Some(StaffSession {
-                account: acc,
-                locked: false,
-            });
+            r.staff = Some(StaffSession { account: acc });
             // ログイン後は両方の画面が操作できる（触れている一瞬だけ排他）
             r.touch = None;
             // ログインで店員側が操作できるようになる（お客様の支払い中でも）
@@ -2005,8 +2020,8 @@ impl Store {
                 self.calls.resolve(register, CallKind::Service, now);
             }
             return done(match was {
+                _ if resumed => format!("{}さんがレジを再開しました（有人モード）", acc.name),
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),
-                StaffState::Locked => format!("{}さんがロックを解除しました", acc.name),
                 _ => format!("{}さんがログインしました（有人モード）", acc.name),
             });
         }
@@ -2132,18 +2147,6 @@ impl Store {
             r.txn.paying = false;
             r.txn.method = None;
             r.txn.customer_turn = false;
-        }
-        if side == Side::Customer && r.mode == Mode::FullSelf {
-            // セルフモードでお客様が自分で取った FF。お渡し・受取確認はない
-            r.txn.push(
-                p,
-                qty,
-                LineKind::Ff {
-                    state: FfState::Received,
-                },
-                tax,
-            );
-            return done(format!("{} ×{qty} を登録しました", p.name));
         }
         r.txn.push(
             p,
@@ -2333,8 +2336,8 @@ impl Store {
         let r = self.reg(register).ok_or("レジがありません")?;
         let c = r.context();
         match active_side(&c) {
-            Some(s) if s != side => Err(if c.menu_open {
-                "お客様画面で店舗メニューを操作中です"
+            Some(s) if s != side => Err(if c.menu_side.is_some() {
+                "もう一方の画面で店舗メニューを操作中です"
             } else if c.staff != StaffState::Ready {
                 "スタッフバーコードでログインしてください"
             } else if c.customer_turn {
@@ -2493,14 +2496,112 @@ impl Store {
         done(msg)
     }
 
+    /// お客様側から店舗メニューを開くための使い捨てパスワード（英大文字と数字の 4 桁）
+    fn new_menu_code(&mut self) -> String {
+        (0..MENU_CODE_LEN)
+            .map(|_| {
+                let i = self.rng.range(0, MENU_CODE_CHARS.len() as u64 - 1) as usize;
+                MENU_CODE_CHARS[i] as char
+            })
+            .collect()
+    }
+
+    fn open_menu(
+        &mut self,
+        register: u8,
+        side: Side,
+        screen: Option<MenuScreen>,
+        code: Option<String>,
+        exchange_to: Option<u32>,
+    ) -> Result<Outcome, String> {
+        let now = self.now;
+        let r = self.reg(register).ok_or("レジがありません")?;
+        if r.staff_state() != StaffState::Ready {
+            return Err("店舗メニューは名札でログインした店員だけが使えます".into());
+        }
+        let Some(screen) = screen else {
+            // 閉じる（お客様側のパスワード入力をやめるときも）
+            let r = self.reg_mut(register)?;
+            if r.menu.is_some_and(|m| m.side != side) {
+                return Err("もう一方の画面で店舗メニューを開いています".into());
+            }
+            r.menu = None;
+            if side == Side::Customer {
+                r.menu_code = None;
+            }
+            return Ok(Outcome::default());
+        };
+        if screen.side().is_some_and(|s| s != side) {
+            return Err(match side {
+                Side::Staff => "お金の出し入れは、お客様側の画面の店舗メニューで行います",
+                Side::Customer => "この項目は店員側の画面の店舗メニューにあります",
+            }
+            .into());
+        }
+        match r.menu {
+            Some(m) if m.side != side => {
+                return Err("もう一方の画面で店舗メニューを開いています".into())
+            }
+            Some(_) => {}
+            // 店員側はパスワード不要。お客様側は、店員画面に出た使い捨てパスワードを見た人だけが開ける
+            None if side == Side::Customer => {
+                let Some(expected) = r.menu_code.clone() else {
+                    return Err("店員画面にパスワードを出してから入力してください".into());
+                };
+                let given = code.unwrap_or_default().trim().to_ascii_uppercase();
+                if let Err(e) = self.auth.verify_menu_code(&given, &expected, now) {
+                    // 続けて間違えたら、パスワードを作り直す（総当たりさせない）
+                    if e.contains("ロックしました") {
+                        let fresh = self.new_menu_code();
+                        self.reg_mut(register)?.menu_code = Some(fresh);
+                    }
+                    return Err(e);
+                }
+            }
+            None if r.menu_code.is_some() => {
+                return Err("お客様側の画面でパスワードを入力中です".into())
+            }
+            None => {}
+        }
+        let r = self.reg_mut(register)?;
+        // 取引中はお金の出し入れの画面を開けない（一覧・店員側の項目は開ける）
+        if screen.side() == Some(Side::Customer) && !r.txn.lines.is_empty() {
+            return Err("取引中は店舗メニューを開けません".into());
+        }
+        let to = exchange_to
+            .or(r.menu.map(|m| m.exchange_to))
+            .unwrap_or(1_000);
+        if !is_valid_denomination(to) {
+            return Err("使えない金種です".into());
+        }
+        // パスワードは一度きり
+        r.menu_code = None;
+        r.menu = Some(Menu {
+            side,
+            screen,
+            exchange_to: to,
+        });
+        Ok(Outcome::default())
+    }
+
+    /// 自動釣銭機へのお金の出し入れは、お客様側の店舗メニューに入っているときだけ
+    fn require_cash_menu(&self, register: u8) -> Result<(), String> {
+        let r = self.reg(register).ok_or("レジがありません")?;
+        if r.menu.is_some_and(|m| m.side == Side::Customer) {
+            Ok(())
+        } else {
+            Err("お金の出し入れは、お客様側の画面の店舗メニューで行います".into())
+        }
+    }
+
     fn cash_out(
         &mut self,
         register: u8,
         kind: CashOutKind,
         amount: u32,
-        password: &str,
     ) -> Result<Outcome, String> {
         self.check_active(register, Action::CashOut)?;
+        self.require_cash_menu(register)?;
         let now = self.now;
         let staff = self
             .reg(register)
@@ -2518,11 +2619,6 @@ impl Store {
         };
         if amount == 0 {
             return Err("金額を入力してください".into());
-        }
-        // ログイン中でも、出金のたびに出金パスワードを求める（問題6）
-        if let Err(e) = self.auth.verify_cash_out(password, now) {
-            log(self, format!("拒否：{e}"));
-            return Err(e);
         }
         let r = self.reg_mut(register)?;
         match r.drawer.take(amount, false) {
@@ -2544,6 +2640,7 @@ impl Store {
     /// お金を入れる操作。抜く操作と違ってパスワードは求めない（記録は残す）
     fn cash_in(&mut self, register: u8, kind: CashInKind, amount: u32) -> Result<Outcome, String> {
         self.check_active(register, Action::CashIn)?;
+        self.require_cash_menu(register)?;
         if amount == 0 {
             return Err("金額を入力してください".into());
         }
@@ -2764,6 +2861,8 @@ impl Store {
             outlet: r.outlet.total(),
             outlet_detail: r.outlet.0.clone(),
             menu: r.menu,
+            menu_code: r.menu_code.clone(),
+            paused: r.paused,
             idle_voids: !r.idle(),
             idle_revert_in: (r.mode != Mode::SemiSelf || !r.idle())
                 .then(|| r.idle_revert_in(self.now)),
@@ -2980,6 +3079,10 @@ pub struct RegisterView {
     pub outlet_detail: Vec<(u32, u32)>,
     /// お客様画面に開いている店舗メニュー
     pub menu: Option<Menu>,
+    /// お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す）
+    pub menu_code: Option<String>,
+    /// レジ休止中（スタッフバーコードで再開）
+    pub paused: bool,
     /// セミセルフ以外で待機中なら、セミセルフに戻るまでの残り時間（ミリ秒）
     pub idle_revert_in: Option<u64>,
     /// 無操作が続くと、登録中の取引を中止する（取引があるとき）
@@ -3028,14 +3131,14 @@ fn bell_kind(i: u8) -> BellKind {
     }
 }
 
-/// 1 台目は据え付けの「呼び鈴」、2 台目は「検品端末」、3 台目は「ストアコンピューター」、
-/// 4 台目以降は番号付きの検品端末
+/// 1 台目は「据え付け端末」、2 台目は「可搬性端末」、3 台目は「ストアコンピューター」、
+/// 4 台目以降は番号付きの可搬性端末
 fn bell_name(i: u8) -> String {
     match i {
-        0 => "呼び鈴".into(),
-        1 => "検品端末".into(),
+        0 => "据え付け端末".into(),
+        1 => "可搬性端末".into(),
         2 => "ストアコンピューター".into(),
-        n => format!("検品端末{}", n - 1),
+        n => format!("可搬性端末{}", n - 1),
     }
 }
 

@@ -59,6 +59,16 @@ fn login(s: &mut Store, r: u8) {
     login_as(s, r, "ST1001");
 }
 
+/// お客様側の画面から店舗メニューを開く：店員画面に出た使い捨てパスワードを入力する
+fn open_customer_menu(s: &mut Store, r: u8) {
+    ok(s, json!({"type":"request_menu_code","register":r}));
+    let code = reg(s, r).menu_code.expect("店員画面にパスワードが出る");
+    ok(
+        s,
+        json!({"type":"open_menu","register":r,"side":"customer","screen":"top","code":code}),
+    );
+}
+
 fn login_as(s: &mut Store, r: u8, badge: &str) {
     scan(s, r, "staff", badge);
     ok(s, json!({"type":"claim","register":r,"side":"staff"}));
@@ -191,7 +201,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
 
 /// セミセルフでは年確が店員呼び出しになり、店員が来るまでお客様は確認できない。
 #[test]
-fn self_mode_age_check_calls_staff() {
+fn semi_self_age_check_calls_staff() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", BEER);
     ok(
@@ -395,27 +405,113 @@ fn service_item_needs_staff() {
     assert_eq!(reg(&s, 2).customer.total, 1200);
 }
 
-/// 問題6：出金は毎回、ログインとは別の出金パスワードが要り、記録が残る。
+/// 問題6：出金はお客様側の店舗メニューに入ったときだけでき（入るには使い捨てパスワード）、記録が残る。
 #[test]
-fn cash_out_requires_separate_password_every_time() {
+fn cash_out_only_inside_the_customer_side_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    let co = |pw: &str| json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":pw});
+    let co = json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000});
     assert!(
-        run(&mut s, co("1111")).is_err(),
-        "login password is not the cash-out password"
+        run(&mut s, co.clone()).is_err(),
+        "店舗メニューの外では出金できない"
     );
-    ok(&mut s, co("7777"));
-    ok(&mut s, co("7777"));
+    // 店員側の店舗メニューにはお金の出し入れがない
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"top"}),
+    );
+    assert!(run(&mut s, co.clone()).is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"emergency"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":null}),
+    );
+    open_customer_menu(&mut s, 1);
+    ok(&mut s, co.clone());
+    ok(&mut s, co);
     let a = s.snapshot().audit;
-    assert_eq!(a.len(), 3);
+    assert_eq!(a.len(), 2);
     assert_eq!(a[1].staff, "山田");
     // 未ログインのレジでは出金できない
     assert!(run(
         &mut s,
-        json!({"type":"cash_out","register":2,"kind":"refund","amount":100,"password":"7777"})
+        json!({"type":"cash_out","register":2,"kind":"refund","amount":100})
     )
     .is_err());
+}
+
+/// お客様側から店舗メニューを開くには、店員画面にだけ出る使い捨てのパスワード（英大文字と数字の 4 桁）が要る。
+/// 店員側からはパスワードなしで開ける。開いた側の画面にだけ、その側の項目を出す。
+#[test]
+fn customer_side_menu_needs_a_one_time_code() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    let open = |code: &str| json!({"type":"open_menu","register":1,"side":"customer","screen":"top","code":code});
+    assert!(
+        run(&mut s, open("AAAA")).is_err(),
+        "パスワードを出す前は開けない"
+    );
+    ok(&mut s, json!({"type":"request_menu_code","register":1}));
+    let v = reg(&s, 1);
+    let code = v.menu_code.clone().unwrap();
+    assert_eq!(code.len(), 4);
+    assert!(code
+        .chars()
+        .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
+    assert_eq!(v.active_side, Some(Side::Customer), "お客様側で入力する");
+    let wrong = if code == "0000" { "1111" } else { "0000" };
+    assert!(run(&mut s, open(wrong)).is_err());
+    ok(&mut s, open(&code.to_lowercase()));
+    let v = reg(&s, 1);
+    assert_eq!(v.menu.unwrap().side, Side::Customer);
+    assert!(v.menu_code.is_none(), "パスワードは一度きり");
+    assert_eq!(v.active_side, Some(Side::Customer));
+    // お客様側には店員側の項目を出さない
+    assert!(run(
+        &mut s,
+        json!({"type":"open_menu","register":1,"side":"customer","screen":"journal"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"side":"customer","screen":null}),
+    );
+    // 閉じたら、もう一度パスワードを出さないと開けない
+    assert!(run(&mut s, open(&code)).is_err());
+    // 続けて間違えるとロックし、パスワードを作り直す
+    ok(&mut s, json!({"type":"request_menu_code","register":1}));
+    let first = reg(&s, 1).menu_code.unwrap();
+    let bad = if first == "ZZZZ" { "YYYY" } else { "ZZZZ" };
+    for _ in 0..3 {
+        assert!(run(&mut s, open(bad)).is_err());
+    }
+    let again = reg(&s, 1).menu_code.unwrap();
+    assert!(run(&mut s, open(&again)).is_err(), "しばらくロック");
+    advance(&mut s, 31_000);
+    ok(&mut s, open(&again));
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"side":"customer","screen":null}),
+    );
+    advance(&mut s, 1_000);
+    // 店員側はパスワードなし。店員側の項目（仮設）を開ける
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"top"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.menu.unwrap().side, Side::Staff);
+    assert_eq!(v.active_side, Some(Side::Staff));
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"journal"}),
+    );
+    // 店員側で開いている間は、お客様側からは開けない
+    assert!(run(&mut s, json!({"type":"request_menu_code","register":1})).is_err());
 }
 
 /// 問題8：呼び出しは発生したレジだけに出て、ほかのレジには出ない。
@@ -466,7 +562,10 @@ fn mat_rings_despite_loss_and_reports_link_down() {
     advance(&mut s, 8_000);
     let snap = s.snapshot();
     assert!(!snap.mats[0].link_ok);
-    assert_eq!(snap.registers[0].staff.mat_down, vec!["呼び鈴".to_string()]);
+    assert_eq!(
+        snap.registers[0].staff.mat_down,
+        vec!["据え付け端末".to_string()]
+    );
 }
 
 /// お客様画面には分類や年確対象の情報を出さない（店員画面にだけ出す）。
@@ -491,7 +590,7 @@ fn staff_and_customer_screens_are_exclusive() {
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
     assert_eq!(v.active_side, Some(Side::Customer));
-    assert!(run(&mut s, json!({"type":"lock","register":1})).is_err());
+    assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -561,49 +660,20 @@ fn mode_follows_staff_badge() {
         .all(|r| r.mode == Mode::SemiSelf && r.staff.state == StaffState::Absent));
     login(&mut s, 1);
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
-    for m in ["attended", "semi_self", "full_self"] {
-        assert!(run(&mut s, json!({"type":"set_mode","register":1,"mode":m})).is_err());
-    }
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
-    assert!(run(
-        &mut s,
-        json!({"type":"set_mode","register":1,"mode":"full_self"})
-    )
-    .is_err());
 }
 
-/// セルフモード（将来の拡張）：有効にすると、お客様が FF も自分で登録できる。
+/// セミセルフでは、お客様は FF を登録できない（FF ボタンで係員を呼ぶ）。
 #[test]
-fn customer_registers_ff_in_self_mode() {
+fn customer_cannot_register_ff_in_semi_self() {
     let mut s = Store::new(1, 2, 1);
-    let ff =
-        |r: u8| json!({"type":"register_ff","register":r,"side":"customer","code":"FF01","qty":1});
-    // セミセルフでは FF は店員の登録
-    assert!(run(&mut s, ff(2)).is_err());
-    s.set_self_mode_enabled(true);
-    ok(
+    assert!(run(
         &mut s,
-        json!({"type":"set_mode","register":2,"mode":"full_self"}),
-    );
-    ok(&mut s, ff(2));
-    let v = reg(&s, 2);
-    assert_eq!(v.customer.lines.len(), 1);
-    assert!(
-        s.snapshot().calls.is_empty(),
-        "no staff call for self-picked FF"
-    );
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"}),
-    );
-    confirm_point(&mut s, 2);
-    ok(
-        &mut s,
-        json!({"type":"insert_cash","register":2,"denomination":1000,"count":1}),
-    );
-    ok(&mut s, json!({"type":"finish_insert","register":2}));
-    assert!(reg(&s, 2).customer.lines.is_empty(), "paid and settled");
+        json!({"type":"register_ff","register":2,"side":"customer","code":"FF01","qty":1})
+    )
+    .is_err());
+    ok(&mut s, json!({"type":"ff_button","register":2}));
 }
 
 /// 名札でログインした有人モードも、5 分間操作がなければログアウトしてセミセルフに戻る。
@@ -655,14 +725,19 @@ fn idle_register_returns_to_semi_self() {
     assert!(reg(&s, 2).idle_revert_in.is_none());
 }
 
-/// 店舗メニュー：お金を入れる操作はパスワード不要、抜く操作は店舗パスワードが要る。どちらも記録が残る。
+/// 店舗メニュー（お客様側）：お金を入れる操作も抜く操作も、メニューに入ればパスワード不要。どちらも記録が残る。
 #[test]
-fn cash_in_needs_no_password_but_cash_out_does() {
+fn cash_in_and_out_from_the_customer_side_menu() {
     let mut s = Store::new(1, 2, 1);
     let cin = json!({"type":"cash_in","register":1,"kind":"deposit","amount":3000});
     // 名札でログインした有人モードでだけ使える
     assert!(run(&mut s, cin.clone()).is_err());
     login(&mut s, 1);
+    assert!(
+        run(&mut s, cin.clone()).is_err(),
+        "店舗メニューの外では入金できない"
+    );
+    open_customer_menu(&mut s, 1);
     let before = reg(&s, 1).staff.drawer_total;
     ok(&mut s, cin);
     ok(
@@ -670,15 +745,13 @@ fn cash_in_needs_no_password_but_cash_out_does() {
         json!({"type":"cash_in","register":1,"kind":"changer_refill","amount":1500}),
     );
     assert_eq!(reg(&s, 1).staff.drawer_total, before + 4500);
-    let out = |pw: &str| json!({"type":"cash_out","register":1,"kind":"changer_collect","amount":4500,"password":pw});
-    assert!(run(&mut s, out("")).is_err());
-    ok(&mut s, out("7777"));
+    ok(
+        &mut s,
+        json!({"type":"cash_out","register":1,"kind":"changer_collect","amount":4500}),
+    );
     assert_eq!(reg(&s, 1).staff.drawer_total, before);
     let ops: Vec<_> = s.snapshot().audit.iter().map(|a| a.operation).collect();
-    assert_eq!(
-        ops,
-        vec!["取引外入金", "釣銭補充", "釣銭機回収", "釣銭機回収"]
-    );
+    assert_eq!(ops, vec!["取引外入金", "釣銭補充", "釣銭機回収"]);
     // 取引中は入出金できない
     scan(&mut s, 1, "staff", BREAD);
     assert!(run(
@@ -731,18 +804,19 @@ fn inlet_pays_and_change_waits_in_outlet() {
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
 }
 
-/// 店舗メニューはお客様画面に一画面ずつ出す。開いている間はお客様画面側で操作し、
+/// お客様側の店舗メニューは一画面ずつ出す。開いている間はお客様画面側で操作し、
 /// 入金・両替は投入口、出金と両替のお金は排出口を使う。
 #[test]
 fn store_menu_uses_inlet_and_outlet() {
     let mut s = Store::new(1, 2, 1);
-    let open = |screen: &str| json!({"type":"open_menu","register":1,"screen":screen});
+    let open =
+        |screen: &str| json!({"type":"open_menu","register":1,"side":"customer","screen":screen});
     assert!(
-        run(&mut s, open("top")).is_err(),
+        run(&mut s, json!({"type":"request_menu_code","register":1})).is_err(),
         "only for logged-in staff"
     );
     login(&mut s, 1);
-    ok(&mut s, open("top"));
+    open_customer_menu(&mut s, 1);
     let v = reg(&s, 1);
     assert_eq!(v.active_side, Some(Side::Customer));
     // 取引外入金：投入口に入れた金額が入金になる
@@ -753,7 +827,7 @@ fn store_menu_uses_inlet_and_outlet() {
     // 自動釣銭機：一万円を千円札に両替して排出口へ
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"screen":"changer","exchange_to":1000}),
+        json!({"type":"open_menu","register":1,"side":"customer","screen":"changer","exchange_to":1000}),
     );
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1500})).is_err());
     ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));
@@ -761,26 +835,25 @@ fn store_menu_uses_inlet_and_outlet() {
     assert_eq!(v.outlet_detail, vec![(1000, 10)]);
     assert_eq!(v.staff.drawer_total, before + 2000);
     ok(&mut s, json!({"type":"take_outlet","register":1}));
-    // 緊急出金：パスワードが要り、お金は排出口に出る
+    // 緊急出金：お金は排出口に出る
     ok(&mut s, open("emergency"));
-    assert!(run(
-        &mut s,
-        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"x"})
-    )
-    .is_err());
     ok(
         &mut s,
-        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"}),
+        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000}),
     );
     assert_eq!(reg(&s, 1).outlet, 5000);
     // 閉じると両方の画面に戻る（触れている一瞬が過ぎれば）。ログアウトでもメニューは閉じる
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"screen":null}),
+        json!({"type":"open_menu","register":1,"side":"customer","screen":null}),
     );
     advance(&mut s, 1_000);
     assert_eq!(reg(&s, 1).active_side, None);
-    ok(&mut s, open("top"));
+    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"top"}),
+    );
     ok(
         &mut s,
         json!({"type":"scan","register":1,"side":"staff","code":"ST1002"}),
@@ -965,12 +1038,11 @@ fn shortcut_buttons_call_staff() {
     // 店員が来ると、たばこ・サービスのボタン呼び出しは片付く（FF は登録するまで残る）
     login(&mut s, 1);
     assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
-    // 有人モードではボタンで呼ばない
-    assert!(run(
-        &mut s,
-        json!({"type":"call_staff","register":1,"topic":"tobacco"})
-    )
-    .is_err());
+    // 有人モードでは、店員が仲間に SOS を出すのに使う。Bell は鳴るが、呼び出しの記録は増えない
+    ok(&mut s, json!({"type":"call_staff","register":1}));
+    advance(&mut s, 1_000);
+    assert!(s.snapshot().mats[0].buzzing, "SOS rings the bell");
+    assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
 }
 
 /// 呼び出しボタンは触れている間だけ MAT を鳴らす。短く押して「押した」電文が失われても、
@@ -1098,7 +1170,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     assert!(!reg(&s, 1).customer.point_pending);
 }
 
-/// 店員側・お客様側の区別はない。有人モードでは操作側の画面なら取引中止もロックもできる。
+/// 店員側・お客様側の区別はない。有人モードでは操作側の画面なら取引中止もできる。
 /// 年確の「する／しない」は店員側の画面にだけ効く。
 #[test]
 fn either_screen_can_operate_except_age_confirmation() {
@@ -1125,8 +1197,6 @@ fn either_screen_can_operate_except_age_confirmation() {
     no_id_check(&mut s, 1);
     // 取引中止もお客様側の画面から（操作側なので）できる
     ok(&mut s, json!({"type":"void_transaction","register":1}));
-    ok(&mut s, json!({"type":"lock","register":1}));
-    assert_eq!(reg(&s, 1).staff.state, StaffState::Locked);
 }
 
 /// 有人モードで店員が年確を「しない」を選ぶと、年確はそこで済む。
@@ -1245,9 +1315,9 @@ fn shopping_is_limited_to_ten_items() {
     scan(&mut s, 1, "customer", BREAD);
 }
 
-/// 取引中止・ロック・ログアウトは店舗メニュー（☰）から行い、済んだらメニューは閉じる。
+/// 取引中止・ログアウトは店舗メニューから行い、済んだらメニューは閉じる。ロックはない。
 #[test]
-fn void_lock_and_logout_from_the_store_menu() {
+fn void_and_logout_from_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
@@ -1256,12 +1326,6 @@ fn void_lock_and_logout_from_the_store_menu() {
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     let v = reg(&s, 1);
     assert!(v.menu.is_none() && v.staff.lines.is_empty());
-    ok(&mut s, top.clone());
-    ok(&mut s, json!({"type":"lock","register":1}));
-    let v = reg(&s, 1);
-    assert!(v.menu.is_none());
-    assert_eq!(v.staff.state, StaffState::Locked);
-    scan(&mut s, 1, "staff", "ST1001");
     ok(&mut s, top);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
@@ -1559,7 +1623,7 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
 fn handheld_and_store_computer_bells_can_be_turned_off() {
     let mut s = Store::new(1, 2, 3);
     let ids: Vec<String> = s.snapshot().mats.iter().map(|m| m.id.clone()).collect();
-    assert_eq!(ids, ["呼び鈴", "検品端末", "ストアコンピューター"]);
+    assert_eq!(ids, ["据え付け端末", "可搬性端末", "ストアコンピューター"]);
     assert!(run(&mut s, json!({"type":"set_bell_on","mat":0,"on":false})).is_err());
     ok(&mut s, json!({"type":"set_bell_on","mat":1,"on":false}));
     ok(&mut s, json!({"type":"set_bell_on","mat":2,"on":false}));
@@ -1991,4 +2055,46 @@ fn customer_voids_and_money_comes_back() {
     assert!(v.customer.lines.is_empty());
     assert_eq!(v.outlet, 100);
     assert_eq!(v.customer.inserted, 0);
+}
+
+/// 店員側・お客様側どちらの店舗メニューにも「ログアウト」と「レジ休止中」がある（お客様側はパスワードで入った後）。
+/// ログアウトでセミセルフに戻る。休止中はスタッフバーコードを読むまでどの操作も受け付けない。
+#[test]
+fn logout_and_pause_from_either_store_menu() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    open_customer_menu(&mut s, 1);
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SemiSelf);
+    assert!(v.menu.is_none());
+    // 取引中は休止できない
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    open_customer_menu(&mut s, 1);
+    ok(&mut s, json!({"type":"pause","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.paused);
+    assert_eq!(v.mode, Mode::SemiSelf);
+    assert!(v.menu.is_none());
+    // 休止中はお客様が読んでも、呼び出しボタンを押しても受け付けない
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":BREAD})
+    )
+    .is_err());
+    assert!(run(&mut s, json!({"type":"call_staff","register":1})).is_err());
+    // 店員側の店舗メニューからも休止できる。スタッフバーコードで再開して有人モードになる
+    scan(&mut s, 1, "staff", "ST1001");
+    let v = reg(&s, 1);
+    assert!(!v.paused);
+    assert_eq!(v.mode, Mode::Attended);
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"top"}),
+    );
+    ok(&mut s, json!({"type":"pause","register":1}));
+    assert!(reg(&s, 1).paused);
 }

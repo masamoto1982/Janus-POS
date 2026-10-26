@@ -26,10 +26,9 @@ use serde::{Deserialize, Serialize};
 pub enum Mode {
     /// 有人：名札でログインした係員がいる
     Attended,
-    /// セミセルフ：係員なし。お客様が登録して支払う（FF・サービス・たばこは係員を呼ぶ）
+    /// セミセルフ：係員なし。お客様が登録して支払う（FF・サービス・たばこは係員を呼ぶ）。
+    /// 完全なセルフレジはコンビニには合わないので持たない（有人とセミセルフだけ）
     SemiSelf,
-    /// セルフ：お客様が登録から支払いまで行い、店員は MAT の呼び出しで駆けつける
-    FullSelf,
 }
 
 impl Mode {
@@ -37,7 +36,6 @@ impl Mode {
         match self {
             Mode::Attended => "有人",
             Mode::SemiSelf => "セミセルフ",
-            Mode::FullSelf => "セルフ",
         }
     }
 }
@@ -86,7 +84,6 @@ impl PaymentMethod {
 #[serde(rename_all = "snake_case")]
 pub enum StaffState {
     Absent,
-    Locked,
     Ready,
 }
 
@@ -117,9 +114,9 @@ pub enum Action {
     TapEmoney,
     CallStaff,
     VoidTransaction,
-    SetMode,
-    Lock,
     EndStaffMode,
+    /// レジ休止中にする（店舗メニューから。スタッフバーコードで再開する）
+    Pause,
     CashOut,
     CashIn,
     /// 電子マネーのチャージ・残高確認を始める・やめる（お買い物の途中でもできる）
@@ -148,9 +145,8 @@ pub const ACTIONS: &[Action] = &[
     Action::TapEmoney,
     Action::CallStaff,
     Action::VoidTransaction,
-    Action::SetMode,
-    Action::Lock,
     Action::EndStaffMode,
+    Action::Pause,
     Action::CashOut,
     Action::CashIn,
     Action::Emoney,
@@ -185,8 +181,8 @@ pub struct Context {
     pub method: Option<PaymentMethod>,
     /// セミセルフで、店員が会計に進めてお客様に支払いを任せている
     pub customer_turn: bool,
-    /// 店員がお客様画面で店舗メニュー（入出金・両替）を開いている
-    pub menu_open: bool,
+    /// 店舗メニューを開いている側（お客様側のパスワード入力中もお客様側）
+    pub menu_side: Option<Side>,
     /// いま触れている側（操作した直後の一瞬だけ。その間はもう一方からの操作が利かない）
     pub touching: Option<Side>,
     /// 買い物点数が上限（[`MAX_ITEMS`]）に達している
@@ -310,12 +306,12 @@ fn confirm_point(c: &Context) -> Result<(), Denial> {
 
 /// 今、操作できる側が片方に限られているなら、その側（`None` なら両方の画面が操作できる）。
 pub fn active_side(c: &Context) -> Option<Side> {
-    if c.menu_open {
-        // 店舗メニューはお客様画面に出す（釣銭機の出し入れ口が売り場側にあるため）
-        return Some(Side::Customer);
+    if let Some(side) = c.menu_side {
+        // 店舗メニューは開いた側の画面に出し、その側で操作する
+        return Some(side);
     }
     if c.staff != StaffState::Ready {
-        // 店員が操作できない（未ログイン・ロック中）ならお客様側
+        // 店員がいない（未ログイン）ならお客様側
         return Some(Side::Customer);
     }
     if c.customer_turn {
@@ -418,20 +414,16 @@ fn pay_action(action: Action, c: &Context) -> Result<(), Denial> {
 /// 有人モード（名札でログインした係員がいる）
 fn attended(action: Action, c: &Context) -> Result<(), Denial> {
     let paying = c.phase == Phase::Paying;
-    if c.staff == StaffState::Locked
-        && !matches!(
-            action,
-            Action::Scan | Action::EndStaffMode | Action::InsertCash | Action::TapEmoney
-        )
-    {
-        return Err("画面ロック中です（スタッフバーコードで解除）");
-    }
     match action {
-        Action::Scan | Action::SetMode | Action::Lock | Action::EndStaffMode => Ok(()),
+        Action::Scan | Action::EndStaffMode => Ok(()),
         Action::RegisterFf => {
             require(!paying, "お会計中です")?;
             require(!c.items_full, ITEMS_FULL)
         }
+        Action::Pause => require(
+            !c.has_lines && !c.has_coupons,
+            "取引中は休止できません（取引を終えるか中止してください）",
+        ),
         Action::CashOut => require(!c.has_lines, "取引中は出金操作ができません"),
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
         Action::CheckFf => check_ff(c),
@@ -458,13 +450,14 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::ConfirmBillPayment => confirm_bill(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
-        Action::CallStaff => Err("係員が対応中です"),
+        // 一人で手に負えないとき、店員が仲間に SOS を出す（Bell を鳴らすだけで、呼び出しの記録・画面表示はなし）
+        Action::CallStaff => Ok(()),
         Action::Emoney => emoney(c),
         Action::ResolveEmoneyShort => resolve_emoney_short(c),
     }
 }
 
-/// セミセルフモード（名札なし。お客様が登録して支払う）。セルフ（将来）は FF も自分で登録する
+/// セミセルフモード（名札なし。お客様が登録して支払う。FF は係員を呼ぶ）
 fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
     let paying = c.phase == Phase::Paying;
     match action {
@@ -472,12 +465,8 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Scan => Ok(()),
         // 呼び出しボタンの一つ。サービス・たばこと同じく会計中（年確の呼び出し中も）押せる。
         // 係員は「商品登録に戻る」で登録画面に引き返して FF を追加する
-        Action::FfButton => require(c.mode == Mode::SemiSelf, "FF はタブから登録してください"),
-        Action::RegisterFf => {
-            require(c.mode == Mode::FullSelf, "FF は係員にお申し付けください")?;
-            require(!paying, "お会計中です")?;
-            require(!c.items_full, ITEMS_FULL)
-        }
+        Action::FfButton => Ok(()),
+        Action::RegisterFf => Err("FF は係員にお申し付けください"),
         Action::CheckFf => check_ff(c),
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;
@@ -508,9 +497,8 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         // 取引中止はお客様もできる（誤操作を防ぐため、画面で確認と長押しを挟む）
         Action::VoidTransaction => void_transaction(c),
         Action::CompleteService
-        | Action::SetMode
-        | Action::Lock
         | Action::EndStaffMode
+        | Action::Pause
         | Action::CashOut
         | Action::CashIn => Err("係員の操作です（名札でログインしてください）"),
     }
@@ -523,7 +511,7 @@ mod tests {
     fn contexts() -> Vec<Context> {
         let mut v = vec![];
         let b = [false, true];
-        for mode in [Mode::Attended, Mode::SemiSelf, Mode::FullSelf] {
+        for mode in [Mode::Attended, Mode::SemiSelf] {
             for phase in [Phase::Registering, Phase::Paying] {
                 for has_lines in b {
                     for age_choice_pending in b {
@@ -536,7 +524,7 @@ mod tests {
                                 {
                                     for customer_turn in b {
                                         v.push(Context {
-                                            menu_open: false,
+                                            menu_side: None,
                                             point_pending: false,
                                             has_coupons: false,
                                             coupon_unmatched: false,
@@ -663,24 +651,6 @@ mod tests {
         }
         for c in contexts().into_iter().filter(|c| !c.bill_pending) {
             assert!(permitted(Side::Customer, Action::ConfirmBillPayment, &c).is_err());
-        }
-    }
-
-    #[test]
-    fn locked_staff_screen_rejects_everything() {
-        for c in contexts() {
-            let locked = Context {
-                staff: StaffState::Locked,
-                ..c
-            };
-            for &a in ACTIONS
-                .iter()
-                .filter(|&&a| !is_device_action(a) && a != Action::EndStaffMode)
-            {
-                if c.mode == Mode::Attended {
-                    assert!(permitted(Side::Staff, a, &locked).is_err(), "{a:?}");
-                }
-            }
         }
     }
 }

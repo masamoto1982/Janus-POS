@@ -46,18 +46,18 @@ describe("view helpers", () => {
     expect(sideOf({ type: "confirm_bill_payment", register: 1 })).toBe("customer");
   });
 
-  it("shows the staff which calls are open, and the customer a fixed waiting message", () => {
+  it("shows the open calls only on the semi-self staff screen", () => {
     const call = (kind: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, created_at, detail: "" });
     const r = {
       staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], mat_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
-    const staff = callNotice(r, 6000, "staff");
+    const staff = callScreen(r, 6000);
     expect(staff).toContain("FF＆煙草");
     expect(staff).toContain("5秒経過");
+    expect(callNotice(r, 6000, "staff")).toBe("");
     const customer = callNotice(r, 6000, "customer");
-    expect(customer).toContain("係員を呼び出しています。しばらくお待ちください。");
-    expect(customer).not.toContain("FF");
+    expect(customer).toBe("");
   });
 
   it("tells the customer that staff are on the way in attended mode", () => {
@@ -67,7 +67,7 @@ describe("view helpers", () => {
       customer: { staff_called: true },
     } as unknown as RegisterView;
     expect(callNotice(r, 6000, "customer")).toContain("店員が向かっています");
-    expect(callNotice(r, 6000, "staff")).toContain("年確");
+    expect(callNotice(r, 6000, "staff")).toBe("");
   });
 
   it("shows no elapsed time for an age-check call", () => {

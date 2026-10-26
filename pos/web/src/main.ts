@@ -8,7 +8,7 @@
 //   店員画面に落とせば店員側スキャナー、お客様画面に落とせばお客様側スキャナーで読んだことになる。
 
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { Command, Snapshot } from "./types";
+import type { Command, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 // 仮のロゴマーク（正式なロゴは後日差し替え）
@@ -58,7 +58,7 @@ function bytesFromB64(b64: string): Uint8Array {
 async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
-  // 呼び鈴は据え付け型 1 台、携帯型の検品端末 1 台、事務所のストアコンピューター 1 台
+  // Bell は据え付け端末 1 台、可搬性端末 1 台、事務所のストアコンピューター 1 台
   reset(2, 3);
   setupDrag();
   window.setInterval(frame, 100);
@@ -176,7 +176,7 @@ function buildSkeleton(): void {
     </dialog>
     <dialog class="rules-dlg bell-dlg" id="bell-dlg" aria-labelledby="bell-title">
       <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
-      <p class="muted">検品端末とストアコンピューターは、呼び鈴機能を OFF にできます。OFF の端末は鳴らず、不通の警告も出しません。据え付けの呼び鈴は常に ON です。</p>
+      <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます。OFF の端末は鳴らず、不通の警告も出しません。据え付け端末は常に ON です。</p>
       <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
     <div class="drag-ghost" id="ghost" hidden></div>`;
@@ -438,6 +438,46 @@ function send(cmd: Command): boolean {
 // イベント（委譲。描き直しでボタンが入れ替わっても取りこぼさない）
 // ---------------------------------------------------------------------------
 
+// 使い方の説明：Item・Wallet のボタンにカーソルを重ねると、少し遅れて出す（画面の外にはみ出さない位置に置く）
+const hoverTip = document.createElement("div");
+hoverTip.className = "hover-tip";
+hoverTip.setAttribute("role", "tooltip");
+hoverTip.hidden = true;
+document.body.append(hoverTip);
+let hintFor: HTMLElement | null = null;
+let hintTimer = 0;
+const hideHint = (): void => {
+  window.clearTimeout(hintTimer);
+  hintFor = null;
+  hoverTip.hidden = true;
+};
+document.addEventListener("pointerover", (e) => {
+  if (e.pointerType === "touch") return;
+  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-hint]");
+  if (!el || el === hintFor) return;
+  hideHint();
+  hintFor = el;
+  hintTimer = window.setTimeout(() => {
+    if (!el.isConnected || document.body.classList.contains("dragging")) return;
+    hoverTip.textContent = el.dataset.hint ?? "";
+    hoverTip.hidden = false;
+    const r = el.getBoundingClientRect();
+    const w = hoverTip.offsetWidth;
+    const h = hoverTip.offsetHeight;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    const below = r.bottom + 6 + h <= window.innerHeight - 8;
+    hoverTip.style.left = `${left}px`;
+    hoverTip.style.top = `${below ? r.bottom + 6 : r.top - h - 6}px`;
+  }, 350);
+});
+document.addEventListener("pointerout", (e) => {
+  if (!hintFor) return;
+  const to = e.relatedTarget as Node | null;
+  if (!to || !hintFor.contains(to)) hideHint();
+});
+document.addEventListener("pointerdown", hideHint, true);
+window.addEventListener("scroll", hideHint, true);
+
 // 両方の画面に同じ入力欄があるので、押したボタンのある画面（操作している側）の欄を読む
 let scope: ParentNode = app;
 const val = (key: string): string => scope.querySelector<HTMLInputElement>(`[data-key="${key}"]`)?.value.trim() ?? "";
@@ -462,9 +502,12 @@ function form(b: HTMLElement): void {
         register: reg,
         kind: b.dataset.kind,
         amount: Number(val(`mo-amt-${reg}`) || 0),
-        password: val(`mo-pw-${reg}`),
       });
-      clear(`mo-pw-${reg}`);
+      clear(`mo-amt-${reg}`);
+      break;
+    case "menucode":
+      send({ type: "open_menu", register: reg, side: "customer", screen: "top", code: val(`mc-${reg}`) });
+      clear(`mc-${reg}`);
       break;
   }
 }
@@ -477,7 +520,19 @@ app.addEventListener("input", (e) => {
     el.dataset.typed = "1";
   }
   // 生年月日：西暦 8 桁。全角の数字は半角に直す
+  // 店舗メニューのパスワード：英大文字と数字の 4 桁（小文字・全角は直す）
+  if (el.dataset.menucode)
+    el.value = el.value
+      .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 4);
   if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
+});
+app.addEventListener("keydown", (e) => {
+  const el = e.target as HTMLInputElement;
+  if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
+  el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
@@ -627,10 +682,15 @@ app.addEventListener("click", (e) => {
     ffTabs.set(reg, { tab: u.tab, page: Math.max(0, u.page + d) });
     return frame();
   }
+  // 稼働モードのバッジ：開いた側の画面で店舗メニューを開く・閉じる。
+  // お客様側は、店員画面に出る使い捨てパスワードを入力して開く
   if (b.dataset.gear) {
-    const reg = Number(b.dataset.gear);
-    const open = snap.registers.find((x) => x.id === reg)?.menu;
-    send({ type: "open_menu", register: reg, screen: open ? null : "top" });
+    const [reg, side] = b.dataset.gear.split(":") as [string, Side];
+    const r = snap.registers.find((x) => x.id === Number(reg));
+    const open = r?.menu?.side === side || (side === "customer" && !!r?.menu_code);
+    if (open) send({ type: "open_menu", register: Number(reg), side, screen: null });
+    else if (side === "customer") send({ type: "request_menu_code", register: Number(reg) });
+    else send({ type: "open_menu", register: Number(reg), side, screen: "top" });
     return;
   }
   if (b.dataset.outlet) {
@@ -641,7 +701,6 @@ app.addEventListener("click", (e) => {
   if (b.dataset.voidAsk) {
     const [reg, side] = b.dataset.voidAsk.split(":");
     const r = Number(reg);
-    if (snap.registers.find((x) => x.id === r)?.menu) send({ type: "open_menu", register: r, screen: null });
     voidAsk.set(r, side as "staff" | "customer");
     return frame();
   }

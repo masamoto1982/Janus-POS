@@ -1,10 +1,10 @@
 // コアの Snapshot（core/src/store.rs）を TypeScript から読むための型。
 
 export type Side = "staff" | "customer";
-export type Mode = "attended" | "semi_self" | "full_self";
+export type Mode = "attended" | "semi_self";
 export type Phase = "registering" | "paying";
 export type Method = "cash" | "emoney" | "qr" | "credit" | "points";
-export type StaffState = "absent" | "locked" | "ready";
+export type StaffState = "absent" | "ready";
 export type FfState = "waiting" | "received";
 
 export interface ActionState {
@@ -150,7 +150,11 @@ export interface RegisterView {
   change_left: boolean;
   outlet: number;
   outlet_detail: [number, number][];
-  menu: { screen: MenuScreen; exchange_to: number } | null;
+  menu: { side: Side; screen: MenuScreen; exchange_to: number } | null;
+  /** お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す） */
+  menu_code: string | null;
+  /** レジ休止中（スタッフバーコードで再開） */
+  paused: boolean;
   staff: StaffView;
   customer: CustomerView;
   /** 開いている電子マネーの手続き（チャージ・残高確認） */
@@ -162,7 +166,7 @@ export interface RegisterView {
   last_receipt: Receipt | null;
 }
 
-export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer";
+export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer" | "journal" | "waste" | "ff_fresh";
 
 export interface AgeRule {
   id: number;

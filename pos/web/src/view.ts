@@ -278,10 +278,9 @@ const CALL_SHORT: Record<string, string> = {
 
 /**
  * 呼び出し中の表示。両画面同内容の原則の、表示上の例外：
- * お客様側には定型の待機メッセージ、店員側には呼ばれた内容（「FF」「FF＆煙草」のように）を出す。
- * 情報は一つ（同じ呼び出しの記録）で、側ごとに見せ方だけを変える。
+ * 有人モードのお客様側には「店員が向かっています」を出す。店員側は Bell の不通だけを知らせる。
  */
-export function callNotice(r: RegisterView, now: number, side: Side): string {
+export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
   // 有人モードで年確の工程を出している間は、年確の呼び出しは表示しない（年確の画面そのものが知らせる）
   const ageOnScreen = r.mode === "attended" && (v.age_choice_pending || v.id_pending);
@@ -291,17 +290,16 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
     const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
     return (
       change +
-      (r.customer.staff_called && (!ageOnScreen || calls.length)
-        ? `<div class="banner call">${r.mode === "attended" ? "店員が向かっています" : "係員を呼び出しています。しばらくお待ちください。"}</div>`
+      (r.mode === "attended" && r.customer.staff_called && (!ageOnScreen || calls.length)
+        ? `<div class="banner call">店員が向かっています</div>`
         : "")
     );
   }
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  if (!calls.length) return warn;
-  const kinds = [...new Set(calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
-  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}${elapsed(calls, now, " ")}</div>`;
+  // 有人モードでは店員がレジにいるので、呼び出しの内容や経過時間は店員側に出さない
+  return warn;
 }
 
 /** 呼び出しの経過時間。年確の呼び出しは数えない（経過時間を出さない） */
@@ -320,7 +318,8 @@ export function callScreen(r: RegisterView, now: number): string {
     : "";
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
   const details = [...new Set(v.calls.map((c) => c.detail).filter(Boolean))];
-  return `${warn}<div class="call-screen">
+  // 登録画面の領域いっぱいに広げて出す（最下段の FF・サービス・たばこボタンはそのまま）
+  return `<div class="call-screen">${warn}
       <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
       ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
       <p class="muted">${elapsed(v.calls, now, "", "　")}店員証でログインすると対応を始めます</p>
@@ -516,7 +515,10 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
-  if (r.menu) return notice + storeMenu(r);
+  // 店舗メニューは開いた側の画面にだけ出す。お客様側から開くときは、店員画面にパスワード・お客様画面に入力欄
+  if (r.menu?.side === side) return notice + storeMenu(r);
+  if (r.menu_code) return notice + menuCode(r, side);
+  if (r.menu && side === "staff") return notice + pairNote("お客様側の画面で店舗メニューを操作しています");
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
@@ -670,9 +672,14 @@ export function itemCount(lines: { qty: number }[]): number {
  * 有人モードのお客様側には、お客様本人が押すボタン（お支払い内容の確認・投入おわり）だけを出す。
  */
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
+  // レジ休止中：どちらの画面も休止の案内だけ（店員側には再開のしかた）
+  if (r.paused)
+    return confirm(`<div class="point-screen paused-screen"><div class="big">レジ休止中</div><p>${
+      side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します"
+    }</p></div>`);
   // セミセルフの呼び出し中、店員側の画面は呼び出しの理由だけを大きく出す（年確の工程などは出さない：
   // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
-  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return confirm(callScreen(r, snap.now));
+  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
   if (!r.menu && (r.emoney || r.emoney_short !== null)) return notice + confirm(emoneyScreen(r, side));
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
@@ -733,15 +740,24 @@ export function clockText(d: Date): string {
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
+  // 有人モードでは、店員側のベルは仲間に SOS を出すのに使う（お客様側は店員がいるので押せない）
   const call = find(r.customer.actions, "call_staff");
-  const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="係員を呼ぶ（押している間鳴ります）" title="${esc(call.allowed ? "係員を呼ぶ（押している間鳴ります）" : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
+  const sos = r.mode === "attended";
+  const on = call.allowed && !(sos && side === "customer");
+  const bellTip = sos ? "仲間の店員を呼ぶ（押している間鳴ります）" : "係員を呼ぶ（押している間鳴ります）";
+  const reason = sos && side === "customer" ? "店員が対応中です" : (call.reason ?? "");
+  const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}>🔔</button>`;
   const label = r.mode === "attended" ? "有人モード" : "セミセルフモード";
   const cls = `mode-badge ${r.mode === "attended" ? "attended" : "semi"}`;
+  // 店舗メニューは両方の画面のバッジから開ける。開いた側の画面にだけ、その側の項目を出す
+  const open = r.menu?.side === side || (side === "customer" && !!r.menu_code);
+  const what = side === "staff" ? "ジャーナル確認・廃棄登録・FF鮮度管理など" : "自動釣銭機へのお金の出し入れ。店員画面に出るパスワードで開く";
   const badge =
-    r.mode === "attended" && r.staff.state === "ready" && side === "staff"
-      ? `<button type="button" class="${cls}" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー（返品・返金、自動釣銭機など）"${r.menu ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
+    r.mode === "attended" && r.staff.state === "ready"
+      ? `<button type="button" class="${cls}" data-gear="${r.id}:${side}" aria-label="レジ${r.id}の店舗メニュー" title="${open ? "店舗メニューを閉じる" : `店舗メニュー（${what}）`}"${open ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
       : `<span class="${cls}">${label}</span>`;
-  return `<span class="head-l">${badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
+  // 休止中は画面の「レジ休止中」と重ねて出さない（稼働モードのバッジは出さない）
+  return `<span class="head-l">${r.paused ? "" : badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -765,7 +781,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const reg = r.id;
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
-  if (r.menu || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
+  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -823,47 +839,80 @@ const MENU_LABEL: Record<MenuScreen, string> = {
   deposit: "取引外入金",
   expense: "経費支出",
   changer: "自動釣銭機（両替）",
+  journal: "ジャーナル確認",
+  waste: "廃棄登録",
+  ff_fresh: "FF鮮度管理",
 };
+
+/** 店舗メニューの項目：お客様側は自動釣銭機へのお金の出し入れ、店員側はそれ以外 */
+const MENU_ITEMS: Record<Side, MenuScreen[]> = {
+  customer: ["refund", "emergency", "deposit", "expense", "changer"],
+  staff: ["journal", "waste", "ff_fresh"],
+};
+
+/**
+ * お客様側から店舗メニューを開くときの使い捨てパスワード。店員画面にだけパスワードを出し、
+ * お客様側の画面で入力する（パスワードを見た人でなければ開けない）
+ */
+function menuCode(r: RegisterView, side: Side): string {
+  const reg = r.id;
+  if (side === "staff")
+    return confirm(`<div class="point-screen menu-code-show">
+      <p>お客様側の画面から店舗メニューを開こうとしています</p>
+      <div class="big menu-code-value" aria-label="パスワード">${esc(r.menu_code ?? "")}</div>
+      <p class="muted">このパスワードをお客様側の画面で入力してください。一度きり有効です</p>
+    </div>`);
+  return confirm(`<div class="point-screen menu-code">
+      <div class="big">店舗メニューのパスワード</div>
+      <p>店員側の画面に出ている 4 桁を入力してください</p>
+      <div class="row menu-code-form">
+        <input type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例 U8X3" data-menucode="1" data-key="mc-${reg}" aria-label="パスワード" />
+        <button class="primary" data-form="menucode" data-reg="${reg}">開く</button>
+      </div>
+      <div class="pay-choices">${btn("やめる", { type: "open_menu", register: reg, side: "customer", screen: null }, undefined, "ghost")}</div>
+    </div>`);
+}
 
 /** 一度に一つの画面だけを出す：一覧 → 各項目の画面 */
 export function storeMenu(r: RegisterView): string {
   const v = r.staff;
   const reg = r.id;
   const m = r.menu!;
-  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
+  const side = m.side;
+  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side, screen, ...extra });
   const head = (title: string) =>
     `<div class="menu-head">${btn("‹ 戻る", go("top"), undefined, "small ghost")}<b>${esc(title)}</b></div>`;
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span>${btn("閉じる", go(null), undefined, "small ghost")}</div>
-        <div class="menu-list">${(["refund", "emergency", "deposit", "expense", "changer"] as const)
-          .map((k) => btn(MENU_LABEL[k], go(k), busy, "menu-item"))
+      return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
+        <div class="menu-list">${MENU_ITEMS[side]
+          .map((k) => btn(MENU_LABEL[k], go(k), side === "customer" ? busy : undefined, "menu-item"))
           .join("")}</div>
         <div class="menu-list">
-          ${(() => {
-            const st = find(v.actions, "void_transaction");
-            return `<button type="button" class="menu-item"${st.allowed ? ` data-void-ask="${reg}:staff"` : ` disabled title="${esc(st.reason ?? "")}"`}>取引中止</button>`;
-          })()}
-          ${btn("ロック", { type: "lock", register: reg }, find(v.actions, "lock"), "menu-item")}
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
+          ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
         </div>`;
+    case "journal":
+    case "waste":
+    case "ff_fresh":
+      return `${head(MENU_LABEL[m.screen])}
+        <p class="muted">準備中です（今後つくりこみます）。</p>`;
     case "refund":
     case "emergency":
     case "expense": {
       const cout = find(v.actions, "cash_out");
       return `${head(MENU_LABEL[m.screen])}
-        <p class="muted">お金を抜く操作です。店舗パスワードが毎回必要で、お金は下の「出金」ボックスに出ます。</p>
+        <p class="muted">お金を抜く操作です。お金は下の「出金」ボックスに出ます。記録は担当者名つきで残ります。</p>
         <div class="menu-form">
           <input type="number" inputmode="numeric" min="1" placeholder="金額" data-key="mo-amt-${reg}" />
-          <input type="password" inputmode="numeric" placeholder="店舗パスワード" data-key="mo-pw-${reg}" autocomplete="off" />
           <button class="primary" data-form="cashout" data-reg="${reg}" data-kind="${m.screen}" ${cout.allowed ? "" : `disabled title="${esc(cout.reason ?? "")}"`}>出金</button>
         </div>`;
     }
     case "deposit":
       return `${head(MENU_LABEL.deposit)}
         <p>入金する金額を下の<b>「入金」ボックス</b>に入れて Enter を押してください。</p>
-        <p class="muted">お金を入れる操作なのでパスワードは要りません。記録は担当者名つきで残ります。</p>`;
+        <p class="muted">記録は担当者名つきで残ります。</p>`;
     case "changer": {
       const have = (d: number) => v.drawer.find(([x]) => x === d)?.[1] ?? 0;
       const segs = [1000, 500, 100, 50, 10]
@@ -882,7 +931,7 @@ export function storeMenu(r: RegisterView): string {
 // ---------------------------------------------------------------------------
 
 export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
-  if (r.menu) return notice + storeMenu(r);
+  if (r.menu?.side === side) return notice + storeMenu(r);
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
@@ -946,19 +995,18 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 // ---------------------------------------------------------------------------
 
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
-const BELL_KIND = { fixed: "据え付け", handheld: "携帯", store_computer: "事務所" } as const;
 
 export function matPanel(s: Snapshot): string {
   return s.mats
     .map(
       (m) => `<div class="mat ${m.buzzing ? "buzz" : ""} ${m.bell_on ? "" : "off"}">
-        <span class="bell">${BELL_ICON[m.kind]}</span><span class="mat-id">${esc(m.id)}</span><span class="mat-kind">${BELL_KIND[m.kind]}</span><span class="mat-state">${!m.bell_on ? "呼び鈴OFF" : m.buzzing ? "鳴動中" : "待機"}</span>
+        <span class="bell">${BELL_ICON[m.kind]}</span><span class="mat-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="mat-state">呼び鈴OFF</span>` : m.buzzing ? `<span class="mat-state">鳴動中</span>` : ""}
       </div>`,
     )
     .join("");
 }
 
-/** Bell の設定：検品端末とストアコンピューターの呼び鈴機能の ON/OFF（据え付けの呼び鈴は常に ON） */
+/** Bell の設定：可搬性端末とストアコンピューターの呼び鈴機能の ON/OFF（据え付け端末は常に ON） */
 export function bellSettings(s: Snapshot): string {
   return s.mats
     .map((m, i) =>
@@ -1112,12 +1160,18 @@ const SHELVES: Shelf[] = [
   { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134") },
   // 4 大分類の外：お客様が持ち込む払込票・送る荷物と受け取る荷物、レジに置いてあるカトラリー・レジ袋
   { label: "サービス", match: (p) => p.category === "service" },
-  { label: "カトラリー＆レジ袋", match: (p) => p.category === "bag" },
+  { label: "オプション", match: (p) => p.category === "bag" },
 ];
 
-function item(code: string, name: string, sub: string, cls = ""): string {
-  return `<button type="button" class="item ${cls}" data-code="${esc(code)}" aria-label="${esc(name)}をドラッグ">
-    <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
+/** 使い方の説明（ボタンにカーソルを重ねると出る） */
+const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
+const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
+const HINT_PAY = "支払方法を選んでから、入金ボックスにドラッグ＆ドロップ";
+const HINT_EMONEY = "入金ボックスにドラッグ＆ドロップ";
+
+function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCAN): string {
+  return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
 /** Item：4 大分類ごとに小さな見出しを付けて並べる */
@@ -1130,7 +1184,7 @@ export function shelfPanel(s: Snapshot): string {
     // 棚の並びは SHELVES に書いた順
     const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || attended);
     if (!items.length) return "";
-    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items">${items
+    return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
         item(
           p.code,
@@ -1148,25 +1202,25 @@ export function shelfPanel(s: Snapshot): string {
 // 実在のサービス名は使わない
 // ---------------------------------------------------------------------------
 
-function walletItem(key: string, name: string, sub: string, cls: string): string {
-  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" aria-label="${esc(name)}をドラッグ">
-    <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
+function walletItem(key: string, name: string, sub: string, cls: string, hint: string): string {
+  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
 export function walletPanel(emoneyBalance: number): string {
-  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "紙幣", "bill"));
-  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "硬貨", "coin"));
+  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill", HINT_CASH));
+  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin", HINT_CASH));
   const cards = [
-    item("PC12345678", "ポイントカード", "レジで読む", "card"),
-    item("PC87654321", "ポイントアプリ", "スマホ", "card"),
+    item("PC12345678", "ポイントカード", "", "card"),
+    item("PC87654321", "ポイントアプリ", "", "card"),
     item("CP0001", "引換券", "ソフトドリンク", "coupon"),
     item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
-    walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
-    walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
-    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay"),
+    walletItem("pay:qr", "バーコード決済", "", "pay", HINT_PAY),
+    walletItem("pay:credit", "クレジットカード", "", "pay", HINT_PAY),
+    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay", HINT_EMONEY),
   ];
-  // 見出しなしの一つの並び（表示スペースの節約）
-  return `<div class="shelf"><div class="items">${[...bills, ...coins, ...cards].join("")}</div></div>`;
+  // 見出しなし（表示スペースの節約）。お金以外は同じ大きさのボタンに揃える
+  return `<div class="shelf"><div class="items">${[...bills, ...coins].join("")}</div><div class="items wallet-cards">${cards.join("")}</div></div>`;
 }
 
 /** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */

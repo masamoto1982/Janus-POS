@@ -1195,12 +1195,12 @@ export function shelfPanel(s: Snapshot): string {
 
 function walletItem(key: string, name: string, sub: string, cls: string): string {
   return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" aria-label="${esc(name)}をドラッグ">
-    <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
 export function walletPanel(emoneyBalance: number): string {
-  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "紙幣", "bill"));
-  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "硬貨", "coin"));
+  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill"));
+  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin"));
   const cards = [
     item("PC12345678", "ポイントカード", "レジで読む", "card"),
     item("PC87654321", "ポイントアプリ", "スマホ", "card"),

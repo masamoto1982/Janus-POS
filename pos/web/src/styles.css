@@ -405,8 +405,10 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }
 .lines tr.coupon td { color: var(--danger); }
 .item.card { background: var(--call-bg); color: var(--call); }
-.item.bill { background: var(--bill-bg); border-color: var(--border); }
-.item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 999px; }
+/* お金は金額だけ。紙幣は横長の札、硬貨は真円 */
+.item.bill { background: var(--bill-bg); border-color: var(--border); justify-content: center; min-height: 34px; }
+.item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; text-align: center; }
+.item.coin .item-name { font-size: 11px; white-space: nowrap; }
 .item.pay { background: var(--pay-bg); border-color: var(--border); }
 
 /* ドロップ先 */

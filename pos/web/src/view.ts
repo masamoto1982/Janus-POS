@@ -278,10 +278,9 @@ const CALL_SHORT: Record<string, string> = {
 
 /**
  * 呼び出し中の表示。両画面同内容の原則の、表示上の例外：
- * お客様側には定型の待機メッセージ、店員側には呼ばれた内容（「FF」「FF＆煙草」のように）を出す。
- * 情報は一つ（同じ呼び出しの記録）で、側ごとに見せ方だけを変える。
+ * 有人モードのお客様側には「店員が向かっています」を出す。店員側は Bell の不通だけを知らせる。
  */
-export function callNotice(r: RegisterView, now: number, side: Side): string {
+export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
   // 有人モードで年確の工程を出している間は、年確の呼び出しは表示しない（年確の画面そのものが知らせる）
   const ageOnScreen = r.mode === "attended" && (v.age_choice_pending || v.id_pending);
@@ -299,9 +298,8 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  if (!calls.length) return warn;
-  const kinds = [...new Set(calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
-  return `${warn}<div class="banner call">🔔 ${esc(kinds.join("＆"))}${elapsed(calls, now, " ")}</div>`;
+  // 有人モードでは店員がレジにいるので、呼び出しの内容や経過時間は店員側に出さない
+  return warn;
 }
 
 /** 呼び出しの経過時間。年確の呼び出しは数えない（経過時間を出さない） */

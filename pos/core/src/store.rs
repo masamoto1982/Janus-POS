@@ -142,6 +142,8 @@ pub enum CallTopic {
     /// 代行収納・宅配便
     Service,
     Tobacco,
+    /// 電子マネーのチャージ・残高確認（セミセルフでは扱わず、係員を呼ぶ）
+    Emoney,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1566,6 +1568,7 @@ impl Store {
                 let (kind, detail) = match topic {
                     Some(CallTopic::Service) => (CallKind::Service, "お支払い・荷物"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
+                    Some(CallTopic::Emoney) => (CallKind::Emoney, "チャージ・残高確認"),
                     None => (CallKind::CustomerHelp, "お客様からの呼び出し"),
                 };
                 self.call(register, kind, detail);
@@ -1573,6 +1576,7 @@ impl Store {
                 done(match topic {
                     Some(CallTopic::Service) => "係員をお呼びしました（サービス）",
                     Some(CallTopic::Tobacco) => "係員をお呼びしました（たばこ）",
+                    Some(CallTopic::Emoney) => "係員をお呼びしました（電子マネー）",
                     None => "係員をお呼びしました",
                 })
             }
@@ -1614,6 +1618,7 @@ impl Store {
                     CallKind::FastFood,
                     CallKind::Service,
                     CallKind::Tobacco,
+                    CallKind::Emoney,
                 ] {
                     self.calls.resolve(register, k, now);
                 }
@@ -1965,6 +1970,7 @@ impl Store {
                 self.reg_mut(register)?.txn.tobacco_asked = true;
             }
             self.calls.resolve(register, CallKind::Tobacco, now);
+            self.calls.resolve(register, CallKind::Emoney, now);
             if !service_pending {
                 self.calls.resolve(register, CallKind::Service, now);
             }
@@ -2451,6 +2457,7 @@ impl Store {
             CallKind::FastFood,
             CallKind::Service,
             CallKind::Tobacco,
+            CallKind::Emoney,
         ] {
             self.calls.resolve(register, k, now);
         }

@@ -270,6 +270,7 @@ function editorRow(reg: number, side: Side, body: string): string {
 const CALL_SHORT: Record<string, string> = {
   fast_food: "FF",
   tobacco: "煙草",
+  emoney: "電子マネー",
   service: "サービス",
   customer_help: "呼び出し",
   age_check: "年確",
@@ -724,6 +725,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("サービス", "お支払い・荷物", { type: "call_staff", register: reg, topic: "service" }, a("call_staff"), "service"),
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
+      // 電子マネーのチャージ・残高確認はセミセルフでは扱わない（チャージ音を決済音と取り違える事故を防ぐ）。
+      // 係員を呼び、店員がログインして有人モードで受け付ける
+      callBtn("電子マネー", "チャージ・残高確認", { type: "call_staff", register: reg, topic: "emoney" }, a("call_staff"), "emoney"),
     ].join("")}</div>`;
   }
   // 有人モードの FF は店員側の画面から登録する（お客様側には出さない）

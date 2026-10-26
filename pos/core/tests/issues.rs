@@ -923,21 +923,27 @@ fn shortcut_buttons_call_staff() {
         json!({"type":"call_staff","register":1,"topic":"service"}),
     );
     ok(&mut s, json!({"type":"ff_button","register":1}));
+    // 電子マネーのチャージ・残高確認も係員を呼ぶ（セミセルフでは扱わない）
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"emoney"}),
+    );
     let k = kinds(&s, 1);
     assert!(
         k.contains(&CallKind::Tobacco)
             && k.contains(&CallKind::Service)
             && k.contains(&CallKind::FastFood)
+            && k.contains(&CallKind::Emoney)
     );
     assert!(reg(&s, 1).lamp);
     // 呼び出しは開いたまま（店員が来るまでランプが点く）
     ok(&mut s, json!({"type":"release_call","register":1}));
     advance(&mut s, 60_000);
-    assert_eq!(kinds(&s, 1).len(), 3);
+    assert_eq!(kinds(&s, 1).len(), 4);
     // 宅配便のバーコードを直接読むと、サービスの呼び出しになる
     scan(&mut s, 2, "customer", PARCEL);
     assert!(kinds(&s, 2).contains(&CallKind::Service));
-    // 店員が来ると、たばこ・サービスのボタン呼び出しは片付く（FF は登録するまで残る）
+    // 店員が来ると、たばこ・サービス・電子マネーのボタン呼び出しは片付く（FF は登録するまで残る）
     login(&mut s, 1);
     assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
     // 有人モードではボタンで呼ばない

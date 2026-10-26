@@ -291,8 +291,8 @@ export function callNotice(r: RegisterView, now: number, side: Side): string {
     const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
     return (
       change +
-      (r.customer.staff_called && (!ageOnScreen || calls.length)
-        ? `<div class="banner call">${r.mode === "attended" ? "店員が向かっています" : "係員を呼び出しています。しばらくお待ちください。"}</div>`
+      (r.mode === "attended" && r.customer.staff_called && (!ageOnScreen || calls.length)
+        ? `<div class="banner call">店員が向かっています</div>`
         : "")
     );
   }

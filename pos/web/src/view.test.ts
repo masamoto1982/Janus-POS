@@ -46,7 +46,7 @@ describe("view helpers", () => {
     expect(sideOf({ type: "confirm_bill_payment", register: 1 })).toBe("customer");
   });
 
-  it("shows the staff which calls are open, and the customer a fixed waiting message", () => {
+  it("shows the staff which calls are open, and the customer nothing in semi-self", () => {
     const call = (kind: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, created_at, detail: "" });
     const r = {
       staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], mat_down: [] },
@@ -56,8 +56,7 @@ describe("view helpers", () => {
     expect(staff).toContain("FF＆煙草");
     expect(staff).toContain("5秒経過");
     const customer = callNotice(r, 6000, "customer");
-    expect(customer).toContain("係員を呼び出しています。しばらくお待ちください。");
-    expect(customer).not.toContain("FF");
+    expect(customer).toBe("");
   });
 
   it("tells the customer that staff are on the way in attended mode", () => {

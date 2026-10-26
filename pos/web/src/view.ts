@@ -320,7 +320,8 @@ export function callScreen(r: RegisterView, now: number): string {
     : "";
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
   const details = [...new Set(v.calls.map((c) => c.detail).filter(Boolean))];
-  return `${warn}<div class="call-screen">
+  // 登録画面の領域いっぱいに広げて出す（最下段の FF・サービス・たばこボタンはそのまま）
+  return `<div class="call-screen">${warn}
       <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
       ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
       <p class="muted">${elapsed(v.calls, now, "", "　")}店員証でログインすると対応を始めます</p>
@@ -680,7 +681,7 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
     }</p></div>`);
   // セミセルフの呼び出し中、店員側の画面は呼び出しの理由だけを大きく出す（年確の工程などは出さない：
   // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
-  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return confirm(callScreen(r, snap.now));
+  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
   if (!r.menu && (r.emoney || r.emoney_short !== null)) return notice + confirm(emoneyScreen(r, side));
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);

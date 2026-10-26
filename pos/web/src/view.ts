@@ -1161,10 +1161,10 @@ const SHELVES: Shelf[] = [
 ];
 
 /** 使い方の説明（ボタンにカーソルを重ねると出る） */
-const HINT_SCAN = "レジ画面にドラッグすると、その画面のスキャナーで読み取ります";
-const HINT_CASH = "入金ボックスにドラッグして入れます";
-const HINT_PAY = "支払方法を選んだあと、入金ボックスにドラッグしてかざします";
-const HINT_EMONEY = "入金ボックスにドラッグしてかざします（支払い・チャージ・残高確認）";
+const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
+const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
+const HINT_PAY = "支払方法を選んでから、入金ボックスにドラッグ＆ドロップ";
+const HINT_EMONEY = "入金ボックスにドラッグ＆ドロップ";
 
 function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCAN): string {
   return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">

@@ -288,7 +288,11 @@ function render(): void {
     setRegion(
       `mode-${r.id}`,
       `<span class="mode mode-${r.mode}">${esc(r.mode_label)}</span>${
-        idle !== null ? `<span class="idle" title="5分間操作がないとセミセルフに戻って待機します">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} でセミセルフに戻ります</span>` : ""
+        idle !== null
+          ? `<span class="idle" title="5分間操作がないと、登録中の取引も中止してセミセルフに戻ります">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} で${
+              r.idle_voids ? (r.mode === "semi_self" ? "取引を中止します" : "取引を中止してセミセルフに戻ります") : "セミセルフに戻ります"
+            }</span>`
+          : ""
       }`,
     );
     // 両方の画面に同じ内容を出す（呼び出しの表示だけは側ごとに出し分ける）

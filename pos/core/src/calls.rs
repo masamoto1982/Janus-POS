@@ -17,8 +17,6 @@ pub enum CallKind {
     FastFood,
     Service,
     Tobacco,
-    /// 電子マネーのチャージ・残高確認（有人モードで店員が受け付ける）
-    Emoney,
     CustomerHelp,
     /// 排出口に釣り銭が残ったまま 2 分（有人モードは 1 分）たった（釣銭忘れ）
     ChangeLeft,
@@ -31,7 +29,6 @@ impl CallKind {
             CallKind::FastFood => "FF の注文",
             CallKind::Service => "サービス受付",
             CallKind::Tobacco => "たばこ",
-            CallKind::Emoney => "電子マネー",
             CallKind::CustomerHelp => "お呼び出し",
             CallKind::ChangeLeft => "釣銭忘れ",
         }

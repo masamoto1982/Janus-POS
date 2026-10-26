@@ -205,10 +205,11 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .reg-top .sum { font-size: 16px; }
 .reg-top .count b { font-size: 28px; }
 .reg-top .sum { white-space: nowrap; }
-.reg-top .action { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-.reg-top .emoney-top { display: flex; flex-direction: column; align-items: center; padding: 3px 10px; line-height: 1.2; }
-.reg-top .emoney-top b { font-size: 12px; }
-.reg-top .emoney-top small { font-size: 9px; }
+.reg-top .action { margin-left: auto; display: flex; align-items: stretch; gap: 8px; }
+/* 電子マネー（チャージ・残高確認）は会計ボタンと同じ高さで、塗らずに枠線だけの控えめな表現 */
+.reg-top .emoney-top { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 10px; line-height: 1.2; background: transparent; color: var(--ink); border: 1px solid var(--border); font-weight: 400; }
+.reg-top .emoney-top b { font-size: 12px; font-weight: 400; }
+.reg-top .emoney-top small { font-size: 9px; color: var(--msg-weak); }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 /* 登録の明細は表示エリアが狭いので小ぶりに */
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
@@ -290,7 +291,7 @@ details summary h3 { display: inline; }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
 /* 有人モードの初期画面：二段目の電子マネー（サービスボタンと同じ二行の意匠） */
-.attended-welcome .emoney-guide { min-width: 180px; padding: 6px 18px; background: var(--btn); color: var(--btn-ink); }
+.welcome .emoney-guide { min-width: 180px; padding: 6px 18px; background: var(--btn); color: var(--btn-ink); }
 /* お客様側は押せないが、薄くせず店員側と同じ見た目で映す（選んだ用件も同じく塗る） */
 .attended-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
@@ -520,14 +521,14 @@ body.dragging .drop-hint { display: inline; }
 .screen.inactive .mode-badge { pointer-events: none; }
 
 /* セミセルフの店員呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ） */
-.call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .bell-btn:disabled { opacity: .45; }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { background: var(--btn-on) !important; color: var(--btn-on-ink) !important; transform: translateY(1px); box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
 .call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 0; padding: 2px 6px; border-radius: 8px; color: #fff; line-height: 1.2; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; }
-.call-btn.ff, .call-btn.service, .call-btn.tob, .call-btn.emoney { background: var(--btn); color: var(--btn-ink); }
+.call-btn.ff, .call-btn.service, .call-btn.tob { background: var(--btn); color: var(--btn-ink); }
 
 /* 適用先のないクーポンの注意と、取り消したクーポンの返却 */
 .coupon-card { border: 2px solid var(--border); background: var(--danger-bg); padding: 8px 10px; font-size: 13px; }
@@ -552,3 +553,14 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 
 .emoney-choices { display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: min(100%, 280px); margin: 0 auto; }
 .emoney-screen .emoney-balance { font-size: 28px; font-variant-numeric: tabular-nums; }
+
+/* 取引中止：明細の上の帯に控えめに置く（会計ボタンから離す）。確認画面で「長押しで中止」を押し続けて決まる */
+.void-btn { font-size: 11px; padding: 2px 8px; background: transparent; color: var(--msg-weak); border: 1px solid var(--border); }
+.staff-head { gap: 8px; }
+.void-choices { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.void-choices > button { min-width: 140px; min-height: 44px; }
+.hold-confirm { position: relative; overflow: hidden; background: transparent; color: var(--ink); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hold-confirm .hold-fill { position: absolute; inset: 0; width: 0; background: var(--btn-on); }
+.hold-confirm.holding .hold-fill { width: 100%; transition: width 1.5s linear; }
+.hold-confirm .hold-label { position: relative; }
+.hold-confirm.holding .hold-label { color: var(--btn-on-ink); }

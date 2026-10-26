@@ -491,7 +491,7 @@ fn staff_and_customer_screens_are_exclusive() {
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
     assert_eq!(v.active_side, Some(Side::Customer));
-    assert!(run(&mut s, json!({"type":"void_transaction","register":1})).is_err());
+    assert!(run(&mut s, json!({"type":"lock","register":1})).is_err());
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -923,27 +923,21 @@ fn shortcut_buttons_call_staff() {
         json!({"type":"call_staff","register":1,"topic":"service"}),
     );
     ok(&mut s, json!({"type":"ff_button","register":1}));
-    // 電子マネーのチャージ・残高確認も係員を呼ぶ（セミセルフでは扱わない）
-    ok(
-        &mut s,
-        json!({"type":"call_staff","register":1,"topic":"emoney"}),
-    );
     let k = kinds(&s, 1);
     assert!(
         k.contains(&CallKind::Tobacco)
             && k.contains(&CallKind::Service)
             && k.contains(&CallKind::FastFood)
-            && k.contains(&CallKind::Emoney)
     );
     assert!(reg(&s, 1).lamp);
     // 呼び出しは開いたまま（店員が来るまでランプが点く）
     ok(&mut s, json!({"type":"release_call","register":1}));
     advance(&mut s, 60_000);
-    assert_eq!(kinds(&s, 1).len(), 4);
+    assert_eq!(kinds(&s, 1).len(), 3);
     // 宅配便のバーコードを直接読むと、サービスの呼び出しになる
     scan(&mut s, 2, "customer", PARCEL);
     assert!(kinds(&s, 2).contains(&CallKind::Service));
-    // 店員が来ると、たばこ・サービス・電子マネーのボタン呼び出しは片付く（FF は登録するまで残る）
+    // 店員が来ると、たばこ・サービスのボタン呼び出しは片付く（FF は登録するまで残る）
     login(&mut s, 1);
     assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
     // 有人モードではボタンで呼ばない
@@ -1950,4 +1944,26 @@ fn emoney_short_offers_three_choices() {
     );
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 1_120);
     assert_eq!(emoney_balance(&s), 880);
+}
+
+/// 取引中止はセミセルフのお客様もできる。入れたお金は出金ボックスに戻り、電子マネーで払った分は残高に戻る
+#[test]
+fn customer_voids_and_money_comes_back() {
+    let mut s = Store::new(1, 2, 1);
+    assert!(
+        run(&mut s, json!({"type":"void_transaction","register":1})).is_err(),
+        "取引がない"
+    );
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.customer.lines.is_empty());
+    assert_eq!(v.outlet, 100);
+    assert_eq!(v.customer.inserted, 0);
 }

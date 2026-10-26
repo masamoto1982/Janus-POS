@@ -142,8 +142,6 @@ pub enum CallTopic {
     /// 代行収納・宅配便
     Service,
     Tobacco,
-    /// 電子マネーのチャージ・残高確認（セミセルフでは扱わず、係員を呼ぶ）
-    Emoney,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1568,7 +1566,6 @@ impl Store {
                 let (kind, detail) = match topic {
                     Some(CallTopic::Service) => (CallKind::Service, "お支払い・荷物"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
-                    Some(CallTopic::Emoney) => (CallKind::Emoney, "チャージ・残高確認"),
                     None => (CallKind::CustomerHelp, "お客様からの呼び出し"),
                 };
                 self.call(register, kind, detail);
@@ -1576,7 +1573,6 @@ impl Store {
                 done(match topic {
                     Some(CallTopic::Service) => "係員をお呼びしました（サービス）",
                     Some(CallTopic::Tobacco) => "係員をお呼びしました（たばこ）",
-                    Some(CallTopic::Emoney) => "係員をお呼びしました（電子マネー）",
                     None => "係員をお呼びしました",
                 })
             }
@@ -1601,7 +1597,14 @@ impl Store {
                 // 店舗メニューから行うので、済んだらメニューを閉じる
                 r.menu = None;
                 let txn = std::mem::take(&mut r.txn);
-                let back = txn.inserted.total();
+                // 入れたお金と、チャージ用に入れた紙幣は出金ボックスに戻す
+                r.outlet.merge(&txn.inserted);
+                let mut back = txn.inserted.total();
+                if let Some(EmoneyTask::Charge { inserted }) = r.emoney.take() {
+                    back += inserted.total();
+                    r.outlet.merge(&inserted);
+                }
+                r.emoney = None;
                 // 電子マネーで先に払った分は、電子マネーに戻す
                 self.emoney_balance += txn.emoney_paid;
                 for l in &txn.lines {
@@ -1618,12 +1621,13 @@ impl Store {
                     CallKind::FastFood,
                     CallKind::Service,
                     CallKind::Tobacco,
-                    CallKind::Emoney,
                 ] {
                     self.calls.resolve(register, k, now);
                 }
                 if back > 0 {
-                    done(format!("取引を中止しました。投入金 {back}円を返却します"))
+                    done(format!(
+                        "取引を中止しました。{back}円を出金ボックスから取り出してください"
+                    ))
                 } else {
                     done("取引を中止しました")
                 }
@@ -1970,7 +1974,6 @@ impl Store {
                 self.reg_mut(register)?.txn.tobacco_asked = true;
             }
             self.calls.resolve(register, CallKind::Tobacco, now);
-            self.calls.resolve(register, CallKind::Emoney, now);
             if !service_pending {
                 self.calls.resolve(register, CallKind::Service, now);
             }
@@ -2457,7 +2460,6 @@ impl Store {
             CallKind::FastFood,
             CallKind::Service,
             CallKind::Tobacco,
-            CallKind::Emoney,
         ] {
             self.calls.resolve(register, k, now);
         }

@@ -1160,9 +1160,15 @@ const SHELVES: Shelf[] = [
   { label: "カトラリー＆レジ袋", match: (p) => p.category === "bag" },
 ];
 
-function item(code: string, name: string, sub: string, cls = ""): string {
-  return `<button type="button" class="item ${cls}" data-code="${esc(code)}" aria-label="${esc(name)}をドラッグ">
-    <span class="item-name">${esc(name)}</span><span class="item-sub">${sub}</span></button>`;
+/** 使い方の説明（ボタンにカーソルを重ねると出る） */
+const HINT_SCAN = "レジ画面にドラッグすると、その画面のスキャナーで読み取ります";
+const HINT_CASH = "入金ボックスにドラッグして入れます";
+const HINT_PAY = "支払方法を選んだあと、入金ボックスにドラッグしてかざします";
+const HINT_EMONEY = "入金ボックスにドラッグしてかざします（支払い・チャージ・残高確認）";
+
+function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCAN): string {
+  return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
 /** Item：4 大分類ごとに小さな見出しを付けて並べる */
@@ -1193,22 +1199,22 @@ export function shelfPanel(s: Snapshot): string {
 // 実在のサービス名は使わない
 // ---------------------------------------------------------------------------
 
-function walletItem(key: string, name: string, sub: string, cls: string): string {
-  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" aria-label="${esc(name)}をドラッグ">
+function walletItem(key: string, name: string, sub: string, cls: string, hint: string): string {
+  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
 export function walletPanel(emoneyBalance: number): string {
-  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill"));
-  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin"));
+  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill", HINT_CASH));
+  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin", HINT_CASH));
   const cards = [
-    item("PC12345678", "ポイントカード", "レジで読む", "card"),
-    item("PC87654321", "ポイントアプリ", "スマホ", "card"),
+    item("PC12345678", "ポイントカード", "", "card"),
+    item("PC87654321", "ポイントアプリ", "", "card"),
     item("CP0001", "引換券", "ソフトドリンク", "coupon"),
     item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
-    walletItem("pay:qr", "バーコード決済", "スマホ", "pay"),
-    walletItem("pay:credit", "クレジットカード", "端末にかざす", "pay"),
-    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay"),
+    walletItem("pay:qr", "バーコード決済", "", "pay", HINT_PAY),
+    walletItem("pay:credit", "クレジットカード", "", "pay", HINT_PAY),
+    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay", HINT_EMONEY),
   ];
   // 見出しなしの一つの並び（表示スペースの節約）
   return `<div class="shelf"><div class="items">${[...bills, ...coins, ...cards].join("")}</div></div>`;

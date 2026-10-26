@@ -586,3 +586,6 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 .menu-code-value { font-size: 40px; letter-spacing: .25em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; margin: 4px 0; padding-left: .25em; }
 .menu-code-form { justify-content: center; gap: 8px; }
 .menu-code-form input { width: 7.5em; font-size: 20px; letter-spacing: .2em; text-align: center; text-transform: uppercase; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
+/* 使い方の説明（Item・Wallet のボタンにカーソルを重ねると出る）。画面に固定して置くので横スクロールを生まない */
+.hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
+.hover-tip[hidden] { display: none; }

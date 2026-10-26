@@ -438,6 +438,46 @@ function send(cmd: Command): boolean {
 // イベント（委譲。描き直しでボタンが入れ替わっても取りこぼさない）
 // ---------------------------------------------------------------------------
 
+// 使い方の説明：Item・Wallet のボタンにカーソルを重ねると、少し遅れて出す（画面の外にはみ出さない位置に置く）
+const hoverTip = document.createElement("div");
+hoverTip.className = "hover-tip";
+hoverTip.setAttribute("role", "tooltip");
+hoverTip.hidden = true;
+document.body.append(hoverTip);
+let hintFor: HTMLElement | null = null;
+let hintTimer = 0;
+const hideHint = (): void => {
+  window.clearTimeout(hintTimer);
+  hintFor = null;
+  hoverTip.hidden = true;
+};
+document.addEventListener("pointerover", (e) => {
+  if (e.pointerType === "touch") return;
+  const el = (e.target as HTMLElement).closest<HTMLElement>("[data-hint]");
+  if (!el || el === hintFor) return;
+  hideHint();
+  hintFor = el;
+  hintTimer = window.setTimeout(() => {
+    if (!el.isConnected || document.body.classList.contains("dragging")) return;
+    hoverTip.textContent = el.dataset.hint ?? "";
+    hoverTip.hidden = false;
+    const r = el.getBoundingClientRect();
+    const w = hoverTip.offsetWidth;
+    const h = hoverTip.offsetHeight;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+    const below = r.bottom + 6 + h <= window.innerHeight - 8;
+    hoverTip.style.left = `${left}px`;
+    hoverTip.style.top = `${below ? r.bottom + 6 : r.top - h - 6}px`;
+  }, 350);
+});
+document.addEventListener("pointerout", (e) => {
+  if (!hintFor) return;
+  const to = e.relatedTarget as Node | null;
+  if (!to || !hintFor.contains(to)) hideHint();
+});
+document.addEventListener("pointerdown", hideHint, true);
+window.addEventListener("scroll", hideHint, true);
+
 // 両方の画面に同じ入力欄があるので、押したボタンのある画面（操作している側）の欄を読む
 let scope: ParentNode = app;
 const val = (key: string): string => scope.querySelector<HTMLInputElement>(`[data-key="${key}"]`)?.value.trim() ?? "";

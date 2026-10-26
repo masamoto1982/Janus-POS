@@ -739,7 +739,7 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const cls = `mode-badge ${r.mode === "attended" ? "attended" : "semi"}`;
   const badge =
     r.mode === "attended" && r.staff.state === "ready" && side === "staff"
-      ? `<button type="button" class="${cls}" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="店舗メニュー（返品・返金、自動釣銭機など）"${r.menu ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
+      ? `<button type="button" class="${cls}" data-gear="${r.id}" aria-label="レジ${r.id}の店舗メニュー" title="${r.menu ? "店舗メニューを閉じる" : "店舗メニュー（返品・返金、自動釣銭機など）"}"${r.menu ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
       : `<span class="${cls}">${label}</span>`;
   return `<span class="head-l">${badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
@@ -836,7 +836,7 @@ export function storeMenu(r: RegisterView): string {
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span>${btn("閉じる", go(null), undefined, "small ghost")}</div>
+      return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
         <div class="menu-list">${(["refund", "emergency", "deposit", "expense", "changer"] as const)
           .map((k) => btn(MENU_LABEL[k], go(k), busy, "menu-item"))
           .join("")}</div>

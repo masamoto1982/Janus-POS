@@ -615,3 +615,37 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 /* 使い方の説明（Item・Wallet のボタンにカーソルを重ねると出る）。画面に固定して置くので横スクロールを生まない */
 .hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
 .hover-tip[hidden] { display: none; }
+
+/* ---------------------------------------------------------------------------
+   モバイルモード（画面の小さい端末）：Item・Wallet は出さず、Bell と 2 台のレジを縦に並べる。
+   店員側とお客様側の画面は横に並べてスワイプで切り替える（上のタブでも切り替わる）。
+   レジ画面を長押しすると Item の商品を、入金ボックスを長押しすると Wallet の決済方法を選べる
+   --------------------------------------------------------------------------- */
+.swipe-tabs { display: none; }
+.picker-dlg { width: min(720px, calc(100vw - 16px)); max-height: calc(100dvh - 32px); overflow: auto; }
+.picker-dlg .item { cursor: pointer; touch-action: manipulation; }
+.picker-dlg .tip { display: none; }
+@media (max-width: 760px) {
+  .top { padding-block: 6px; }
+  .top .logo { width: 36px; height: 36px; }
+  .top h1 { font-size: 18px; }
+  .floor { padding-block: 8px; gap: 8px; }
+  .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+  .left { gap: 8px; }
+  .right-col { display: none; }
+  .register { padding: 8px; }
+  .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: 15px; margin-bottom: 4px; }
+  .register h2 .idle { font-size: 11px; }
+  .swipe-tabs { display: flex; gap: 4px; margin-bottom: 4px; }
+  .swipe-tabs button { flex: 1; min-height: 30px; padding: 2px 8px; font-size: 13px; background: var(--btn); color: var(--btn-ink); }
+  .swipe-tabs button.on { background: var(--btn-on); color: var(--btn-on-ink); }
+  .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .screens::-webkit-scrollbar { display: none; }
+  .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+  .screen-cap { display: none; }
+  .screen { height: clamp(280px, 46vh, 420px); }
+  /* 長押しで選ぶので、文字選択やコンテキストメニューを出さない */
+  .screen, [data-inlet] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  .money-io { margin-top: 6px; }
+  .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
+}

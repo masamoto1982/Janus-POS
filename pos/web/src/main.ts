@@ -186,6 +186,10 @@ function buildSkeleton(): void {
       <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます。OFF の端末は鳴らず、不通の警告も出しません。据え付け端末は常に ON です。</p>
       <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
+    <dialog class="rules-dlg picker-dlg" id="picker-dlg" aria-labelledby="picker-title">
+      <div class="dlg-head"><h2 id="picker-title">選ぶ</h2><button class="small ghost" data-close-picker>閉じる</button></div>
+      <div id="picker-body"></div>
+    </dialog>
     <div class="drag-ghost" id="ghost" hidden></div>`;
 }
 
@@ -800,12 +804,7 @@ function setupDrag(): void {
 
   app.addEventListener("pointerdown", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-code], [data-wallet]");
-    if (!b || e.button !== 0) return;
-    // モバイルモード：ドラッグはせず、タップで「いま見えている画面」で読む（Item・Wallet は指で縦にスクロールできるようにする）
-    if (isMobile()) {
-      tap = { code: b.dataset.code, wallet: b.dataset.wallet, x: e.clientX, y: e.clientY, id: e.pointerId };
-      return;
-    }
+    if (!b || e.button !== 0 || b.closest("#picker-dlg")) return;
     e.preventDefault();
     drag = { code: b.dataset.code, wallet: b.dataset.wallet, label: b.querySelector(".item-name")?.textContent ?? "", x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
   });
@@ -825,12 +824,6 @@ function setupDrag(): void {
   });
 
   window.addEventListener("pointerup", (e) => {
-    if (tap && e.pointerId === tap.id) {
-      const t = tap;
-      tap = null;
-      if (Math.hypot(e.clientX - t.x, e.clientY - t.y) < 10) mobileUse(t.code, t.wallet);
-      return;
-    }
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag;
     const t = target(e.clientX, e.clientY);
@@ -854,10 +847,7 @@ function setupDrag(): void {
     else send({ type: "tap_emoney", register, method: value });
   });
 
-  window.addEventListener("pointercancel", () => {
-    tap = null;
-    end();
-  });
+  window.addEventListener("pointercancel", end);
 
   app.addEventListener("pointerdown", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-hold]");
@@ -920,18 +910,43 @@ function setupDrag(): void {
 }
 
 // ---------------------------------------------------------------------------
-// モバイルモード（画面の小さい端末）：レジ 1 台だけを出し、店員側とお客様側の画面はスワイプで切り替える。
-// 商品やお金はドラッグせず、タップすると、いま見えている画面のスキャナー（お金・決済は入金ボックス）で読む
+// モバイルモード（画面の小さい端末）：Item・Wallet の欄は出さず、レジ画面を長押しすると Item の商品を、
+// 入金ボックスを長押しすると Wallet の決済方法（お金・カード）を選べる。選んだものは、その画面のスキャナー
+// （お金・決済はそのレジの入金ボックス）で読む。店員側とお客様側の画面はスワイプで切り替える
 // ---------------------------------------------------------------------------
 
 const MOBILE = window.matchMedia("(max-width: 760px)");
 const isMobile = (): boolean => MOBILE.matches;
-let tap: { code?: string; wallet?: string; x: number; y: number; id: number } | null = null;
+/** 長押しとみなす時間 */
+const LONG_PRESS_MS = 500;
+let longPress: { timer: number; x: number; y: number; id: number } | null = null;
+/** 長押しのあとの指を離したクリックは、下にあるボタンに届けない */
+let swallowClick = false;
+/** 長押しで開いた選択画面の行き先 */
+let pickFor: { register: number; side: Side; kind: "item" | "wallet" } | null = null;
 
-/** モバイルモードで見えている側（スワイプの位置で決まる） */
-function shownSide(reg: number): Side {
-  const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
-  return el && el.scrollLeft > el.clientWidth / 2 ? "customer" : "staff";
+const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg") as HTMLDialogElement;
+
+function openPicker(register: number, side: Side, kind: "item" | "wallet"): void {
+  pickFor = { register, side, kind };
+  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "店員側" : "お客様側"}で読む商品` : `レジ${register}の入金ボックスに入れる・かざす`;
+  document.getElementById("picker-title")!.textContent = title;
+  const body = document.getElementById("picker-body")!;
+  body.innerHTML = kind === "item" ? shelfPanel(snap) : walletPanel(snap.emoney_balance);
+  pickerDlg().showModal();
+}
+
+function pick(code?: string, wallet?: string): void {
+  if (!pickFor) return;
+  const { register, side } = pickFor;
+  pickerDlg().close();
+  pickFor = null;
+  const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
+  if (code?.startsWith("PC") && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
+  if (code) return void send({ type: "scan", register, side, code });
+  const [kind, value] = wallet!.split(":");
+  if (kind === "cash") send({ type: "insert", register, amount: Number(value) });
+  else send({ type: "tap_emoney", register, method: value });
 }
 
 function swipeTo(reg: number, side: Side): void {
@@ -940,7 +955,8 @@ function swipeTo(reg: number, side: Side): void {
 }
 
 function syncSwipeTabs(reg: number): void {
-  const side = shownSide(reg);
+  const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
+  const side: Side = el && el.scrollLeft > el.clientWidth / 2 ? "customer" : "staff";
   app.querySelectorAll<HTMLElement>(`[data-swipe-to^="${reg}:"]`).forEach((b) => {
     const on = b.dataset.swipeTo === `${reg}:${side}`;
     b.classList.toggle("on", on);
@@ -948,15 +964,9 @@ function syncSwipeTabs(reg: number): void {
   });
 }
 
-function mobileUse(code?: string, wallet?: string): void {
-  const register = 1;
-  const side = shownSide(register);
-  const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
-  if (code?.startsWith("PC") && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
-  if (code) return void send({ type: "scan", register, side, code });
-  const [kind, value] = wallet!.split(":");
-  if (kind === "cash") send({ type: "insert", register, amount: Number(value) });
-  else send({ type: "tap_emoney", register, method: value });
+function cancelLongPress(): void {
+  if (longPress) clearTimeout(longPress.timer);
+  longPress = null;
 }
 
 function wireSwipe(): void {
@@ -968,6 +978,58 @@ function wireSwipe(): void {
   });
   app.querySelectorAll<HTMLElement>("[data-swipe]").forEach((el) => {
     el.addEventListener("scroll", () => syncSwipeTabs(Number(el.dataset.swipe)), { passive: true });
+  });
+  // 長押し：レジ画面なら Item、入金ボックスなら Wallet
+  app.addEventListener("pointerdown", (e) => {
+    if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
+    const t = e.target as Element;
+    const inlet = t.closest<HTMLElement>("[data-inlet]");
+    const screen = t.closest<HTMLElement>("[data-drop]");
+    if (!inlet && !screen) return;
+    cancelLongPress();
+    const timer = window.setTimeout(() => {
+      longPress = null;
+      swallowClick = true;
+      if (inlet) {
+        (inlet as HTMLInputElement).blur();
+        openPicker(Number(inlet.dataset.inlet), "customer", "wallet");
+      } else {
+        const [reg, side] = screen!.dataset.drop!.split(":");
+        openPicker(Number(reg), side as Side, "item");
+      }
+    }, LONG_PRESS_MS);
+    longPress = { timer, x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (longPress && e.pointerId === longPress.id && Math.hypot(e.clientX - longPress.x, e.clientY - longPress.y) > 10) cancelLongPress();
+  });
+  for (const ev of ["pointerup", "pointercancel"] as const) window.addEventListener(ev, cancelLongPress);
+  window.addEventListener(
+    "click",
+    (e) => {
+      if (!swallowClick) return;
+      swallowClick = false;
+      e.stopPropagation();
+      e.preventDefault();
+    },
+    true,
+  );
+  // 長押しを離したときの click が出ない端末もあるので、次に触れた時点で打ち消しをやめる
+  window.addEventListener("pointerdown", () => (swallowClick = false), true);
+  app.addEventListener("contextmenu", (e) => {
+    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet]")) e.preventDefault();
+  });
+  // 選択画面：タップで選ぶ（指で縦にスクロールできるよう、ドラッグはしない）
+  const dlg = pickerDlg();
+  dlg.addEventListener("click", (e) => {
+    const t = e.target as Element;
+    if (t.closest("[data-close-picker]") || t === dlg) {
+      dlg.close();
+      pickFor = null;
+      return;
+    }
+    const b = t.closest<HTMLElement>("[data-code], [data-wallet]");
+    if (b) pick(b.dataset.code, b.dataset.wallet);
   });
 }
 

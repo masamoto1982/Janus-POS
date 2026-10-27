@@ -617,11 +617,14 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
 .hover-tip[hidden] { display: none; }
 
 /* ---------------------------------------------------------------------------
-   モバイルモード（画面の小さい端末）：機能を絞り、レジ 1 台だけを出す。
+   モバイルモード（画面の小さい端末）：Item・Wallet は出さず、Bell と 2 台のレジを縦に並べる。
    店員側とお客様側の画面は横に並べてスワイプで切り替える（上のタブでも切り替わる）。
-   Bell は出さない。Item・Wallet はタップで使い、レジの下でスクロールする
+   レジ画面を長押しすると Item の商品を、入金ボックスを長押しすると Wallet の決済方法を選べる
    --------------------------------------------------------------------------- */
 .swipe-tabs { display: none; }
+.picker-dlg { width: min(720px, calc(100vw - 16px)); max-height: calc(100dvh - 32px); overflow: auto; }
+.picker-dlg .item { cursor: pointer; touch-action: manipulation; }
+.picker-dlg .tip { display: none; }
 @media (max-width: 760px) {
   .top { padding-block: 6px; }
   .top .logo { width: 36px; height: 36px; }
@@ -629,9 +632,10 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   .left { gap: 8px; }
-  .mat-area, .register:not([data-register="1"]) { display: none; }
+  .right-col { display: none; }
   .register { padding: 8px; }
-  .register h2 { flex-wrap: wrap; row-gap: 4px; }
+  .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: 15px; margin-bottom: 4px; }
+  .register h2 .idle { font-size: 11px; }
   .swipe-tabs { display: flex; gap: 4px; margin-bottom: 4px; }
   .swipe-tabs button { flex: 1; min-height: 30px; padding: 2px 8px; font-size: 13px; background: var(--btn); color: var(--btn-ink); }
   .swipe-tabs button.on { background: var(--btn-on); color: var(--btn-on-ink); }
@@ -640,14 +644,8 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
   .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
   .screen-cap { display: none; }
   .screen { height: clamp(280px, 46vh, 420px); }
-  /* レジは上に留め、Item・Wallet はその下でスクロールする（タップした結果がいつも見える） */
-  .floor { display: block; }
-  .left { position: sticky; top: 0; z-index: 5; background: var(--bg); padding-bottom: 8px; }
-  .register h2 { font-size: 15px; margin-bottom: 4px; }
-  .register h2 .idle { font-size: 11px; }
+  /* 長押しで選ぶので、文字選択やコンテキストメニューを出さない */
+  .screen, [data-inlet] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .money-io { margin-top: 6px; }
-  .right-col { gap: 8px; }
-  .right { padding: 8px; }
-  .item { cursor: pointer; touch-action: manipulation; }
-  .tip::after { content: "タップすると、いま見えている画面で読みます（お金・決済は入金ボックス）"; }
+  .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
 }

@@ -351,13 +351,16 @@ fn fast_food_flow_in_semi_self_mode() {
         .unwrap()
         .line
         .id;
-    // お渡し個数が数量（2個）と合わなければ照合できない
-    let e = run(
+    // お渡し数が注文数（2個）と合わなければ NG：お渡し前のままで、会計に進めない
+    ok(
         &mut s,
         json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":1}),
+    );
+    assert!(run(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"})
     )
-    .unwrap_err();
-    assert!(e.contains("合いません"), "{e}");
+    .is_err());
     ok(
         &mut s,
         json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2}),

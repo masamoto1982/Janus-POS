@@ -633,6 +633,12 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   .left { gap: 8px; }
   .right-col { display: none; }
+  /* Bell：見出し・端末・⚙ を詰めて並べ、端末の下に余白を残さない */
+  .mat-area { gap: 6px 8px; padding: 8px 44px 8px 10px; }
+  .mat-area .bell-open { position: absolute; top: 6px; right: 6px; margin: 0; }
+  .mats { gap: 6px; }
+  .mat { gap: 4px; padding: 3px 8px; font-size: 13px; }
+  .mat .bell { font-size: 15px; }
   .register { padding: 8px; }
   .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: 15px; margin-bottom: 4px; }
   .register h2 .idle { font-size: 11px; }

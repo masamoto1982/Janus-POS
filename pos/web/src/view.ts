@@ -748,7 +748,7 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
   // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
   if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
-  if (!r.menu && (r.emoney || r.emoney_short !== null)) return notice + confirm(emoneyScreen(r, side));
+  if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return notice + confirm(emoneyScreen(r, side));
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
 
@@ -761,13 +761,30 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   const ro = r.mode === "attended" && side === "customer";
   const actions = r.mode === "semi_self" ? r.customer.actions : r.staff.actions;
   const close = (label: string) => (ro ? "" : btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip"));
+  if (r.emoney_partial !== null) {
+    // 「不足分を現金で払う」：残高を引き出し残りを現金で払うことを確かめてから、電子マネーを受け付ける
+    // （かざしたままの電子マネーで、案内を見ないうちに決済が走らないように）
+    const rest = Math.max(0, r.staff.due - r.emoney_partial);
+    const st = find(actions, "resolve_emoney_short");
+    const go = (label: string, c: string, cls: string) => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
+    const note = `<p>電子マネーの残高 <b>${yen(r.emoney_partial)}</b> を引き出し、残り <b>${yen(rest)}</b> を現金でお支払いいただきます</p>`;
+    if (!r.emoney_partial_ok)
+      return `<div class="point-screen emoney-screen">
+          <div class="big">お支払い方法の確認</div>${note}
+          ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}${go("確認しました", "cash_confirmed", "primary")}</div>`}
+        </div>`;
+    return `<div class="point-screen emoney-screen">
+        <div class="big">電子マネーを入金ボックスにかざしてください</div>${note}
+        ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}</div>`}
+      </div>`;
+  }
   if (r.emoney_short !== null) {
     const st = find(actions, "resolve_emoney_short");
     const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     return `<div class="point-screen emoney-screen">
         <div class="big">電子マネーの残高が足りません</div>
         <p>残高 <b>${yen(r.emoney_short)}</b>・お支払い <b>${yen(r.staff.due)}</b></p>
-        ${ro ? "" : `<div class="emoney-choices">${choice("電子マネーを使うのをやめる", "cancel")}${choice("残りを現金で払う", "cash")}${choice("電子マネーをチャージする", "charge", "primary")}</div>`}
+        ${ro ? "" : `<div class="emoney-choices">${choice("他の決済を使う", "cancel")}${choice("不足分を現金で払う", "cash", r.mode === "attended" ? "" : "primary")}${r.mode === "attended" ? choice("電子マネーをチャージする", "charge", "primary") : ""}</div>`}
       </div>`;
   }
   const e = r.emoney!;
@@ -848,7 +865,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const reg = r.id;
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
-  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
+  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -1023,7 +1040,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const top = regTop(
     c.total,
     itemCount(c.lines),
-    emoneyEntry(reg, side, a("emoney"), "emoney-top") +
+    // セミセルフではお買い物の途中に電子マネーのチャージ・残高確認はできない（ボタンを出さない）
+    (c.lines.length || c.coupons.length ? "" : emoneyEntry(reg, side, a("emoney"), "emoney-top")) +
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : c.method === "cash"

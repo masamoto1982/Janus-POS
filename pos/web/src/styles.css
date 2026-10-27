@@ -326,6 +326,9 @@ button.tag.ff-verify:disabled { cursor: not-allowed; }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* 引き返すボタンは左下 */
 .ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 8px 0 0; }
+/* 引き返すボタンは左下、進むボタンは右下 */
+.emoney-screen:has(> .emoney-foot) { align-self: stretch; flex: 1 0 auto; }
+.emoney-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
 .change { font-size: 18px; margin: 8px 0; }
 
 .toast {

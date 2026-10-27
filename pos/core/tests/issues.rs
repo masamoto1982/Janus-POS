@@ -1877,11 +1877,11 @@ fn emoney_balance(s: &Store) -> u32 {
     s.snapshot().emoney_balance
 }
 
-/// 「電子マネー」ボタンでチャージか残高確認を選ぶ。残高確認はかざすと残高が出る。お買い物の途中でも開ける
+/// 「電子マネー」ボタンでチャージか残高確認を選ぶ。残高確認はかざすと残高が出る。
+/// セミセルフではお買い物の途中にチャージ・残高確認はできない
 #[test]
 fn emoney_inquiry_shows_the_balance() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
     ok(
         &mut s,
         json!({"type":"start_emoney","register":1,"side":"customer","kind":"menu"}),
@@ -1896,6 +1896,24 @@ fn emoney_inquiry_shows_the_balance() {
     );
     ok(
         &mut s,
+        json!({"type":"close_emoney","register":1,"side":"customer"}),
+    );
+    scan(&mut s, 1, "customer", BREAD);
+    for kind in ["menu", "charge", "inquiry"] {
+        assert!(
+            run(
+                &mut s,
+                json!({"type":"start_emoney","register":1,"side":"customer","kind":kind})
+            )
+            .is_err(),
+            "お買い物の途中はチャージ・残高確認できない"
+        );
+    }
+
+    // 残高確認だけの取引
+    let mut s = Store::new(1, 2, 1);
+    ok(
+        &mut s,
         json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),
     );
     assert_eq!(reg(&s, 1).emoney.unwrap().balance, None);
@@ -1908,9 +1926,7 @@ fn emoney_inquiry_shows_the_balance() {
         &mut s,
         json!({"type":"close_emoney","register":1,"side":"customer"}),
     );
-    let v = reg(&s, 1);
-    assert!(v.emoney.is_none());
-    assert_eq!(v.customer.lines.len(), 1, "お買い物はそのまま");
+    assert!(reg(&s, 1).emoney.is_none());
 }
 
 /// チャージ：紙幣だけを入れてかざす。上限 20,000 円。やめると紙幣は排出口に戻る
@@ -1962,14 +1978,18 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
 
 /// 残高不足の会計に進めるまで（7 個 × 160 円 = 1,120 円、残高 1,000 円）
 fn short_checkout(s: &mut Store) {
+    short_checkout_on(s, "customer");
+}
+
+fn short_checkout_on(s: &mut Store, side: &str) {
     for _ in 0..7 {
-        scan(s, 1, "customer", BREAD);
+        scan(s, 1, side, BREAD);
     }
-    ok(s, json!({"type":"checkout","register":1,"side":"customer"}));
+    ok(s, json!({"type":"checkout","register":1,"side":side}));
     confirm_point(s, 1);
     ok(
         s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":side,"method":"emoney"}),
     );
     ok(
         s,
@@ -1984,7 +2004,8 @@ fn short_checkout(s: &mut Store) {
     );
 }
 
-/// 残高不足は「使うのをやめる」「残りを現金で払う」「チャージする」に分かれる
+/// 残高不足は「使うのをやめる（他の決済）」「残りを現金で払う」に分かれる。
+/// 「チャージする」は有人モードだけ（セミセルフはお買い物の途中にチャージしない）
 #[test]
 fn emoney_short_offers_three_choices() {
     // やめる：支払方法の選び直しへ
@@ -1999,14 +2020,37 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.customer.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
-    // 残りを現金で：残高を使い切り、残り 120 円を現金で
+    // 不足分を現金で：案内を確認してから電子マネーをかざして残高を引き出し、残り 120 円を現金で
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     ok(
         &mut s,
         json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
     );
+    assert_eq!(reg(&s, 1).emoney_partial, Some(1_000));
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"tap_emoney","register":1,"method":"emoney"})
+        )
+        .is_err(),
+        "案内を確認するまでは引き落とさない（かざしたままでも）"
+    );
+    assert_eq!(emoney_balance(&s), 1_000);
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash_confirmed"}),
+    );
+    assert!(
+        run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err(),
+        "先に電子マネーをかざす"
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
     let v = reg(&s, 1);
+    assert_eq!(v.emoney_partial, None);
     assert_eq!(v.customer.due, 120);
     assert_eq!(v.emoney_paid, 1_000);
     assert_eq!(emoney_balance(&s), 0);
@@ -2024,12 +2068,42 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.outlet, 880);
     assert_eq!(v.last_receipt.unwrap().method, "電子マネー・現金");
 
-    // チャージ：入れてかざし、もう一度かざして払う
+    // 案内を見て、やめることもできる（何も引き落とされない）
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"charge"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.emoney_partial, None);
+    assert_eq!(v.customer.method, None);
+    assert_eq!(emoney_balance(&s), 1_000);
+
+    // セミセルフではチャージを選べない
+    let mut s = Store::new(1, 2, 1);
+    short_checkout(&mut s);
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"charge"})
+        )
+        .is_err(),
+        "セミセルフはお買い物の途中にチャージしない"
+    );
+    assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
+
+    // 有人モードのチャージ：入れてかざし、もう一度かざして払う
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    short_checkout_on(&mut s, "staff");
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"charge"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     ok(

@@ -146,8 +146,10 @@ pub enum EmoneyKind {
 pub enum ShortChoice {
     /// 電子マネーを使うのをやめる（支払方法を選び直す）
     Cancel,
-    /// 残高をすべて使い、残りを現金で払う
+    /// 残高をすべて使い、残りを現金で払う（まず案内を出す）
     Cash,
+    /// 「残高を引き出し、残りを現金で」の案内を確認した。ここで初めて電子マネーを受け付ける
+    CashConfirmed,
     /// 電子マネーをチャージする（済んだらもう一度かざす）
     Charge,
 }
@@ -610,8 +612,10 @@ struct Txn {
     emoney_paid: u32,
     /// 電子マネーで払おうとしたが残高が足りず、どうするか選んでいない
     emoney_short: bool,
-    /// 「不足分を現金で払う」を選び、残高を引き出すために電子マネーをかざすのを待っている
+    /// 「不足分を現金で払う」を選んだ（残高を引き出し、残りを現金で払う）
     emoney_partial: bool,
+    /// その案内を確認し、電子マネーをかざすのを待っている（確認前にかざしても引き落とさない）
+    emoney_partial_ok: bool,
 }
 
 impl Txn {
@@ -1585,30 +1589,26 @@ impl Store {
                 if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
                     return self.tap_emoney_task(register, method);
                 }
-                // 「不足分を現金で払う」：不足分の現金が入ってから、かざした電子マネーの残高を引き出して決済する
-                // （先に引き出すと、現金が足りないと分かったときに戻せない）
+                // 「不足分を現金で払う」：案内（残高を引き出し、残りを現金で）を確認してから、かざした電子マネーの残高を引き出す
                 if self.reg(register).is_some_and(|r| r.txn.emoney_partial) {
                     if method.is_some_and(|m| m != PaymentMethod::Emoney) {
                         return Err("電子マネーをかざしてください".into());
                     }
                     let balance = self.emoney_balance;
                     let r = self.reg_mut(register)?;
-                    let due = r.txn.due();
-                    let short = due.saturating_sub(balance);
-                    let paid = r.txn.inserted.total();
-                    if paid < short {
-                        return Err(format!(
-                            "先に不足分の現金を入れてください（あと {}円）",
-                            short - paid
-                        ));
+                    if !r.txn.emoney_partial_ok {
+                        return Err("案内を確認してから、電子マネーをかざしてください".into());
                     }
-                    let drawn = balance.min(due);
+                    let drawn = balance.min(r.txn.due());
                     r.txn.emoney_partial = false;
+                    r.txn.emoney_partial_ok = false;
                     r.txn.emoney_paid += drawn;
                     r.txn.method = Some(PaymentMethod::Cash);
-                    let inserted = r.txn.inserted.clone();
+                    let due = r.txn.due();
                     self.emoney_balance -= drawn;
-                    return self.settle(register, PaymentMethod::Cash, paid, inserted);
+                    return done(format!(
+                        "電子マネーで {drawn}円 お支払いしました。残り {due}円を現金でお支払いください"
+                    ));
                 }
                 self.check(register, Side::Customer, Action::TapEmoney)?;
                 let balance = self.emoney_balance;
@@ -1698,28 +1698,30 @@ impl Store {
                 if r.mode == Mode::SemiSelf && choice == ShortChoice::Charge {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
+                if choice == ShortChoice::CashConfirmed {
+                    if !r.txn.emoney_partial {
+                        return Err("「不足分を現金で払う」が選ばれていません".into());
+                    }
+                    r.txn.emoney_partial_ok = true;
+                    return done("電子マネーを入金ボックスにかざしてください");
+                }
                 r.txn.emoney_short = false;
                 r.txn.emoney_partial = false;
+                r.txn.emoney_partial_ok = false;
                 match choice {
                     ShortChoice::Cancel => {
                         r.txn.method = None;
-                        // 不足分として入れた現金はお返しする
-                        let back = std::mem::take(&mut r.txn.inserted);
-                        let n = back.total();
-                        r.outlet.merge(&back);
-                        if n > 0 {
-                            return done(format!(
-                                "電子マネーを使うのをやめました。{n}円を出金ボックスから取り出し、お支払い方法を選んでください"
-                            ));
-                        }
                         done("電子マネーを使うのをやめました。お支払い方法を選んでください")
                     }
                     ShortChoice::Cash => {
-                        // 先に不足分の現金を入れてもらい、電子マネーはそのあとでかざしてもらう
+                        // すぐには引き落とさない：かざしたままの電子マネーで、案内を見ないうちに決済が走らないように
                         r.txn.emoney_partial = true;
-                        let short = r.txn.due().saturating_sub(balance);
-                        done(format!("不足分 {short}円を現金で入れてください"))
+                        let rest = r.txn.due().saturating_sub(balance);
+                        done(format!(
+                            "電子マネーの残高 {balance}円を引き出し、残り {rest}円を現金でお支払いいただきます"
+                        ))
                     }
+                    ShortChoice::CashConfirmed => unreachable!(),
                     ShortChoice::Charge => {
                         r.emoney = Some(EmoneyTask::Charge {
                             inserted: Cash::default(),
@@ -2447,17 +2449,6 @@ impl Store {
             None if self.reg(register).is_some_and(|r| r.emoney.is_some()) => {
                 self.charge_cash(register, Cash::from_amount(amount))
             }
-            None if self.reg(register).is_some_and(|r| r.txn.emoney_partial) => {
-                let balance = self.emoney_balance;
-                let r = self.reg_mut(register)?;
-                r.txn.inserted.merge(&Cash::from_amount(amount));
-                let paid = r.txn.inserted.total();
-                let short = r.txn.due().saturating_sub(balance);
-                if paid < short {
-                    return done(format!("{paid}円 投入（あと {}円）", short - paid));
-                }
-                done(format!("{paid}円 投入。電子マネーをかざしてください"))
-            }
             None => {
                 self.check(register, Side::Customer, Action::InsertCash)?;
                 self.pay_cash(register, Cash::from_amount(amount))
@@ -3045,6 +3036,7 @@ impl Store {
             }),
             emoney_short: t.emoney_short.then_some(self.emoney_balance),
             emoney_partial: t.emoney_partial.then_some(self.emoney_balance),
+            emoney_partial_ok: t.emoney_partial_ok,
             emoney_paid: t.emoney_paid,
             last_receipt: r.last_receipt.clone(),
         }
@@ -3201,6 +3193,8 @@ pub struct RegisterView {
     pub emoney_short: Option<u32>,
     /// 「不足分を現金で払う」：電子マネーをかざして残高を引き出すのを待つ（値は引き出す残高）
     pub emoney_partial: Option<u32>,
+    /// その案内を確認済みで、電子マネーをかざすのを待っている
+    pub emoney_partial_ok: bool,
     /// このお会計で電子マネーから払った額（残りを現金で払うとき）
     pub emoney_paid: u32,
     pub last_receipt: Option<Receipt>,

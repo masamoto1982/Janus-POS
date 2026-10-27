@@ -164,6 +164,7 @@ export interface RegisterView {
   /** 電子マネーの残高が足りないとき、その残高 */
   emoney_short: number | null;
   emoney_partial: number | null;
+  emoney_partial_ok: boolean;
   /** このお会計で電子マネーから払った額 */
   emoney_paid: number;
   last_receipt: Receipt | null;

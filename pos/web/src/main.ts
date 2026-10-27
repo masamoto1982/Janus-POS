@@ -72,6 +72,7 @@ function reset(registers: number, mats: number): void {
   t0 = performance.now();
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   buildSkeleton();
+  wireSwipe();
   // 閉じたら（Esc でも）認証を解除し、パスワードを消す
   rulesDlg().addEventListener("close", lockRules);
   rulesDlg()
@@ -105,7 +106,11 @@ function buildSkeleton(): void {
           </select>
         </label>
       </h2>
-      <div class="screens">
+      <div class="swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
+        <button type="button" role="tab" class="on" data-swipe-to="${r.id}:staff">店員側</button>
+        <button type="button" role="tab" data-swipe-to="${r.id}:customer">お客様側</button>
+      </div>
+      <div class="screens" data-swipe="${r.id}">
         <div class="screen-wrap" data-wrap="${r.id}:staff">
           <div class="screen-cap">店員側<span class="drop-hint">ここに落とす＝店員側スキャナーで読む</span></div>
           <section class="screen staff-screen" data-drop="${r.id}:staff">
@@ -796,6 +801,11 @@ function setupDrag(): void {
   app.addEventListener("pointerdown", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-code], [data-wallet]");
     if (!b || e.button !== 0) return;
+    // モバイルモード：ドラッグはせず、タップで「いま見えている画面」で読む（Item・Wallet は指で縦にスクロールできるようにする）
+    if (isMobile()) {
+      tap = { code: b.dataset.code, wallet: b.dataset.wallet, x: e.clientX, y: e.clientY, id: e.pointerId };
+      return;
+    }
     e.preventDefault();
     drag = { code: b.dataset.code, wallet: b.dataset.wallet, label: b.querySelector(".item-name")?.textContent ?? "", x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
   });
@@ -815,6 +825,12 @@ function setupDrag(): void {
   });
 
   window.addEventListener("pointerup", (e) => {
+    if (tap && e.pointerId === tap.id) {
+      const t = tap;
+      tap = null;
+      if (Math.hypot(e.clientX - t.x, e.clientY - t.y) < 10) mobileUse(t.code, t.wallet);
+      return;
+    }
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag;
     const t = target(e.clientX, e.clientY);
@@ -838,7 +854,10 @@ function setupDrag(): void {
     else send({ type: "tap_emoney", register, method: value });
   });
 
-  window.addEventListener("pointercancel", end);
+  window.addEventListener("pointercancel", () => {
+    tap = null;
+    end();
+  });
 
   app.addEventListener("pointerdown", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-hold]");
@@ -897,6 +916,58 @@ function setupDrag(): void {
   });
   app.addEventListener("keyup", (e) => {
     if (held && held.pointer === null && (e.key === " " || e.key === "Enter")) release();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// モバイルモード（画面の小さい端末）：レジ 1 台だけを出し、店員側とお客様側の画面はスワイプで切り替える。
+// 商品やお金はドラッグせず、タップすると、いま見えている画面のスキャナー（お金・決済は入金ボックス）で読む
+// ---------------------------------------------------------------------------
+
+const MOBILE = window.matchMedia("(max-width: 760px)");
+const isMobile = (): boolean => MOBILE.matches;
+let tap: { code?: string; wallet?: string; x: number; y: number; id: number } | null = null;
+
+/** モバイルモードで見えている側（スワイプの位置で決まる） */
+function shownSide(reg: number): Side {
+  const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
+  return el && el.scrollLeft > el.clientWidth / 2 ? "customer" : "staff";
+}
+
+function swipeTo(reg: number, side: Side): void {
+  const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
+  el?.scrollTo({ left: side === "customer" ? el.scrollWidth : 0, behavior: "smooth" });
+}
+
+function syncSwipeTabs(reg: number): void {
+  const side = shownSide(reg);
+  app.querySelectorAll<HTMLElement>(`[data-swipe-to^="${reg}:"]`).forEach((b) => {
+    const on = b.dataset.swipeTo === `${reg}:${side}`;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-selected", String(on));
+  });
+}
+
+function mobileUse(code?: string, wallet?: string): void {
+  const register = 1;
+  const side = shownSide(register);
+  const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
+  if (code?.startsWith("PC") && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
+  if (code) return void send({ type: "scan", register, side, code });
+  const [kind, value] = wallet!.split(":");
+  if (kind === "cash") send({ type: "insert", register, amount: Number(value) });
+  else send({ type: "tap_emoney", register, method: value });
+}
+
+function wireSwipe(): void {
+  app.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-swipe-to]");
+    if (!b) return;
+    const [reg, side] = b.dataset.swipeTo!.split(":");
+    swipeTo(Number(reg), side as Side);
+  });
+  app.querySelectorAll<HTMLElement>("[data-swipe]").forEach((el) => {
+    el.addEventListener("scroll", () => syncSwipeTabs(Number(el.dataset.swipe)), { passive: true });
   });
 }
 

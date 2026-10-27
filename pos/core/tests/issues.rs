@@ -2,7 +2,7 @@
 
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
-use janus_pos_core::store::{Command, RegisterView, Store};
+use janus_pos_core::store::{Command, FfState, LineKind, RegisterView, Store};
 use serde_json::{json, Value};
 
 const BREAD: &str = "4900000000011";
@@ -351,19 +351,26 @@ fn fast_food_flow_in_semi_self_mode() {
         .unwrap()
         .line
         .id;
+    // お渡し個数が数量（2個）と合わなければ照合できない
+    let e = run(
+        &mut s,
+        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":1}),
+    )
+    .unwrap_err();
+    assert!(e.contains("合いません"), "{e}");
     ok(
         &mut s,
-        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"checked":true}),
+        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2}),
     );
     ok(
         &mut s,
         json!({"type":"checkout","register":2,"side":"staff"}),
     );
     confirm_point(&mut s, 2);
-    // 会計画面ではチェックを外せない
+    // 会計画面では照合し直せない
     assert!(run(
         &mut s,
-        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"checked":false})
+        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2})
     )
     .is_err());
     assert_eq!(
@@ -901,7 +908,7 @@ fn attended_screens_lock_only_while_touched() {
     assert!(!allowed(&v, Side::Staff, Action::Checkout));
     assert!(allowed(&v, Side::Staff, Action::CheckFf));
     let ids: Vec<u32> = v.staff.lines.iter().map(|l| l.line.id).collect();
-    let check = |id: u32, side: &str| json!({"type":"check_ff","register":1,"side":side,"line_id":id,"checked":true});
+    let check = |id: u32, side: &str| json!({"type":"check_ff","register":1,"side":side,"line_id":id,"handed":1});
     // 店員が触れた直後は、お客様画面からはチェックできない
     assert!(run(&mut s, check(ids[0], "customer")).is_err());
     ok(&mut s, check(ids[0], "staff"));
@@ -1124,7 +1131,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     let id = reg(&s, 1).customer.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"checked":true}),
+        json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"handed":1}),
     );
     ok(
         &mut s,
@@ -1161,7 +1168,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     let id = reg(&s, 1).customer.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"checked":true}),
+        json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"handed":1}),
     );
     ok(
         &mut s,
@@ -2097,4 +2104,64 @@ fn logout_and_pause_from_either_store_menu() {
     );
     ok(&mut s, json!({"type":"pause","register":1}));
     assert!(reg(&s, 1).paused);
+}
+
+/// お渡し済みの FF の数量を増やすとお渡し前に戻り、減らす・取り消すと店員側に回収の案内が出る
+#[test]
+fn changing_handed_ff_rewinds_or_asks_to_collect() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":2}),
+    );
+    let id = reg(&s, 1).staff.lines[0].line.id;
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":2}),
+    );
+    advance(&mut s, 1_000);
+    // 増やすとお渡し前に戻り、照合し直すまで会計に進めない
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
+    );
+    let v = reg(&s, 1);
+    assert!(matches!(
+        v.staff.lines[0].line.kind,
+        LineKind::Ff {
+            state: FfState::Waiting
+        }
+    ));
+    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":3}),
+    );
+    advance(&mut s, 1_000);
+    // 減らすと回収の案内（お渡し済みのまま）
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":2}),
+    );
+    let v = reg(&s, 1);
+    assert!(matches!(
+        v.staff.lines[0].line.kind,
+        LineKind::Ff {
+            state: FfState::Received
+        }
+    ));
+    assert_eq!(v.staff.ff_collect.len(), 1);
+    assert_eq!(v.staff.ff_collect[0].qty, 1);
+    ok(&mut s, json!({"type":"dismiss_ff_collect","register":1}));
+    assert!(reg(&s, 1).staff.ff_collect.is_empty());
+    // 取り消しても回収の案内
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+    );
+    assert_eq!(reg(&s, 1).staff.ff_collect[0].qty, 2);
 }

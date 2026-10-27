@@ -85,6 +85,8 @@ export interface StaffView {
   age_choice_pending: boolean;
   /** 年確で販売できず取り除いた商品（店員が回収する） */
   confiscated: { name: string; qty: number }[];
+  /** お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する） */
+  ff_collect: { name: string; qty: number }[];
   /** 会計に進んだが、適用先のないクーポンが残っている（決済できない） */
   coupon_unmatched: boolean;
   /** 取り消して、お客様に返却するクーポン */

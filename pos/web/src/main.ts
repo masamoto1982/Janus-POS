@@ -17,6 +17,8 @@ import {
   esc,
   FF_TABS,
   editing,
+  ffVerifying,
+  ffVerifyMsg,
   flashing,
   type FfUi,
   itemsPanel,
@@ -559,14 +561,6 @@ app.addEventListener("keydown", (e) => {
 
 app.addEventListener("change", (e) => {
   const sel = e.target as HTMLSelectElement;
-  if (sel.dataset.ffcheck) {
-    // お渡し確認のチェック。押した画面の側からの操作になる
-    const box = sel as unknown as HTMLInputElement;
-    const [reg, line] = box.dataset.ffcheck!.split(":").map(Number);
-    const side = box.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "staff";
-    if (!send({ type: "check_ff", register: reg, side, line_id: line, checked: box.checked })) box.checked = !box.checked;
-    return;
-  }
   if (sel.dataset.bellOn) {
     const box = sel as unknown as HTMLInputElement;
     if (!send({ type: "set_bell_on", mat: Number(box.dataset.bellOn), on: box.checked })) box.checked = !box.checked;
@@ -717,7 +711,45 @@ app.addEventListener("click", (e) => {
     frame();
     return;
   }
-  // 明細の「変更」：行を広げて個数変更・取り消し（登録画面の中で完結。コアには決めたときだけ送る）
+  // FF の「お渡し前」：お渡し照合の画面を開く（登録画面を置き換える）
+  if (b.dataset.ffverify) {
+    ffVerifying.add(b.dataset.ffverify);
+    ffVerifyMsg.delete(b.dataset.ffverify);
+    editing.delete(b.dataset.ffverify);
+    frame();
+    return;
+  }
+  if (b.dataset.ffverifyClose) {
+    ffVerifying.delete(b.dataset.ffverifyClose);
+    ffVerifyMsg.delete(b.dataset.ffverifyClose);
+    frame();
+    return;
+  }
+  // 照合する：入力したお渡し個数を FF ごとに送る。数量と合った FF だけお渡し済みになる
+  if (b.dataset.ffverifySubmit) {
+    const key = b.dataset.ffverifySubmit;
+    const [reg, side] = key.split(":");
+    const box = b.closest(".ffv-screen");
+    const inputs = [...(box?.querySelectorAll<HTMLInputElement>("[data-ffv-line]") ?? [])];
+    if (inputs.some((i) => i.value.trim() === "")) {
+      ffVerifyMsg.set(key, "すべての商品のお渡し個数を入力してください");
+      frame();
+      return;
+    }
+    const wrong: string[] = [];
+    for (const i of inputs) {
+      const ok = send({ type: "check_ff", register: Number(reg), side, line_id: Number(i.dataset.ffvLine), handed: Number(i.value) });
+      if (!ok) wrong.push(i.getAttribute("aria-label")?.replace(/の(お渡し|お受け取り)個数$/, "") ?? "");
+    }
+    if (wrong.length) ffVerifyMsg.set(key, `${wrong.join("・")}：個数が合いません。もう一度数えてください`);
+    else {
+      ffVerifying.delete(key);
+      ffVerifyMsg.delete(key);
+    }
+    frame();
+    return;
+  }
+  // 明細の数量ボタン：行を広げて数量変更・取り消し（登録画面の中で完結。コアには決めたときだけ送る）
   if (b.dataset.edit) {
     const [reg, side, id, qty] = b.dataset.edit.split(":");
     const key = `${reg}:${side}`;

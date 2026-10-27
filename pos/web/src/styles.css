@@ -584,6 +584,9 @@ body.dragging .drop-hint { display: inline; }
 button.danger { color: var(--danger); border-color: var(--border); background: var(--danger-bg); }
 
 .emoney-choices { display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: min(100%, 280px); margin: 0 auto; }
+/* チャージと残高確認は横に並べ、やめるは次の行に置く */
+.emoney-choices.row { display: grid; grid-template-columns: 1fr 1fr; width: 280px; max-width: 100%; margin-bottom: 8px; }
+.emoney-choices.row > * { white-space: nowrap; }
 .emoney-screen .emoney-balance { font-size: 28px; font-variant-numeric: tabular-nums; }
 
 /* 取引中止：明細の上の帯に控えめに置く（会計ボタンから離す）。確認画面で「長押しで中止」を押し続けて決まる */

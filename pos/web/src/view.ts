@@ -4,6 +4,7 @@
 
 import type {
   ActionState,
+  Unavailable,
   Coupon,
   Returned,
   Command,
@@ -219,8 +220,8 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 /** 支払方法を選んだ後の案内 */
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
-  // 現金のみの商品（切手・代行収納）があれば、キャッシュレスで払う額と現金で払う額をかざす前に見せる
-  // （かざし方は入金ボックスの点滅する案内に任せ、ここは金額の内訳だけにする）
+  // 現金のみの商品（切手・代行収納）があれば、電子マネーで払う額と現金で払う額をかざす前に見せる
+  // （現金と併用できるのは電子マネーだけ。かざし方は入金ボックスの点滅する案内に任せ、ここは金額の内訳だけにする）
   if (method && method !== "cash" && cashlessDue < due)
     return `<p>${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
   if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、入金ボックスにかざしてください</p>`;
@@ -236,12 +237,15 @@ function payHint(method: string | null, blocker: string | null, inserted: number
  * 支払方法の選択肢。現金は入れただけで支払方法が現金に決まるので、入れた後は出さない
  * （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）
  */
-function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = "", cashlessDue = 1): string {
+function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = "", unavailable: Unavailable[] = []): string {
   if (method === "cash" && inserted) return "";
-  // 現金のみの商品（切手・代行収納）しか残っていなければ、キャッシュレスは選べない
-  const off: ActionState = { action: st.action, allowed: false, reason: CASH_ONLY_NOTE };
+  // 決済の組み合わせの原則で使えない支払方法は押せなくする（理由は core が返す）
+  const off = (m: string): ActionState => {
+    const u = unavailable.find((x) => x.method === m);
+    return u ? { action: st.action, allowed: false, reason: u.reason } : st;
+  };
   return `<div class="row wrap ${cls}">${METHODS
-    .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, m !== "cash" && !cashlessDue ? off : st, `seg ${method === m ? "on" : ""}`))
+    .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, off(m), `seg ${method === m ? "on" : ""}`))
     .join("")}</div>`;
 }
 
@@ -251,9 +255,9 @@ const CASH_ONLY_NOTE = "現金のみの商品（切手・お支払い）は現�
  * 有人モードのお客様側：支払方法の一覧を見せるだけ（選ぶのは店員）。電子マネーとバーコード決済、
  * 電子マネーとポイントを取り違えるお客様が多いので、現金以外は店員を介して決める
  */
-function methodList(method: string | null, inserted: number, cashlessDue = 1): string {
+function methodList(method: string | null, inserted: number, unavailable: Unavailable[] = []): string {
   if (method === "cash" && inserted) return "";
-  return `<div class="row wrap method-list">${METHODS.map((m) => `<span class="seg ${method === m ? "on" : ""}${m !== "cash" && !cashlessDue ? " off" : ""}">${METHOD_LABEL[m]}</span>`).join("")}</div>`;
+  return `<div class="row wrap method-list">${METHODS.map((m) => `<span class="seg ${method === m ? "on" : ""}${unavailable.some((u) => u.method === m) ? " off" : ""}">${METHOD_LABEL[m]}</span>`).join("")}</div>`;
 }
 
 /**
@@ -619,7 +623,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const pay = payStage
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
-        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.cashless_due) : methodList(v.method, v.inserted, r.cashless_due)}
+        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : methodList(v.method, v.inserted, r.unavailable)}
         ${r.prepaid && !v.inserted && !v.payment_blocker ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due) : cashOnlyNote(r)}
       </div>`
     : agePending
@@ -828,7 +832,7 @@ function prepaidNote(r: RegisterView, due: number): string {
 function cashOnlyNote(r: RegisterView): string {
   if (!r.cash_only || r.prepaid) return "";
   return r.cashless_due
-    ? `<p>切手・お支払いの <b>${yen(r.cash_only)}</b> は現金のみ。キャッシュレスは <b>${yen(r.cashless_due)}</b> まで</p>`
+    ? `<p>切手・お支払いの <b>${yen(r.cash_only)}</b> は現金のみ（併用できるのは電子マネー）</p>`
     : `<p>${CASH_ONLY_NOTE}</p>`;
 }
 
@@ -1089,7 +1093,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
     return screen(`<div class="paybox center">
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.cashless_due)}${r.prepaid && !c.inserted && !c.payment_blocker ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due)}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due)}
       </div>`);
   if (ffVerifying.has(`${reg}:${side}`) && ffVerifyRows(reg, side, c.lines).length)
     return screen(ffVerifyScreen(reg, side, c.lines, true));

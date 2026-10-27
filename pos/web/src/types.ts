@@ -171,6 +171,7 @@ export interface RegisterView {
   prepaid_method: string | null;
   cash_only: number;
   cashless_due: number;
+  unavailable: Unavailable[];
   last_receipt: Receipt | null;
 }
 
@@ -222,3 +223,8 @@ export interface Snapshot {
 }
 
 export type Command = { type: string; [k: string]: unknown };
+
+export interface Unavailable {
+  method: string;
+  reason: string;
+}

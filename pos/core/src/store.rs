@@ -27,6 +27,9 @@ pub const MAX_MATS: u8 = 5;
 /// お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収が要る）
 const FF_RECEIVED_SELF: &str = "お渡し済みの FF の数量は係員が変更します。係員をお呼びください";
 const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現金でお支払いください";
+const NO_CASH_MIX: &str =
+    "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）";
+const NO_POINTS: &str = "切手・お支払い・たばこにはポイントを使えません";
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
 
@@ -689,6 +692,24 @@ impl Txn {
     /// これから払う額のうち、キャッシュレスで払える分（現金のみの商品を除く）
     fn cashless_due(&self) -> u32 {
         self.due().saturating_sub(self.cash_only())
+    }
+
+    /// その支払方法が使えない理由（使えれば None）。決済の組み合わせの原則（有人・セミセルフ共通）：
+    /// 現金と併用できるのは電子マネーだけ。クレジットカード・バーコード決済は現金と併用できないので、
+    /// 現金のみの商品（切手・代行収納）がある取引では使えない。ポイントは現金のみの商品とたばこには使えない
+    fn method_refusal(&self, m: PaymentMethod) -> Option<&'static str> {
+        match m {
+            PaymentMethod::Cash => None,
+            _ if self.cashless_due() == 0 => Some(CASH_ONLY),
+            PaymentMethod::Qr | PaymentMethod::Credit if self.cash_only() > 0 => Some(NO_CASH_MIX),
+            PaymentMethod::Points
+                if self.cash_only() > 0
+                    || self.lines.iter().any(|l| l.category == Category::Tobacco) =>
+            {
+                Some(NO_POINTS)
+            }
+            _ => None,
+        }
     }
 
     /// 税率ごとの対象額と内税額（インボイス：税率ごとに合計してから 1 回だけ端数処理する）。
@@ -1503,8 +1524,8 @@ impl Store {
                 if r.txn.inserted.total() > 0 && method != PaymentMethod::Cash {
                     return Err("現金が投入済みです。現金でお支払いください".into());
                 }
-                if method != PaymentMethod::Cash && r.txn.cashless_due() == 0 {
-                    return Err(CASH_ONLY.into());
+                if let Some(why) = r.txn.method_refusal(method) {
+                    return Err(why.into());
                 }
                 r.txn.method = Some(method);
                 // ポイント利用なのにポイントカードが読まれていなければ、ポイントカードの確認に差し戻す
@@ -1656,15 +1677,17 @@ impl Store {
                     return Err(CASH_ONLY.into());
                 }
                 if part < due {
-                    if method == PaymentMethod::Emoney {
-                        if balance < part {
-                            r.txn.emoney_short = true;
-                            return done(format!(
-                                "電子マネーの残高が足りません（残高 {balance}円・お支払い {part}円）"
-                            ));
-                        }
-                        self.emoney_balance -= part;
+                    // 現金と併用できるのは電子マネーだけ
+                    if method != PaymentMethod::Emoney {
+                        return Err(NO_CASH_MIX.into());
                     }
+                    if balance < part {
+                        r.txn.emoney_short = true;
+                        return done(format!(
+                            "電子マネーの残高が足りません（残高 {balance}円・お支払い {part}円）"
+                        ));
+                    }
+                    self.emoney_balance -= part;
                     let r = self.reg_mut(register)?;
                     r.txn.prepaid += part;
                     r.txn.prepaid_method = Some(method);
@@ -3102,6 +3125,18 @@ impl Store {
                 .map(PaymentMethod::label),
             cash_only: t.cash_only(),
             cashless_due: t.cashless_due(),
+            unavailable: [
+                PaymentMethod::Emoney,
+                PaymentMethod::Qr,
+                PaymentMethod::Credit,
+                PaymentMethod::Points,
+            ]
+            .into_iter()
+            .filter_map(|m| {
+                t.method_refusal(m)
+                    .map(|reason| Unavailable { method: m, reason })
+            })
+            .collect(),
             last_receipt: r.last_receipt.clone(),
         }
     }
@@ -3269,7 +3304,15 @@ pub struct RegisterView {
     pub cash_only: u32,
     /// これから払う額のうち、キャッシュレスで払える分
     pub cashless_due: u32,
+    /// いまの取引で使えない支払方法とその理由
+    pub unavailable: Vec<Unavailable>,
     pub last_receipt: Option<Receipt>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Unavailable {
+    pub method: PaymentMethod,
+    pub reason: &'static str,
 }
 
 #[derive(Clone, Debug, Serialize)]

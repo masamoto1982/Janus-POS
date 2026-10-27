@@ -26,6 +26,7 @@ pub const MAX_MATS: u8 = 5;
 
 /// お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収が要る）
 const FF_RECEIVED_SELF: &str = "お渡し済みの FF の数量は係員が変更します。係員をお呼びください";
+const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現金でお支払いください";
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
 
@@ -569,6 +570,8 @@ pub struct Line {
     pub tax: String,
     pub rate_bp: u32,
     pub category: Category,
+    /// 現金でしか払えない（切手・代行収納）
+    pub cash_only: bool,
     #[serde(flatten)]
     pub kind: LineKind,
 }
@@ -608,8 +611,11 @@ struct Txn {
     inserted: Cash,
     /// セミセルフで店員が会計に進め、お客様に支払いを任せている（店員が名札を読むと解除）
     customer_turn: bool,
-    /// 電子マネーで先に払った額（残高不足で「残りを現金で払う」を選んだとき）
-    emoney_paid: u32,
+    /// キャッシュレスで先に払った額（電子マネーの残高不足で「不足分を現金で払う」を選んだとき、
+    /// または現金のみの商品（切手・代行収納）を除いた分をキャッシュレスで払ったとき）。残りは現金で払う
+    prepaid: u32,
+    /// 先に払ったキャッシュレスの種類
+    prepaid_method: Option<PaymentMethod>,
     /// 電子マネーで払おうとしたが残高が足りず、どうするか選んでいない
     emoney_short: bool,
     /// 「不足分を現金で払う」を選んだ（残高を引き出し、残りを現金で払う）
@@ -666,9 +672,23 @@ impl Txn {
         gross.saturating_sub(self.discount_of(None))
     }
 
-    /// これから払う額（電子マネーで先に払った分を除く）
+    /// これから払う額（キャッシュレスで先に払った分を除く）
     fn due(&self) -> u32 {
-        self.total().saturating_sub(self.emoney_paid)
+        self.total().saturating_sub(self.prepaid)
+    }
+
+    /// 現金でしか払えない商品（切手・代行収納）の合計
+    fn cash_only(&self) -> u32 {
+        self.lines
+            .iter()
+            .filter(|l| l.cash_only)
+            .map(Line::amount)
+            .sum()
+    }
+
+    /// これから払う額のうち、キャッシュレスで払える分（現金のみの商品を除く）
+    fn cashless_due(&self) -> u32 {
+        self.due().saturating_sub(self.cash_only())
     }
 
     /// 税率ごとの対象額と内税額（インボイス：税率ごとに合計してから 1 回だけ端数処理する）。
@@ -808,6 +828,7 @@ impl Txn {
             tax: tax.0,
             rate_bp: tax.1,
             category: p.category,
+            cash_only: p.cash_only,
             kind,
         });
     }
@@ -1251,8 +1272,10 @@ impl Store {
             r.outlet.merge(&inserted);
         }
         r.emoney = None;
-        // 電子マネーで先に払った分は、電子マネーに戻す
-        self.emoney_balance += txn.emoney_paid;
+        // 電子マネーで先に払った分は、電子マネーに戻す（ほかのキャッシュレスは取り消す）
+        if txn.prepaid_method == Some(PaymentMethod::Emoney) {
+            self.emoney_balance += txn.prepaid;
+        }
         for l in &txn.lines {
             if l.kind
                 == (LineKind::Ff {
@@ -1462,8 +1485,8 @@ impl Store {
             C::BackToRegistering { register, side } => {
                 self.check(register, side, Action::BackToRegistering)?;
                 let r = self.reg_mut(register)?;
-                if r.txn.emoney_paid > 0 {
-                    return Err("電子マネーで一部お支払い済みです。残りをお支払いください".into());
+                if r.txn.prepaid > 0 {
+                    return Err("一部お支払い済みです。残りを現金でお支払いください".into());
                 }
                 r.txn.paying = false;
                 r.txn.method = None;
@@ -1479,6 +1502,9 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 if r.txn.inserted.total() > 0 && method != PaymentMethod::Cash {
                     return Err("現金が投入済みです。現金でお支払いください".into());
+                }
+                if method != PaymentMethod::Cash && r.txn.cashless_due() == 0 {
+                    return Err(CASH_ONLY.into());
                 }
                 r.txn.method = Some(method);
                 // ポイント利用なのにポイントカードが読まれていなければ、ポイントカードの確認に差し戻す
@@ -1599,10 +1625,11 @@ impl Store {
                     if !r.txn.emoney_partial_ok {
                         return Err("案内を確認してから、電子マネーをかざしてください".into());
                     }
-                    let drawn = balance.min(r.txn.due());
+                    let drawn = balance.min(r.txn.cashless_due());
                     r.txn.emoney_partial = false;
                     r.txn.emoney_partial_ok = false;
-                    r.txn.emoney_paid += drawn;
+                    r.txn.prepaid += drawn;
+                    r.txn.prepaid_method = Some(PaymentMethod::Emoney);
                     r.txn.method = Some(PaymentMethod::Cash);
                     let due = r.txn.due();
                     self.emoney_balance -= drawn;
@@ -1623,6 +1650,31 @@ impl Store {
                 }
                 let method = chosen;
                 let due = r.txn.due();
+                // 現金のみの商品（切手・代行収納）があれば、キャッシュレスで払うのはそれを除いた分だけ。残りは現金で
+                let part = r.txn.cashless_due();
+                if part == 0 {
+                    return Err(CASH_ONLY.into());
+                }
+                if part < due {
+                    if method == PaymentMethod::Emoney {
+                        if balance < part {
+                            r.txn.emoney_short = true;
+                            return done(format!(
+                                "電子マネーの残高が足りません（残高 {balance}円・お支払い {part}円）"
+                            ));
+                        }
+                        self.emoney_balance -= part;
+                    }
+                    let r = self.reg_mut(register)?;
+                    r.txn.prepaid += part;
+                    r.txn.prepaid_method = Some(method);
+                    r.txn.method = Some(PaymentMethod::Cash);
+                    let rest = r.txn.due();
+                    return done(format!(
+                        "{}で {part}円 お支払いしました。残り {rest}円（現金のみの商品）を現金でお支払いください",
+                        method.label()
+                    ));
+                }
                 if method == PaymentMethod::Emoney {
                     if balance < due {
                         // 残高不足：やめる・残りを現金で払う・チャージするから選んでもらう
@@ -1716,9 +1768,10 @@ impl Store {
                     ShortChoice::Cash => {
                         // すぐには引き落とさない：かざしたままの電子マネーで、案内を見ないうちに決済が走らないように
                         r.txn.emoney_partial = true;
-                        let rest = r.txn.due().saturating_sub(balance);
+                        let drawn = balance.min(r.txn.cashless_due());
+                        let rest = r.txn.due().saturating_sub(drawn);
                         done(format!(
-                            "電子マネーの残高 {balance}円を引き出し、残り {rest}円を現金でお支払いいただきます"
+                            "電子マネーの残高 {drawn}円を引き出し、残り {rest}円を現金でお支払いいただきます"
                         ))
                     }
                     ShortChoice::CashConfirmed => unreachable!(),
@@ -2550,10 +2603,12 @@ impl Store {
             no,
             at: now,
             total,
-            method: if txn.emoney_paid > 0 {
-                "電子マネー・現金"
-            } else {
-                method.label()
+            method: match txn.prepaid_method.filter(|_| txn.prepaid > 0) {
+                Some(PaymentMethod::Emoney) => "電子マネー・現金",
+                Some(PaymentMethod::Qr) => "バーコード決済・現金",
+                Some(PaymentMethod::Credit) => "クレジットカード・現金",
+                Some(PaymentMethod::Points) => "ポイント利用・現金",
+                _ => method.label(),
             },
             paid,
             change_total: change.total(),
@@ -2931,6 +2986,7 @@ impl Store {
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
                 limit: self.age_rules.limit_for(l.code),
+                cash_only: l.cash_only,
                 kind: l.kind,
             })
             .collect();
@@ -3035,9 +3091,17 @@ impl Store {
                 },
             }),
             emoney_short: t.emoney_short.then_some(self.emoney_balance),
-            emoney_partial: t.emoney_partial.then_some(self.emoney_balance),
+            emoney_partial: t
+                .emoney_partial
+                .then_some(self.emoney_balance.min(t.cashless_due())),
             emoney_partial_ok: t.emoney_partial_ok,
-            emoney_paid: t.emoney_paid,
+            prepaid: t.prepaid,
+            prepaid_method: t
+                .prepaid_method
+                .filter(|_| t.prepaid > 0)
+                .map(PaymentMethod::label),
+            cash_only: t.cash_only(),
+            cashless_due: t.cashless_due(),
             last_receipt: r.last_receipt.clone(),
         }
     }
@@ -3076,6 +3140,8 @@ pub struct CustomerLine {
     pub amount: u32,
     pub age: Option<u8>,
     pub limit: Option<u32>,
+    /// 現金でしか払えない（切手・代行収納）
+    pub cash_only: bool,
     #[serde(flatten)]
     pub kind: LineKind,
 }
@@ -3195,8 +3261,14 @@ pub struct RegisterView {
     pub emoney_partial: Option<u32>,
     /// その案内を確認済みで、電子マネーをかざすのを待っている
     pub emoney_partial_ok: bool,
-    /// このお会計で電子マネーから払った額（残りを現金で払うとき）
-    pub emoney_paid: u32,
+    /// このお会計でキャッシュレスで先に払った額（残りを現金で払うとき）
+    pub prepaid: u32,
+    /// 先に払ったキャッシュレスの名前
+    pub prepaid_method: Option<&'static str>,
+    /// 現金でしか払えない商品（切手・代行収納）の合計
+    pub cash_only: u32,
+    /// これから払う額のうち、キャッシュレスで払える分
+    pub cashless_due: u32,
     pub last_receipt: Option<Receipt>,
 }
 

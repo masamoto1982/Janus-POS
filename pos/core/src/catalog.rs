@@ -38,6 +38,8 @@ pub enum Category {
     FastFood,
     Bag,
     Service,
+    /// 切手（現金でしか売れない）
+    Stamp,
 }
 
 impl Category {
@@ -58,6 +60,7 @@ impl Category {
             Category::FastFood => "FF",
             Category::Bag => "レジ袋",
             Category::Service => "サービス",
+            Category::Stamp => "切手",
         }
     }
 
@@ -93,6 +96,9 @@ pub struct Product {
     pub needs_staff: bool,
     /// 受付した内容・金額を、お客様本人がお客様側の画面で確認する（代行収納）
     pub customer_confirms: bool,
+    /// 現金でしか払えない（切手・代行収納）。ほかの商品と一緒に買えるが、
+    /// キャッシュレスで払えるのはこれを除いた分だけ（有人・セミセルフ共通）
+    pub cash_only: bool,
 }
 
 const fn p(
@@ -110,6 +116,7 @@ const fn p(
         category,
         needs_staff: matches!(category, Category::Service),
         customer_confirms: false,
+        cash_only: matches!(category, Category::Stamp),
     }
 }
 
@@ -134,6 +141,8 @@ pub const CATALOG: &[Product] = &[
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),
     // 店舗判断の年確のデモ：ライターは店舗ルールの初期値 20 歳
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
+    // 切手は現金でしか売れない（消費税は非課税）
+    p("4900000000141", "切手", 110, Standard10, Stamp),
     // レジまわり（カトラリー・レジ袋）とサービス（お客様が持ち込む荷物・払込票）
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
@@ -144,6 +153,7 @@ pub const CATALOG: &[Product] = &[
     p("2100000000038", "荷物を受取る", 0, Standard10, Service),
     Product {
         customer_confirms: true,
+        cash_only: true,
         ..p("2100000000021", "お支払い", 0, Standard10, Service)
     },
     // FF（バーコードなし。レジ画面下のタブから登録する）

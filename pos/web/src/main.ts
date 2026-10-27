@@ -312,7 +312,7 @@ function render(): void {
       const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null && r.emoney_partial === null;
       // 電子マネーのチャージ・残高確認の間は、その手続きの案内を出す
       const emoney = r.menu ? null : r.emoney;
-      // 「不足分を現金で払う」では、まず電子マネーをかざしてもらう
+      // 「不足分を現金で払う」では、先に現金を入れ、そのあと電子マネーをかざしてもらう
       const partial = !r.menu && r.emoney_partial !== null;
       inlet.classList.toggle("blink", paying || partial || (!!emoney && emoney.kind !== "menu"));
       // 中の文字は、選んだ支払方法に合わせて何をすればよいかを示す
@@ -323,7 +323,7 @@ function render(): void {
             : "紙幣を入れる"
           : "電子マネーをかざす"
         : partial
-          ? "電子マネーをかざす"
+          ? (r.staff.inserted >= Math.max(0, r.staff.due - r.emoney_partial!) ? "電子マネーをかざす" : "現金を入れる")
           : paying
           ? (INLET_HINT[r.staff.method!] ?? "入金")
           : "入金";

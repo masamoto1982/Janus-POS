@@ -762,13 +762,17 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   const actions = r.mode === "semi_self" ? r.customer.actions : r.staff.actions;
   const close = (label: string) => (ro ? "" : btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip"));
   if (r.emoney_partial !== null) {
-    // 「不足分を現金で払う」：かざしてもらい残高を引き出してから、残りを現金で
-    const back = ro ? "" : btn("他の決済を使う", { type: "resolve_emoney_short", register: reg, side, choice: "cancel" }, find(actions, "resolve_emoney_short"), "skip");
-    return `<div class="point-screen emoney-screen">
-        <div class="big">電子マネーを入金ボックスにかざしてください</div>
-        <p>残高 <b>${yen(r.emoney_partial)}</b> を引き出し、残り <b>${yen(r.staff.due - r.emoney_partial)}</b> を現金でお支払いいただきます</p>
-        ${back}
-      </div>`;
+    // 「不足分を現金で払う」：先に不足分の現金を入れてもらい、電子マネーはそのあとでかざしてもらう
+    // （先に引き落とすと、現金が足りないと分かったときに戻せない）
+    const short = Math.max(0, r.staff.due - r.emoney_partial);
+    const inserted = r.staff.inserted;
+    const back = ro ? "" : `<div class="ffv-foot">${btn("他の決済を使う", { type: "resolve_emoney_short", register: reg, side, choice: "cancel" }, find(actions, "resolve_emoney_short"), "skip")}</div>`;
+    const body = inserted < short
+      ? `<div class="big">不足分 ${yen(short)} を現金で入れてください</div>
+        <p>${inserted ? `${yen(inserted)} お預かり（あと <b>${yen(short - inserted)}</b>）。` : ""}現金が入ったら電子マネーをかざしてください。残高 <b>${yen(r.emoney_partial)}</b> でお支払いが完了します</p>`
+      : `<div class="big">電子マネーを入金ボックスにかざしてください</div>
+        <p>現金 <b>${yen(inserted)}</b> お預かり。電子マネーの残高 <b>${yen(r.emoney_partial)}</b> でお支払いが完了します</p>`;
+    return `<div class="point-screen emoney-screen">${body}${back}</div>`;
   }
   if (r.emoney_short !== null) {
     const st = find(actions, "resolve_emoney_short");

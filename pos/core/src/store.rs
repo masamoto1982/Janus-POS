@@ -1585,22 +1585,30 @@ impl Store {
                 if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
                     return self.tap_emoney_task(register, method);
                 }
-                // 「不足分を現金で払う」：かざした電子マネーから引き出せるだけ引き出し、残りを現金で
+                // 「不足分を現金で払う」：不足分の現金が入ってから、かざした電子マネーの残高を引き出して決済する
+                // （先に引き出すと、現金が足りないと分かったときに戻せない）
                 if self.reg(register).is_some_and(|r| r.txn.emoney_partial) {
                     if method.is_some_and(|m| m != PaymentMethod::Emoney) {
                         return Err("電子マネーをかざしてください".into());
                     }
                     let balance = self.emoney_balance;
                     let r = self.reg_mut(register)?;
-                    let drawn = balance.min(r.txn.due());
+                    let due = r.txn.due();
+                    let short = due.saturating_sub(balance);
+                    let paid = r.txn.inserted.total();
+                    if paid < short {
+                        return Err(format!(
+                            "先に不足分の現金を入れてください（あと {}円）",
+                            short - paid
+                        ));
+                    }
+                    let drawn = balance.min(due);
                     r.txn.emoney_partial = false;
                     r.txn.emoney_paid += drawn;
                     r.txn.method = Some(PaymentMethod::Cash);
-                    let due = r.txn.due();
+                    let inserted = r.txn.inserted.clone();
                     self.emoney_balance -= drawn;
-                    return done(format!(
-                        "電子マネーで {drawn}円 お支払いしました。残り {due}円を現金でお支払いください"
-                    ));
+                    return self.settle(register, PaymentMethod::Cash, paid, inserted);
                 }
                 self.check(register, Side::Customer, Action::TapEmoney)?;
                 let balance = self.emoney_balance;
@@ -1695,14 +1703,22 @@ impl Store {
                 match choice {
                     ShortChoice::Cancel => {
                         r.txn.method = None;
+                        // 不足分として入れた現金はお返しする
+                        let back = std::mem::take(&mut r.txn.inserted);
+                        let n = back.total();
+                        r.outlet.merge(&back);
+                        if n > 0 {
+                            return done(format!(
+                                "電子マネーを使うのをやめました。{n}円を出金ボックスから取り出し、お支払い方法を選んでください"
+                            ));
+                        }
                         done("電子マネーを使うのをやめました。お支払い方法を選んでください")
                     }
                     ShortChoice::Cash => {
-                        // 残高はかざしてもらってから引き出す
+                        // 先に不足分の現金を入れてもらい、電子マネーはそのあとでかざしてもらう
                         r.txn.emoney_partial = true;
-                        done(format!(
-                            "電子マネーを入金ボックスにかざしてください（残高 {balance}円を引き出します）"
-                        ))
+                        let short = r.txn.due().saturating_sub(balance);
+                        done(format!("不足分 {short}円を現金で入れてください"))
                     }
                     ShortChoice::Charge => {
                         r.emoney = Some(EmoneyTask::Charge {
@@ -2430,6 +2446,17 @@ impl Store {
             Some(_) => Err("この画面ではお金を受け付けません".into()),
             None if self.reg(register).is_some_and(|r| r.emoney.is_some()) => {
                 self.charge_cash(register, Cash::from_amount(amount))
+            }
+            None if self.reg(register).is_some_and(|r| r.txn.emoney_partial) => {
+                let balance = self.emoney_balance;
+                let r = self.reg_mut(register)?;
+                r.txn.inserted.merge(&Cash::from_amount(amount));
+                let paid = r.txn.inserted.total();
+                let short = r.txn.due().saturating_sub(balance);
+                if paid < short {
+                    return done(format!("{paid}円 投入（あと {}円）", short - paid));
+                }
+                done(format!("{paid}円 投入。電子マネーをかざしてください"))
             }
             None => {
                 self.check(register, Side::Customer, Action::InsertCash)?;

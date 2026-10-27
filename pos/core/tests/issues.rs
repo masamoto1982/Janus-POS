@@ -2020,42 +2020,58 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.customer.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
-    // 不足分を現金で：電子マネーをかざして残高を引き出し、残り 120 円を現金で
+    // 不足分を現金で：先に不足分 120 円の現金を入れ、そのあと電子マネーをかざして残高で決済する
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     ok(
         &mut s,
         json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
     );
-    let v = reg(&s, 1);
-    assert_eq!(v.emoney_partial, Some(1_000));
-    assert_eq!(emoney_balance(&s), 1_000, "かざすまでは引き出さない");
+    assert_eq!(reg(&s, 1).emoney_partial, Some(1_000));
     assert!(
-        run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err(),
-        "先に電子マネーをかざす"
+        run(
+            &mut s,
+            json!({"type":"tap_emoney","register":1,"method":"emoney"})
+        )
+        .is_err(),
+        "現金が入るまでは引き出さない"
     );
+    assert_eq!(emoney_balance(&s), 1_000);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"tap_emoney","register":1,"method":"emoney"})
+        )
+        .is_err(),
+        "まだ足りない"
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     ok(
         &mut s,
         json!({"type":"tap_emoney","register":1,"method":"emoney"}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.emoney_partial, None);
-    assert_eq!(v.customer.due, 120);
-    assert_eq!(v.emoney_paid, 1_000);
     assert_eq!(emoney_balance(&s), 0);
-    assert!(
-        run(
-            &mut s,
-            json!({"type":"back_to_registering","register":1,"side":"customer"})
-        )
-        .is_err(),
-        "電子マネーで払った後は登録に戻れない"
-    );
-    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
-    ok(&mut s, json!({"type":"finish_insert","register":1}));
-    let v = reg(&s, 1);
-    assert_eq!(v.outlet, 880);
+    assert_eq!(v.outlet, 980);
     assert_eq!(v.last_receipt.unwrap().method, "電子マネー・現金");
+
+    // 現金が足りないと分かったら：やめれば入れた現金は戻り、電子マネーは引き落とされない
+    let mut s = Store::new(1, 2, 1);
+    short_checkout(&mut s);
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.outlet, 100);
+    assert_eq!(v.emoney_partial, None);
+    assert_eq!(emoney_balance(&s), 1_000);
 
     // セミセルフではチャージを選べない
     let mut s = Store::new(1, 2, 1);

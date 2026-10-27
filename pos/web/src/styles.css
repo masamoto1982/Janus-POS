@@ -183,12 +183,10 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 /* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */
-.lines.cols4 { table-layout: fixed; }
-.lines.cols4 td { overflow-wrap: anywhere; }
-.lines.cols4 col.c-qty { width: 44px; }
-.lines.cols4 col.c-amt { width: 60px; }
-.lines.cols4 col.c-warn { width: 60px; }
-.lines .warn-marks { display: flex; flex-wrap: wrap; gap: 2px 4px; }
+.lines.cols3 { table-layout: fixed; }
+.lines.cols3 td { overflow-wrap: anywhere; }
+.lines.cols3 col.c-qty { width: 44px; }
+.lines.cols3 col.c-amt { width: 60px; }
 .lines th { text-align: left; font-weight: 500; font-size: 12px; color: var(--msg-weak); }
 .lines th.num { text-align: right; }
 .lines td, .lines th { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }

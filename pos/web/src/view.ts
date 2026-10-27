@@ -225,19 +225,22 @@ function methodList(method: string | null, inserted: number): string {
 }
 
 /**
- * 明細の列：品目・数量・小計・注意のしるし（年確・限定）。数量はボタンの形で、押すと数量変更・取り消しの行が広がる。
+ * 明細の列：品目・数量・小計。数量はボタンの形で、押すと数量変更・取り消しの行が広がる。
  * 押せない画面でも同じ幅にし、店員側とお客様側で列の位置がずれないようにする
  */
-const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /><col class="c-warn" /></colgroup>`;
+const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /></colgroup>`;
 
 // 内税の表示（有人・セミセルフ共通）
 function taxNote(v: { taxes: TaxTotal[] }): string {
   return `<span class="muted tax-note">内税 ${v.taxes.map((t) => `${esc(t.rate)} ${yen(t.tax)}`).join(" / ")}</span>`;
 }
 
-function warnCell(l: { age: number | null; limit: number | null }): string {
-  const marks = [l.age ? `<span class="tag age">年確${l.age}</span>` : "", l.limit ? `<span class="tag age">限定${l.limit}</span>` : ""];
-  return `<td class="warn-cell"><div class="warn-marks">${marks.join("")}</div></td>`;
+/**
+ * 注意のしるし（年確・限定）。品目の横、FF のお渡し前・お渡し済と同じ位置に出す
+ * （年確が要る FF はないので重ならず、専用の列を持たずに済む）
+ */
+function warnTags(l: { age: number | null; limit: number | null }): string {
+  return [l.age ? `<span class="tag age">年確${l.age}</span>` : "", l.limit ? `<span class="tag age">限定${l.limit}</span>` : ""].filter(Boolean).join(" ");
 }
 
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
@@ -246,6 +249,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   const ro = side === "customer";
   if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
   if (l.kind === "service") tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
+  tags.push(warnTags(l));
   const remove = find(v.actions, "remove_line");
   let svc = "";
   if (l.kind === "service" && !l.done && !ro) {
@@ -258,7 +262,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${ro ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
-    <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>${warnCell(l)}
+    <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>
   </tr>${lineEditor(reg, side, l, remove)}`;
 }
 
@@ -295,7 +299,7 @@ function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind:
 }
 
 function editorRow(reg: number, side: Side, body: string): string {
-  return `<tr class="edit-row"><td colspan="4"><div class="edit-box">${body}<button class="small ghost" data-edit-close="${reg}:${side}">閉じる</button></div></td></tr>`;
+  return `<tr class="edit-row"><td colspan="3"><div class="edit-box">${body}<button class="small ghost" data-edit-close="${reg}:${side}">閉じる</button></div></td></tr>`;
 }
 
 /** 呼び出しの種類の短い表示（店員側画面） */
@@ -383,7 +387,7 @@ export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Actio
     c.id,
     `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${ro ? "1" : qtyBtn(reg, side, c.id, 1, st)}</td><td class="num">${
       c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
-    }</td><td></td></tr>${
+    }</td></tr>${
       !ro && editing.get(`${reg}:${side}`)?.id === c.id && st.allowed ? editorRow(reg, side, btn("取り消し", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small danger")) : ""
     }`,
   ]);
@@ -629,8 +633,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
     </div>
-    <table class="lines cols4">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th><th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
+    <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="3" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
 }
 
@@ -984,7 +988,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
             : "";
       const qty = c.phase === "registering" ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
       const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line")) : "";
-      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>${warnCell(l)}</tr>${editor}`];
+      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td></tr>${editor}`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
@@ -1027,7 +1031,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   ffVerifyMsg.delete(`${reg}:${side}`);
   return `${top}${notice}
     <div class="staff-head">${taxNote(c)}</div>
-    <table class="lines cols4">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+    <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------------

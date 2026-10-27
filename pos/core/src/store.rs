@@ -24,6 +24,9 @@ use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 pub const MAX_REGISTERS: u8 = 10;
 pub const MAX_MATS: u8 = 5;
 
+/// お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収が要る）
+const FF_RECEIVED_SELF: &str = "お渡し済みの FF の数量は係員が変更します。係員をお呼びください";
+
 // ---------------------------------------------------------------------------
 // コマンド
 // ---------------------------------------------------------------------------
@@ -258,6 +261,10 @@ pub enum Command {
     DismissConfiscated {
         register: u8,
     },
+    /// お渡し済みの FF を減らした・取り消した分の回収の案内を閉じる（店員が「回収しました」）
+    DismissFfCollect {
+        register: u8,
+    },
     /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない
     ConfirmBillPayment {
         register: u8,
@@ -452,6 +459,7 @@ impl Command {
             | C::ChooseAgeCheck { register, .. }
             | C::CheckId { register, .. }
             | C::DismissConfiscated { register }
+            | C::DismissFfCollect { register }
             | C::ConfirmBillPayment { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
@@ -588,6 +596,8 @@ struct Txn {
     verified_age: Option<u8>,
     /// 年確で販売できず、買い物から取り除いた商品（店員が回収する）
     confiscated: Vec<(&'static str, u32)>,
+    /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する。品名と個数）
+    ff_collect: Vec<(&'static str, u32)>,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
@@ -1404,7 +1414,18 @@ impl Store {
                     .iter()
                     .position(|l| l.id == line_id)
                     .ok_or("明細が見つかりません")?;
+                let received = r.txn.lines[i].kind
+                    == LineKind::Ff {
+                        state: FfState::Received,
+                    };
+                // お渡し済みの FF は店員がお客様から回収する。係員のいないセミセルフでは取り消せない
+                if received && r.staff_state() != StaffState::Ready {
+                    return Err(FF_RECEIVED_SELF.into());
+                }
                 let l = r.txn.lines.remove(i);
+                if received {
+                    r.txn.ff_collect.push((l.name, l.qty));
+                }
                 if l.kind
                     == (LineKind::Ff {
                         state: FfState::Waiting,
@@ -1522,6 +1543,11 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 r.txn.confiscated.clear();
                 done("販売できない商品を回収しました")
+            }
+            C::DismissFfCollect { register } => {
+                let r = self.reg_mut(register)?;
+                r.txn.ff_collect.clear();
+                done("FF を回収しました")
             }
             C::ConfirmBillPayment { register, side } => {
                 self.check(register, side, Action::ConfirmBillPayment)?;
@@ -1942,11 +1968,16 @@ impl Store {
             .find(|l| l.id == line_id)
             .ok_or("明細が見つかりません")?;
         let (code, name, old, kind) = (l.code, l.name, l.qty, l.kind);
+        let received = kind
+            == LineKind::Ff {
+                state: FfState::Received,
+            };
         match kind {
             LineKind::Service { .. } => return Err("サービス商品の個数は変えられません".into()),
-            LineKind::Ff {
-                state: FfState::Received,
-            } => return Err("お渡し済みの FF は個数を変えられません".into()),
+            // お渡し済みの FF の数量を変えるのは店員（増やせばお渡し前に戻し、減らせば回収してもらう）
+            _ if received && r.staff_state() != StaffState::Ready => {
+                return Err(FF_RECEIVED_SELF.into())
+            }
             _ => {}
         }
         if qty > old && r.txn.item_count() - old + qty > MAX_ITEMS {
@@ -1955,12 +1986,9 @@ impl Store {
         if qty > old {
             self.check_limit(register, code, qty - old)?;
         }
-        // お渡し前の FF は、増やした分を在庫から取り、減らした分を在庫に戻す
-        if kind
-            == (LineKind::Ff {
-                state: FfState::Waiting,
-            })
-        {
+        // FF は増やした分を在庫から取る。減らした分は、お渡し前なら在庫に戻す
+        // （お渡し済みはお客様の手に渡ったので戻さず、回収してもらう）
+        if matches!(kind, LineKind::Ff { .. }) {
             if qty > old {
                 let stock = self
                     .ff_stock
@@ -1971,7 +1999,7 @@ impl Store {
                     return Err(format!("{name}は在庫が足りません（残り {}）", stock.1));
                 }
                 stock.1 -= qty - old;
-            } else {
+            } else if !received {
                 self.restock(code, old - qty);
             }
         }
@@ -1981,6 +2009,16 @@ impl Store {
         let l = t.lines.iter_mut().find(|l| l.id == line_id).unwrap();
         l.qty = qty;
         l.touched = touched;
+        if received && qty > old {
+            // 増やした分はまだ渡していないので、お渡し前に戻す（照合し直す）
+            l.kind = LineKind::Ff {
+                state: FfState::Waiting,
+            };
+        }
+        if received && qty < old {
+            t.ff_collect.push((name, old - qty));
+            return done(format!("{name}を{}点回収してください", old - qty));
+        }
         done(format!("{name}の個数を {qty} にしました"))
     }
 
@@ -2884,6 +2922,11 @@ impl Store {
                     .iter()
                     .map(|&(name, qty)| Confiscated { name, qty })
                     .collect(),
+                ff_collect: t
+                    .ff_collect
+                    .iter()
+                    .map(|&(name, qty)| Confiscated { name, qty })
+                    .collect(),
                 id_pending: c.id_pending,
                 coupon_unmatched: c.coupon_unmatched,
                 returned: returned.clone(),
@@ -3001,6 +3044,8 @@ pub struct StaffView {
     pub age_choice_pending: bool,
     /// 年確で販売できず取り除いた商品（店員が回収する）
     pub confiscated: Vec<Confiscated>,
+    /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する）
+    pub ff_collect: Vec<Confiscated>,
     /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
     pub coupon_unmatched: bool,
     /// 取り消して、お客様に返却するクーポン

@@ -168,6 +168,16 @@ function confiscatedCard(reg: number, v: StaffView): string {
     </div>`;
 }
 
+/** お渡し済みの FF を減らした・取り消した分の回収の案内（店員側）。「回収しました」で閉じる */
+function ffCollectCard(reg: number, v: StaffView): string {
+  if (!v.ff_collect.length) return "";
+  const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}を${c.qty}点回収してください。</div>`).join("");
+  return `<div class="point-screen collect">
+      ${lines}
+      <div class="point-choices">${btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { action: "dismiss_ff_collect", allowed: true, reason: null }, "primary")}</div>
+    </div>`;
+}
+
 /**
  * 代行収納の支払い内容・件数・金額の確認。受け付けたらすぐ、お客様本人がお客様側の画面で押す
  * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
@@ -282,19 +292,22 @@ function qtyBtn(reg: number, side: Side, id: number, qty: number, st: ActionStat
 }
 
 /** 広げた行の中身：個数の − ＋ と「個数変更」、それに「取り消し」 */
-function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind: string; state?: string }, st: ActionState): string {
+function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind: string; state?: string }, st: ActionState, semiSelf = false): string {
   const e = editing.get(`${reg}:${side}`);
   if (!e || e.id !== l.id || !st.allowed) return "";
-  // サービス商品とお渡し済みの FF は個数を変えられない（取り消しだけ）
-  const fixed = l.kind === "service" || (l.kind === "ff" && l.state === "received");
+  // お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収の案内が出る）
+  if (semiSelf && l.kind === "ff" && l.state === "received")
+    return editorRow(reg, side, `<span class="muted">お渡し済みの FF の数量は係員が変更します</span>`);
+  // サービス商品は数量を変えられない（取り消しだけ）
+  const fixed = l.kind === "service";
   const qty = fixed
-    ? `<span class="muted">この商品は個数を変えられません</span>`
+    ? `<span class="muted">この商品は数量を変えられません</span>`
     : `<span class="qty-edit">
         <button class="small" data-edit-step="${reg}:${side}:-1" ${e.qty <= 1 ? "disabled" : ""}>−</button>
         <b>${e.qty}</b>
         <button class="small" data-edit-step="${reg}:${side}:1">＋</button>
       </span>
-      ${btn("個数変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`;
+      ${btn("数量変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`;
   return editorRow(reg, side, `${qty}${btn("取り消し", { type: "remove_line", register: reg, side, line_id: l.id }, st, "small danger")}`);
 }
 
@@ -561,7 +574,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (r.last_receipt && !v.lines.length) return notice + thanks();
   // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
-  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length) return attendedWelcome(r, notice, side);
+  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return attendedWelcome(r, notice, side);
   // お客様側に出すボタンは、お客様本人が押すもの（お支払い内容の確認・投入おわり）だけ。
   // ほかの操作（会計・変更・ポイントカード・支払方法など）は店員側の画面で行う
   const ro = side === "customer";
@@ -617,6 +630,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
     side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
+    side === "staff" ? ffCollectCard(reg, v) : "",
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);
@@ -837,7 +851,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
   // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
-  if (r.mode === "attended" && (r.staff.bill_check !== null || r.staff.returned.length || r.staff.confiscated.length)) return "";
+  if (r.mode === "attended" && (r.staff.bill_check !== null || r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -987,7 +1001,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
       const qty = c.phase === "registering" ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
-      const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line")) : "";
+      const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line"), true) : "";
       return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td></tr>${editor}`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);

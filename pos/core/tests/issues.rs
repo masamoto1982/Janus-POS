@@ -2,7 +2,7 @@
 
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
-use janus_pos_core::store::{Command, RegisterView, Store};
+use janus_pos_core::store::{Command, FfState, LineKind, RegisterView, Store};
 use serde_json::{json, Value};
 
 const BREAD: &str = "4900000000011";
@@ -2104,4 +2104,64 @@ fn logout_and_pause_from_either_store_menu() {
     );
     ok(&mut s, json!({"type":"pause","register":1}));
     assert!(reg(&s, 1).paused);
+}
+
+/// お渡し済みの FF の数量を増やすとお渡し前に戻り、減らす・取り消すと店員側に回収の案内が出る
+#[test]
+fn changing_handed_ff_rewinds_or_asks_to_collect() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":2}),
+    );
+    let id = reg(&s, 1).staff.lines[0].line.id;
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":2}),
+    );
+    advance(&mut s, 1_000);
+    // 増やすとお渡し前に戻り、照合し直すまで会計に進めない
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
+    );
+    let v = reg(&s, 1);
+    assert!(matches!(
+        v.staff.lines[0].line.kind,
+        LineKind::Ff {
+            state: FfState::Waiting
+        }
+    ));
+    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":3}),
+    );
+    advance(&mut s, 1_000);
+    // 減らすと回収の案内（お渡し済みのまま）
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":2}),
+    );
+    let v = reg(&s, 1);
+    assert!(matches!(
+        v.staff.lines[0].line.kind,
+        LineKind::Ff {
+            state: FfState::Received
+        }
+    ));
+    assert_eq!(v.staff.ff_collect.len(), 1);
+    assert_eq!(v.staff.ff_collect[0].qty, 1);
+    ok(&mut s, json!({"type":"dismiss_ff_collect","register":1}));
+    assert!(reg(&s, 1).staff.ff_collect.is_empty());
+    // 取り消しても回収の案内
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+    );
+    assert_eq!(reg(&s, 1).staff.ff_collect[0].qty, 2);
 }

@@ -748,7 +748,7 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
   // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
   if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
-  if (!r.menu && (r.emoney || r.emoney_short !== null)) return notice + confirm(emoneyScreen(r, side));
+  if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return notice + confirm(emoneyScreen(r, side));
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
 
@@ -761,6 +761,15 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   const ro = r.mode === "attended" && side === "customer";
   const actions = r.mode === "semi_self" ? r.customer.actions : r.staff.actions;
   const close = (label: string) => (ro ? "" : btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip"));
+  if (r.emoney_partial !== null) {
+    // 「不足分を現金で払う」：かざしてもらい残高を引き出してから、残りを現金で
+    const back = ro ? "" : btn("他の決済を使う", { type: "resolve_emoney_short", register: reg, side, choice: "cancel" }, find(actions, "resolve_emoney_short"), "skip");
+    return `<div class="point-screen emoney-screen">
+        <div class="big">電子マネーを入金ボックスにかざしてください</div>
+        <p>残高 <b>${yen(r.emoney_partial)}</b> を引き出し、残り <b>${yen(r.staff.due - r.emoney_partial)}</b> を現金でお支払いいただきます</p>
+        ${back}
+      </div>`;
+  }
   if (r.emoney_short !== null) {
     const st = find(actions, "resolve_emoney_short");
     const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
@@ -848,7 +857,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const reg = r.id;
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
-  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || voidAsk.has(reg)) return "";
+  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>

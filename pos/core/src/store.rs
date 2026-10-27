@@ -610,6 +610,8 @@ struct Txn {
     emoney_paid: u32,
     /// 電子マネーで払おうとしたが残高が足りず、どうするか選んでいない
     emoney_short: bool,
+    /// 「不足分を現金で払う」を選び、残高を引き出すために電子マネーをかざすのを待っている
+    emoney_partial: bool,
 }
 
 impl Txn {
@@ -944,7 +946,7 @@ impl Register {
                 .or(self.menu_code.as_ref().map(|_| Side::Customer)),
             touching: self.touch.map(|(side, _)| side),
             items_full: t.item_count() >= MAX_ITEMS,
-            emoney_short: t.emoney_short,
+            emoney_short: t.emoney_short || t.emoney_partial,
         }
     }
 }
@@ -1583,6 +1585,23 @@ impl Store {
                 if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
                     return self.tap_emoney_task(register, method);
                 }
+                // 「不足分を現金で払う」：かざした電子マネーから引き出せるだけ引き出し、残りを現金で
+                if self.reg(register).is_some_and(|r| r.txn.emoney_partial) {
+                    if method.is_some_and(|m| m != PaymentMethod::Emoney) {
+                        return Err("電子マネーをかざしてください".into());
+                    }
+                    let balance = self.emoney_balance;
+                    let r = self.reg_mut(register)?;
+                    let drawn = balance.min(r.txn.due());
+                    r.txn.emoney_partial = false;
+                    r.txn.emoney_paid += drawn;
+                    r.txn.method = Some(PaymentMethod::Cash);
+                    let due = r.txn.due();
+                    self.emoney_balance -= drawn;
+                    return done(format!(
+                        "電子マネーで {drawn}円 お支払いしました。残り {due}円を現金でお支払いください"
+                    ));
+                }
                 self.check(register, Side::Customer, Action::TapEmoney)?;
                 let balance = self.emoney_balance;
                 let r = self.reg_mut(register)?;
@@ -1672,18 +1691,17 @@ impl Store {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
                 r.txn.emoney_short = false;
+                r.txn.emoney_partial = false;
                 match choice {
                     ShortChoice::Cancel => {
                         r.txn.method = None;
                         done("電子マネーを使うのをやめました。お支払い方法を選んでください")
                     }
                     ShortChoice::Cash => {
-                        r.txn.emoney_paid += balance;
-                        r.txn.method = Some(PaymentMethod::Cash);
-                        let due = r.txn.due();
-                        self.emoney_balance = 0;
+                        // 残高はかざしてもらってから引き出す
+                        r.txn.emoney_partial = true;
                         done(format!(
-                            "電子マネーで {balance}円 お支払いしました。残り {due}円を現金でお支払いください"
+                            "電子マネーを入金ボックスにかざしてください（残高 {balance}円を引き出します）"
                         ))
                     }
                     ShortChoice::Charge => {
@@ -2999,6 +3017,7 @@ impl Store {
                 },
             }),
             emoney_short: t.emoney_short.then_some(self.emoney_balance),
+            emoney_partial: t.emoney_partial.then_some(self.emoney_balance),
             emoney_paid: t.emoney_paid,
             last_receipt: r.last_receipt.clone(),
         }
@@ -3153,6 +3172,8 @@ pub struct RegisterView {
     pub emoney: Option<EmoneyView>,
     /// 電子マネーの残高が足りず、どうするかを選んでもらう（値は残高）
     pub emoney_short: Option<u32>,
+    /// 「不足分を現金で払う」：電子マネーをかざして残高を引き出すのを待つ（値は引き出す残高）
+    pub emoney_partial: Option<u32>,
     /// このお会計で電子マネーから払った額（残りを現金で払うとき）
     pub emoney_paid: u32,
     pub last_receipt: Option<Receipt>,

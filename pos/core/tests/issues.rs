@@ -2020,7 +2020,7 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.customer.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
-    // 残りを現金で：残高を使い切り、残り 120 円を現金で
+    // 不足分を現金で：電子マネーをかざして残高を引き出し、残り 120 円を現金で
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     ok(
@@ -2028,6 +2028,18 @@ fn emoney_short_offers_three_choices() {
         json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
     );
     let v = reg(&s, 1);
+    assert_eq!(v.emoney_partial, Some(1_000));
+    assert_eq!(emoney_balance(&s), 1_000, "かざすまでは引き出さない");
+    assert!(
+        run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err(),
+        "先に電子マネーをかざす"
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.emoney_partial, None);
     assert_eq!(v.customer.due, 120);
     assert_eq!(v.emoney_paid, 1_000);
     assert_eq!(emoney_balance(&s), 0);

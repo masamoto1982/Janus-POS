@@ -1878,7 +1878,7 @@ fn emoney_balance(s: &Store) -> u32 {
 }
 
 /// 「電子マネー」ボタンでチャージか残高確認を選ぶ。残高確認はかざすと残高が出る。
-/// セミセルフではお買い物の途中にチャージはできず、残高確認だけ
+/// セミセルフではお買い物の途中にチャージ・残高確認はできない
 #[test]
 fn emoney_inquiry_shows_the_balance() {
     let mut s = Store::new(1, 2, 1);
@@ -1899,16 +1899,19 @@ fn emoney_inquiry_shows_the_balance() {
         json!({"type":"close_emoney","register":1,"side":"customer"}),
     );
     scan(&mut s, 1, "customer", BREAD);
-    for kind in ["menu", "charge"] {
+    for kind in ["menu", "charge", "inquiry"] {
         assert!(
             run(
                 &mut s,
                 json!({"type":"start_emoney","register":1,"side":"customer","kind":kind})
             )
             .is_err(),
-            "お買い物の途中はチャージできない"
+            "お買い物の途中はチャージ・残高確認できない"
         );
     }
+
+    // 残高確認だけの取引
+    let mut s = Store::new(1, 2, 1);
     ok(
         &mut s,
         json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),
@@ -1923,9 +1926,7 @@ fn emoney_inquiry_shows_the_balance() {
         &mut s,
         json!({"type":"close_emoney","register":1,"side":"customer"}),
     );
-    let v = reg(&s, 1);
-    assert!(v.emoney.is_none());
-    assert_eq!(v.customer.lines.len(), 1, "お買い物はそのまま");
+    assert!(reg(&s, 1).emoney.is_none());
 }
 
 /// チャージ：紙幣だけを入れてかざす。上限 20,000 円。やめると紙幣は排出口に戻る

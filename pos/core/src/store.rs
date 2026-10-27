@@ -27,7 +27,7 @@ pub const MAX_MATS: u8 = 5;
 /// お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収が要る）
 const FF_RECEIVED_SELF: &str = "お渡し済みの FF の数量は係員が変更します。係員をお呼びください";
 const EMONEY_NO_CHARGE: &str =
-    "お買い物の途中は電子マネーのチャージはできません。チャージはお会計のあとにどうぞ";
+    "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
 
 // ---------------------------------------------------------------------------
 // コマンド
@@ -1615,9 +1615,9 @@ impl Store {
             } => {
                 self.check(register, side, Action::Emoney)?;
                 let r = self.reg_mut(register)?;
-                // セミセルフでは、お買い物の途中にチャージはできない（残高確認だけ）
+                // セミセルフでは、お買い物の途中にチャージ・残高確認はできない
                 let shopping = !r.txn.lines.is_empty() || !r.txn.coupons.is_empty();
-                if r.mode == Mode::SemiSelf && shopping && kind != EmoneyKind::Inquiry {
+                if r.mode == Mode::SemiSelf && shopping {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
                 // 選ぶ画面からは、チャージ・残高確認に進める

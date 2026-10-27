@@ -507,10 +507,8 @@ export function welcome(reg: number, side: Side, emoney?: ActionState): string {
 }
 
 /** 電子マネーのチャージ・残高確認を始めるボタン（支払方法の「電子マネー」と取り違えないよう二行目を添える） */
-function emoneyEntry(reg: number, side: Side, st: ActionState, cls: string, inquiryOnly = false): string {
-  const kind = inquiryOnly ? "inquiry" : "menu";
-  const sub = inquiryOnly ? "残高確認" : "チャージ・残高確認";
-  return btn("", { type: "start_emoney", register: reg, side, kind }, st, cls).replace("></button>", `><b>電子マネー</b><small>${sub}</small></button>`);
+function emoneyEntry(reg: number, side: Side, st: ActionState, cls: string): string {
+  return btn("", { type: "start_emoney", register: reg, side, kind: "menu" }, st, cls).replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
 }
 
 /**
@@ -1025,8 +1023,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const top = regTop(
     c.total,
     itemCount(c.lines),
-    // セミセルフではお買い物の途中にチャージはできない（残高確認だけ）
-    emoneyEntry(reg, side, a("emoney"), "emoney-top", c.lines.length > 0 || c.coupons.length > 0) +
+    // セミセルフではお買い物の途中に電子マネーのチャージ・残高確認はできない（ボタンを出さない）
+    (c.lines.length || c.coupons.length ? "" : emoneyEntry(reg, side, a("emoney"), "emoney-top")) +
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : c.method === "cash"

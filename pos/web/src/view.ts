@@ -807,8 +807,8 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   if (e.kind === "menu") {
     const go = (label: string, kind: string) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
     return `<div class="point-screen emoney-screen">
-        <div class="big">チャージか残高確認を選んでください</div>
-        ${ro ? "" : `<div class="emoney-choices">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("やめる")}`}
+        <div class="big">選択してください</div>
+        ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("やめる")}`}
       </div>`;
   }
   if (e.kind === "inquiry")

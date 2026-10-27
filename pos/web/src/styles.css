@@ -319,6 +319,8 @@ button.tag.ff-verify:disabled { cursor: not-allowed; }
 .ffv-screen table.ffv td { padding: 1px 6px; vertical-align: middle; text-align: left; }
 .ffv-screen table.ffv td.num { text-align: right; white-space: nowrap; }
 .ffv-input { width: 52px; padding: 2px 4px; text-align: right; }
+.ffv-order { color: var(--msg-weak); }
+.ffv-order b { color: var(--ink); font-size: 15px; }
 .ffv-screen .ffv-msg { color: var(--danger); }
 .ffv-actions { display: flex; gap: 8px; }
 .change { font-size: 18px; margin: 8px 0; }

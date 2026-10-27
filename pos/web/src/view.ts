@@ -69,13 +69,17 @@ export const ffVerifying = new Set<string>();
 /** 照合できなかったときの知らせ（レジ:画面 → 文）。照合の画面の中に出す */
 export const ffVerifyMsg = new Map<string, string>();
 
-/** お渡し照合：お渡し前の FF ごとに、お渡しした個数を入力する（数量は出さず、数えて入れてもらう） */
-function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number }[], customer: boolean): string {
+/**
+ * お渡し照合：お渡し前の FF ごとに、オーダーを受けた数を見ながらお渡しした個数を入力する。
+ * 数を打ち込むことで、いくつ渡したかに注意が向く。オーダー数はここにも出す
+ * （画面が切り替わると直前に見た数は忘れやすく、確かめるために登録画面へ戻らせない）
+ */
+function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number }[], customer: boolean): string {
   // 並びは登録画面と同じ（新しい動きのあった行ほど上）
   const waiting = lines.filter((l) => l.kind === "ff" && l.state === "waiting").sort((a, b) => b.touched - a.touched);
   const rows = waiting
     .map(
-      (l) => `<tr><td>${esc(l.name)}</td><td class="num"><input type="number" inputmode="numeric" min="0" class="ffv-input" data-key="ffv-${reg}-${side}-${l.id}" data-ffv-line="${l.id}" aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}個数" /> 個</td></tr>`,
+      (l) => `<tr><td>${esc(l.name)}</td><td class="num ffv-order">${customer ? "ご注文" : "オーダー"} <b>${l.qty}</b></td><td class="num"><input type="number" inputmode="numeric" min="0" class="ffv-input" data-key="ffv-${reg}-${side}-${l.id}" data-ffv-line="${l.id}" aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}個数" /> 個</td></tr>`,
     )
     .join("");
   return `<div class="ffv-screen">

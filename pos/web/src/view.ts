@@ -75,6 +75,11 @@ function closeFfVerify(reg: number, side: Side): void {
   for (const k of [...ffvInput.keys()]) if (k.startsWith(`${reg}:${side}:`)) ffvInput.delete(k);
 }
 
+/** 照合画面に並べる FF：未照合（お渡し前）のものと、この画面で入力したもの */
+function ffVerifyRows<L extends { id: number; kind: string; state?: FfState }>(reg: number, side: Side, lines: L[]): L[] {
+  return lines.filter((l) => l.kind === "ff" && (l.state === "waiting" || ffvInput.has(`${reg}:${side}:${l.id}`)));
+}
+
 /**
  * お渡し照合：表で 品目｜注文数｜お渡し数｜照合。手続きを引き返す「商品登録に戻る」は左下に置く
  * （物事は右へ進む感覚に合わせ、進めるボタンは右、引き返すボタンは左）。お渡し数を入力すると、その場で注文数と比べて OK / NG を出す
@@ -82,8 +87,9 @@ function closeFfVerify(reg: number, side: Side): void {
  * 画面が切り替わると直前に見た数は忘れやすいので、注文数はここにも出す
  */
 function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number }[], customer: boolean): string {
+  // 並べるのは未照合の FF だけ（この画面で入力して OK になった行は、判定が見えるよう残す）。
   // 並びは登録画面と同じ（新しい動きのあった行ほど上）
-  const ff = lines.filter((l) => l.kind === "ff").sort((a, b) => b.touched - a.touched);
+  const ff = ffVerifyRows(reg, side, lines).sort((a, b) => b.touched - a.touched);
   const rows = ff
     .map((l) => {
       const key = `${reg}:${side}:${l.id}`;
@@ -92,7 +98,9 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
       return `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num"><input type="text" inputmode="numeric" autocomplete="off" class="ffv-input" value="${esc(value)}" data-key="ffv-${key}" data-ffv-line="${key}" aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}数" /></td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
+  // 見出しは「お渡しの確認」（荷物や支払いの控えのお渡しにも同じ形の画面を使える）
   return `<div class="ffv-screen">
+      <div class="big">お渡しの確認</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="ffv-foot"><button type="button" class="small ghost" data-ffverify-close="${reg}:${side}">商品登録に戻る</button></div>
     </div>`;
@@ -644,7 +652,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
-  if (!ro && !paying && ffVerifying.has(`${reg}:${side}`) && v.lines.some((l) => l.kind === "ff"))
+  if (!ro && !paying && ffVerifying.has(`${reg}:${side}`) && ffVerifyRows(reg, side, v.lines).length)
     return screen(ffVerifyScreen(reg, side, v.lines, false));
   closeFfVerify(reg, side);
   return `${top}${notice}
@@ -1044,7 +1052,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     return screen(`<div class="paybox center">
         ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center")}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}${emoneyPaidNote(r)}
       </div>`);
-  if (ffVerifying.has(`${reg}:${side}`) && c.lines.some((l) => l.kind === "ff"))
+  if (ffVerifying.has(`${reg}:${side}`) && ffVerifyRows(reg, side, c.lines).length)
     return screen(ffVerifyScreen(reg, side, c.lines, true));
   closeFfVerify(reg, side);
   return `${top}${notice}

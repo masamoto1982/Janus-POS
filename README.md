@@ -3,7 +3,7 @@
 コンビニエンスストア向けセミセルフ式 POS レジのシミュレーター。
 
 - `pos/core` … Rust で書いた決定的なコア（wasm-bindgen で Web UI に公開）
-- `pos/web` … TypeScript + Vite の Web UI（店員画面・客側画面・MAT）
+- `pos/web` … TypeScript + Vite の Web UI（店員画面・客側画面・呼び鈴）
 
 ## 開発
 

@@ -645,6 +645,7 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
   .swipe-tabs { display: flex; gap: 4px; margin-bottom: 4px; }
   .swipe-tabs button { flex: 1; min-height: 30px; padding: 2px 8px; font-size: 13px; background: var(--btn); color: var(--btn-ink); }
   .swipe-tabs button.on { background: var(--btn-on); color: var(--btn-on-ink); }
+  .swipe-tabs button.view-only::after { content: "（表示のみ）"; font-size: 11px; }
   .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .screens::-webkit-scrollbar { display: none; }
   .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }

@@ -507,8 +507,10 @@ export function welcome(reg: number, side: Side, emoney?: ActionState): string {
 }
 
 /** 電子マネーのチャージ・残高確認を始めるボタン（支払方法の「電子マネー」と取り違えないよう二行目を添える） */
-function emoneyEntry(reg: number, side: Side, st: ActionState, cls: string): string {
-  return btn("", { type: "start_emoney", register: reg, side, kind: "menu" }, st, cls).replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
+function emoneyEntry(reg: number, side: Side, st: ActionState, cls: string, inquiryOnly = false): string {
+  const kind = inquiryOnly ? "inquiry" : "menu";
+  const sub = inquiryOnly ? "残高確認" : "チャージ・残高確認";
+  return btn("", { type: "start_emoney", register: reg, side, kind }, st, cls).replace("></button>", `><b>電子マネー</b><small>${sub}</small></button>`);
 }
 
 /**
@@ -767,7 +769,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     return `<div class="point-screen emoney-screen">
         <div class="big">電子マネーの残高が足りません</div>
         <p>残高 <b>${yen(r.emoney_short)}</b>・お支払い <b>${yen(r.staff.due)}</b></p>
-        ${ro ? "" : `<div class="emoney-choices">${choice("電子マネーを使うのをやめる", "cancel")}${choice("残りを現金で払う", "cash")}${choice("電子マネーをチャージする", "charge", "primary")}</div>`}
+        ${ro ? "" : `<div class="emoney-choices">${choice("他の決済を使う", "cancel")}${choice("不足分を現金で払う", "cash", r.mode === "attended" ? "" : "primary")}${r.mode === "attended" ? choice("電子マネーをチャージする", "charge", "primary") : ""}</div>`}
       </div>`;
   }
   const e = r.emoney!;
@@ -1023,7 +1025,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const top = regTop(
     c.total,
     itemCount(c.lines),
-    emoneyEntry(reg, side, a("emoney"), "emoney-top") +
+    // セミセルフではお買い物の途中にチャージはできない（残高確認だけ）
+    emoneyEntry(reg, side, a("emoney"), "emoney-top", c.lines.length > 0 || c.coupons.length > 0) +
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : c.method === "cash"

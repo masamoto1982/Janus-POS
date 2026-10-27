@@ -76,7 +76,8 @@ function closeFfVerify(reg: number, side: Side): void {
 }
 
 /**
- * お渡し照合：表で 品目｜注文数｜お渡し数｜照合。お渡し数を入力すると、その場で注文数と比べて OK / NG を出す
+ * お渡し照合：表で 品目｜注文数｜お渡し数｜照合。手続きを引き返す「商品登録に戻る」は左下に置く
+ * （物事は右へ進む感覚に合わせ、進めるボタンは右、引き返すボタンは左）。お渡し数を入力すると、その場で注文数と比べて OK / NG を出す
  * （判定ボタンはない）。注文数を見ながら数を打ち込むことで、いくつ渡したかに注意が向く。
  * 画面が切り替わると直前に見た数は忘れやすいので、注文数はここにも出す
  */
@@ -92,8 +93,8 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
     })
     .join("");
   return `<div class="ffv-screen">
-      <div class="ffv-head"><div class="big">${customer ? "お受け取りになった数を入力してください" : "お渡しした数を入力してください"}</div><button type="button" class="small ghost" data-ffverify-close="${reg}:${side}">商品登録に戻る</button></div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="ffv-foot"><button type="button" class="small ghost" data-ffverify-close="${reg}:${side}">商品登録に戻る</button></div>
     </div>`;
 }
 

@@ -313,8 +313,10 @@ details summary h3 { display: inline; }
 button.tag.ff-verify { font: inherit; font-size: 11px; border: 1px solid currentColor; cursor: pointer; }
 button.tag.ff-verify:disabled { cursor: not-allowed; }
 /* お渡し照合の画面：品目｜注文数｜お渡し数｜照合 の表。入力するとその場で OK / NG */
-.ffv-screen { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px 0; text-align: center; }
-.ffv-screen .big { font-size: 15px; }
+.ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; text-align: center; }
+.ffv-screen .lines.ffv { margin-bottom: auto; }
+.ffv-screen .big { font-size: 14px; }
+.ffv-screen .lines.ffv td, .ffv-screen .lines.ffv th { padding-top: 2px; padding-bottom: 2px; }
 .ffv-screen .lines.ffv { width: auto; min-width: 80%; }
 .ffv-screen .lines.ffv td { vertical-align: middle; text-align: left; }
 .ffv-screen .lines.ffv td.num, .ffv-screen .lines.ffv th.num { text-align: right; }
@@ -322,7 +324,8 @@ button.tag.ff-verify:disabled { cursor: not-allowed; }
 .ffv-input { width: 52px; padding: 2px 4px; text-align: right; }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
-.ffv-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; }
+/* 引き返すボタンは左下 */
+.ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 2px 0 0; }
 .change { font-size: 18px; margin: 8px 0; }
 
 .toast {

@@ -984,7 +984,8 @@ function wireSwipe(): void {
     if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
     const t = e.target as Element;
     const inlet = t.closest<HTMLElement>("[data-inlet]");
-    const screen = t.closest<HTMLElement>("[data-drop]");
+    // 最上部（呼び鈴など）と最下段（FF・サービス・たばこ）は長押しで操作するボタンがあるので対象外
+    const screen = t.closest(".screen-head, .screen-items") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;
     cancelLongPress();
     const timer = window.setTimeout(() => {

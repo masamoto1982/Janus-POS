@@ -295,6 +295,16 @@ function render(): void {
       setRegion(`items-${r.id}-${side}`, items);
       el?.classList.toggle("no-items", !items);
     }
+    // モバイルモード：操作できる側が決まったら（セミセルフはお客様側）その画面を見せ、もう一方のタブに「表示のみ」と添える
+    const shownActive = activeShown.get(r.id);
+    if (r.active_side !== shownActive) {
+      activeShown.set(r.id, r.active_side);
+      if (r.active_side && isMobile()) swipeTo(r.id, r.active_side);
+    }
+    app.querySelectorAll<HTMLElement>(`[data-swipe-to^="${r.id}:"]`).forEach((b) => {
+      const side = b.dataset.swipeTo!.split(":")[1];
+      b.classList.toggle("view-only", r.active_side !== null && r.active_side !== side);
+    });
     const idle = r.idle_revert_in;
     setRegion(
       `mode-${r.id}`,
@@ -396,6 +406,8 @@ function cancelConfirm(): void {
 // ---------------------------------------------------------------------------
 // 呼び出しボタン：触れている間だけ鳴る。離す・指が外れる・画面を離れると止まる
 // ---------------------------------------------------------------------------
+
+const activeShown = new Map<number, Side | null>();
 
 let held: { cmd: string; register: number; pointer: number | null } | null = null;
 
@@ -662,6 +674,8 @@ function lockRules(): void {
 // ブラウザは操作があるまで音を出せないので、最初のタッチ・キー入力で音を準備する
 document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
+// iOS は pointerdown では音を出す準備ができないので、指を離したときにも準備する
+document.addEventListener("touchend", unlockAudio, { capture: true });
 
 app.addEventListener("click", (e) => {
   const b = (e.target as Element).closest("button");

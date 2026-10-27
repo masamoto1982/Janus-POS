@@ -194,7 +194,7 @@ pub enum Command {
     FfButton {
         register: u8,
     },
-    /// FF の明細のお渡し照合。渡した個数を入力し、数量と合えばお渡し済みになる
+    /// FF の明細のお渡し照合。渡した個数を入力するたびに判定し、注文数と合えばお渡し済み、合わなければお渡し前になる
     /// （チェックだけだと数量を意識せずに済ませられ、渡し忘れを防げないため。照合が揃うまで会計に進めない）
     CheckFf {
         register: u8,
@@ -1364,15 +1364,20 @@ impl Store {
                     .find(|l| l.id == line_id && matches!(l.kind, LineKind::Ff { .. }))
                     .ok_or("FF の明細が見つかりません")?;
                 let name = l.name;
-                if handed != l.qty {
-                    return Err(format!(
-                        "{name}：お渡しした個数（{handed}個）が数量と合いません。もう一度数えてください"
-                    ));
-                }
+                // 入力のたびに判定する。合えばお渡し済み（OK）、合わなければお渡し前（NG）
+                let matched = handed == l.qty;
                 l.kind = LineKind::Ff {
-                    state: FfState::Received,
+                    state: if matched {
+                        FfState::Received
+                    } else {
+                        FfState::Waiting
+                    },
                 };
-                done(format!("{name}：お渡し照合済み"))
+                done(if matched {
+                    format!("{name}：照合 OK")
+                } else {
+                    format!("{name}：照合 NG（お渡し数 {handed} が注文数と合いません）")
+                })
             }
             C::CompleteService {
                 register,

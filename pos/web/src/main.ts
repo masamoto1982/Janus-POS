@@ -18,7 +18,7 @@ import {
   FF_TABS,
   editing,
   ffVerifying,
-  ffVerifyMsg,
+  ffvInput,
   flashing,
   type FfUi,
   itemsPanel,
@@ -529,6 +529,14 @@ app.addEventListener("input", (e) => {
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, "")
       .slice(0, 4);
+  // お渡し照合：お渡し数を入力するたびに判定する（判定ボタンはない）。全角の数字は半角に直す
+  if (el.dataset.ffvLine) {
+    el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 3);
+    const [reg, side, line] = el.dataset.ffvLine.split(":");
+    ffvInput.set(el.dataset.ffvLine, el.value);
+    send({ type: "check_ff", register: Number(reg), side, line_id: Number(line), handed: Number(el.value || 0) });
+    return;
+  }
   if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
 });
 app.addEventListener("keydown", (e) => {
@@ -714,38 +722,14 @@ app.addEventListener("click", (e) => {
   // FF の「お渡し前」：お渡し照合の画面を開く（登録画面を置き換える）
   if (b.dataset.ffverify) {
     ffVerifying.add(b.dataset.ffverify);
-    ffVerifyMsg.delete(b.dataset.ffverify);
     editing.delete(b.dataset.ffverify);
     frame();
     return;
   }
+  // 商品登録に戻る（照合の途中でも）。入力した数は消す
   if (b.dataset.ffverifyClose) {
     ffVerifying.delete(b.dataset.ffverifyClose);
-    ffVerifyMsg.delete(b.dataset.ffverifyClose);
-    frame();
-    return;
-  }
-  // 照合する：入力したお渡し個数を FF ごとに送る。数量と合った FF だけお渡し済みになる
-  if (b.dataset.ffverifySubmit) {
-    const key = b.dataset.ffverifySubmit;
-    const [reg, side] = key.split(":");
-    const box = b.closest(".ffv-screen");
-    const inputs = [...(box?.querySelectorAll<HTMLInputElement>("[data-ffv-line]") ?? [])];
-    if (inputs.some((i) => i.value.trim() === "")) {
-      ffVerifyMsg.set(key, "すべての商品のお渡し個数を入力してください");
-      frame();
-      return;
-    }
-    const wrong: string[] = [];
-    for (const i of inputs) {
-      const ok = send({ type: "check_ff", register: Number(reg), side, line_id: Number(i.dataset.ffvLine), handed: Number(i.value) });
-      if (!ok) wrong.push(i.getAttribute("aria-label")?.replace(/の(お渡し|お受け取り)個数$/, "") ?? "");
-    }
-    if (wrong.length) ffVerifyMsg.set(key, `${wrong.join("・")}：個数が合いません。もう一度数えてください`);
-    else {
-      ffVerifying.delete(key);
-      ffVerifyMsg.delete(key);
-    }
+    for (const k of [...ffvInput.keys()]) if (k.startsWith(`${b.dataset.ffverifyClose}:`)) ffvInput.delete(k);
     frame();
     return;
   }

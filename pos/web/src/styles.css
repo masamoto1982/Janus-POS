@@ -236,6 +236,7 @@ button.seg { background: var(--btn); color: var(--btn-ink); padding: 4px 10px; }
 button.seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
 .method-list .seg { border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
 .method-list .seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); opacity: 1; }
+.method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 button.ff { background: var(--btn); color: var(--btn-ink); }
 .segs { display: inline-flex; gap: 4px; }
 

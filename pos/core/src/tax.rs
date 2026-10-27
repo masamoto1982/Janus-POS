@@ -124,9 +124,9 @@ impl Default for TaxSettings {
             rate_bp,
         };
         let mut products = BTreeMap::new();
-        // 代行収納（お支払い）は消費税の対象外
+        // 代行収納（お支払い）と切手は消費税の対象外
         for p in catalog::CATALOG {
-            if p.customer_confirms {
+            if p.cash_only {
                 products.insert(p.code.to_string(), "exempt".to_string());
             }
         }

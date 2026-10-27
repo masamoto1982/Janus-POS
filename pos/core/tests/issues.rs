@@ -15,6 +15,8 @@ const SANDWICH: &str = "4900000000028";
 const TEA: &str = "4900000000035";
 const PARCEL: &str = "2100000000014";
 const BILL: &str = "2100000000021";
+const STAMP: &str = "4900000000141";
+const TOBACCO: &str = "4900000000127";
 
 fn run(s: &mut Store, v: Value) -> Result<Option<String>, String> {
     let cmd: Command = serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("{v}: {e}"));
@@ -1285,12 +1287,140 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
     );
     no_id_check(&mut s, 1);
     confirm_point(&mut s, 1);
+    // 代行収納は現金のみ。クレジットカード・バーコード決済は現金と併用できないので使えず、ポイントも使えない
+    for m in ["credit", "qr", "points"] {
+        assert!(
+            run(
+                &mut s,
+                json!({"type":"select_payment","register":1,"side":"staff","method":m})
+            )
+            .is_err(),
+            "{m}"
+        );
+    }
+    // 電子マネーは現金と併用できる：宅配便とビールの分を電子マネーで、代行収納は現金で
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+    );
+    ok(&mut s, json!({"type":"tap_emoney","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.last_receipt.is_none());
+    assert_eq!(v.prepaid, 0, "残高 1,000 円では足りない");
+    assert_eq!(v.emoney_short, Some(1_000));
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cancel"}),
+    );
+    ok(&mut s, json!({"type":"insert","register":1,"amount":20000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let r = reg(&s, 1).last_receipt.unwrap();
+    assert_eq!(r.total, 8_640 + 1_200 + 248);
+    assert_eq!(r.method, "現金");
+}
+
+/// たばこにはポイントを使えない
+#[test]
+fn points_cannot_pay_for_tobacco() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", TOBACCO);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    no_id_check(&mut s, 1);
+    confirm_point(&mut s, 1);
+    let v = reg(&s, 1);
+    assert!(v
+        .unavailable
+        .iter()
+        .any(|u| u.method == PaymentMethod::Points));
+    assert!(run(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"points"})
+    )
+    .is_err());
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
     );
-    ok(&mut s, json!({"type":"tap_emoney","register":1}));
-    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 8_640 + 1_200 + 248);
+}
+
+/// 切手は現金のみ（非課税）。ほかの商品と一緒に買えるが、キャッシュレスで払えるのは切手を除いた分だけ
+#[test]
+fn stamps_are_paid_in_cash_even_with_other_items() {
+    // 切手だけならキャッシュレスは選べない
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", STAMP);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    for m in ["emoney", "qr", "credit", "points"] {
+        assert!(
+            run(
+                &mut s,
+                json!({"type":"select_payment","register":1,"side":"customer","method":m})
+            )
+            .is_err(),
+            "{m}"
+        );
+    }
+    assert_eq!(
+        reg(&s, 1).staff.taxes.iter().map(|t| t.tax).sum::<u32>(),
+        0,
+        "非課税"
+    );
+
+    // パンと切手：電子マネーで払うのはパンの分だけ、切手は現金で
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", STAMP);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    assert_eq!(reg(&s, 1).cashless_due, 160);
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(emoney_balance(&s), 840);
+    assert_eq!(v.customer.due, 110);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.outlet, 390);
+    assert_eq!(v.last_receipt.unwrap().method, "電子マネー・現金");
+
+    // 取引中止なら電子マネーで払った分は残高に戻る
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", STAMP);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    assert_eq!(emoney_balance(&s), 1_000);
 }
 
 /// 買い物点数は 10 点まで（数量の合計）。上限を超える商品は登録されず、FF も同じ。
@@ -2052,7 +2182,7 @@ fn emoney_short_offers_three_choices() {
     let v = reg(&s, 1);
     assert_eq!(v.emoney_partial, None);
     assert_eq!(v.customer.due, 120);
-    assert_eq!(v.emoney_paid, 1_000);
+    assert_eq!(v.prepaid, 1_000);
     assert_eq!(emoney_balance(&s), 0);
     assert!(
         run(

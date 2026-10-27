@@ -42,12 +42,13 @@ export type StaffLine = LineKind & {
   unit_price: number;
   qty: number;
   category: string;
+  cash_only: boolean;
   amount: number;
   age: number | null;
   limit: number | null;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean };
 
 export interface Call {
   id: number;
@@ -166,7 +167,11 @@ export interface RegisterView {
   emoney_partial: number | null;
   emoney_partial_ok: boolean;
   /** このお会計で電子マネーから払った額 */
-  emoney_paid: number;
+  prepaid: number;
+  prepaid_method: string | null;
+  cash_only: number;
+  cashless_due: number;
+  unavailable: Unavailable[];
   last_receipt: Receipt | null;
 }
 
@@ -218,3 +223,8 @@ export interface Snapshot {
 }
 
 export type Command = { type: string; [k: string]: unknown };
+
+export interface Unavailable {
+  method: string;
+  reason: string;
+}

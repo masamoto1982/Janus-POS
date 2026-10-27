@@ -325,7 +325,7 @@ button.tag.ff-verify:disabled { cursor: not-allowed; }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* 引き返すボタンは左下 */
-.ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 0; }
+.ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 8px 0 0; }
 .change { font-size: 18px; margin: 8px 0; }
 
 .toast {

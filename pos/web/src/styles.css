@@ -183,12 +183,11 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
 /* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */
-.lines.cols5 { table-layout: fixed; }
-.lines.cols5 td { overflow-wrap: anywhere; }
-.lines.cols5 col.c-qty { width: 32px; }
-.lines.cols5 col.c-amt { width: 60px; }
-.lines.cols5 col.c-edit { width: 52px; }
-.lines.cols5 col.c-warn { width: 60px; }
+.lines.cols4 { table-layout: fixed; }
+.lines.cols4 td { overflow-wrap: anywhere; }
+.lines.cols4 col.c-qty { width: 44px; }
+.lines.cols4 col.c-amt { width: 60px; }
+.lines.cols4 col.c-warn { width: 60px; }
 .lines .warn-marks { display: flex; flex-wrap: wrap; gap: 2px 4px; }
 .lines th { text-align: left; font-weight: 500; font-size: 12px; color: var(--msg-weak); }
 .lines th.num { text-align: right; }
@@ -301,7 +300,7 @@ details summary h3 { display: inline; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }
 .point-screen { text-align: center; padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.point-screen .big, .pay-stage .big { font-size: 18px; font-weight: 700; }
+.point-screen .big, .pay-stage .big, .ffv-screen .big { font-size: 18px; font-weight: 700; }
 /* 選択肢のボタンは画面の幅によらず横一列に並べる（狭いときは縮める） */
 .point-choices { display: flex; gap: 10px; flex-wrap: nowrap; justify-content: center; max-width: 100%; }
 .point-services { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
@@ -309,9 +308,21 @@ details summary h3 { display: inline; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 180px; width: 180px; min-width: 0; padding: 12px 16px; font-size: 14px; }
 .bill-card { background: var(--warn-bg); color: var(--warn); }
-.ffcheck { display: inline-flex; vertical-align: middle; margin-left: 6px; }
-.ffcheck input { width: 18px; height: 18px; accent-color: var(--ff); cursor: pointer; }
-.ffcheck input:disabled { cursor: not-allowed; }
+/* 数量はボタンの形（押すと数量変更・取り消しの行が広がる） */
+.qty-btn { min-width: 34px; padding: 2px 8px; font: inherit; font-weight: 600; text-align: center; background: var(--bg); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.qty-btn.on { border-color: var(--ink); }
+/* FF の「お渡し前」は押せるアイコン（押すとお渡し照合の画面） */
+button.tag.ff-verify { font: inherit; font-size: 11px; border: 1px solid currentColor; cursor: pointer; }
+button.tag.ff-verify:disabled { cursor: not-allowed; }
+/* お渡し照合の画面：お渡しした個数を入力する */
+.ffv-screen { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px 0; text-align: center; }
+.ffv-screen .big { font-size: 15px; }
+.ffv-screen table.ffv { border-collapse: collapse; }
+.ffv-screen table.ffv td { padding: 1px 6px; vertical-align: middle; text-align: left; }
+.ffv-screen table.ffv td.num { text-align: right; white-space: nowrap; }
+.ffv-input { width: 52px; padding: 2px 4px; text-align: right; }
+.ffv-screen .ffv-msg { color: var(--danger); }
+.ffv-actions { display: flex; gap: 8px; }
 .change { font-size: 18px; margin: 8px 0; }
 
 .toast {

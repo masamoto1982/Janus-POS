@@ -227,7 +227,7 @@ impl Context {
 
 pub type Denial = &'static str;
 
-const FF_UNCHECKED: Denial = "FF のお渡し確認にチェックが入っていません";
+const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
 /// 似て非なる商品をクーポンのつもりで定価で買ってしまう事故を防ぐため、決済を止める
 const COUPON_UNMATCHED: Denial =

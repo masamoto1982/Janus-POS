@@ -52,10 +52,44 @@ const FF_LABEL: Record<FfState, string> = {
  * FF の明細の個数の右に置く、お渡し確認のチェックボックス。
  * 全部にチェックが入るまで会計に進めない。どちらの画面から押したかは、押した画面で決まる
  */
-function ffCheck(reg: number, l: { id: number; kind: string; state?: FfState }, a: ActionState): string {
-  if (l.kind !== "ff") return "";
-  const title = a.allowed ? "お渡ししたらチェック" : (a.reason ?? "");
-  return `<label class="ffcheck" title="${esc(title)}"><input type="checkbox" data-ffcheck="${reg}:${l.id}"${l.state === "received" ? " checked" : ""}${a.allowed ? "" : " disabled"} aria-label="お渡し確認" /></label>`;
+/**
+ * FF の明細のお渡し状況。お渡し前は押せるアイコンで、押すとお渡し照合の画面になる。
+ * 照合ではお渡しした個数を入力させる（チェックだけだと数量を意識せずに済ませられ、渡し忘れを防げない）
+ */
+function ffTag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: ActionState, ro: boolean, labels = FF_LABEL): string {
+  if (l.kind !== "ff" || !l.state) return "";
+  const text = labels[l.state];
+  if (l.state === "received" || ro) return `<span class="tag ff-${l.state}">${text}</span>`;
+  const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
+  return `<button type="button" class="tag ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
+}
+
+/** お渡し照合の画面を開いている画面（レジ:画面）。照合が済むか「戻る」で閉じる */
+export const ffVerifying = new Set<string>();
+/** 照合できなかったときの知らせ（レジ:画面 → 文）。照合の画面の中に出す */
+export const ffVerifyMsg = new Map<string, string>();
+
+/** お渡し照合：お渡し前の FF ごとに、お渡しした個数を入力する（数量は出さず、数えて入れてもらう） */
+function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number }[], customer: boolean): string {
+  // 並びは登録画面と同じ（新しい動きのあった行ほど上）
+  const waiting = lines.filter((l) => l.kind === "ff" && l.state === "waiting").sort((a, b) => b.touched - a.touched);
+  const rows = waiting
+    .map(
+      (l) => `<tr><td>${esc(l.name)}</td><td class="num"><input type="number" inputmode="numeric" min="0" class="ffv-input" data-key="ffv-${reg}-${side}-${l.id}" data-ffv-line="${l.id}" aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}個数" /> 個</td></tr>`,
+    )
+    .join("");
+  return `<div class="ffv-screen">
+      ${
+        ffVerifyMsg.has(`${reg}:${side}`)
+          ? `<div class="big ffv-msg">${esc(ffVerifyMsg.get(`${reg}:${side}`)!)}</div>`
+          : `<div class="big">${customer ? "お受け取りになった個数を入力してください" : "お渡しした個数を入力してください"}</div>`
+      }
+      <table class="ffv"><tbody>${rows}</tbody></table>
+      <div class="ffv-actions">
+        <button type="button" class="small primary" data-ffverify-submit="${reg}:${side}">照合する</button>
+        <button type="button" class="small ghost" data-ffverify-close="${reg}:${side}">戻る</button>
+      </div>
+    </div>`;
 }
 
 const METHOD_LABEL: Record<string, string> = { cash: "現金", emoney: "電子マネー", qr: "バーコード決済", credit: "クレジットカード", points: "ポイント利用" };
@@ -191,10 +225,10 @@ function methodList(method: string | null, inserted: number): string {
 }
 
 /**
- * 明細の列：品目・個数・小計・変更ボタンの枠・注意のしるし（年確・限定）。変更ボタンがない画面でも
- * 枠は空けておき、店員側とお客様側で列の位置がずれないようにする
+ * 明細の列：品目・数量・小計・注意のしるし（年確・限定）。数量はボタンの形で、押すと数量変更・取り消しの行が広がる。
+ * 押せない画面でも同じ幅にし、店員側とお客様側で列の位置がずれないようにする
  */
-const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /><col class="c-edit" /><col class="c-warn" /></colgroup>`;
+const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /><col class="c-warn" /></colgroup>`;
 
 // 内税の表示（有人・セミセルフ共通）
 function taxNote(v: { taxes: TaxTotal[] }): string {
@@ -208,11 +242,11 @@ function warnCell(l: { age: number | null; limit: number | null }): string {
 
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
   const tags: string[] = [];
-  if (l.kind === "ff") tags.push(`<span class="tag ff-${l.state}">FF ${FF_LABEL[l.state]}</span>`);
-  if (l.kind === "service") tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
-  const remove = find(v.actions, "remove_line");
   // 有人モードのお客様側は見るだけ（操作は店員側の画面で行う）
   const ro = side === "customer";
+  if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
+  if (l.kind === "service") tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
+  const remove = find(v.actions, "remove_line");
   let svc = "";
   if (l.kind === "service" && !l.done && !ro) {
     const a = find(v.actions, "complete_service");
@@ -223,9 +257,8 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   }
   return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
-    <td class="num">${l.qty}${ro ? "" : ffCheck(reg, l, find(v.actions, "check_ff"))}</td>
-    <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>
-    <td>${ro ? "" : editBtn(reg, side, l.id, l.qty, remove)}</td>${warnCell(l)}
+    <td class="num">${ro ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
+    <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>${warnCell(l)}
   </tr>${lineEditor(reg, side, l, remove)}`;
 }
 
@@ -237,12 +270,11 @@ export const editing = new Map<string, { id: number; qty: number }>();
 
 const editingRow = (reg: number, side: Side, id: number): string => (editing.get(`${reg}:${side}`)?.id === id ? "editing" : "");
 
-/** 取消ボタンに代わる「変更」ボタン。押すと行が広がる（もう一度押すと閉じる） */
-function editBtn(reg: number, side: Side, id: number, qty: number, st: ActionState): string {
+/** 数量をボタンの形で出す。押すと行が広がって数量変更・取り消しができる（もう一度押すと閉じる）。押せないときは数字だけ */
+function qtyBtn(reg: number, side: Side, id: number, qty: number, st: ActionState): string {
+  if (!st.allowed) return `${qty}`;
   const open = editing.get(`${reg}:${side}`)?.id === id;
-  const disabled = !st.allowed;
-  const title = disabled && st.reason ? ` title="${esc(st.reason)}"` : "";
-  return `<button class="small ghost ${open ? "on" : ""}" data-edit="${reg}:${side}:${id}:${qty}"${disabled ? " disabled" : ""}${title}>変更</button>`;
+  return `<button type="button" class="qty-btn ${open ? "on" : ""}" data-edit="${reg}:${side}:${id}:${qty}" title="数量変更・取り消し" aria-label="数量 ${qty}。押すと数量変更・取り消し">${qty}</button>`;
 }
 
 /** 広げた行の中身：個数の − ＋ と「個数変更」、それに「取り消し」 */
@@ -263,7 +295,7 @@ function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind:
 }
 
 function editorRow(reg: number, side: Side, body: string): string {
-  return `<tr class="edit-row"><td colspan="5"><div class="edit-box">${body}<button class="small ghost" data-edit-close="${reg}:${side}">閉じる</button></div></td></tr>`;
+  return `<tr class="edit-row"><td colspan="4"><div class="edit-box">${body}<button class="small ghost" data-edit-close="${reg}:${side}">閉じる</button></div></td></tr>`;
 }
 
 /** 呼び出しの種類の短い表示（店員側画面） */
@@ -341,17 +373,17 @@ function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => Action
   return v.age_choice_pending || v.id_pending ? idCard(reg, age, v, a) : "";
 }
 
-/** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい） */
 /** 登録した直後の行（レジ:明細番号）。一瞬目立つ色にする（main.ts が数量の変化から決める） */
 export const flashing = new Set<string>();
 const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
 
+/** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい）。数量 1 のボタンで取り消しを開く */
 export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState, ro = false): Row[] {
   return coupons.map((c) => [
     c.id,
-    `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num"></td><td class="num">${
+    `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${ro ? "1" : qtyBtn(reg, side, c.id, 1, st)}</td><td class="num">${
       c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
-    }</td><td>${ro ? "" : editBtn(reg, side, c.id, 1, st)}</td><td></td></tr>${
+    }</td><td></td></tr>${
       !ro && editing.get(`${reg}:${side}`)?.id === c.id && st.allowed ? editorRow(reg, side, btn("取り消し", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small danger")) : ""
     }`,
   ]);
@@ -588,13 +620,17 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
+  if (!ro && !paying && ffVerifying.has(`${reg}:${side}`) && v.lines.some((l) => l.kind === "ff" && l.state === "waiting"))
+    return screen(ffVerifyScreen(reg, side, v.lines, false));
+  ffVerifying.delete(`${reg}:${side}`);
+  ffVerifyMsg.delete(`${reg}:${side}`);
   return `${top}${notice}
     <div class="staff-head">
       <span>店員：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
     </div>
-    <table class="lines cols5">${LINE_COLS}<thead><tr><th>品名</th><th class="num">点数</th><th class="num">小計</th><th></th><th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="5" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
+    <table class="lines cols4">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="4" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
 }
 
@@ -942,13 +978,13 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const lineRows = c.lines.map((l): Row => {
       const tag =
         l.kind === "ff"
-          ? `<span class="tag ff-${l.state}">${{ waiting: "ご用意中", received: "お受け取り済" }[l.state]}</span>`
+          ? ffTag(reg, side, l, a("check_ff"), false, { waiting: "お受け取り前", received: "お受け取り済" })
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
-      const rm = c.phase === "registering" ? editBtn(reg, side, l.id, l.qty, a("remove_line")) : "";
+      const qty = c.phase === "registering" ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
       const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line")) : "";
-      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${l.qty}${ffCheck(reg, l, a("check_ff"))}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td><td>${rm}</td>${warnCell(l)}</tr>${editor}`];
+      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${tag}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>${warnCell(l)}</tr>${editor}`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
@@ -985,9 +1021,13 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     return screen(`<div class="paybox center">
         ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center")}${payHint(c.method, c.payment_blocker, c.inserted, c.due)}${emoneyPaidNote(r)}
       </div>`);
+  if (ffVerifying.has(`${reg}:${side}`) && c.lines.some((l) => l.kind === "ff" && l.state === "waiting"))
+    return screen(ffVerifyScreen(reg, side, c.lines, true));
+  ffVerifying.delete(`${reg}:${side}`);
+  ffVerifyMsg.delete(`${reg}:${side}`);
   return `${top}${notice}
     <div class="staff-head">${taxNote(c)}</div>
-    <table class="lines cols5">${LINE_COLS}<tbody>${rows}</tbody></table>`;
+    <table class="lines cols4">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 // ---------------------------------------------------------------------------

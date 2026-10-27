@@ -191,12 +191,13 @@ pub enum Command {
     FfButton {
         register: u8,
     },
-    /// FF の明細のお渡し確認チェックを入れる・外す（チェックが揃うまで会計に進めない）
+    /// FF の明細のお渡し照合。渡した個数を入力し、数量と合えばお渡し済みになる
+    /// （チェックだけだと数量を意識せずに済ませられ、渡し忘れを防げないため。照合が揃うまで会計に進めない）
     CheckFf {
         register: u8,
         side: Side,
         line_id: u32,
-        checked: bool,
+        handed: u32,
     },
     CompleteService {
         register: u8,
@@ -1342,7 +1343,7 @@ impl Store {
                 register,
                 side,
                 line_id,
-                checked,
+                handed,
             } => {
                 self.check(register, side, Action::CheckFf)?;
                 let r = self.reg_mut(register)?;
@@ -1352,19 +1353,16 @@ impl Store {
                     .iter_mut()
                     .find(|l| l.id == line_id && matches!(l.kind, LineKind::Ff { .. }))
                     .ok_or("FF の明細が見つかりません")?;
-                l.kind = LineKind::Ff {
-                    state: if checked {
-                        FfState::Received
-                    } else {
-                        FfState::Waiting
-                    },
-                };
                 let name = l.name;
-                done(if checked {
-                    format!("{name}：お渡し確認済み")
-                } else {
-                    format!("{name}：お渡し確認を外しました")
-                })
+                if handed != l.qty {
+                    return Err(format!(
+                        "{name}：お渡しした個数（{handed}個）が数量と合いません。もう一度数えてください"
+                    ));
+                }
+                l.kind = LineKind::Ff {
+                    state: FfState::Received,
+                };
+                done(format!("{name}：お渡し照合済み"))
             }
             C::CompleteService {
                 register,

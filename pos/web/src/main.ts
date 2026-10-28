@@ -559,6 +559,9 @@ function form(b: HTMLElement): void {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
       break;
+    case "slips":
+      if (Number(val(`slips-${reg}`))) send({ type: "declare_bill_count", register: reg, side: b.dataset.side, count: Number(val(`slips-${reg}`)) });
+      break;
     case "birth":
       send({ type: "check_id", register: reg, side: "staff", birth: val(`birth-${reg}`), today: isoDate(new Date()) });
       break;
@@ -607,6 +610,11 @@ app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
   el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
+});
+app.addEventListener("keydown", (e) => {
+  const el = e.target as HTMLInputElement;
+  if (!el.dataset?.slips || e.key !== "Enter" || e.isComposing) return;
+  el.closest(".bill-slips")?.querySelector<HTMLButtonElement>('[data-form="slips"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;

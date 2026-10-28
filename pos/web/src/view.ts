@@ -4,6 +4,7 @@
 
 import type {
   ActionState,
+  BillSlips,
   Unavailable,
   Coupon,
   Returned,
@@ -214,6 +215,30 @@ export function billCard(reg: number, count: number, amount: number, st: ActionS
 const confirm = (body: string): string => `<div class="confirm">${body}</div>`;
 
 /** 確認の最中に、操作しない側に出す対のメッセージ */
+/**
+ * 公共料金の払込票の読み取り。1 枚目を読んだら全部の枚数を尋ね、答えた後は残りの枚数を案内する
+ * （読み終えたら、お客様がお支払い内容を確認する）。読み取っている側の画面に出す
+ */
+function billSlipsCard(reg: number, side: Side, s: BillSlips, st: ActionState): string {
+  const off = st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`;
+  if (s.declared === null)
+    return `<div class="point-screen bill-slips">
+      <div class="big">払込票は全部で何枚ですか？</div>
+      <p class="muted">1枚目を読み取りました</p>
+      <div class="point-choices">
+        <input type="number" inputmode="numeric" min="${s.scanned}" max="10" placeholder="枚数" autocomplete="off" data-key="slips-${reg}" data-slips="${reg}" aria-label="払込票の枚数" ${off} />
+        <button class="primary" data-form="slips" data-reg="${reg}" data-side="${side}" ${off}>決定</button>
+      </div>
+    </div>`;
+  return `<div class="point-screen bill-slips">
+      <div class="big">残りの払込票を読み取ってください</div>
+      <p>全 <b>${s.declared}枚</b> のうち <b>${s.scanned}枚</b> を読み取りました（あと ${s.declared - s.scanned}枚）</p>
+      <div class="point-choices">
+        ${btn("枚数を訂正", { type: "declare_bill_count", register: reg, side, count: 0 }, st, "neg")}
+      </div>
+    </div>`;
+}
+
 function pairNote(head: string, sub = ""): string {
   return `<div class="point-screen pair-note"><div class="big">${esc(head)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}</div>`;
 }
@@ -292,7 +317,8 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   // 有人モードのお客様側は見るだけ（操作は店員側の画面で行う）
   const ro = side === "customer";
   if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
-  if (l.kind === "service") tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
+  // 払込票（現金のみのサービス）は受付が要らないので、受付の札を出さない
+  if (l.kind === "service" && !(l.done && l.cash_only)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
   tags.push(warnTags(l));
   const remove = find(v.actions, "remove_line");
   let svc = "";
@@ -659,6 +685,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 取引中止の確認は、ほかのどの確認よりも先に出す（どの場面からでも中止できる）
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
+  if (v.bill_slips)
+    return screen(side === "staff" ? billSlipsCard(reg, side, v.bill_slips, a("declare_bill_count")) : pairNote("払込票を読み取っています"));
   if (v.bill_check !== null)
     return screen(side === "customer" ? billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
@@ -1087,6 +1115,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）
   const screen = (body: string) => `${top}${notice}${confirm(body)}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
+  if (c.bill_slips) return screen(billSlipsCard(reg, side, c.bill_slips, a("declare_bill_count")));
   if (c.bill_check !== null) return screen(billCard(reg, c.bill_count, c.bill_check, a("confirm_bill_payment")));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   const card = firstOf([

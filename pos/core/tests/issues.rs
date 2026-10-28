@@ -15,6 +15,8 @@ const SANDWICH: &str = "4900000000028";
 const TEA: &str = "4900000000035";
 const PARCEL: &str = "2100000000014";
 const BILL: &str = "2100000000021";
+const WATER_BILL: &str = "2100000000043";
+const GAS_BILL: &str = "2100000000050";
 const STAMP: &str = "4900000000141";
 const TOBACCO: &str = "4900000000127";
 
@@ -1242,80 +1244,52 @@ fn staff_skipping_the_age_check_needs_no_customer_button() {
     assert_eq!(reg(&s, 1).staff.payment_blocker, None);
 }
 
-/// 代行収納の確認で「スキップ」を押すと、手持ちが足りないなどで支払いを取りやめたものとして
-/// 確認待ちの代行収納の明細が消える。ほかの商品はそのまま残り、会計を続けられる。
-#[test]
-fn skipping_the_bill_confirmation_cancels_the_bill_payment() {
-    let mut s = Store::new(1, 2, 1);
-    login(&mut s, 1);
-    scan(&mut s, 1, "staff", BILL);
-    scan(&mut s, 1, "staff", BEER);
-    let id = reg(&s, 1)
-        .staff
-        .lines
-        .iter()
-        .find(|l| l.line.code == BILL)
-        .unwrap()
-        .line
-        .id;
+/// 払込票の枚数を答える（読み取っている側の画面で）
+fn declare_bills(s: &mut Store, r: u8, side: &str, count: u32) {
     ok(
-        &mut s,
-        json!({"type":"complete_service","register":1,"line_id":id,"amount":8_640}),
-    );
-    assert_eq!(reg(&s, 1).customer.bill_check, Some(8_640));
-    ok(
-        &mut s,
-        json!({"type":"confirm_bill_payment","register":1,"side":"customer","skip":true}),
-    );
-    let v = reg(&s, 1);
-    assert_eq!(v.customer.bill_check, None);
-    assert!(
-        v.staff.lines.iter().all(|l| l.line.code != BILL),
-        "代行収納の明細は消える"
-    );
-    assert!(
-        v.staff.lines.iter().any(|l| l.line.code == BEER),
-        "ほかの商品は残る"
+        s,
+        json!({"type":"declare_bill_count","register":r,"side":side,"count":count}),
     );
 }
 
-/// 代行収納：係員が支払い内容・金額を受け付けたら、すぐにお客様が金額と件数を確認する。
-/// 確認ボタンはお客様側の画面からしか押せない（係員が画面を持っていても）。宅配便は確認の対象外。
-/// 確認の優先順は 代行収納 ＞ 年確 ＞ ポイントカード ＞ 決済手段（一つの画面で一つの確認だけ）。
+/// 公共料金の支払い：1 枚目の払込票を読むと全部の枚数を尋ね、申告した枚数を読み終えた時点で
+/// お客様が件数・金額を確認する。確認ボタンはお客様側の画面からしか押せない。
+/// 金額は払込票に印字済み（電気 5,000 円・水道 4,000 円・ガス 3,000 円）で、現金のみ。
 #[test]
-fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
+fn utility_bills_ask_for_the_slip_count_and_confirm_once_all_are_read() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BILL);
-    scan(&mut s, 1, "staff", PARCEL);
-    scan(&mut s, 1, "staff", BEER);
-    for code in [BILL, PARCEL] {
-        let v = reg(&s, 1);
-        let id = v
-            .staff
-            .lines
-            .iter()
-            .find(|l| l.line.code == code)
-            .unwrap()
-            .line
-            .id;
-        let amount = if code == BILL { 8_640 } else { 1_200 };
-        ok(
-            &mut s,
-            json!({"type":"complete_service","register":1,"line_id":id,"amount":amount}),
-        );
-    }
-    // 受け付けたらすぐ確認を求める（宅配便は確認しない）
     let v = reg(&s, 1);
-    assert_eq!(v.customer.bill_check, Some(8_640));
-    assert_eq!(v.customer.bill_count, 1);
-    // 会計に進んでも、代行収納の確認が済むまで年確・ポイントカードの確認は始まらない
-    ok(
+    let slips = v.staff.bill_slips.unwrap();
+    assert_eq!((slips.declared, slips.scanned), (None, 1));
+    assert_eq!(v.customer.bill_check, None);
+    // 枚数を答えるまで次の払込票は読めず、会計にも進めない
+    let e = run(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
-    );
+        json!({"type":"scan","register":1,"side":"staff","code":WATER_BILL}),
+    )
+    .unwrap_err();
+    assert!(e.contains("何枚"), "{e}");
+    assert!(run(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"})
+    )
+    .is_err());
+    declare_bills(&mut s, 1, "staff", 3);
+    scan(&mut s, 1, "staff", WATER_BILL);
+    assert_eq!(reg(&s, 1).customer.bill_check, None, "まだ 1 枚足りない");
+    scan(&mut s, 1, "staff", GAS_BILL);
     let v = reg(&s, 1);
-    assert!(!v.staff.age_choice_pending && !v.staff.point_pending);
+    assert!(v.staff.bill_slips.is_none());
+    assert_eq!(v.customer.bill_check, Some(12_000));
+    assert_eq!(v.customer.bill_count, 3);
+    // 申告した枚数より多くは読めない
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"staff","code":GAS_BILL})
+    )
+    .is_err());
     let e = run(
         &mut s,
         json!({"type":"confirm_bill_payment","register":1,"side":"staff"}),
@@ -1326,17 +1300,12 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
         &mut s,
         json!({"type":"confirm_bill_payment","register":1,"side":"customer"}),
     );
-    let v = reg(&s, 1);
-    assert_eq!(v.customer.bill_check, None);
-    assert!(v.staff.age_choice_pending, "次は年確");
-    assert_eq!(
-        v.active_side,
-        Some(Side::Staff),
-        "確認しても操作側は変わらない"
+    assert_eq!(reg(&s, 1).customer.bill_check, None);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    no_id_check(&mut s, 1);
     confirm_point(&mut s, 1);
-    // 代行収納は現金のみ。クレジットカード・バーコード決済は現金と併用できないので使えず、ポイントも使えない
     for m in ["credit", "qr", "points"] {
         assert!(
             run(
@@ -1347,25 +1316,112 @@ fn bill_payment_is_confirmed_by_the_customer_on_the_customer_screen() {
             "{m}"
         );
     }
-    // 電子マネーは現金と併用できる：宅配便とビールの分を電子マネーで、代行収納は現金で
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
-    );
-    ok(&mut s, json!({"type":"tap_emoney","register":1}));
-    let v = reg(&s, 1);
-    assert!(v.last_receipt.is_none());
-    assert_eq!(v.prepaid, 0, "残高 1,000 円では足りない");
-    assert_eq!(v.emoney_short, Some(1_000));
-    ok(
-        &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cancel"}),
+        json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":20000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let r = reg(&s, 1).last_receipt.unwrap();
-    assert_eq!(r.total, 8_640 + 1_200 + 248);
+    assert_eq!(r.total, 12_000);
     assert_eq!(r.method, "現金");
+}
+
+/// 公共料金の払込票は、ほかの商品と一緒に登録できない（どちらを先に読んでも、FF も）
+#[test]
+fn utility_bills_cannot_share_a_transaction_with_other_goods() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"staff","code":BILL}),
+    )
+    .unwrap_err();
+    assert!(e.contains("一緒に登録できません"), "{e}");
+    ok(
+        &mut s,
+        json!({"type":"void_transaction","register":1,"side":"staff"}),
+    );
+    scan(&mut s, 1, "staff", BILL);
+    declare_bills(&mut s, 1, "staff", 1);
+    for cmd in [
+        json!({"type":"scan","register":1,"side":"staff","code":BREAD}),
+        json!({"type":"register_ff","register":1,"code":"FF01","qty":1}),
+    ] {
+        let e = run(&mut s, cmd).unwrap_err();
+        assert!(e.contains("一緒に登録できません"), "{e}");
+    }
+    assert_eq!(reg(&s, 1).staff.lines.len(), 1);
+}
+
+/// 枚数は読み取りの途中で訂正できる（0 を送ると、もう一度枚数を尋ねる）。
+/// 読み取った枚数より少なくは答えられない
+#[test]
+fn the_slip_count_can_be_corrected_while_reading() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BILL);
+    declare_bills(&mut s, 1, "staff", 3);
+    scan(&mut s, 1, "staff", WATER_BILL);
+    assert!(run(
+        &mut s,
+        json!({"type":"declare_bill_count","register":1,"side":"staff","count":1})
+    )
+    .is_err());
+    declare_bills(&mut s, 1, "staff", 0);
+    assert_eq!(reg(&s, 1).staff.bill_slips.unwrap().declared, None);
+    declare_bills(&mut s, 1, "staff", 2);
+    assert_eq!(reg(&s, 1).customer.bill_check, Some(9_000));
+    // 払込票を取り消すと、残りの枚数の読み取りに戻る
+    let id = reg(&s, 1).staff.lines[0].line.id;
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.bill_check, None);
+    assert_eq!(v.staff.bill_slips.unwrap().scanned, 1);
+}
+
+/// 確認で「スキップ」を押すと、手数料などで手持ちが足りず支払いを取りやめたものとして
+/// 払込票の明細が消え、また何でも登録できる
+#[test]
+fn skipping_the_bill_confirmation_cancels_the_bill_payment() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BILL);
+    declare_bills(&mut s, 1, "staff", 1);
+    assert_eq!(reg(&s, 1).customer.bill_check, Some(5_000));
+    ok(
+        &mut s,
+        json!({"type":"confirm_bill_payment","register":1,"side":"customer","skip":true}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.bill_check, None);
+    assert!(v.staff.bill_slips.is_none());
+    assert!(v.staff.lines.is_empty(), "払込票の明細は消える");
+    scan(&mut s, 1, "staff", BREAD);
+}
+
+/// セミセルフでは、お客様が払込票を読み、枚数を答え、確認まで一人でできる（係員は呼ばない）
+#[test]
+fn semi_self_customers_pay_utility_bills_on_their_own() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", GAS_BILL);
+    declare_bills(&mut s, 1, "customer", 2);
+    scan(&mut s, 1, "customer", GAS_BILL);
+    let v = reg(&s, 1);
+    assert!(!v.customer.staff_called);
+    assert_eq!(v.customer.bill_check, Some(6_000));
+    ok(
+        &mut s,
+        json!({"type":"confirm_bill_payment","register":1,"side":"customer"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
 }
 
 /// たばこにはポイントを使えない

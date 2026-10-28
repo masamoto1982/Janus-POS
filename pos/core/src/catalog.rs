@@ -88,13 +88,13 @@ pub struct Product {
     /// バーコード（FF はバーコードを持たず、店員画面のメニューから登録する）
     pub code: &'static str,
     pub name: &'static str,
-    /// 税込価格（円）。サービス商品は受付時に金額が決まるため 0
+    /// 税込価格（円）。荷物のサービス商品は受付時に金額が決まるため 0（払込票は印字された金額）
     pub price: u32,
     pub tax: TaxRate,
     pub category: Category,
     /// 「要店員」：お客様側で読まれたら店員呼び出しをかけ、店員の受付操作を待つ
     pub needs_staff: bool,
-    /// 受付した内容・金額を、お客様本人がお客様側の画面で確認する（代行収納）
+    /// 公共料金の払込票（代行収納）。読み取った件数・金額を、お客様本人がお客様側の画面で確認する
     pub customer_confirms: bool,
     /// 現金でしか払えない（切手・代行収納）。ほかの商品と一緒に買えるが、
     /// キャッシュレスで払えるのはこれを除いた分だけ（有人・セミセルフ共通）
@@ -117,6 +117,16 @@ const fn p(
         needs_staff: matches!(category, Category::Service),
         customer_confirms: false,
         cash_only: matches!(category, Category::Stamp),
+    }
+}
+
+/// 公共料金の払込票（代行収納）。係員の受付は要らず、お客様が件数・金額を確認する。現金のみ
+const fn bill(code: &'static str, name: &'static str, price: u32) -> Product {
+    Product {
+        needs_staff: false,
+        customer_confirms: true,
+        cash_only: true,
+        ..p(code, name, price, TaxRate::Standard10, Category::Service)
     }
 }
 
@@ -151,11 +161,11 @@ pub const CATALOG: &[Product] = &[
     p("2000000000053", "お手拭き", 3, Standard10, Bag),
     p("2100000000014", "荷物を送る", 0, Standard10, Service),
     p("2100000000038", "荷物を受取る", 0, Standard10, Service),
-    Product {
-        customer_confirms: true,
-        cash_only: true,
-        ..p("2100000000021", "お支払い", 0, Standard10, Service)
-    },
+    // 公共料金の払込票（金額は印字済み）。1 枚目を読むと全部の枚数を尋ね、
+    // 申告した枚数を読み終えたらお客様が件数・金額を確認する。ほかの商品とは一緒に登録できない
+    bill("2100000000021", "電気料金", 5000),
+    bill("2100000000043", "水道料金", 4000),
+    bill("2100000000050", "ガス料金", 3000),
     // FF（バーコードなし。レジ画面下のタブから登録する）
     p("FF01", "フライドチキン", 220, Reduced8, FastFood),
     p("FF02", "スパイシーチキン", 220, Reduced8, FastFood),

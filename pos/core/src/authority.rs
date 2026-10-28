@@ -110,6 +110,8 @@ pub enum Action {
     CheckId,
     /// 代行収納の支払い内容・金額の確認（お客様の承認）
     ConfirmBillPayment,
+    /// 公共料金の払込票が全部で何枚かを入力する（1 枚目を読んだ後）
+    DeclareBillCount,
     InsertCash,
     TapEmoney,
     CallStaff,
@@ -141,6 +143,7 @@ pub const ACTIONS: &[Action] = &[
     Action::ChooseAgeCheck,
     Action::CheckId,
     Action::ConfirmBillPayment,
+    Action::DeclareBillCount,
     Action::InsertCash,
     Action::TapEmoney,
     Action::CallStaff,
@@ -172,6 +175,8 @@ pub struct Context {
     pub service_pending: bool,
     /// 代行収納の支払い内容・金額を、お客様がまだ確認していない
     pub bill_pending: bool,
+    /// 公共料金の払込票の枚数の申告待ちか、申告した枚数をまだ読み終えていない
+    pub bill_counting: bool,
     /// 会計に進んだが、ポイントカードの最終確認がまだ
     pub point_pending: bool,
     /// 読み取ったクーポンがある
@@ -205,6 +210,8 @@ impl Context {
     pub fn payment_blocker(&self) -> Option<&'static str> {
         if self.emoney_short {
             Some(EMONEY_SHORT)
+        } else if self.bill_counting {
+            Some(BILL_COUNTING)
         } else if self.bill_pending {
             Some(BILL_UNCONFIRMED)
         } else if self.age_choice_pending {
@@ -233,6 +240,7 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります。対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
+const BILL_COUNTING: Denial = "払込票をすべて読み取っていません（枚数の入力と読み取り）";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";
 
 /// 電子マネーのチャージ・残高確認（残高不足の対応中は、その選択肢から）
@@ -252,6 +260,11 @@ fn resolve_emoney_short(c: &Context) -> Result<(), Denial> {
 /// 代行収納の内容・金額・件数の確認。受け付けたらすぐ（どちらのモードでも、お客様が押す）
 fn confirm_bill(c: &Context) -> Result<(), Denial> {
     require(c.bill_pending, "確認が必要な代行収納はありません")
+}
+
+/// 払込票の枚数の入力（読み取りの途中ならいつでも訂正できる）
+fn declare_bill(c: &Context) -> Result<(), Denial> {
+    require(c.bill_counting, "枚数を入力する払込票はありません")
 }
 
 /// お客様本人の意思表示・申告にあたる操作。お客様側の画面からしか押せず、
@@ -437,6 +450,7 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
+            require(!c.bill_counting, BILL_COUNTING)?;
             require(!c.ff_waiting, FF_UNCHECKED)
         }
         Action::BackToRegistering => require(paying, "会計画面ではありません"),
@@ -448,6 +462,7 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::ChooseAgeCheck => choose_age_check(c),
         Action::CheckId => check_id(c),
         Action::ConfirmBillPayment => confirm_bill(c),
+        Action::DeclareBillCount => declare_bill(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
         // 一人で手に負えないとき、店員が仲間に SOS を出す（Bell を鳴らすだけで、呼び出しの記録・画面表示はなし）
@@ -476,6 +491,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでにお会計中です")?;
             require(c.has_lines, "商品を登録してください")?;
+            require(!c.bill_counting, BILL_COUNTING)?;
             require(!c.ff_waiting, FF_UNCHECKED)
         }
         Action::BackToRegistering => require(paying, "お会計中ではありません"),
@@ -490,6 +506,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
             Err("年齢確認は係員が名札でログインしてから行います")
         }
         Action::ConfirmBillPayment => confirm_bill(c),
+        Action::DeclareBillCount => declare_bill(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::CallStaff => Ok(()),
         Action::Emoney => emoney(c),
@@ -543,6 +560,7 @@ mod tests {
                                             has_ff,
                                             service_pending,
                                             bill_pending,
+                                            bill_counting: false,
                                             method,
                                         });
                                     }

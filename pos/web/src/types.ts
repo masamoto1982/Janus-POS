@@ -97,6 +97,8 @@ export interface StaffView {
   /** 会計時、お客様の確認待ちの代行収納の金額 */
   bill_check: number | null;
   bill_count: number;
+  /** 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない） */
+  bill_slips: BillSlips | null;
   point_pending: boolean;
   method: Method | null;
   inserted: number;
@@ -107,6 +109,13 @@ export interface StaffView {
   drawer_total: number;
   drawer: [number, number][];
   mat_down: string[];
+}
+
+/** 公共料金の払込票の読み取りの進み具合 */
+export interface BillSlips {
+  /** お客様が答えた全部の枚数（まだなら null） */
+  declared: number | null;
+  scanned: number;
 }
 
 export interface CustomerView {
@@ -123,6 +132,8 @@ export interface CustomerView {
   point_pending: boolean;
   bill_check: number | null;
   bill_count: number;
+  /** 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない） */
+  bill_slips: BillSlips | null;
   staff_called: boolean;
   age_wait: number | null;
   staff_present: boolean;

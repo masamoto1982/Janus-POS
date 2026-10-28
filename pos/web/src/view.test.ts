@@ -39,14 +39,10 @@ describe("view helpers", () => {
   });
 
   it("marks the bill-payment confirmation as a customer-only button", () => {
-    const items = [
-      { name: "電気料金", amount: 5000, fee: 0 },
-      { name: "水道料金", amount: 4000, fee: 110 },
-    ];
-    const html = billCard(1, items, 9110, { action: "confirm_bill_payment", allowed: true, reason: null });
+    const html = billCard(1, 2, 8640, { action: "confirm_bill_payment", allowed: true, reason: null });
     expect(html).toContain("customer-only");
-    // 払込票ごとの内容・金額・手数料と、合計
-    for (const t of ["電気料金", "5,000", "なし", "水道料金", "4,000", "110", "2件", "9,110"]) expect(html).toContain(t);
+    expect(html).toContain("8,640");
+    expect(html).toContain("2件");
     expect(html).toContain("確認しました");
     expect(html).toContain("お支払いをやめる");
     expect(html).not.toContain("スキップ");

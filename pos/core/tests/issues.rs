@@ -1406,7 +1406,7 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
     assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
-/// 確認で「スキップ」を押すと、手数料などで手持ちが足りず支払いを取りやめたものとして
+/// 確認で「お支払いをやめる」を押すと、手数料などで手持ちが足りず支払いを取りやめたものとして
 /// 払込票の明細が消え、また何でも登録できる
 #[test]
 fn skipping_the_bill_confirmation_cancels_the_bill_payment() {

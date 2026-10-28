@@ -190,7 +190,43 @@ function buildSkeleton(): void {
       <div class="dlg-head"><h2 id="picker-title">選ぶ</h2><button class="small ghost" data-close-picker>閉じる</button></div>
       <div id="picker-body"></div>
     </dialog>
-    <div class="drag-ghost" id="ghost" hidden></div>`;
+    <div class="drag-ghost" id="ghost" hidden></div>
+    ${rampFilter()}`;
+}
+
+/** 操作できる画面の配色：グレーで描いた画面の濃淡を、そのまま青の濃淡に置き換える。
+ *  白と黒はそのまま。4 段階のグレーは明るさをそろえた青（OKLab の明度をそろえ、P型・D型・T型の色覚でも灰色と見分けられる色相）になるので、文字のコントラストは変わらない */
+const RAMP_STEPS: [number, string][] = [
+  [0x00, "#000000"],
+  [0x53, "#03578b"],
+  [0x87, "#188edb"],
+  [0xae, "#5bb6fe"],
+  [0xd4, "#afdaff"],
+  [0xff, "#ffffff"],
+];
+
+function rampFilter(): string {
+  // グレーの値（0〜255）ごとに、隣り合う段のあいだを直線で結んだ表をつくる
+  const table = (ch: number) =>
+    Array.from({ length: 256 }, (_, v) => {
+      const i = RAMP_STEPS.findIndex(([g]) => g >= v);
+      const [g1, c1] = RAMP_STEPS[i];
+      if (g1 === v || i === 0) return (parseInt(c1.slice(1 + ch * 2, 3 + ch * 2), 16) / 255).toFixed(4);
+      const [g0, c0] = RAMP_STEPS[i - 1];
+      const a = parseInt(c0.slice(1 + ch * 2, 3 + ch * 2), 16);
+      const b = parseInt(c1.slice(1 + ch * 2, 3 + ch * 2), 16);
+      return ((a + ((b - a) * (v - g0)) / (g1 - g0)) / 255).toFixed(4);
+    }).join(" ");
+  return `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <filter id="ramp" color-interpolation-filters="sRGB">
+        <feColorMatrix type="saturate" values="0" />
+        <feComponentTransfer>
+          <feFuncR type="table" tableValues="${table(0)}" />
+          <feFuncG type="table" tableValues="${table(1)}" />
+          <feFuncB type="table" tableValues="${table(2)}" />
+        </feComponentTransfer>
+      </filter>
+    </svg>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -288,6 +324,9 @@ function render(): void {
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
+      // 色を載せるのは操作できる面だけ。有人モードのお客様側は見るだけ（押せるのはお客様本人のボタンだけ）なのでグレー
+      const operable = r.active_side !== null ? r.active_side === side : r.mode !== "attended" || side === "staff";
+      el?.classList.toggle("operable", operable);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
       // レジ画面のヘッダー（稼働モードのバッジ・時刻・ベル。有人モードの店員側ではバッジが店舗メニューを開く）

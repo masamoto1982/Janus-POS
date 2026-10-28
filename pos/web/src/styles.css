@@ -464,7 +464,7 @@ body.dragging .drop-hint { display: inline; }
 /* 店員側もお客様側も、4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す */
 .staff-screen, .customer-screen { filter: grayscale(1); }
 /* 操作できる側の画面は、白と 4 段階のティールで表す（グレーの濃淡をそのまま置き換える。main.ts の tealFilter） */
-.staff-screen:not(.inactive), .customer-screen:not(.inactive) { filter: url(#teal); }
+.staff-screen.operable, .customer-screen.operable { filter: url(#teal); }
 /* 操作できない側の画面（排他）：表示はそのまま（薄くしない）で、押せなくするだけ */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,

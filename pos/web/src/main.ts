@@ -324,6 +324,9 @@ function render(): void {
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
+      // 色を載せるのは操作できる面だけ。有人モードのお客様側は見るだけ（押せるのはお客様本人のボタンだけ）なのでグレー
+      const operable = r.active_side !== null ? r.active_side === side : r.mode !== "attended" || side === "staff";
+      el?.classList.toggle("operable", operable);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
       // レジ画面のヘッダー（稼働モードのバッジ・時刻・ベル。有人モードの店員側ではバッジが店舗メニューを開く）

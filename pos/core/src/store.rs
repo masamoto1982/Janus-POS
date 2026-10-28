@@ -278,7 +278,7 @@ pub enum Command {
         register: u8,
     },
     /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない。
-    /// `skip` は「スキップ」：手数料などで手持ちが足りないとき、確認待ちの代行収納を取りやめる
+    /// `skip` は「お支払いをやめる」：手数料などで手持ちが足りないとき、確認待ちの代行収納を取りやめる（白紙に戻る）
     ConfirmBillPayment {
         register: u8,
         #[serde(default = "customer_side")]

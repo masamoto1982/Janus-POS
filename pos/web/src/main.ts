@@ -190,43 +190,7 @@ function buildSkeleton(): void {
       <div class="dlg-head"><h2 id="picker-title">選ぶ</h2><button class="small ghost" data-close-picker>閉じる</button></div>
       <div id="picker-body"></div>
     </dialog>
-    <div class="drag-ghost" id="ghost" hidden></div>
-    ${tealFilter()}`;
-}
-
-/** 操作できる画面の配色：グレーで描いた画面の濃淡を、そのままティールの濃淡に置き換える。
- *  白と黒はそのまま。4 段階のグレーは明るさ（相対輝度）をそろえたティールになるので、文字のコントラストは変わらない */
-const TEAL_STEPS: [number, string][] = [
-  [0x00, "#000000"],
-  [0x53, "#1b5c5c"],
-  [0x87, "#389494"],
-  [0xae, "#63bcbc"],
-  [0xd4, "#b1dcdc"],
-  [0xff, "#ffffff"],
-];
-
-function tealFilter(): string {
-  // グレーの値（0〜255）ごとに、隣り合う段のあいだを直線で結んだ表をつくる
-  const table = (ch: number) =>
-    Array.from({ length: 256 }, (_, v) => {
-      const i = TEAL_STEPS.findIndex(([g]) => g >= v);
-      const [g1, c1] = TEAL_STEPS[i];
-      if (g1 === v || i === 0) return (parseInt(c1.slice(1 + ch * 2, 3 + ch * 2), 16) / 255).toFixed(4);
-      const [g0, c0] = TEAL_STEPS[i - 1];
-      const a = parseInt(c0.slice(1 + ch * 2, 3 + ch * 2), 16);
-      const b = parseInt(c1.slice(1 + ch * 2, 3 + ch * 2), 16);
-      return ((a + ((b - a) * (v - g0)) / (g1 - g0)) / 255).toFixed(4);
-    }).join(" ");
-  return `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-      <filter id="teal" color-interpolation-filters="sRGB">
-        <feColorMatrix type="saturate" values="0" />
-        <feComponentTransfer>
-          <feFuncR type="table" tableValues="${table(0)}" />
-          <feFuncG type="table" tableValues="${table(1)}" />
-          <feFuncB type="table" tableValues="${table(2)}" />
-        </feComponentTransfer>
-      </filter>
-    </svg>`;
+    <div class="drag-ghost" id="ghost" hidden></div>`;
 }
 
 // ---------------------------------------------------------------------------

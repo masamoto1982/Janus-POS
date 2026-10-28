@@ -336,11 +336,13 @@ function render(): void {
       setRegion(`items-${r.id}-${side}`, items);
       el?.classList.toggle("no-items", !items);
     }
-    // モバイルモード：操作できる側が決まったら（セミセルフはお客様側）その画面を見せる
-    const shownActive = activeShown.get(r.id);
-    if (r.active_side !== shownActive) {
-      activeShown.set(r.id, r.active_side);
-      if (r.active_side && isMobile()) swipeTo(r.id, r.active_side);
+    // モバイルモード：操作する面（アクティブ面）が変わったら、その面を表にする。
+    // セミセルフはお客様側、有人は店員側、店舗メニューは開いた側（パスワード入力中はお客様側）。
+    // 有人モードで触れている一瞬だけ変わる操作側には付いていかない。表にした後もスワイプで切り替えられる
+    const face: Side = r.menu?.side ?? (r.menu_code ? "customer" : r.mode === "attended" ? "staff" : "customer");
+    if (face !== activeShown.get(r.id)) {
+      activeShown.set(r.id, face);
+      if (isMobile()) swipeTo(r.id, face);
     }
     const idle = r.idle_revert_in;
     setRegion(
@@ -444,7 +446,7 @@ function cancelConfirm(): void {
 // 呼び出しボタン：触れている間だけ鳴る。離す・指が外れる・画面を離れると止まる
 // ---------------------------------------------------------------------------
 
-const activeShown = new Map<number, Side | null>();
+const activeShown = new Map<number, Side>();
 
 let held: { cmd: string; register: number; pointer: number | null } | null = null;
 

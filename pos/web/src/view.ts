@@ -1328,6 +1328,9 @@ const SHELVES: Shelf[] = [
   { label: "オプション", match: (p) => p.category === "bag" },
 ];
 
+/** 公共料金の払込票（電気・水道・ガス） */
+const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
+
 /** 使い方の説明（ボタンにカーソルを重ねると出る） */
 const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
 const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
@@ -1351,12 +1354,15 @@ export function shelfPanel(s: Snapshot): string {
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
-        item(
-          p.code,
-          p.name,
-          `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
-          p.category === "tobacco" && asked ? "call-blink" : "",
-        ),
+        // 払込票は一行目に「公共料金」、二行目に種類と金額（例：電気 5,000円）
+        BILL_CODES.includes(p.code)
+          ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
+          : item(
+              p.code,
+              p.name,
+              `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
+              p.category === "tobacco" && asked ? "call-blink" : "",
+            ),
       )
       .join("")}</div></div>`;
   }).join("");

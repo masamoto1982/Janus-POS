@@ -1920,11 +1920,15 @@ impl Store {
                 if r.staff_state() != StaffState::Ready {
                     return Err("店舗メニューは名札でログインした店員だけが使えます".into());
                 }
-                if r.menu.is_some() {
+                if r.menu.is_some_and(|m| m.side == Side::Customer) {
                     return Err("店舗メニューを開いています".into());
                 }
+                // 店員側で開いている店舗メニューは閉じて、お客様側のパスワードを出す
+                // （有人モードでも、お客様側のバッジはいつでも押せる）
                 let code = self.new_menu_code();
-                self.reg_mut(register)?.menu_code = Some(code);
+                let r = self.reg_mut(register)?;
+                r.menu = None;
+                r.menu_code = Some(code);
                 done("店員画面に表示されたパスワードを入力してください")
             }
             C::Insert { register, amount } => self.insert(register, amount),
@@ -2734,6 +2738,9 @@ impl Store {
             .into());
         }
         match r.menu {
+            // 店員側のバッジは、お客様側で開いている店舗メニューを閉じて店員側で開き直す
+            // （どの操作も、やりたいときにできる）
+            Some(m) if m.side != side && side == Side::Staff => {}
             Some(m) if m.side != side => {
                 return Err("もう一方の画面で店舗メニューを開いています".into())
             }
@@ -2753,9 +2760,7 @@ impl Store {
                     return Err(e);
                 }
             }
-            None if r.menu_code.is_some() => {
-                return Err("お客様側の画面でパスワードを入力中です".into())
-            }
+            // 店員側で開けば、お客様側のパスワード入力は取りやめになる
             None => {}
         }
         let r = self.reg_mut(register)?;

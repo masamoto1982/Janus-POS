@@ -522,8 +522,20 @@ fn customer_side_menu_needs_a_one_time_code() {
         &mut s,
         json!({"type":"open_menu","register":1,"screen":"journal"}),
     );
-    // 店員側で開いている間は、お客様側からは開けない
-    assert!(run(&mut s, json!({"type":"request_menu_code","register":1})).is_err());
+    // 有人モードのお客様側のバッジはいつでも押せる：店員側のメニューは閉じ、パスワードを出す
+    ok(&mut s, json!({"type":"request_menu_code","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.menu.is_none());
+    assert!(v.menu_code.is_some());
+    assert_eq!(v.active_side, Some(Side::Customer));
+    // 店員側のバッジもいつでも押せる：お客様側のパスワード入力は取りやめになる
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"top"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.menu.unwrap().side, Side::Staff);
+    assert!(v.menu_code.is_none());
 }
 
 /// 問題8：呼び出しは発生したレジだけに出て、ほかのレジには出ない。

@@ -2549,8 +2549,9 @@ impl Store {
         if !r.txn.age_cleared() {
             r.txn.age_method = None;
         }
-        // 会計ボタンの後は、まずポイントカードの最終確認。読み取り済みなら確認済み
-        r.txn.point_checked = r.txn.point_card.is_some();
+        // 会計ボタンの後は、まずポイントカードの最終確認。読み取り済みなら確認済み。
+        // 公共料金の支払いにはポイントがつかないので、確認しない
+        r.txn.point_checked = r.txn.point_card.is_some() || r.txn.bill_slips() > 0;
         // セミセルフでは、会計に進めたら支払いはお客様に任せる
         r.txn.customer_turn = r.mode == Mode::SemiSelf;
         let ready = r.staff_state() == StaffState::Ready;

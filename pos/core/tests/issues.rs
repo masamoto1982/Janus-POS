@@ -1305,7 +1305,10 @@ fn utility_bills_ask_for_the_slip_count_and_confirm_once_all_are_read() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
+    // ポイントはつかないのでポイントカードの確認はなく、年確もない。すぐに決済手段へ
+    let v = reg(&s, 1);
+    assert!(!v.staff.point_pending && !v.staff.age_choice_pending);
+    assert_eq!(v.staff.payment_blocker, None);
     for m in ["credit", "qr", "points"] {
         assert!(
             run(
@@ -1441,6 +1444,7 @@ fn semi_self_customers_pay_utility_bills_on_their_own() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
+    assert!(!reg(&s, 1).customer.point_pending);
 }
 
 /// たばこにはポイントを使えない

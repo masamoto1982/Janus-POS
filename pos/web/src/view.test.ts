@@ -43,6 +43,8 @@ describe("view helpers", () => {
     expect(html).toContain("customer-only");
     expect(html).toContain("8,640");
     expect(html).toContain("2件");
+    expect(html).toContain("確認しました");
+    expect(html).toContain("スキップ");
     expect(sideOf({ type: "confirm_bill_payment", register: 1 })).toBe("customer");
   });
 

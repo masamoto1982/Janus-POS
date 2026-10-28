@@ -194,14 +194,18 @@ function ffCollectCard(reg: number, v: StaffView): string {
 }
 
 /**
- * 代行収納の支払い内容・件数・金額の確認。受け付けたらすぐ、お客様本人がお客様側の画面で押す
+ * 代行収納の支払い内容・件数・金額の確認。受け付けたらすぐ、お客様本人がお客様側の画面で押す。
+ * 手数料などで手持ちが足りないときは「スキップ」で代行収納の支払いを取りやめられる
  * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
  */
 export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
       <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください</p>
-      ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
+      <div class="point-choices">
+        ${btn("確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary")}
+        ${btn("スキップ", { type: "confirm_bill_payment", register: reg, skip: true }, st, "skip")}
+      </div>
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
 }
@@ -333,9 +337,9 @@ function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind:
   const qty = fixed
     ? `<span class="muted">この商品は数量を変えられません</span>`
     : `<span class="qty-edit">
-        <button class="small" data-edit-step="${reg}:${side}:-1" ${e.qty <= 1 ? "disabled" : ""}>−</button>
+        <button class="small neg" data-edit-step="${reg}:${side}:-1" ${e.qty <= 1 ? "disabled" : ""}>−</button>
         <b>${e.qty}</b>
-        <button class="small" data-edit-step="${reg}:${side}:1">＋</button>
+        <button class="small neg" data-edit-step="${reg}:${side}:1">＋</button>
       </span>
       ${btn("数量変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`;
   return editorRow(reg, side, `${qty}${btn("取り消し", { type: "remove_line", register: reg, side, line_id: l.id }, st, "small danger")}`);
@@ -643,7 +647,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       : ro
         ? ""
         : paying
-          ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"))
+          ? btn("登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost")
           : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.max_items,
     !!v.point_card,
@@ -800,14 +804,15 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     return `<div class="point-screen emoney-screen">
         <div class="big">電子マネーの残高が足りません</div>
         <p>残高 <b>${yen(r.emoney_short)}</b>・お支払い <b>${yen(r.staff.due)}</b></p>
-        ${ro ? "" : `<div class="emoney-choices">${choice("他の決済を使う", "cancel")}${choice("不足分を現金で払う", "cash", r.mode === "attended" ? "" : "primary")}${r.mode === "attended" ? choice("電子マネーをチャージする", "charge", "primary") : ""}</div>`}
+        ${ro ? "" : `<div class="emoney-choices">${choice("他の決済を使う", "cancel", "skip")}${choice("不足分を現金で払う", "cash", r.mode === "attended" ? "" : "primary")}${r.mode === "attended" ? choice("電子マネーをチャージする", "charge", "primary") : ""}</div>`}
       </div>`;
   }
   const e = r.emoney!;
   if (e.kind === "menu") {
     const go = (label: string, kind: string) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
     return `<div class="point-screen emoney-screen">
-        <div class="big">選択してください</div>
+        <div class="big">電子マネー</div>
+        <p class="muted">選択してください</p>
         ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("やめる")}`}
       </div>`;
   }

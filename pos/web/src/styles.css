@@ -166,15 +166,14 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 /* FF タブ */
 .ff-tabs { display: flex; gap: 2px; align-items: center; flex: none; }
 /* タブは区画の横幅いっぱいに均等に並べる */
-.ff-tab { flex: 1 1 0; min-width: 0; padding: 2px 4px; font-size: 11px; white-space: nowrap; border-radius: 6px 6px 0 0; background: var(--btn); color: var(--btn-ink); border: 0; }
-.ff-tab.on { background: var(--btn-on); color: var(--btn-on-ink); }
+.ff-tab { flex: 1 1 0; min-width: 0; padding: 2px 4px; font-size: 11px; white-space: nowrap; border-radius: 6px 6px 0 0; }
 .ff-page { flex: 1; min-height: 0; display: flex; gap: 4px; }
 .ff-arrows { flex: none; width: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; }
-.ff-arrow { flex: 1; max-height: 48%; padding: 0; font-size: 9px; background: var(--panel); color: var(--ink); border: 1px solid var(--border); }
+.ff-arrow { flex: 1; max-height: 48%; padding: 0; font-size: 9px; }
 .ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: 4px; }
-.ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 1px 3px; font-size: 10px; line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; background: var(--btn); color: var(--btn-ink); }
+.ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 1px 3px; font-size: 10px; line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
 .ff-item small { font-size: 9px; }
-.ff-item.soldout { background: var(--line); color: var(--muted); }
+.ff-item.soldout { background: var(--off-bg); color: var(--off-ink); border-color: var(--off-ink); }
 /* 店員画面とお客様画面は同じ内容・同じ見た目。操作している側だけ色がつく */
 .staff-screen { background: var(--cust-bg); border: 1px solid var(--border); }
 .customer-screen { background: var(--cust-bg); border: 1px solid var(--border); }
@@ -193,7 +192,6 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .num { text-align: right; white-space: nowrap; }
 
 .reg-top { position: sticky; top: -8px; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; min-height: 44px; margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); }
-.reg-top button { background: var(--btn); color: var(--btn-ink); border-color: var(--border); }
 .reg-top .total { font-size: 28px; }
 .reg-top .info { flex: 1 0 100%; display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 14px; min-width: 0; font-size: 12px; white-space: nowrap; }
 .reg-top .info .point { color: var(--msg-weak); }
@@ -203,7 +201,7 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .reg-top .sum { white-space: nowrap; }
 .reg-top .action { margin-left: auto; display: flex; align-items: stretch; gap: 8px; }
 /* 電子マネー（チャージ・残高確認）は会計ボタンと同じ高さで、塗らずに枠線だけの控えめな表現 */
-.reg-top .emoney-top { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 10px; line-height: 1.2; background: transparent; color: var(--ink); border: 1px solid var(--border); font-weight: 400; }
+.reg-top .emoney-top { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 10px; line-height: 1.2; font-weight: 400; }
 .reg-top .emoney-top b { font-size: 12px; font-weight: 400; }
 .reg-top .emoney-top small { font-size: 9px; color: var(--msg-weak); }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
@@ -218,26 +216,30 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .row.wrap { flex-wrap: wrap; }
 .row.center, .center { justify-content: center; text-align: center; }
 
+/* ボタンは「積極ボタン」と「消極ボタン」の二種類だけ（2026-10-28 ユーザー指定）。
+   積極ボタン＝濃い背景色に白文字、枠線なし。ふつうのボタンはこちら（進む・決める・選ぶ）。
+   消極ボタン＝濃い枠線と濃い文字、背景なし。スキップ・やめる・戻る・閉じるなどの控えめな操作と、
+   切り替えボタン（タブ・支払い方法など）の選ばれていない側。選ばれている側は積極ボタンになる */
 button {
-  border: 1px solid transparent; border-radius: 8px; padding: 8px 12px; cursor: pointer;
-  background: var(--btn); color: var(--btn-ink);
+  border: 1.5px solid transparent; border-radius: 8px; padding: 8px 12px; cursor: pointer;
+  background: var(--btn-on); color: var(--btn-on-ink);
 }
-button.on, button[aria-pressed="true"] { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); opacity: 1; }
+button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
+.ff-tab, .ff-arrow, .ff-item, .qty-btn, .guide-btn, .void-btn, .call-btn, .hold-confirm, .reg-top .emoney-top, .swipe-tabs button {
+  background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong);
+}
+button.on, button[aria-pressed="true"] { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); opacity: 1; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
-button.ghost { background: var(--btn); color: var(--btn-ink); }
 button.ghost:disabled { opacity: .3; }
-/* スキップは控えめに（年確はしたほうが、ポイントは付けたほうが商売上よいので） */
-button.skip { background: var(--btn); color: var(--btn-ink); font-weight: 500; }
+/* スキップは消極ボタン（年確はしたほうが、ポイントは付けたほうが商売上よいので） */
+button.skip { font-weight: 500; }
 button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
-button.seg { background: var(--btn); color: var(--btn-ink); padding: 4px 10px; }
-button.seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
-.method-list .seg { border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; }
-.method-list .seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); opacity: 1; }
+button.seg { padding: 4px 10px; }
+.method-list .seg { border-radius: 6px; padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
-button.ff { background: var(--btn); color: var(--btn-ink); }
 .segs { display: inline-flex; gap: 4px; }
 
 input, select {
@@ -278,7 +280,6 @@ input, select {
 .svc input { width: 7em; }
 details summary { cursor: pointer; margin-top: 6px; }
 details summary h3 { display: inline; }
-.ffmenu button.ff { background: var(--btn); color: var(--btn-ink); }
 
 .welcome, .thanks { text-align: center; padding: 40px 8px; }
 .welcome { box-sizing: border-box; min-height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 8px; }
@@ -286,8 +287,7 @@ details summary h3 { display: inline; }
 .welcome p { font-size: 12px; margin: 4px 0 0; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
 /* 押さなくても困らない補助ボタンは塗らずに枠線だけ。選択中は通常の選択色 */
-.guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: transparent; color: var(--ink); border-color: var(--border); }
-.guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--border); }
+.guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
 /* 有人モードの初期画面：二段目の電子マネーも、お買い物などと同じ枠線だけの丸い形と色 */
 .welcome .emoney-guide { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.25; padding: 4px 16px; }
@@ -307,9 +307,10 @@ details summary h3 { display: inline; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 180px; width: 180px; min-width: 0; padding: 12px 16px; font-size: 14px; }
 .bill-card { background: var(--warn-bg); color: var(--warn); }
+/* お支払い内容の確認は、角の丸い枠に入れず登録エリアいっぱいに広げる（最上段と会計バーは除く。2026-10-28 ユーザー） */
+.confirm > .bill-card { align-self: stretch; flex: 1 0 auto; max-width: none; margin: -8px -12px; border-radius: 0; padding: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; }
 /* 数量はボタンの形（押すと数量変更・取り消しの行が広がる） */
-.qty-btn { min-width: 34px; padding: 2px 8px; font: inherit; font-weight: 600; text-align: center; background: var(--bg); color: var(--ink); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
-.qty-btn.on { border-color: var(--ink); }
+.qty-btn { min-width: 34px; padding: 2px 8px; font: inherit; font-weight: 600; text-align: center; border-radius: 6px; cursor: pointer; }
 /* FF の「お渡し前」は押せるアイコン（押すとお渡し照合の画面） */
 button.tag.ff-verify { font: inherit; font-size: 11px; border: 1px solid currentColor; cursor: pointer; }
 button.tag.ff-verify:disabled { cursor: not-allowed; }
@@ -559,10 +560,9 @@ body.dragging .drop-hint { display: inline; }
 .bell-btn:disabled { opacity: .45; }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { background: var(--btn-on) !important; color: var(--btn-on-ink) !important; transform: translateY(1px); box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
-.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 0; padding: 2px 6px; border-radius: 8px; color: #fff; line-height: 1.2; }
+.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; }
-.call-btn.ff, .call-btn.service, .call-btn.tob { background: var(--btn); color: var(--btn-ink); }
 
 /* 適用先のないクーポンの注意と、取り消したクーポンの返却 */
 .coupon-card { border: 2px solid var(--border); background: var(--danger-bg); padding: 8px 10px; font-size: 13px; }
@@ -583,20 +583,21 @@ body.dragging .drop-hint { display: inline; }
 .qty-edit { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
 .qty-edit b { min-width: 2em; text-align: center; font-size: 15px; }
 .qty-edit button { min-width: 32px; }
-button.danger { color: var(--danger); border-color: var(--border); background: var(--danger-bg); }
 
 .emoney-choices { display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: min(100%, 280px); margin: 0 auto; }
 /* チャージと残高確認は横に並べ、やめるは次の行に置く */
 .emoney-choices.row { display: grid; grid-template-columns: 1fr 1fr; width: 280px; max-width: 100%; margin-bottom: 8px; }
 .emoney-choices.row > * { white-space: nowrap; }
+/* 「電子マネー」（積極テキスト）のすぐ下に「選択してください」（消極テキスト） */
+.emoney-screen .big + .muted { margin-top: -14px; }
 .emoney-screen .emoney-balance { font-size: 28px; font-variant-numeric: tabular-nums; }
 
 /* 取引中止：明細の上の帯に控えめに置く（会計ボタンから離す）。確認画面で「長押しで中止」を押し続けて決まる */
-.void-btn { font-size: 11px; padding: 2px 8px; background: transparent; color: var(--msg-weak); border: 1px solid var(--border); }
+.void-btn { font-size: 11px; padding: 2px 8px; }
 .staff-head { gap: 8px; }
 .void-choices { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 .void-choices > button { min-width: 140px; min-height: 44px; }
-.hold-confirm { position: relative; overflow: hidden; background: transparent; color: var(--ink); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.hold-confirm { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .hold-confirm .hold-fill { position: absolute; inset: 0; width: 0; background: var(--btn-on); }
 .hold-confirm.holding .hold-fill { width: 100%; transition: width 1.5s linear; }
 .hold-confirm .hold-label { position: relative; }
@@ -649,8 +650,8 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
   .register h2 .idle { font-size: 11px; }
   .swipe-tabs { display: flex; gap: 4px; margin-bottom: 4px; }
   /* 表に出ている面のタブを幅 2/3、裏の面のタブを 1/3 にして、どちらを見ているかを一目でわかるようにする */
-  .swipe-tabs button { flex: 1 1 0; min-width: 0; min-height: 30px; padding: 2px 4px; font-size: 13px; line-height: 1.2; background: var(--btn); color: var(--btn-ink); transition: flex-grow .2s; }
-  .swipe-tabs button.on { flex-grow: 2; background: var(--btn-on); color: var(--btn-on-ink); }
+  .swipe-tabs button { flex: 1 1 0; min-width: 0; min-height: 30px; padding: 2px 4px; font-size: 13px; line-height: 1.2; transition: flex-grow .2s; }
+  .swipe-tabs button.on { flex-grow: 2; }
   .swipe-tabs button.operable { filter: url(#ramp); }
   .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .screens::-webkit-scrollbar { display: none; }

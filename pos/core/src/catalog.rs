@@ -258,6 +258,32 @@ pub fn find(code: &str) -> Option<&'static Product> {
     CATALOG.iter().find(|p| p.code == code)
 }
 
+/// 公共料金の収納手数料（払込票ごとに決まっていて、お客様が負担する）。払込票を読むと明細に一緒に載る。
+/// 手数料は消費税の課税対象（標準税率）。Item には並べず、スキャンしても読めない
+pub const BILL_FEES: &[Product] = &[
+    bill_fee("F2100000000043", "水道料金の手数料", 110),
+    bill_fee("F2100000000050", "ガス料金の手数料", 110),
+];
+
+const fn bill_fee(code: &'static str, name: &'static str, price: u32) -> Product {
+    Product {
+        needs_staff: false,
+        customer_confirms: false,
+        cash_only: true,
+        ..p(code, name, price, TaxRate::Standard10, Category::Service)
+    }
+}
+
+/// 払込票（バーコード）の収納手数料（手数料のかからない払込票は None）
+pub fn fee_for(bill: &str) -> Option<&'static Product> {
+    BILL_FEES.iter().find(|f| &f.code[1..] == bill)
+}
+
+/// 収納手数料の明細の商品（明細の番号から引く）
+pub fn find_fee(code: &str) -> Option<&'static Product> {
+    BILL_FEES.iter().find(|f| f.code == code)
+}
+
 /// FF の初期在庫。コロッケは最初から品切れ（登録できないことを確認できる）。
 /// カウンターのドリンクはカップがある限り作れるので多めにしておく。
 pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[

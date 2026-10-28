@@ -4,6 +4,7 @@
 
 import type {
   ActionState,
+  BillItem,
   BillSlips,
   Unavailable,
   Coupon,
@@ -199,11 +200,23 @@ function ffCollectCard(reg: number, v: StaffView): string {
  * 手数料などで手持ちが足りないときは「スキップ」で代行収納の支払いを取りやめられる
  * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
  */
-/** 公共料金のお支払い内容の確認。確認できなければ支払いは成立しないので、取りやめ（白紙に戻る）は左下の消極ボタン、確認しましたは右下 */
-export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
+/**
+ * 公共料金のお支払い内容の確認。払込票ごとの内容・金額・手数料と合計を並べる。
+ * 確認できなければ支払いは成立しないので、取りやめ（白紙に戻る）は左下の消極ボタン、確認しましたは右下
+ */
+export function billCard(reg: number, items: BillItem[], total: number, st: ActionState): string {
+  const rows = items
+    .map((b) => `<tr><td>${esc(b.name)}</td><td class="num">${yen(b.amount)}</td><td class="num">${b.fee ? yen(b.fee) : "なし"}</td></tr>`)
+    .join("");
+  // 狭い画面でも合計とボタンが見えるよう、見出しと合計を一行にし、払込票の一覧だけをスクロールさせる
   return `<div class="card bill-card customer-only">
-      <div class="big">お支払い内容の確認</div>
-      <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください</p>
+      <div class="bill-head"><div class="big">お支払い内容の確認</div><div class="bill-total">合計（${items.length}件）<b>${yen(total)}</b></div></div>
+      <div class="bill-scroll">
+        <table class="bill-list">
+          <thead><tr><th>内容</th><th class="num">金額</th><th class="num">手数料</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
       <div class="bill-foot">
         ${btn("お支払いをやめる", { type: "confirm_bill_payment", register: reg, skip: true }, st, "neg")}
@@ -692,7 +705,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (v.bill_slips)
     return screen(side === "staff" ? billSlipsCard(reg, side, v.bill_slips, a("declare_bill_count")) : pairNote("払込票を読み取っています"));
   if (v.bill_check !== null)
-    return screen(side === "customer" ? billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
+    return screen(side === "customer" ? billCard(reg, v.bill_items, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
     side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
@@ -780,8 +793,9 @@ export function regTop(total: number, count: number, action: string, max = Infin
 }
 
 /** 買い物点数（数量の合計） */
-export function itemCount(lines: { qty: number }[]): number {
-  return lines.reduce((n, l) => n + l.qty, 0);
+export function itemCount(lines: { qty: number; fee?: boolean }[]): number {
+  // 公共料金の収納手数料は買い物点数に数えない
+  return lines.reduce((n, l) => n + (l.fee ? 0 : l.qty), 0);
 }
 
 /**
@@ -1120,7 +1134,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const screen = (body: string) => `${top}${notice}${confirm(body)}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
   if (c.bill_slips) return screen(billSlipsCard(reg, side, c.bill_slips, a("declare_bill_count")));
-  if (c.bill_check !== null) return screen(billCard(reg, c.bill_count, c.bill_check, a("confirm_bill_payment")));
+  if (c.bill_check !== null) return screen(billCard(reg, c.bill_items, c.bill_check, a("confirm_bill_payment")));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
@@ -1314,6 +1328,9 @@ const SHELVES: Shelf[] = [
   { label: "オプション", match: (p) => p.category === "bag" },
 ];
 
+/** 公共料金の払込票（電気・水道・ガス） */
+const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
+
 /** 使い方の説明（ボタンにカーソルを重ねると出る） */
 const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
 const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
@@ -1337,12 +1354,15 @@ export function shelfPanel(s: Snapshot): string {
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
-        item(
-          p.code,
-          p.name,
-          `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
-          p.category === "tobacco" && asked ? "call-blink" : "",
-        ),
+        // 払込票は一行目に「公共料金」、二行目に種類と金額（例：電気 5,000円）
+        BILL_CODES.includes(p.code)
+          ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
+          : item(
+              p.code,
+              p.name,
+              `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
+              p.category === "tobacco" && asked ? "call-blink" : "",
+            ),
       )
       .join("")}</div></div>`;
   }).join("");

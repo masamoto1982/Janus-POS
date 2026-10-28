@@ -43,12 +43,14 @@ export type StaffLine = LineKind & {
   qty: number;
   category: string;
   cash_only: boolean;
+  /** 公共料金の収納手数料の明細（買い物点数に数えない） */
+  fee: boolean;
   amount: number;
   age: number | null;
   limit: number | null;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean; fee: boolean };
 
 export interface Call {
   id: number;
@@ -97,6 +99,8 @@ export interface StaffView {
   /** 会計時、お客様の確認待ちの代行収納の金額 */
   bill_check: number | null;
   bill_count: number;
+  /** お客様の確認待ちの払込票（内容・金額・手数料） */
+  bill_items: BillItem[];
   /** 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない） */
   bill_slips: BillSlips | null;
   point_pending: boolean;
@@ -109,6 +113,14 @@ export interface StaffView {
   drawer_total: number;
   drawer: [number, number][];
   mat_down: string[];
+}
+
+/** お支払い内容の確認に並べる払込票一枚分 */
+export interface BillItem {
+  name: string;
+  amount: number;
+  /** 収納手数料（なければ 0） */
+  fee: number;
 }
 
 /** 公共料金の払込票の読み取りの進み具合 */
@@ -132,6 +144,8 @@ export interface CustomerView {
   point_pending: boolean;
   bill_check: number | null;
   bill_count: number;
+  /** お客様の確認待ちの払込票（内容・金額・手数料） */
+  bill_items: BillItem[];
   /** 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない） */
   bill_slips: BillSlips | null;
   staff_called: boolean;

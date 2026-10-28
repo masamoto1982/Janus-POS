@@ -42,7 +42,7 @@ describe("view helpers", () => {
     const html = billCard(1, 2, 8640, { action: "confirm_bill_payment", allowed: true, reason: null });
     expect(html).toContain("customer-only");
     expect(html).toContain("8,640");
-    expect(html).toContain("2件");
+    expect(html).toContain("2点");
     expect(html).toContain("確認しました");
     expect(html).toContain("お支払いをやめる");
     expect(html).not.toContain("スキップ");

@@ -199,11 +199,18 @@ function ffCollectCard(reg: number, v: StaffView): string {
  * 手数料などで手持ちが足りないときは「スキップ」で代行収納の支払いを取りやめられる
  * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
  */
-/** 公共料金のお支払い内容の確認。確認できなければ支払いは成立しないので、取りやめ（白紙に戻る）は左下の消極ボタン、確認しましたは右下 */
+/**
+ * 公共料金のお支払い内容の確認（受付点数と合計額）。確認できなければ支払いは成立しないので、
+ * 取りやめ（白紙に戻る）は左下の消極ボタン、確認しましたは右下。
+ *
+ * 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは、この画面に払込票ごとの支払いの内容・金額・手数料と
+ * 合計額を記載する。Janus POS はシミュレーターで表示エリアが足りないため、受付点数と合計額だけにし、
+ * 手数料（収納手数料）の概念も扱わない。
+ */
 export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
-      <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください</p>
+      <p>受付点数 <b>${count}点</b>　合計 <b>${yen(amount)}</b><br>払込票の枚数と合計金額をご確認ください</p>
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
       <div class="bill-foot">
         ${btn("お支払いをやめる", { type: "confirm_bill_payment", register: reg, skip: true }, st, "neg")}

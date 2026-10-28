@@ -318,7 +318,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   const ro = side === "customer";
   if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
   // 払込票（現金のみのサービス）は受付が要らないので、受付の札を出さない
-  if (l.kind === "service" && !(l.done && l.cash_only)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
+  if (l.kind === "service" && !isBill(l)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
   tags.push(warnTags(l));
   const remove = find(v.actions, "remove_line");
   let svc = "";
@@ -331,7 +331,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   }
   return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
-    <td class="num">${ro ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
+    <td class="num">${ro || isBill(l) ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
     <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>
   </tr>${lineEditor(reg, side, l, remove)}`;
 }
@@ -343,6 +343,9 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
 export const editing = new Map<string, { id: number; qty: number }>();
 
 const editingRow = (reg: number, side: Side, id: number): string => (editing.get(`${reg}:${side}`)?.id === id ? "editing" : "");
+
+/** 公共料金の払込票（明細ごとには取り消せない。やめるときは取引中止） */
+const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolean => l.kind === "service" && !!l.done && l.cash_only;
 
 /** 数量をボタンの形で出す。押すと行が広がって数量変更・取り消しができる（もう一度押すと閉じる）。押せないときは数字だけ */
 function qtyBtn(reg: number, side: Side, id: number, qty: number, st: ActionState): string {
@@ -1088,7 +1091,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
-      const qty = c.phase === "registering" ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
+      const qty = c.phase === "registering" && !isBill(l) ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
       const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line"), true) : "";
       return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td></tr>${editor}`];
     });

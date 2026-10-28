@@ -1373,15 +1373,34 @@ fn the_slip_count_can_be_corrected_while_reading() {
     assert_eq!(reg(&s, 1).staff.bill_slips.unwrap().declared, None);
     declare_bills(&mut s, 1, "staff", 2);
     assert_eq!(reg(&s, 1).customer.bill_check, Some(9_000));
-    // 払込票を取り消すと、残りの枚数の読み取りに戻る
+}
+
+/// 登録した払込票は明細ごとには取り消せない（有人でもセミセルフでも）。
+/// 払えないときは取引中止で最初からやり直す
+#[test]
+fn registered_bill_slips_cannot_be_removed_only_voided() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BILL);
+    declare_bills(&mut s, 1, "customer", 2);
+    scan(&mut s, 1, "customer", WATER_BILL);
     let id = reg(&s, 1).staff.lines[0].line.id;
+    let try_remove = |s: &mut Store, side: &str| {
+        let e = run(
+            s,
+            json!({"type":"remove_line","register":1,"side":side,"line_id":id}),
+        )
+        .unwrap_err();
+        assert!(e.contains("取引中止"), "{e}");
+    };
+    try_remove(&mut s, "customer");
+    login(&mut s, 1);
+    try_remove(&mut s, "staff");
+    assert_eq!(reg(&s, 1).staff.lines.len(), 2);
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+        json!({"type":"void_transaction","register":1,"side":"staff"}),
     );
-    let v = reg(&s, 1);
-    assert_eq!(v.customer.bill_check, None);
-    assert_eq!(v.staff.bill_slips.unwrap().scanned, 1);
+    assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
 /// 確認で「スキップ」を押すと、手数料などで手持ちが足りず支払いを取りやめたものとして

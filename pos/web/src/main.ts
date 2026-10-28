@@ -295,16 +295,12 @@ function render(): void {
       setRegion(`items-${r.id}-${side}`, items);
       el?.classList.toggle("no-items", !items);
     }
-    // モバイルモード：操作できる側が決まったら（セミセルフはお客様側）その画面を見せ、もう一方のタブに「表示のみ」と添える
+    // モバイルモード：操作できる側が決まったら（セミセルフはお客様側）その画面を見せる
     const shownActive = activeShown.get(r.id);
     if (r.active_side !== shownActive) {
       activeShown.set(r.id, r.active_side);
       if (r.active_side && isMobile()) swipeTo(r.id, r.active_side);
     }
-    app.querySelectorAll<HTMLElement>(`[data-swipe-to^="${r.id}:"]`).forEach((b) => {
-      const side = b.dataset.swipeTo!.split(":")[1];
-      b.classList.toggle("view-only", r.active_side !== null && r.active_side !== side);
-    });
     const idle = r.idle_revert_in;
     setRegion(
       `mode-${r.id}`,

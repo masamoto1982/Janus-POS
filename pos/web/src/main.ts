@@ -198,10 +198,10 @@ function buildSkeleton(): void {
  *  白と黒はそのまま。4 段階のグレーは明るさをそろえた青（OKLab の明度をそろえ、P型・D型・T型の色覚でも灰色と見分けられる色相）になるので、文字のコントラストは変わらない */
 const RAMP_STEPS: [number, string][] = [
   [0x00, "#000000"],
-  [0x53, "#2e5484"],
-  [0x87, "#618abd"],
-  [0xae, "#87b1e7"],
-  [0xd4, "#b8d7fe"],
+  [0x53, "#03578b"],
+  [0x87, "#188edb"],
+  [0xae, "#5bb6fe"],
+  [0xd4, "#afdaff"],
   [0xff, "#ffffff"],
 ];
 

@@ -30,6 +30,8 @@ const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現�
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）";
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
+const BILL_NO_REMOVE: &str =
+    "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
 const BILL_COUNT_FIRST: &str = "払込票が全部で何枚か、先に入力してください";
 const NO_POINTS: &str = "切手・お支払い・たばこにはポイントを使えません";
 const EMONEY_NO_CHARGE: &str =
@@ -1516,6 +1518,11 @@ impl Store {
                     .iter()
                     .position(|l| l.id == line_id)
                     .ok_or("明細が見つかりません")?;
+                // 公共料金の払込票は、一度登録したら明細ごとには取り消さない（数え違い・取り違えを防ぐ）。
+                // 払えないときは取引中止で最初からやり直す
+                if r.txn.lines[i].is_bill() {
+                    return Err(BILL_NO_REMOVE.into());
+                }
                 let received = r.txn.lines[i].kind
                     == LineKind::Ff {
                         state: FfState::Received,
@@ -1536,18 +1543,6 @@ impl Store {
                     self.restock(l.code, l.qty);
                 }
                 let r = self.reg_mut(register)?;
-                // 払込票を取り消したら、件数・金額の確認はやり直し（残りがなければ枚数の申告からやり直し）
-                if l.is_bill() {
-                    if r.txn.bill_slips() == 0 {
-                        r.txn.bill_declared = None;
-                    }
-                    for b in r.txn.lines.iter_mut().filter(|b| b.is_bill()) {
-                        b.kind = LineKind::Service {
-                            done: true,
-                            confirm_pending: true,
-                        };
-                    }
-                }
                 if !r.txn.service_pending() {
                     self.calls.resolve(register, CallKind::Service, self.now);
                 }

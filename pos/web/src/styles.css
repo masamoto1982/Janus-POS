@@ -463,6 +463,8 @@ body.dragging .drop-hint { display: inline; }
 
 /* 店員側もお客様側も、4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す */
 .staff-screen, .customer-screen { filter: grayscale(1); }
+/* 操作できる側の画面は、白と 4 段階のティールで表す（グレーの濃淡をそのまま置き換える。main.ts の tealFilter） */
+.staff-screen.operable, .customer-screen.operable { filter: url(#teal); }
 /* 操作できない側の画面（排他）：表示はそのまま（薄くしない）で、押せなくするだけ */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
@@ -659,38 +661,3 @@ button.danger { color: var(--danger); border-color: var(--border); background: v
   .money-io { margin-top: 6px; }
   .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
 }
-
-/* ---------------------------------------------------------------------------
-   操作できる面の配色（2026-10-28 ユーザー指定）。操作できない面は上のグレーのまま。
-   シアン #4DC4FF：基調色・背景／青 #005AFF：ボタン（目立たせたいものは塗りに白文字・白枠、
-   目立たせたくないものは塗らずに青の文字と枠）／緑 #03AF7A：お渡し済み・照合 OK／
-   赤 #FF4B00：お渡し前・照合 NG など注意を促すところ／黄 #FFF100：呼び鈴と、登録した明細のエフェクト。
-   緑・赤・黄・シアンの上の文字は黒（白では読みにくい）
-   --------------------------------------------------------------------------- */
-.screen.operable {
-  filter: none;
-  --border: var(--ac-sky);
-  --line: color-mix(in srgb, var(--ac-sky) 30%, white);
-  --reg-top-bg: color-mix(in srgb, var(--ac-sky) 40%, white);
-  --btn: transparent; --btn-ink: var(--ac-blue);
-  --btn-on: var(--ac-blue); --btn-on-ink: #ffffff;
-  --ok: var(--ac-green); --danger: var(--ac-red);
-  --warn: #000000; --warn-bg: var(--ac-red);
-  --flash: var(--ac-yellow);
-}
-.screen.operable button:not(:disabled) { border-color: var(--ac-blue); }
-/* 目立たせたいボタン：青の塗りに白の文字と枠 */
-.screen.operable button.primary:not(:disabled), .screen.operable button.on:not(:disabled),
-.screen.operable button[aria-pressed="true"]:not(:disabled), .screen.operable .call-btn.pressing {
-  background: var(--ac-blue) !important; color: #ffffff !important; border-color: #ffffff;
-}
-.screen.operable .scan-welcome, .screen.operable .attended-welcome { --glow: #ffffff; --dark: color-mix(in srgb, var(--ac-sky) 55%, white); }
-.screen.operable .scan-welcome .emoney-link { color: var(--ac-blue); }
-.screen.operable .bell-btn:not(:disabled) { background: var(--ac-yellow); }
-/* お渡し前・照合 NG は赤、お渡し済み・照合 OK は緑（塗りに黒文字） */
-.screen.operable .tag.ff-waiting, .screen.operable .tag.warn { background: var(--ac-red); color: #000000; border-color: var(--ac-red); }
-.screen.operable .tag.ff-received, .screen.operable .tag.ok { background: var(--ac-green); color: #000000; border-color: var(--ac-green); }
-.screen.operable .ffv-ok, .screen.operable .ffv-ng { padding: 1px 8px; border-radius: 4px; color: #000000; }
-.screen.operable .ffv-ok { background: var(--ac-green); }
-.screen.operable .ffv-ng { background: var(--ac-red); }
-.screen.operable .guide-btn:not(:disabled):not(.on) { color: var(--ac-blue); }

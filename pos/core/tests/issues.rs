@@ -1282,28 +1282,8 @@ fn utility_bills_ask_for_the_slip_count_and_confirm_once_all_are_read() {
     scan(&mut s, 1, "staff", GAS_BILL);
     let v = reg(&s, 1);
     assert!(v.staff.bill_slips.is_none());
-    // 水道とガスには 110 円ずつ収納手数料がかかる（電気はかからない）。件数は払込票の枚数
-    assert_eq!(v.customer.bill_check, Some(12_220));
+    assert_eq!(v.customer.bill_check, Some(12_000));
     assert_eq!(v.customer.bill_count, 3);
-    let items: Vec<_> = v
-        .customer
-        .bill_items
-        .iter()
-        .map(|b| (b.name, b.amount, b.fee))
-        .collect();
-    assert_eq!(items.len(), 3);
-    assert!(items.contains(&("電気料金", 5_000, 0)));
-    assert!(items.contains(&("水道料金", 4_000, 110)));
-    assert!(items.contains(&("ガス料金", 3_000, 110)));
-    // 手数料には消費税（標準税率）がかかる（買い物点数に数えないことはレシートで確かめる）
-    let ten: u32 = v
-        .staff
-        .taxes
-        .iter()
-        .filter(|t| t.rate_bp == 1000)
-        .map(|t| t.tax)
-        .sum();
-    assert_eq!(ten, 20, "手数料 220 円の内税");
     // 申告した枚数より多くは読めない
     assert!(run(
         &mut s,
@@ -1346,8 +1326,7 @@ fn utility_bills_ask_for_the_slip_count_and_confirm_once_all_are_read() {
     ok(&mut s, json!({"type":"insert","register":1,"amount":20000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let r = reg(&s, 1).last_receipt.unwrap();
-    assert_eq!(r.total, 12_220);
-    assert_eq!(r.items, 3);
+    assert_eq!(r.total, 12_000);
     assert_eq!(r.method, "現金");
 }
 
@@ -1396,7 +1375,7 @@ fn the_slip_count_can_be_corrected_while_reading() {
     declare_bills(&mut s, 1, "staff", 0);
     assert_eq!(reg(&s, 1).staff.bill_slips.unwrap().declared, None);
     declare_bills(&mut s, 1, "staff", 2);
-    assert_eq!(reg(&s, 1).customer.bill_check, Some(9_110));
+    assert_eq!(reg(&s, 1).customer.bill_check, Some(9_000));
 }
 
 /// 登録した払込票は明細ごとには取り消せない（有人でもセミセルフでも）。
@@ -1419,7 +1398,7 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
     try_remove(&mut s, "customer");
     login(&mut s, 1);
     try_remove(&mut s, "staff");
-    assert_eq!(reg(&s, 1).staff.lines.len(), 3, "電気・水道と水道の手数料");
+    assert_eq!(reg(&s, 1).staff.lines.len(), 2);
     ok(
         &mut s,
         json!({"type":"void_transaction","register":1,"side":"staff"}),
@@ -1456,7 +1435,7 @@ fn semi_self_customers_pay_utility_bills_on_their_own() {
     scan(&mut s, 1, "customer", GAS_BILL);
     let v = reg(&s, 1);
     assert!(!v.customer.staff_called);
-    assert_eq!(v.customer.bill_check, Some(6_220));
+    assert_eq!(v.customer.bill_check, Some(6_000));
     ok(
         &mut s,
         json!({"type":"confirm_bill_payment","register":1,"side":"customer"}),

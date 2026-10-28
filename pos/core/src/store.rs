@@ -538,15 +538,6 @@ impl Command {
     }
 }
 
-/// お支払い内容の確認に並べる払込票一枚分
-#[derive(Clone, Debug, Serialize)]
-pub struct BillItem {
-    pub name: &'static str,
-    pub amount: u32,
-    /// 収納手数料（なければ 0）
-    pub fee: u32,
-}
-
 /// 公共料金の払込票の読み取りの進み具合
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct BillSlips {
@@ -609,8 +600,6 @@ pub struct Line {
     pub category: Category,
     /// 現金でしか払えない（切手・代行収納）
     pub cash_only: bool,
-    /// 公共料金の収納手数料の明細（買い物点数には数えない）
-    pub fee: bool,
     #[serde(flatten)]
     pub kind: LineKind,
 }
@@ -623,11 +612,6 @@ impl Line {
     /// 公共料金の払込票
     fn is_bill(&self) -> bool {
         catalog::find(self.code).is_some_and(|p| p.customer_confirms)
-    }
-
-    /// 公共料金の支払いの明細（払込票か、その収納手数料）
-    fn is_bill_part(&self) -> bool {
-        self.is_bill() || self.fee
     }
 }
 
@@ -834,31 +818,20 @@ impl Txn {
         Some(pending.map(Line::amount).sum())
     }
 
-    /// お客様の確認待ちの代行収納の件数（手数料の明細は数えない）
+    /// お客様の確認待ちの代行収納の件数
     fn bill_count(&self) -> u32 {
-        self.bill_items().len() as u32
-    }
-
-    /// お客様の確認待ちの払込票（内容・金額・手数料）
-    fn bill_items(&self) -> Vec<BillItem> {
         self.lines
             .iter()
             .filter(|l| {
-                l.is_bill()
-                    && matches!(
-                        l.kind,
-                        LineKind::Service {
-                            confirm_pending: true,
-                            ..
-                        }
-                    )
+                matches!(
+                    l.kind,
+                    LineKind::Service {
+                        confirm_pending: true,
+                        ..
+                    }
+                )
             })
-            .map(|l| BillItem {
-                name: l.name,
-                amount: l.amount(),
-                fee: catalog::fee_for(l.code).map_or(0, |f| f.price),
-            })
-            .collect()
+            .count() as u32
     }
 
     /// 承認済みの年齢で、いまの年確商品がすべて足りている
@@ -887,7 +860,7 @@ impl Txn {
     }
 
     fn item_count(&self) -> u32 {
-        self.lines.iter().filter(|l| !l.fee).map(|l| l.qty).sum()
+        self.lines.iter().map(|l| l.qty).sum()
     }
 
     /// この商品をいくつ登録しているか（行が分かれていても合計する）
@@ -923,7 +896,6 @@ impl Txn {
             rate_bp: tax.1,
             category: p.category,
             cash_only: p.cash_only,
-            fee: catalog::find_fee(p.code).is_some(),
             kind,
         });
     }
@@ -1548,7 +1520,7 @@ impl Store {
                     .ok_or("明細が見つかりません")?;
                 // 公共料金の払込票は、一度登録したら明細ごとには取り消さない（数え違い・取り違えを防ぐ）。
                 // 払えないときは取引中止で最初からやり直す
-                if r.txn.lines[i].is_bill_part() {
+                if r.txn.lines[i].is_bill() {
                     return Err(BILL_NO_REMOVE.into());
                 }
                 let received = r.txn.lines[i].kind
@@ -2338,10 +2310,6 @@ impl Store {
             Scanned::Product(p) => self.tax_for(p.code),
             _ => (String::new(), 0),
         };
-        let fee = match &scanned {
-            Scanned::Product(p) => catalog::fee_for(p.code).map(|f| (f, self.tax_for(f.code))),
-            _ => None,
-        };
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
@@ -2358,7 +2326,7 @@ impl Store {
         if let Scanned::Product(p) = &scanned {
             let slips = r.txn.bill_slips();
             if p.customer_confirms {
-                if r.txn.lines.iter().any(|l| !l.is_bill_part()) {
+                if r.txn.lines.iter().any(|l| !l.is_bill()) {
                     return Err(BILL_ALONE.into());
                 }
                 match r.txn.bill_declared {
@@ -2412,15 +2380,15 @@ impl Store {
                 })
             }
             Scanned::Product(p) if p.customer_confirms => {
-                let kind = LineKind::Service {
-                    done: true,
-                    confirm_pending: true,
-                };
-                r.txn.push(p, 1, kind, tax);
-                // 手数料のかかる払込票は、手数料を別の明細にする（手数料には消費税がかかる）
-                if let Some((f, fee_tax)) = fee {
-                    r.txn.push(f, 1, kind, fee_tax);
-                }
+                r.txn.push(
+                    p,
+                    1,
+                    LineKind::Service {
+                        done: true,
+                        confirm_pending: true,
+                    },
+                    tax,
+                );
                 let slips = r.txn.bill_slips();
                 done(match r.txn.bill_declared {
                     None => format!("{} {}円：払込票は全部で何枚ですか{back}", p.name, p.price),
@@ -2827,7 +2795,7 @@ impl Store {
             paid,
             change_total: change.total(),
             change,
-            items: txn.item_count(),
+            items: txn.lines.iter().map(|l| l.qty).sum(),
             points: if txn.point_card.is_some() {
                 total / 100
             } else {
@@ -3202,7 +3170,6 @@ impl Store {
                 age: self.age_rules.age_for(l.code, l.category),
                 limit: self.age_rules.limit_for(l.code),
                 cash_only: l.cash_only,
-                fee: l.fee,
                 kind: l.kind,
             })
             .collect();
@@ -3255,11 +3222,6 @@ impl Store {
                 returned: returned.clone(),
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 bill_count: t.bill_count(),
-                bill_items: if c.bill_pending {
-                    t.bill_items()
-                } else {
-                    vec![]
-                },
                 bill_slips: t.bill_counting().then(|| BillSlips {
                     declared: t.bill_declared,
                     scanned: t.bill_slips(),
@@ -3289,11 +3251,6 @@ impl Store {
                 point_pending: c.point_pending,
                 bill_check: t.bill_pending().filter(|_| c.bill_pending),
                 bill_count: t.bill_count(),
-                bill_items: if c.bill_pending {
-                    t.bill_items()
-                } else {
-                    vec![]
-                },
                 bill_slips: t.bill_counting().then(|| BillSlips {
                     declared: t.bill_declared,
                     scanned: t.bill_slips(),
@@ -3388,8 +3345,6 @@ pub struct CustomerLine {
     pub limit: Option<u32>,
     /// 現金でしか払えない（切手・代行収納）
     pub cash_only: bool,
-    /// 公共料金の収納手数料の明細（買い物点数には数えない）
-    pub fee: bool,
     #[serde(flatten)]
     pub kind: LineKind,
 }
@@ -3425,8 +3380,6 @@ pub struct StaffView {
     pub bill_count: u32,
     /// 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない）
     pub bill_slips: Option<BillSlips>,
-    /// お客様の確認待ちの払込票（内容・金額・手数料）
-    pub bill_items: Vec<BillItem>,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
     pub point_pending: bool,
     pub method: Option<PaymentMethod>,
@@ -3463,8 +3416,6 @@ pub struct CustomerView {
     pub bill_count: u32,
     /// 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない）
     pub bill_slips: Option<BillSlips>,
-    /// お客様の確認待ちの払込票（内容・金額・手数料）
-    pub bill_items: Vec<BillItem>,
     pub staff_called: bool,
     /// セミセルフで年確の係員を待っている間の年齢（身分証の準備を案内する）
     pub age_wait: Option<u8>,

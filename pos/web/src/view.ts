@@ -194,14 +194,18 @@ function ffCollectCard(reg: number, v: StaffView): string {
 }
 
 /**
- * 代行収納の支払い内容・件数・金額の確認。受け付けたらすぐ、お客様本人がお客様側の画面で押す
+ * 代行収納の支払い内容・件数・金額の確認。受け付けたらすぐ、お客様本人がお客様側の画面で押す。
+ * 手数料などで手持ちが足りないときは「スキップ」で代行収納の支払いを取りやめられる
  * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
  */
 export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
   return `<div class="card bill-card customer-only">
       <div class="big">お支払い内容の確認</div>
       <p>お支払い　<b>${count}件</b>　合計 <b>${yen(amount)}</b><br>払込票の内容・件数・金額をご確認ください</p>
-      ${btn("内容・金額を確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary big-btn")}
+      <div class="point-choices">
+        ${btn("確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary")}
+        ${btn("スキップ", { type: "confirm_bill_payment", register: reg, skip: true }, st, "skip")}
+      </div>
       ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
     </div>`;
 }

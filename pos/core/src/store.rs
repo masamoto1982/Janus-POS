@@ -273,11 +273,14 @@ pub enum Command {
     DismissFfCollect {
         register: u8,
     },
-    /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない
+    /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない。
+    /// `skip` は「スキップ」：手数料などで手持ちが足りないとき、確認待ちの代行収納を取りやめる
     ConfirmBillPayment {
         register: u8,
         #[serde(default = "customer_side")]
         side: Side,
+        #[serde(default)]
+        skip: bool,
     },
     InsertCash {
         register: u8,
@@ -1609,10 +1612,37 @@ impl Store {
                 r.txn.ff_collect.clear();
                 done("FF を回収しました")
             }
-            C::ConfirmBillPayment { register, side } => {
+            C::ConfirmBillPayment {
+                register,
+                side,
+                skip,
+            } => {
                 self.check(register, side, Action::ConfirmBillPayment)?;
                 let r = self.reg_mut(register)?;
                 let amount = r.txn.bill_pending().unwrap_or(0);
+                if skip {
+                    r.txn.lines.retain(|l| {
+                        !matches!(
+                            l.kind,
+                            LineKind::Service {
+                                confirm_pending: true,
+                                ..
+                            }
+                        )
+                    });
+                    // ほかに何も残っていなければ、会計の途中でも登録画面に戻る
+                    if r.txn.lines.is_empty() && r.txn.prepaid == 0 {
+                        r.txn.paying = false;
+                        r.txn.method = None;
+                        r.txn.customer_turn = false;
+                    }
+                    if !r.txn.service_pending() {
+                        self.calls.resolve(register, CallKind::Service, self.now);
+                    }
+                    return done(format!(
+                        "お客様が代行収納（{amount}円）のお支払いを取りやめました"
+                    ));
+                }
                 for l in &mut r.txn.lines {
                     if let LineKind::Service {
                         confirm_pending, ..

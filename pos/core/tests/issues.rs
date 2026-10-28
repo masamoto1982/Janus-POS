@@ -1230,6 +1230,43 @@ fn staff_skipping_the_age_check_needs_no_customer_button() {
     assert_eq!(reg(&s, 1).staff.payment_blocker, None);
 }
 
+/// 代行収納の確認で「スキップ」を押すと、手持ちが足りないなどで支払いを取りやめたものとして
+/// 確認待ちの代行収納の明細が消える。ほかの商品はそのまま残り、会計を続けられる。
+#[test]
+fn skipping_the_bill_confirmation_cancels_the_bill_payment() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BILL);
+    scan(&mut s, 1, "staff", BEER);
+    let id = reg(&s, 1)
+        .staff
+        .lines
+        .iter()
+        .find(|l| l.line.code == BILL)
+        .unwrap()
+        .line
+        .id;
+    ok(
+        &mut s,
+        json!({"type":"complete_service","register":1,"line_id":id,"amount":8_640}),
+    );
+    assert_eq!(reg(&s, 1).customer.bill_check, Some(8_640));
+    ok(
+        &mut s,
+        json!({"type":"confirm_bill_payment","register":1,"side":"customer","skip":true}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.customer.bill_check, None);
+    assert!(
+        v.staff.lines.iter().all(|l| l.line.code != BILL),
+        "代行収納の明細は消える"
+    );
+    assert!(
+        v.staff.lines.iter().any(|l| l.line.code == BEER),
+        "ほかの商品は残る"
+    );
+}
+
 /// 代行収納：係員が支払い内容・金額を受け付けたら、すぐにお客様が金額と件数を確認する。
 /// 確認ボタンはお客様側の画面からしか押せない（係員が画面を持っていても）。宅配便は確認の対象外。
 /// 確認の優先順は 代行収納 ＞ 年確 ＞ ポイントカード ＞ 決済手段（一つの画面で一つの確認だけ）。

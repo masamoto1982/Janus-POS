@@ -5,6 +5,7 @@
 import type {
   ActionState,
   BillRow,
+  Parcel,
   Unavailable,
   Coupon,
   Returned,
@@ -156,6 +157,69 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
         ${choose(false, "スキップ", "skip")}
       </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// 荷物を送る（宅配便の発送）：サイズ → 郵便番号 → 料金 → 次の荷物
+// ---------------------------------------------------------------------------
+
+/** 明細の札：決まったサイズと届け先（受付中は「受付中」） */
+function parcelTag(p: Parcel, done: boolean): string {
+  if (done && p.size && p.region) return `<span class="tag ok">${p.size}サイズ・${esc(p.region)}あて</span>`;
+  return `<span class="tag warn">${p.size ? `${p.size}サイズ・届け先未定` : "受付中"}</span>`;
+}
+
+/** 受付中（料金がまだ決まっていない）の荷物 */
+export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
+  return lines.find((l) => l.kind === "service" && !l.done && l.parcel);
+}
+
+const kg = (g: number): string => `${(g / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}kg`;
+
+/**
+ * 店員側：受付中の荷物のサイズ決定、または届け先の郵便番号の入力。
+ * 年確の生年月日の入力と同じ形（問いを一行、入力欄、ボタンの行。どれも中央に）
+ */
+function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): string {
+  const p = l.parcel as Parcel;
+  const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
+  const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
+  if (!p.size) {
+    return `<div class="point-screen parcel-entry">
+        <div class="big">${no}取り扱いサイズを決定してください</div>
+        <div class="parcel-fields">
+          <label>三辺の合計<input type="number" inputmode="numeric" min="1" max="999" autocomplete="off" data-key="pcm-${reg}" data-parcel="${reg}" aria-label="荷物の三辺の合計（cm）" /><span>cm</span></label>
+          <label>重さ<input type="number" inputmode="decimal" min="0.1" step="0.1" autocomplete="off" data-key="pkg-${reg}" data-parcel="${reg}" aria-label="荷物の重さ（kg）" /><span>kg</span></label>
+        </div>
+        <div class="point-choices"><button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
+        <p class="muted">三辺の合計と重さの両方が収まるサイズに決まります（60〜160）</p>
+      </div>`;
+  }
+  return `<div class="point-screen parcel-entry">
+      <div class="big">${no}お届け先の郵便番号を入力してください</div>
+      <p class="parcel-size">${p.size}サイズ（三辺の合計 ${p.sum_cm}cm・${kg(p.weight_g)}）</p>
+      <input type="text" inputmode="numeric" maxlength="8" placeholder="例 100-0001" autocomplete="off" data-key="ppost-${reg}" data-parcel="${reg}" aria-label="お届け先の郵便番号（7桁）" />
+      <div class="point-choices">
+        ${btn("サイズに戻る", { type: "parcel_back", register: reg, line_id: l.id }, st, "ghost")}
+        <button class="primary" data-form="parcel-postal" data-reg="${reg}" data-line="${l.id}"${off}>決定</button>
+      </div>
+    </div>`;
+}
+
+/** 店員側：料金が決まった後の「次の荷物はありますか」。直前に受け付けた荷物の料金と、受付済みの個数を添える */
+function parcelAsk(reg: number, lines: StaffLine[], st: ActionState): string {
+  const done = lines.filter((l) => l.parcel && l.kind === "service" && l.done);
+  const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
+  const p = last?.parcel;
+  return `<div class="point-screen parcel-ask">
+      ${p && last ? `<p class="parcel-fee">${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b>${yen(last.amount)}</b></p>` : ""}
+      <div class="big">次の荷物はありますか？</div>
+      <div class="point-choices">
+        ${btn("ある", { type: "parcel_next", register: reg, more: true }, st)}
+        ${btn("ない", { type: "parcel_next", register: reg, more: false }, st, "primary")}
+      </div>
+      <p class="muted">受付済み ${done.length}個</p>
     </div>`;
 }
 
@@ -339,11 +403,13 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   const ro = side === "customer";
   if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
   // 払込票（現金のみのサービス）は受付が要らないので、受付の札を出さない
-  if (l.kind === "service" && !isBill(l)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
+  if (l.kind === "service" && l.parcel) tags.push(parcelTag(l.parcel, l.done));
+  else if (l.kind === "service" && !isBill(l)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
   tags.push(warnTags(l));
   const remove = find(v.actions, "remove_line");
   let svc = "";
-  if (l.kind === "service" && !l.done && !ro) {
+  // 荷物を送るは、サイズと郵便番号を決める画面で料金を決める（金額は打ち込まない）
+  if (l.kind === "service" && !l.done && !ro && !l.parcel) {
     const a = find(v.actions, "complete_service");
     svc = `<div class="svc">
       <input type="number" inputmode="numeric" min="0" placeholder="金額" data-key="svc-${reg}-${l.id}" ${a.allowed ? "" : "disabled"} />
@@ -715,6 +781,15 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
   // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
+  // 荷物を送る：店員がサイズと郵便番号を決める間、お客様には伝票の貼り付けをお願いする
+  const parcel = pendingParcel(v.lines);
+  if (!paying && parcel)
+    return screen(
+      side === "staff"
+        ? parcelStep(reg, parcel, a("complete_service"), v.lines.filter((l) => l.parcel).length)
+        : pairNote("伝票の貼り付けをお願いします", parcel.parcel?.size ? "お届け先の郵便番号を確認しています" : "荷物の大きさと重さを測っています"),
+    );
+  if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("ほかにお送りする荷物はございますか？"));
   const slips = v.bills.length;
   if (paying && slips && v.bill_unchecked)
     return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "店員が払込票を確認しています"));
@@ -970,6 +1045,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
   // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
   if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
+  // 荷物の発送はほかの商品と一緒に会計できないので、荷物の取引では FF タブを出さない（受付の画面を広く使う）
+  if (r.mode === "attended" && r.staff.lines.some((l) => l.parcel)) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);

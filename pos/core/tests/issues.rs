@@ -14,6 +14,8 @@ const LIGHTER: &str = "4900000000134";
 const SANDWICH: &str = "4900000000028";
 const TEA: &str = "4900000000035";
 const PARCEL: &str = "2100000000014";
+/// 荷物を受取る
+const RECEIVE: &str = "2100000000038";
 const BILL: &str = "2100000000021";
 const WATER_BILL: &str = "2100000000043";
 const GAS_BILL: &str = "2100000000050";
@@ -403,7 +405,7 @@ fn fast_food_flow_in_semi_self_mode() {
 #[test]
 fn service_item_needs_staff() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "customer", RECEIVE);
     assert!(s
         .snapshot()
         .calls
@@ -417,6 +419,115 @@ fn service_item_needs_staff() {
     );
     assert_eq!(reg(&s, 2).mode, Mode::Attended);
     assert_eq!(reg(&s, 2).customer.total, 1200);
+}
+
+fn pending_parcel(s: &Store, r: u8) -> u32 {
+    reg(s, r)
+        .staff
+        .lines
+        .iter()
+        .find(|l| matches!(l.line.kind, LineKind::Service { done: false, .. }))
+        .map(|l| l.line.id)
+        .expect("受付中の荷物")
+}
+
+/// 荷物を送る：伝票を読むと係員を呼び、係員がサイズ（三辺の合計・重さ）→ 郵便番号の順に決めると料金が決まる。
+/// 次の荷物が「ある」ならもう一度サイズから、「ない」なら会計に進める（支払方法の制限なし）
+#[test]
+fn parcel_fee_comes_from_size_and_postal_code() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL);
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.kind == CallKind::Service));
+    login_as(&mut s, 2, "ST1001");
+    let id = pending_parcel(&s, 2);
+    // 金額の直接入力はできない
+    assert!(run(
+        &mut s,
+        json!({"type":"complete_service","register":2,"line_id":id,"amount":1200})
+    )
+    .is_err());
+    // サイズを決める前に郵便番号は決められない
+    assert!(run(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"100-0001"})
+    )
+    .is_err());
+    // 160 サイズを超えると受け付けない
+    assert!(run(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":170,"weight_g":3000})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    let v = reg(&s, 2);
+    assert_eq!(v.customer.total, 940);
+    assert!(v.staff.parcel_ask && v.customer.parcel_ask);
+    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    // 次の荷物がある：もう一つ受付する
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":true}),
+    );
+    let id2 = pending_parcel(&s, 2);
+    assert_ne!(id, id2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id2,"sum_cm":75,"weight_g":4000}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id2,"postal":"530-0001"}),
+    );
+    // 80 サイズ・関西あて
+    assert_eq!(reg(&s, 2).customer.total, 940 + 1230 + 240);
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":false}),
+    );
+    let v = reg(&s, 2);
+    assert!(!v.staff.parcel_ask);
+    assert!(allowed(&v, Side::Staff, Action::Checkout));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    );
+}
+
+/// 荷物の発送は、ほかの商品と一緒に会計できない（荷物どうしは一緒に会計できる）
+#[test]
+fn parcel_cannot_be_mixed_with_other_goods() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", BREAD);
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"customer","code":PARCEL})
+    )
+    .is_err());
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "customer", PARCEL);
+    assert_eq!(reg(&s, 2).customer.lines.len(), 2);
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"customer","code":BREAD})
+    )
+    .is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"customer","code":RECEIVE})
+    )
+    .is_err());
 }
 
 /// 問題6：出金はお客様側の店舗メニューに入ったときだけでき（入るには使い捨てパスワード）、記録が残る。

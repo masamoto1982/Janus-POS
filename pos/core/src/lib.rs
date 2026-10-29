@@ -11,6 +11,7 @@ pub mod calls;
 pub mod cash;
 pub mod catalog;
 pub mod mat;
+pub mod parcel;
 pub mod rng;
 pub mod store;
 pub mod tax;

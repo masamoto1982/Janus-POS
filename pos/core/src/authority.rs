@@ -96,6 +96,8 @@ pub enum Action {
     /// FF の明細のお渡し確認チェック（入れる・外す）
     CheckFf,
     CompleteService,
+    /// 荷物の料金が決まった後、次の荷物があるか（「ある」「ない」）を答える
+    ParcelNext,
     RemoveLine,
     /// 読み取ったクーポンの取消（お会計中でもできる。取り消したクーポンはお客様に返す）
     RemoveCoupon,
@@ -134,6 +136,7 @@ pub const ACTIONS: &[Action] = &[
     Action::FfButton,
     Action::CheckFf,
     Action::CompleteService,
+    Action::ParcelNext,
     Action::RemoveLine,
     Action::RemoveCoupon,
     Action::Checkout,
@@ -173,6 +176,8 @@ pub struct Context {
     pub has_ff: bool,
     /// 店員の受付が済んでいないサービス商品がある
     pub service_pending: bool,
+    /// 荷物の料金が決まり、「次の荷物はありますか」の答えを待っている
+    pub parcel_ask: bool,
     /// 公共料金の払込票がある
     pub has_bills: bool,
     /// 店員がまだ内容を確認していない払込票がある
@@ -226,6 +231,8 @@ impl Context {
             Some(FF_UNCHECKED)
         } else if self.service_pending {
             Some("サービス商品の受付が済んでいません")
+        } else if self.parcel_ask {
+            Some(PARCEL_ASK)
         } else {
             None
         }
@@ -235,6 +242,7 @@ impl Context {
 pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
+const PARCEL_ASK: Denial = "次の荷物があるか選んでください";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
 /// 似て非なる商品をクーポンのつもりで定価で買ってしまう事故を防ぐため、決済を止める
 const COUPON_UNMATCHED: Denial =
@@ -446,6 +454,7 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
         Action::CheckFf => check_ff(c),
         Action::CompleteService => require(c.service_pending, "受付待ちのサービス商品はありません"),
+        Action::ParcelNext => require(c.parcel_ask, "次の荷物をお尋ねする場面ではありません"),
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")
@@ -455,7 +464,9 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
-            require(!c.ff_waiting, FF_UNCHECKED)
+            require(!c.ff_waiting, FF_UNCHECKED)?;
+            require(!c.service_pending, "サービス商品の受付が済んでいません")?;
+            require(!c.parcel_ask, PARCEL_ASK)
         }
         Action::BackToRegistering => require(paying, "会計画面ではありません"),
         Action::SelectPayment => {
@@ -522,6 +533,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         // 取引中止はお客様もできる（誤操作を防ぐため、画面で確認と長押しを挟む）
         Action::VoidTransaction => void_transaction(c),
         Action::CompleteService
+        | Action::ParcelNext
         | Action::EndStaffMode
         | Action::Pause
         | Action::CashOut
@@ -567,6 +579,7 @@ mod tests {
                                             ff_waiting,
                                             has_ff,
                                             service_pending,
+                                            parcel_ask: false,
                                             has_bills: bill_unchecked,
                                             bill_unchecked,
                                             bill_handover: false,

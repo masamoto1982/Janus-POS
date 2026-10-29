@@ -540,6 +540,17 @@ body.dragging .drop-hint { display: inline; }
 .id-card { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; }
 .id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
 .id-head button { min-width: 64px; }
+/* 荷物の受付は入力欄とボタンを一画面に収める（年確の入力より詰める） */
+.parcel-entry, .parcel-ask { padding: 12px; gap: 10px; }
+.parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
+.parcel-fields label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.parcel-fields input { width: 84px; text-align: right; font-size: 18px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+.parcel-entry input[data-key^="ppost-"] { width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.parcel-entry p, .parcel-ask p { margin: 0; }
+.parcel-size { margin: 0; font-size: 15px; }
+.parcel-no { margin-right: 8px; padding: 1px 8px; border: 1.5px solid var(--msg-strong); border-radius: 999px; font-size: 14px; }
+.parcel-fee { margin: 0; font-size: 15px; }
+.parcel-fee b { margin-left: 8px; font-size: 22px; }
 .id-entry input[data-birth] { width: 370px; max-width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; padding: 10px 12px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 370px; }
 .collect-list label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; cursor: pointer; text-align: left; }

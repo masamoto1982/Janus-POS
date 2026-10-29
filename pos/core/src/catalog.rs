@@ -99,6 +99,8 @@ pub struct Product {
     /// 現金でしか払えない（切手・代行収納）。ほかの商品と一緒に買えるが、
     /// キャッシュレスで払えるのはこれを除いた分だけ（有人・セミセルフ共通）
     pub cash_only: bool,
+    /// 宅配便の発送（荷物を送る）。サイズと届け先の郵便番号で料金が決まる。ほかの商品と一緒に会計できない
+    pub parcel_send: bool,
 }
 
 const fn p(
@@ -117,6 +119,7 @@ const fn p(
         needs_staff: matches!(category, Category::Service),
         utility_bill: false,
         cash_only: matches!(category, Category::Stamp),
+        parcel_send: false,
     }
 }
 
@@ -159,7 +162,10 @@ pub const CATALOG: &[Product] = &[
     p("2000000000039", "フォーク", 3, Standard10, Bag),
     p("2000000000046", "スプーン", 3, Standard10, Bag),
     p("2000000000053", "お手拭き", 3, Standard10, Bag),
-    p("2100000000014", "荷物を送る", 0, Standard10, Service),
+    Product {
+        parcel_send: true,
+        ..p("2100000000014", "荷物を送る", 0, Standard10, Service)
+    },
     p("2100000000038", "荷物を受取る", 0, Standard10, Service),
     // 公共料金の払込票（金額は印字済み）。1 枚目を読むと全部の枚数を尋ね、
     // 申告した枚数を読み終えたらお客様が件数・金額を確認する。ほかの商品とは一緒に登録できない

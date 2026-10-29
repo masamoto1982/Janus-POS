@@ -33,6 +33,15 @@ export interface Returned {
   unmatched: boolean;
 }
 
+/** 荷物を送る：サイズ（三辺の合計・重さから決まる）と届け先。郵便番号まで決まると料金が確定する */
+export interface Parcel {
+  sum_cm: number;
+  weight_g: number;
+  size: number | null;
+  postal: string | null;
+  region: string | null;
+}
+
 export type StaffLine = LineKind & {
   id: number;
   /** 最後に動きのあった順番（クーポンの id と同じ通し番号） */
@@ -46,6 +55,8 @@ export type StaffLine = LineKind & {
   amount: number;
   age: number | null;
   limit: number | null;
+  /** 荷物を送る明細だけにある */
+  parcel?: Parcel;
 };
 
 export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean };
@@ -99,6 +110,8 @@ export interface StaffView {
   /** 店員がまだ内容を確認していない払込票がある */
   bill_unchecked: boolean;
   point_pending: boolean;
+  /** 荷物の料金が決まり、「次の荷物はありますか」の答えを待っている */
+  parcel_ask: boolean;
   method: Method | null;
   inserted: number;
   due: number;
@@ -136,6 +149,7 @@ export interface CustomerView {
   due: number;
   point_card: boolean;
   point_pending: boolean;
+  parcel_ask: boolean;
   bills: BillRow[];
   bill_unchecked: boolean;
   staff_called: boolean;

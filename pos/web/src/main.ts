@@ -552,12 +552,27 @@ const clear = (key: string): void => {
   if (el) el.value = "";
 };
 
+/** 全角の数字・小数点を半角に */
+const han = (s: string): string => s.replace(/[０-９．]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+
 function form(b: HTMLElement): void {
   const reg = Number(b.dataset.reg);
   scope = b.closest("[data-drop]") ?? app;
   switch (b.dataset.form) {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
+      break;
+    case "parcel-size":
+      send({
+        type: "parcel_size",
+        register: reg,
+        line_id: Number(b.dataset.line),
+        sum_cm: Math.round(Number(han(val(`pcm-${reg}`)) || 0)),
+        weight_g: Math.round(Number(han(val(`pkg-${reg}`)) || 0) * 1000),
+      });
+      break;
+    case "parcel-postal":
+      send({ type: "parcel_postal", register: reg, line_id: Number(b.dataset.line), postal: val(`ppost-${reg}`) });
       break;
     case "birth":
       send({ type: "check_id", register: reg, side: "staff", birth: val(`birth-${reg}`), today: isoDate(new Date()) });
@@ -613,6 +628,16 @@ app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
   el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
+});
+// 荷物のサイズ・郵便番号の入力欄では Enter で決定（三辺の合計の欄では重さの欄へ進む）
+app.addEventListener("keydown", (e) => {
+  const el = e.target as HTMLInputElement;
+  if (!el.dataset?.parcel || e.key !== "Enter" || e.isComposing) return;
+  const box = el.closest(".parcel-entry");
+  const inputs = [...(box?.querySelectorAll<HTMLInputElement>("input[data-parcel]") ?? [])];
+  const next = inputs[inputs.indexOf(el) + 1];
+  if (next) next.focus();
+  else box?.querySelector<HTMLButtonElement>('[data-form^="parcel-"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;

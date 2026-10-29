@@ -18,6 +18,7 @@ use crate::catalog::{
     self, Category, Coupon, FfTab, Product, Scanned, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
 use crate::mat::{Bell, Mat};
+use crate::parcel::{self, Parcel};
 use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 
@@ -30,6 +31,10 @@ const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現�
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）";
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
+/// 荷物を送る（宅配便の伝票）の商品コード
+const PARCEL_CODE: &str = "2100000000014";
+const PARCEL_ALONE: &str =
+    "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str = "切手・お支払い・たばこにはポイントを使えません";
@@ -217,6 +222,29 @@ pub enum Command {
         register: u8,
         line_id: u32,
         amount: u32,
+    },
+    /// 荷物を送る：三辺の合計（cm）と重さ（g）から取り扱いサイズを決める
+    ParcelSize {
+        register: u8,
+        line_id: u32,
+        sum_cm: u32,
+        weight_g: u32,
+    },
+    /// 荷物を送る：届け先の郵便番号を決めて料金を確定する
+    ParcelPostal {
+        register: u8,
+        line_id: u32,
+        postal: String,
+    },
+    /// 荷物を送る：郵便番号の入力からサイズの決定に戻る
+    ParcelBack {
+        register: u8,
+        line_id: u32,
+    },
+    /// 荷物を送る：料金が決まった後の「次の荷物はありますか」への答え
+    ParcelNext {
+        register: u8,
+        more: bool,
     },
     RemoveLine {
         register: u8,
@@ -470,6 +498,10 @@ impl Command {
             | C::FfButton { register, .. }
             | C::CheckFf { register, .. }
             | C::CompleteService { register, .. }
+            | C::ParcelSize { register, .. }
+            | C::ParcelPostal { register, .. }
+            | C::ParcelBack { register, .. }
+            | C::ParcelNext { register, .. }
             | C::RemoveLine { register, .. }
             | C::SetQty { register, .. }
             | C::RemoveCoupon { register, .. }
@@ -532,7 +564,12 @@ impl Command {
             | C::RequestMenuCode { .. }
             | C::CashOut { .. }
             | C::CashIn { .. } => Some(Side::Customer),
-            C::CompleteService { .. } | C::VoidTransaction { .. } => Some(Side::Staff),
+            C::CompleteService { .. }
+            | C::ParcelSize { .. }
+            | C::ParcelPostal { .. }
+            | C::ParcelBack { .. }
+            | C::ParcelNext { .. }
+            | C::VoidTransaction { .. } => Some(Side::Staff),
             _ => None,
         }
     }
@@ -613,6 +650,9 @@ pub struct Line {
     /// 公共料金の払込票のバーコード番号（シミュレーターでは読み取ったときに便宜的に作る）
     #[serde(skip)]
     pub slip_no: Option<String>,
+    /// 荷物を送る：サイズ・届け先（受付の途中も含む）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parcel: Option<Parcel>,
 }
 
 /// 払込票のバーコード番号を便宜的に作る（16 桁を 4 桁ずつ区切る）。
@@ -632,6 +672,11 @@ impl Line {
         self.unit_price * self.qty
     }
 
+    /// 荷物を送る（宅配便の発送）
+    fn is_parcel(&self) -> bool {
+        self.parcel.is_some()
+    }
+
     /// 公共料金の払込票
     fn is_bill(&self) -> bool {
         catalog::find(self.code).is_some_and(|p| p.utility_bill)
@@ -640,6 +685,8 @@ impl Line {
 
 #[derive(Clone, Debug, Default)]
 struct Txn {
+    /// 荷物の料金が決まり、「次の荷物はありますか」の答えを待っている
+    parcel_ask: bool,
     /// たばこボタンで呼ばれた店員がログインした（たばこを登録するまで Item のたばこを点滅させる）
     tobacco_asked: bool,
     lines: Vec<Line>,
@@ -911,6 +958,7 @@ impl Txn {
             cash_only: p.cash_only,
             kind,
             slip_no: None,
+            parcel: p.parcel_send.then(Parcel::default),
         });
     }
 }
@@ -1039,6 +1087,7 @@ impl Register {
                 .iter()
                 .any(|l| matches!(l.kind, LineKind::Ff { .. })),
             service_pending: t.service_pending(),
+            parcel_ask: t.parcel_ask,
             has_bills: t.bill_slips() > 0,
             bill_unchecked: t.bill_unchecked(),
             bill_handover: self.bill_handover.is_some(),
@@ -1512,6 +1561,9 @@ impl Store {
                         l.id == line_id && matches!(l.kind, LineKind::Service { done: false, .. })
                     })
                     .ok_or("受付待ちのサービス商品が見つかりません")?;
+                if l.is_parcel() {
+                    return Err("荷物の料金は、サイズと届け先の郵便番号で決まります".into());
+                }
                 l.unit_price = amount;
                 // 代行収納は、受付した内容・金額をお客様が会計時に確認する
                 l.kind = LineKind::Service {
@@ -1523,6 +1575,86 @@ impl Store {
                     self.calls.resolve(register, CallKind::Service, self.now);
                 }
                 done(format!("{name}を受け付けました（{amount}円）"))
+            }
+            C::ParcelSize {
+                register,
+                line_id,
+                sum_cm,
+                weight_g,
+            } => {
+                self.check_active(register, Action::CompleteService)?;
+                let size = parcel::size_for(sum_cm, weight_g)?;
+                let pc = self.pending_parcel(register, line_id)?;
+                *pc = Parcel {
+                    sum_cm,
+                    weight_g,
+                    size: Some(size),
+                    ..Parcel::default()
+                };
+                done(format!(
+                    "{size} サイズに決まりました。届け先の郵便番号を入力してください"
+                ))
+            }
+            C::ParcelBack { register, line_id } => {
+                self.check_active(register, Action::CompleteService)?;
+                let pc = self.pending_parcel(register, line_id)?;
+                pc.size = None;
+                done("取り扱いサイズを決め直します".to_string())
+            }
+            C::ParcelPostal {
+                register,
+                line_id,
+                postal,
+            } => {
+                self.check_active(register, Action::CompleteService)?;
+                let code = parcel::normalize_postal(&postal)?;
+                let region = parcel::region(&code)?;
+                let pc = self.pending_parcel(register, line_id)?;
+                let size = pc.size.ok_or("先に取り扱いサイズを決めてください")?;
+                let fee = parcel::fee(size, region);
+                pc.postal = Some(format!("{}-{}", &code[..3], &code[3..]));
+                pc.region = Some(region.label());
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                if let Some(l) = r.txn.lines.iter_mut().find(|l| l.id == line_id) {
+                    l.unit_price = fee;
+                    l.kind = LineKind::Service {
+                        done: true,
+                        confirm_pending: false,
+                    };
+                }
+                r.txn.parcel_ask = true;
+                if !r.txn.service_pending() {
+                    self.calls.resolve(register, CallKind::Service, now);
+                }
+                done(format!(
+                    "{size} サイズ・{}あて：料金 {fee}円",
+                    region.label()
+                ))
+            }
+            C::ParcelNext { register, more } => {
+                self.check_active(register, Action::ParcelNext)?;
+                let r = self.reg_mut(register)?;
+                r.txn.parcel_ask = false;
+                if !more {
+                    return done("荷物の受付が済みました".to_string());
+                }
+                if r.txn.item_count() >= MAX_ITEMS {
+                    return Err(ITEMS_FULL.into());
+                }
+                let p = catalog::find(PARCEL_CODE).ok_or("荷物の商品が見つかりません")?;
+                let tax = self.tax_for(p.code);
+                let r = self.reg_mut(register)?;
+                r.txn.push(
+                    p,
+                    1,
+                    LineKind::Service {
+                        done: false,
+                        confirm_pending: false,
+                    },
+                    tax,
+                );
+                done("次の荷物：取り扱いサイズを決定してください".to_string())
             }
             C::RemoveLine {
                 register,
@@ -2139,6 +2271,17 @@ impl Store {
     }
 
     /// 商品ごとの販売個数の上限を超えないか（add 個増やすとき）
+    /// 受付中（料金がまだ決まっていない）の荷物
+    fn pending_parcel(&mut self, register: u8, line_id: u32) -> Result<&mut Parcel, String> {
+        self.reg_mut(register)?
+            .txn
+            .lines
+            .iter_mut()
+            .find(|l| l.id == line_id && matches!(l.kind, LineKind::Service { done: false, .. }))
+            .and_then(|l| l.parcel.as_mut())
+            .ok_or_else(|| "受付中の荷物が見つかりません".to_string())
+    }
+
     fn check_limit(&self, register: u8, code: &str, add: u32) -> Result<(), String> {
         let Some(limit) = self.age_rules.limit_for(code) else {
             return Ok(());
@@ -2311,6 +2454,9 @@ impl Store {
             {
                 return Err(BILL_ALONE.into());
             }
+            if r.txn.lines.iter().any(|l| l.is_parcel() != p.parcel_send) {
+                return Err(PARCEL_ALONE.into());
+            }
         }
         // 買い物点数の上限を超える商品は登録しない（会計画面にもとどまる）
         if matches!(scanned, Scanned::Product(_)) && r.txn.item_count() >= MAX_ITEMS {
@@ -2378,11 +2524,15 @@ impl Store {
                     },
                     tax,
                 );
+                // 次の荷物の伝票を読んだら、「次の荷物はありますか」には「ある」と答えたことになる
+                r.txn.parcel_ask = false;
                 let ready = r.staff_state() == StaffState::Ready;
                 if !ready {
                     self.calls.raise(register, CallKind::Service, now, p.name);
                 }
-                done(if ready {
+                done(if ready && p.parcel_send {
+                    format!("{}：取り扱いサイズを決定してください{back}", p.name)
+                } else if ready {
                     format!("{}：受付内容を入力してください{back}", p.name)
                 } else {
                     format!("{}：係員をお呼びしました{back}", p.name)
@@ -2408,6 +2558,12 @@ impl Store {
         self.check(register, side, Action::RegisterFf)?;
         if self.reg(register).is_some_and(|r| r.txn.bill_slips() > 0) {
             return Err(BILL_ALONE.into());
+        }
+        if self
+            .reg(register)
+            .is_some_and(|r| r.txn.lines.iter().any(Line::is_parcel))
+        {
+            return Err(PARCEL_ALONE.into());
         }
         let p = catalog::find(code)
             .filter(|p| p.category == Category::FastFood)
@@ -3211,6 +3367,7 @@ impl Store {
                 bills: t.bill_rows(),
                 bill_unchecked: c.bill_unchecked,
                 point_pending: c.point_pending,
+                parcel_ask: c.parcel_ask,
                 method: t.method,
                 inserted,
                 due: t.due().saturating_sub(inserted),
@@ -3233,6 +3390,7 @@ impl Store {
                 due: t.due().saturating_sub(inserted),
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
+                parcel_ask: c.parcel_ask,
                 bills: t.bill_rows(),
                 bill_unchecked: c.bill_unchecked,
                 staff_called,
@@ -3361,6 +3519,8 @@ pub struct StaffView {
     pub bill_unchecked: bool,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
     pub point_pending: bool,
+    /// 荷物の料金が決まり、「次の荷物はありますか」の答えを待っている
+    pub parcel_ask: bool,
     pub method: Option<PaymentMethod>,
     pub inserted: u32,
     pub due: u32,
@@ -3389,6 +3549,8 @@ pub struct CustomerView {
     pub due: u32,
     pub point_card: bool,
     pub point_pending: bool,
+    /// 荷物の料金が決まり、店員が「次の荷物はありますか」を尋ねている
+    pub parcel_ask: bool,
     /// 公共料金の払込票の種類ごとの枚数・金額（払込票がなければ空）
     pub bills: Vec<BillRow>,
     /// 店員がまだ内容を確認していない払込票がある

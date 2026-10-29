@@ -380,7 +380,7 @@ function pairNote(head: string, sub = ""): string {
 const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
 /** 支払方法を選んだ後の案内 */
-function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due): string {
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   // 現金のみの商品（切手・代行収納）があれば、電子マネーで払う額と現金で払う額をかざす前に見せる
   // （現金と併用できるのは電子マネーだけ。かざし方は入金ボックスの点滅する案内に任せ、ここは金額の内訳だけにする）
@@ -390,7 +390,10 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
   // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
   if (inserted && due > 0) return `<p>あと <b>${yen(due)}</b> 入れてください</p>`;
+  // 「投入おわり」はお客様だけが押す（入れ終わったかは、お客様にしか分からない）
+  if (inserted && staff) return `<p>お客様が「投入おわり」を押すと、お支払いが確定します</p>`;
   if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
+  if (method === "cash" && staff) return `<p>お客様に現金を入れていただき、「投入おわり」を押していただいてください</p>`;
   if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
 }
@@ -802,7 +805,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due) : cashOnlyNote(r)}
+        ${r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff") : cashOnlyNote(r)}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -816,7 +819,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     v.total,
     itemCount(v.lines),
     emoney +
-    (paying && v.method === "cash"
+    // 「投入おわり」は例外なくお客様側だけに出す（入れ終わったかは、お客様にしか分からない）。
+    // 現金払いの間、店員側の同じ位置は「登録に戻る」のまま
+    (paying && v.method === "cash" && ro
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro
         ? ""
@@ -917,7 +922,7 @@ function customerPointAsk(): string {
  * 商品登録が一つもないときは出さない（案内を広く見せる）。
  */
 /**
- * 現金払いのときだけ、会計ボタンの位置が「投入おわり」に切り替わる。
+ * 現金払いのときだけ、お客様側の会計ボタンの位置が「投入おわり」に切り替わる（店員側には出さない）。
  * 入金ボックスで Enter を押すのは、このボタンを押す近道
  */
 function finishInsert(reg: number, inserted: number, due: number, st: ActionState): string {
@@ -928,7 +933,8 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
       : due > 0
         ? { ...st, allowed: false, reason: `あと ${yen(due)} 入れてください` }
         : st;
-  return btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary");
+  // お客様本人が押すボタン（有人モードでも、お客様側の画面で押せる）
+  return `<span class="customer-only">${btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary")}</span>`;
 }
 
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean, voidHtml = ""): string {
@@ -1278,7 +1284,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : c.method === "cash"
-        ? finishInsert(reg, c.inserted, c.due, a("insert_cash"))
+        ? side === "customer"
+          ? finishInsert(reg, c.inserted, c.due, a("insert_cash"))
+          : ""
         : btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, a("back_to_registering"), "ghost")),
     r.max_items,
     !!c.point_card,

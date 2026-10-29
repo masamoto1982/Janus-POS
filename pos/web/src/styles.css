@@ -225,10 +225,11 @@ button {
   background: var(--btn-on); color: var(--btn-on-ink);
 }
 button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
-.ff-tab, .ff-arrow, .ff-item, .qty-btn, .guide-btn, .void-btn, .call-btn, .hold-confirm, .reg-top .emoney-top, .swipe-tabs button {
+.ff-tab, .ff-arrow, .ff-item, .qty-btn, .guide-btn, .void-btn, .call-btn, .hold-confirm, .reg-top .emoney-top, .swipe-tabs button,
+.method-list .seg {
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong);
 }
-button.on, button[aria-pressed="true"] { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); opacity: 1; }
+button.on, button[aria-pressed="true"], .method-list .seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); opacity: 1; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost:disabled { opacity: .3; }
@@ -238,7 +239,8 @@ button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { padding: 4px 10px; }
-.method-list .seg { border-radius: 6px; padding: 4px 10px; }
+/* 有人モードのお客様側の決済手段の案内：押せないが、店員側のボタンと同じ形（枠つき）で見せる */
+.method-list .seg { border-radius: 8px; padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: 4px; }
 

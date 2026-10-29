@@ -174,7 +174,8 @@ function pickupTag(p: Pickup): string {
 /**
  * 店員側：お預かりの荷物の番号を大きく出し、保管場所に荷物が有るかを選ぶ。
  * 本来は荷物のバーコードを読んで照合するが、シミュレーターでは「有り」「無し」の二択で次の工程に進める。
- * 有り：代金引換の金額が明細に付き、登録画面に戻って会計する（決済の後にサインをもらって引き渡す）。
+ * 代金引換の金額は受取用バーコードを読んだときから合計に出ている（同じ金額をここで重ねて出さない）。
+ * 有り：登録画面に戻って会計する（決済の後にサインをもらって引き渡す）。
  * 無し：お詫びしてお受け取りを終える。どちらからも探し直せる
  */
 function pickupStep(reg: number, p: Pickup, st: ActionState): string {
@@ -188,7 +189,7 @@ function pickupStep(reg: number, p: Pickup, st: ActionState): string {
       </div>`;
   }
   return `<div class="point-screen pickup-step">
-      <p class="pickup-no">${esc(p.no)} <span class="tag">代金引換 ${yen(p.amount)}</span></p>
+      <p class="pickup-no">${esc(p.no)} <span class="tag">代金引換</span></p>
       <div class="big">保管場所に荷物はありましたか？</div>
       <div class="point-choices">${btn("無し", found(false), st, "ghost")}${btn("有り", found(true), st, "primary")}</div>
     </div>`;
@@ -474,7 +475,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${ro || isBill(l) ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
-    <td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td>
+    <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td>
   </tr>${lineEditor(reg, side, l, remove)}`;
 }
 
@@ -840,7 +841,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
   // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
   // 荷物を送る：店員がサイズと郵便番号を決める間、お客様には伝票の貼り付けをお願いする
-  // 荷物を受取る：店員がお預かりの荷物を探す間は「お持ちします」。「有り」なら代金引換の金額が付いた登録画面に戻る
+  // 荷物を受取る：店員がお預かりの荷物を探す間は「お持ちします」。「有り」なら登録画面に戻って会計できる
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
   if (!paying && pickup && !pickup.matched)
     return screen(
@@ -1271,7 +1272,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
             : "";
       const qty = c.phase === "registering" && !isBill(l) ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
       const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line"), true) : "";
-      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done ? "—" : yen(l.amount)}</td></tr>${editor}`];
+      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>${editor}`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
@@ -1300,7 +1301,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
   // 公共料金：係員を待つ間は案内だけ。係員の確認が済んでいれば（その後にログアウトしても）現金で支払う
   const slips = c.bills.length;
-  if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "係員をお呼びしました。払込票の内容を確認いたします") : billPayCard(slips));
+  if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : billPayCard(slips));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",

@@ -428,6 +428,15 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
         .clone()
         .expect("お預かりの番号")
         .no;
+    // 金額は受取用バーコードを読んだときからお客様に見えている
+    let amount = reg(&s, 2).staff.lines[0]
+        .line
+        .pickup
+        .clone()
+        .unwrap()
+        .amount;
+    assert!(amount > 0);
+    assert_eq!(reg(&s, 2).customer.total, amount);
     // 照合の前は引き渡せず、金額の入力もできない。会計もできない
     assert!(run(&mut s, json!({"type":"pickup_handover","register":2})).is_err());
     let id = reg(&s, 2).staff.lines[0].line.id;

@@ -102,7 +102,7 @@ function buildSkeleton(): void {
         <label class="login-sel">店員
           <select data-login="${r.id}" aria-label="レジ${r.id}の店員ログイン">
             <option value="">未ログイン</option>
-            ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.name)}</option>`).join("")}
+            ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.name)}${a.role === "owner" ? "（オーナー）" : ""}</option>`).join("")}
           </select>
         </label>
       </h2>
@@ -173,7 +173,7 @@ function buildSkeleton(): void {
       <form class="owner-auth" data-owner-auth>
         <p class="muted">商品ルールを変えられるのはオーナーだけです。オーナーの従業員番号とパスワードを入れてください。閉じると認証は解除されます。</p>
         <div class="row wrap">
-          <input data-owner="id" placeholder="オーナーの従業員番号" value="9001" aria-label="オーナーの従業員番号" />
+          <input data-owner="id" placeholder="オーナーの従業員番号" value="000" aria-label="オーナーの従業員番号" />
           <input data-owner="pw" type="password" placeholder="パスワード" autocomplete="off" aria-label="オーナーのパスワード" />
           <button type="submit">認証</button>
         </div>

@@ -27,24 +27,25 @@ pub struct StaffAccount {
     password: &'static str,
 }
 
+/// 名札には本名を出さず、店員番号で呼ぶ（つきまといなどから店員を守る）。000 はオーナー専用の番号
 pub const ACCOUNTS: &[StaffAccount] = &[
     StaffAccount {
-        id: "1001",
-        name: "山田",
+        id: "000",
+        name: "スタッフ000",
+        role: Role::Owner,
+        password: "9999",
+    },
+    StaffAccount {
+        id: "001",
+        name: "スタッフ001",
         role: Role::Crew,
         password: "1111",
     },
     StaffAccount {
-        id: "1002",
-        name: "鈴木",
+        id: "002",
+        name: "スタッフ002",
         role: Role::Crew,
         password: "2222",
-    },
-    StaffAccount {
-        id: "9001",
-        name: "佐藤（オーナー）",
-        role: Role::Owner,
-        password: "9999",
     },
 ];
 
@@ -140,7 +141,7 @@ mod tests {
     #[test]
     fn crew_cannot_reauthenticate_as_owner() {
         let mut a = Authenticator::default();
-        assert!(a.verify_owner("1001", "1111", 0).is_err());
-        assert!(a.verify_owner("9001", "9999", 0).is_ok());
+        assert!(a.verify_owner("001", "1111", 0).is_err());
+        assert!(a.verify_owner("000", "9999", 0).is_ok());
     }
 }

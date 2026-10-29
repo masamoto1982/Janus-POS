@@ -59,10 +59,10 @@ fn scan(s: &mut Store, r: u8, side: &str, code: &str) {
     );
 }
 
-/// 名札（山田）を読んでログインし、店員画面にタッチして操作を引き継ぐ。
+/// 名札（スタッフ001）を読んでログインし、店員画面にタッチして操作を引き継ぐ。
 /// ログイン中は有人モード（ログイン直後はお客様画面が操作側）
 fn login(s: &mut Store, r: u8) {
-    login_as(s, r, "ST1001");
+    login_as(s, r, "ST001");
 }
 
 /// お客様側の画面から店舗メニューを開く：店員画面に出た使い捨てパスワードを入力する
@@ -226,7 +226,7 @@ fn semi_self_age_check_calls_staff() {
     ));
     // 係員を待つ間、お客様には身分証の準備を案内する（年齢つき）
     assert_eq!(reg(&s, 2).customer.age_wait, Some(20));
-    scan(&mut s, 2, "staff", "ST1002");
+    scan(&mut s, 2, "staff", "ST002");
     // 有人モードになったら案内は消え、店員が年確をするか選ぶ
     assert_eq!(reg(&s, 2).customer.age_wait, None);
     no_id_check(&mut s, 2);
@@ -267,11 +267,11 @@ fn only_owner_changes_age_rules() {
         json!({"type":"add_age_rule","owner_id":id,"password":pw,
                "target":{"kind":"product","code":SANDWICH},"min_age":20})
     };
-    assert!(run(&mut s, add("1001", "1111")).is_err());
-    ok(&mut s, add("9001", "9999"));
+    assert!(run(&mut s, add("001", "1111")).is_err());
+    ok(&mut s, add("000", "9999"));
     assert!(run(
         &mut s,
-        json!({"type":"remove_age_rule","owner_id":"9001","password":"9999","rule_id":1})
+        json!({"type":"remove_age_rule","owner_id":"000","password":"9999","rule_id":1})
     )
     .is_err());
     scan(&mut s, 1, "staff", SANDWICH);
@@ -323,7 +323,7 @@ fn fast_food_flow_in_semi_self_mode() {
     )
     .is_err());
     ok(&mut s, json!({"type":"ff_button","register":2}));
-    login_as(&mut s, 2, "ST1001");
+    login_as(&mut s, 2, "ST001");
     ok(
         &mut s,
         json!({"type":"register_ff","register":2,"code":"FF01","qty":2}),
@@ -411,7 +411,7 @@ fn service_item_needs_staff() {
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Service));
-    login_as(&mut s, 2, "ST1001");
+    login_as(&mut s, 2, "ST001");
     let id = reg(&s, 2).staff.lines[0].line.id;
     ok(
         &mut s,
@@ -442,7 +442,7 @@ fn parcel_fee_comes_from_size_and_postal_code() {
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Service));
-    login_as(&mut s, 2, "ST1001");
+    login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     // 金額の直接入力はできない
     assert!(run(
@@ -523,7 +523,7 @@ fn parcel_fee_comes_from_size_and_postal_code() {
 fn parcel_skips_point_card_check() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", PARCEL);
-    login_as(&mut s, 2, "ST1001");
+    login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
         &mut s,
@@ -606,7 +606,7 @@ fn cash_out_only_inside_the_customer_side_menu() {
     ok(&mut s, co);
     let a = s.snapshot().audit;
     assert_eq!(a.len(), 2);
-    assert_eq!(a[1].staff, "山田");
+    assert_eq!(a[1].staff, "スタッフ001");
     // 未ログインのレジでは出金できない
     assert!(run(
         &mut s,
@@ -708,7 +708,7 @@ fn calls_stay_on_originating_register() {
     assert!(snap.registers[0].staff.calls.is_empty());
     assert!(snap.registers[2].staff.calls.is_empty());
     // 後から来たレジ4を先に片付けても、レジ2は残る
-    login_as(&mut s, 4, "ST1002");
+    login_as(&mut s, 4, "ST002");
     let snap = s.snapshot();
     assert_eq!(snap.calls.len(), 1);
     assert_eq!(snap.calls[0].register, 2);
@@ -784,7 +784,7 @@ fn staff_and_customer_screens_are_exclusive() {
         json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
     );
     // 店員が名札を読むと有人モードになり、支払い中でも両方の画面が操作できる
-    scan(&mut s, 1, "staff", "ST1002");
+    scan(&mut s, 1, "staff", "ST002");
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::Attended);
     assert_eq!(v.active_side, None);
@@ -816,14 +816,14 @@ fn staff_and_customer_screens_are_exclusive() {
 fn owner_sets_age_rule_per_product() {
     let mut s = Store::new(1, 2, 1);
     let set = |id: &str, pw: &str, code: &str, age: Option<u8>| json!({"type":"set_product_age","owner_id":id,"password":pw,"code":code,"min_age":age});
-    assert!(run(&mut s, set("1001", "1111", SANDWICH, Some(20))).is_err());
-    ok(&mut s, set("9001", "9999", SANDWICH, Some(20)));
-    ok(&mut s, set("9001", "9999", LIGHTER, None));
+    assert!(run(&mut s, set("001", "1111", SANDWICH, Some(20))).is_err());
+    ok(&mut s, set("000", "9999", SANDWICH, Some(20)));
+    ok(&mut s, set("000", "9999", LIGHTER, None));
     // 酒・たばこは法令どおりで変更不可
-    assert!(run(&mut s, set("9001", "9999", BEER, None)).is_err());
-    assert!(run(&mut s, set("9001", "9999", BEER, Some(25))).is_err());
+    assert!(run(&mut s, set("000", "9999", BEER, None)).is_err());
+    assert!(run(&mut s, set("000", "9999", BEER, Some(25))).is_err());
     // どの商品にも個別に設定できる
-    ok(&mut s, set("9001", "9999", TEA, Some(18)));
+    ok(&mut s, set("000", "9999", TEA, Some(18)));
     let cat = s.snapshot().catalog;
     let age = |c: &str| cat.iter().find(|p| p.code == c).unwrap().age;
     assert_eq!(age(SANDWICH), Some(20));
@@ -1039,7 +1039,7 @@ fn store_menu_uses_inlet_and_outlet() {
     );
     ok(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":"ST1002"}),
+        json!({"type":"scan","register":1,"side":"staff","code":"ST002"}),
     );
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert!(reg(&s, 1).menu.is_none());
@@ -1050,7 +1050,7 @@ fn store_menu_uses_inlet_and_outlet() {
 #[test]
 fn attended_screens_lock_only_while_touched() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::Attended);
     assert_eq!(v.active_side, None);
@@ -1124,7 +1124,7 @@ fn called_register_lamp_lights_at_once_until_staff_arrives() {
         reg(&s, 1).lamp && reg(&s, 2).lamp,
         "stays lit while waiting"
     );
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     assert!(!reg(&s, 1).lamp, "staff arrived");
     assert!(reg(&s, 2).lamp);
 }
@@ -1183,7 +1183,7 @@ fn neglected_calls_ring_louder() {
         "the first caller is louder"
     );
     assert_eq!(r1.call_waiting_ms, Some(20_000));
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     assert_eq!(reg(&s, 1).ring_volume, 0.0);
 }
 
@@ -1278,13 +1278,13 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
 #[test]
 fn logout_returns_to_semi_self_even_while_customer_screen_holds() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
     assert_eq!(reg(&s, 1).active_side, None);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
     // 取引の途中（FF 登録済み）でも戻れる
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     ok(
         &mut s,
         json!({"type":"register_ff","register":1,"side":"customer","code":"FF01","qty":1}),
@@ -1298,7 +1298,7 @@ fn logout_returns_to_semi_self_even_while_customer_screen_holds() {
 #[test]
 fn checkout_from_held_customer_screen_then_point_card_check() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     assert_eq!(reg(&s, 1).active_side, None);
     ok(
         &mut s,
@@ -1358,7 +1358,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
 #[test]
 fn either_screen_can_operate_except_age_confirmation() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     assert_eq!(reg(&s, 1).active_side, None);
     scan(&mut s, 1, "customer", BEER);
     assert!(allowed(
@@ -1810,7 +1810,7 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     // 店舗判断でライターを 18 歳以上にしておく
     ok(
         &mut s,
-        json!({"type":"set_product_age","owner_id":"9001","password":"9999","code":LIGHTER,"min_age":18}),
+        json!({"type":"set_product_age","owner_id":"000","password":"9999","code":LIGHTER,"min_age":18}),
     );
     login(&mut s, 1);
     for code in [BREAD, BEER, BEER, LIGHTER] {
@@ -2211,7 +2211,7 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
 #[test]
 fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
     let mut s = Store::new(1, 2, 1);
-    let limit = |pw: &str, n: Option<u32>| json!({"type":"set_sale_limit","owner_id":"9001","password":pw,"code":TEA,"limit":n});
+    let limit = |pw: &str, n: Option<u32>| json!({"type":"set_sale_limit","owner_id":"000","password":pw,"code":TEA,"limit":n});
     // オーナーのパスワードでなければ変えられない
     assert!(run(&mut s, limit("0000", Some(2))).is_err());
     ok(&mut s, limit("9999", Some(2)));
@@ -2272,12 +2272,12 @@ fn tax_rates_are_data_and_owner_only() {
     // 店員は変えられない
     assert!(run(
         &mut s,
-        json!({"type":"set_tax_rate","owner_id":"1001","password":"1111","class_id":"standard","rate_bp":1200})
+        json!({"type":"set_tax_rate","owner_id":"001","password":"1111","class_id":"standard","rate_bp":1200})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"set_tax_rate","owner_id":"9001","password":"9999","class_id":"standard","rate_bp":1200}),
+        json!({"type":"set_tax_rate","owner_id":"000","password":"9999","class_id":"standard","rate_bp":1200}),
     );
     // 登録済みのアルコールは 10% のまま、あとから登録した分は 12%
     scan(&mut s, 1, "staff", TEA);
@@ -2289,12 +2289,12 @@ fn tax_rates_are_data_and_owner_only() {
     // ゼロ税率は 0% から変えられない。インボイスの端数処理を四捨五入に
     assert!(run(
         &mut s,
-        json!({"type":"set_tax_rate","owner_id":"9001","password":"9999","class_id":"zero","rate_bp":500})
+        json!({"type":"set_tax_rate","owner_id":"000","password":"9999","class_id":"zero","rate_bp":500})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"set_invoice","owner_id":"9001","password":"9999","invoice_no":"T1234567890123","rounding":"half_up"}),
+        json!({"type":"set_invoice","owner_id":"000","password":"9999","invoice_no":"T1234567890123","rounding":"half_up"}),
     );
     assert_eq!(reg(&s, 1).staff.taxes[1].tax, 23);
     assert_eq!(s.snapshot().tax.invoice_no, "T1234567890123");
@@ -2317,12 +2317,12 @@ fn product_tax_class_can_be_changed() {
     assert_eq!(class(&s, BREAD), "reduced");
     ok(
         &mut s,
-        json!({"type":"add_tax_class","owner_id":"9001","password":"9999","name":"新税率","kind":"reduced","rate_bp":500}),
+        json!({"type":"add_tax_class","owner_id":"000","password":"9999","name":"新税率","kind":"reduced","rate_bp":500}),
     );
     let id = s.snapshot().tax.classes.last().unwrap().id.clone();
     ok(
         &mut s,
-        json!({"type":"set_product_tax","owner_id":"9001","password":"9999","code":BREAD,"class_id":id}),
+        json!({"type":"set_product_tax","owner_id":"000","password":"9999","code":BREAD,"class_id":id}),
     );
     assert_eq!(class(&s, BREAD), id);
     login(&mut s, 1);
@@ -2631,7 +2631,7 @@ fn logout_and_pause_from_either_store_menu() {
     .is_err());
     assert!(run(&mut s, json!({"type":"call_staff","register":1})).is_err());
     // 店員側の店舗メニューからも休止できる。スタッフバーコードで再開して有人モードになる
-    scan(&mut s, 1, "staff", "ST1001");
+    scan(&mut s, 1, "staff", "ST001");
     let v = reg(&s, 1);
     assert!(!v.paused);
     assert_eq!(v.mode, Mode::Attended);

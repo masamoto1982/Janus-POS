@@ -419,7 +419,7 @@ mod tests {
             classify("PC12345678"),
             Scanned::PointCard("12345678".into())
         );
-        assert_eq!(classify("ST1001"), Scanned::Staff("1001".into()));
+        assert_eq!(classify("ST001"), Scanned::Staff("001".into()));
         assert!(matches!(classify("2000000000015"), Scanned::Product(p) if p.category == Bag));
         assert!(matches!(classify("2100000000014"), Scanned::Product(p) if p.needs_staff));
         assert_eq!(classify("FF01"), Scanned::Unknown);

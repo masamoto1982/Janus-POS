@@ -506,7 +506,12 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでにお会計中です")?;
             require(c.has_lines, "商品を登録してください")?;
-            require(!c.ff_waiting, FF_UNCHECKED)
+            require(!c.ff_waiting, FF_UNCHECKED)?;
+            // 荷物などのサービス商品は、係員が来て受付を済ませてから
+            require(
+                !c.service_pending,
+                "係員がサービス商品の受付をするまでお待ちください",
+            )
         }
         Action::BackToRegistering => require(paying, "お会計中ではありません"),
         Action::SelectPayment => {

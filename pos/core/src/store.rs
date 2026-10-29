@@ -40,6 +40,7 @@ const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、係員が名札�
 /// 荷物の受け取りは一件ずつ、ほかの商品と別に扱う
 const PICKUP_ALONE: &str =
     "荷物のお受け取りは一件ずつ、ほかの商品と別にお取り扱いします（お受け取りが済んでから登録してください）";
+const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引中止にしてください";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
@@ -1787,6 +1788,10 @@ impl Store {
                     .iter_mut()
                     .find(|l| l.is_pickup())
                     .ok_or("お受け取りの手続き中ではありません")?;
+                // 荷物が有ると確かめたら、探し直さない。受け取らないなら取引中止、受け取るなら会計する
+                if l.pickup.as_ref().is_some_and(|pk| pk.matched) {
+                    return Err(PICKUP_NO_REMOVE.into());
+                }
                 l.set_pickup_found(found);
                 let amount = l.unit_price;
                 let now = self.now;
@@ -1816,6 +1821,10 @@ impl Store {
                 // 払えないときは取引中止で最初からやり直す
                 if r.txn.lines[i].is_bill() {
                     return Err(BILL_NO_REMOVE.into());
+                }
+                // 荷物の受け取りも同じ。受け取らないなら取引中止、受け取るなら会計する
+                if r.txn.lines[i].is_pickup() {
+                    return Err(PICKUP_NO_REMOVE.into());
                 }
                 let received = r.txn.lines[i].kind
                     == LineKind::Ff {
@@ -3566,6 +3575,7 @@ impl Store {
                 age: self.age_rules.age_for(l.code, l.category),
                 limit: self.age_rules.limit_for(l.code),
                 cash_only: l.cash_only,
+                pickup: l.is_pickup(),
                 kind: l.kind,
             })
             .collect();
@@ -3737,6 +3747,8 @@ pub struct CustomerLine {
     pub limit: Option<u32>,
     /// 現金でしか払えない（切手・代行収納）
     pub cash_only: bool,
+    /// 荷物の受け取り（数量は変えられず、取り消しは取引中止で行う）
+    pub pickup: bool,
     #[serde(flatten)]
     pub kind: LineKind,
 }

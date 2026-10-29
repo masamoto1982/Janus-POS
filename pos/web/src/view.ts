@@ -469,12 +469,9 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
       <button data-form="service" data-reg="${reg}" data-line="${l.id}" ${a.allowed ? "" : "disabled"}>受付</button>
     </div>`;
   }
-  // 荷物を「有り」にした後でも、会計の前なら探し直せる（取り違えに気づいたとき）
-  if (l.pickup?.matched && !ro && v.phase !== "paying")
-    svc = `<div class="svc">${btn("探し直す", { type: "pickup_found", register: reg, found: null }, undefined, "ghost")}</div>`;
   return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
-    <td class="num">${ro || isBill(l) ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
+    <td class="num">${ro || isBill(l) || l.pickup ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
     <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td>
   </tr>${lineEditor(reg, side, l, remove)}`;
 }
@@ -1270,7 +1267,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
-      const qty = c.phase === "registering" && !isBill(l) ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
+      const qty = c.phase === "registering" && !isBill(l) && !l.pickup ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
       const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line"), true) : "";
       return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>${editor}`];
     });

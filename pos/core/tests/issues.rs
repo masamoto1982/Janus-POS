@@ -510,7 +510,8 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
 }
 
 /// シミュレーターでは、荷物のバーコードを読む代わりに「有り」「無し」の二択で進められる。
-/// 「無し」なら引き渡さずにお受け取りを終え、「探し直す」で照合の前に戻る
+/// 「無し」なら引き渡さずにお受け取りを終え、「探し直す」で照合の前に戻る。
+/// 「有り」の後は探し直さず、明細も取り消せない（受け取らないなら取引中止）
 #[test]
 fn pickup_can_be_decided_by_found_or_missing() {
     let mut s = Store::new(1, 2, 1);
@@ -527,17 +528,33 @@ fn pickup_can_be_decided_by_found_or_missing() {
         json!({"type":"pickup_found","register":2,"found":null}),
     );
     assert!(!pk(&s).missing && !pk(&s).matched);
-    ok(
-        &mut s,
-        json!({"type":"pickup_found","register":2,"found":true}),
-    );
-    assert!(pk(&s).matched);
+    // 無しならお受け取りを終える（別の取引で、もう一度読んでから有りにする）
     ok(
         &mut s,
         json!({"type":"pickup_found","register":2,"found":false}),
     );
     ok(&mut s, json!({"type":"pickup_handover","register":2}));
     assert!(reg(&s, 2).staff.lines.is_empty());
+    scan(&mut s, 2, "staff", RECEIVE);
+    ok(
+        &mut s,
+        json!({"type":"pickup_found","register":2,"found":true}),
+    );
+    assert!(pk(&s).matched);
+    for found in [json!(false), json!(null)] {
+        assert!(run(
+            &mut s,
+            json!({"type":"pickup_found","register":2,"found":found})
+        )
+        .is_err());
+    }
+    let id = reg(&s, 2).staff.lines[0].line.id;
+    assert!(run(
+        &mut s,
+        json!({"type":"remove_line","register":2,"side":"staff","line_id":id})
+    )
+    .is_err());
+    assert!(pk(&s).matched);
 }
 
 fn pending_parcel(s: &Store, r: u8) -> u32 {

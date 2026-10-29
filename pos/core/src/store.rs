@@ -2674,7 +2674,10 @@ impl Store {
         }
         // 会計ボタンの後は、まずポイントカードの最終確認。読み取り済みなら確認済み。
         // 公共料金の支払いにはポイントがつかないので、確認しない
-        r.txn.point_checked = r.txn.point_card.is_some() || r.txn.bill_slips() > 0;
+        // 公共料金と宅配便（荷物を送る）はポイント付与の対象外なので、ポイントカードの確認をしない
+        r.txn.point_checked = r.txn.point_card.is_some()
+            || r.txn.bill_slips() > 0
+            || r.txn.lines.iter().any(Line::is_parcel);
         // セミセルフでは、会計に進めたら支払いはお客様に任せる
         r.txn.customer_turn = r.mode == Mode::SemiSelf;
         let ready = r.staff_state() == StaffState::Ready;
@@ -2939,8 +2942,15 @@ impl Store {
             change_total: change.total(),
             change,
             items: txn.lines.iter().map(|l| l.qty).sum(),
+            // 宅配便（荷物を送る）はポイント付与の対象外
             points: if txn.point_card.is_some() {
-                total / 100
+                txn.lines
+                    .iter()
+                    .filter(|l| !l.is_parcel())
+                    .map(Line::amount)
+                    .sum::<u32>()
+                    .min(total)
+                    / 100
             } else {
                 0
             },

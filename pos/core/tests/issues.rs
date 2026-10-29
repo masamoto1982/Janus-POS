@@ -498,10 +498,50 @@ fn parcel_fee_comes_from_size_and_postal_code() {
     let v = reg(&s, 2);
     assert!(!v.staff.parcel_ask);
     assert!(allowed(&v, Side::Staff, Action::Checkout));
+    // ポイントカードを読んでも、宅配便はポイント付与の対象外（会計時のポイントカードの確認も出ない）
+    scan(&mut s, 2, "staff", "PC12345678");
     ok(
         &mut s,
         json!({"type":"checkout","register":2,"side":"staff"}),
     );
+    let v = reg(&s, 2);
+    assert!(!v.staff.point_pending);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":2,"side":"staff","method":"cash"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"insert_cash","register":2,"denomination":5000,"count":1}),
+    );
+    ok(&mut s, json!({"type":"finish_insert","register":2}));
+    assert_eq!(reg(&s, 2).last_receipt.map(|r| r.points), Some(0));
+}
+
+/// 宅配便だけの会計では、ポイントカードの確認を出さない
+#[test]
+fn parcel_skips_point_card_check() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL);
+    login_as(&mut s, 2, "ST1001");
+    let id = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":false}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    );
+    assert!(!reg(&s, 2).staff.point_pending);
 }
 
 /// 荷物の発送は、ほかの商品と一緒に会計できない（荷物どうしは一緒に会計できる）
@@ -518,6 +558,12 @@ fn parcel_cannot_be_mixed_with_other_goods() {
     scan(&mut s, 2, "customer", PARCEL);
     scan(&mut s, 2, "customer", PARCEL);
     assert_eq!(reg(&s, 2).customer.lines.len(), 2);
+    // 係員が受付をするまで会計できない
+    assert!(run(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"customer"})
+    )
+    .is_err());
     assert!(run(
         &mut s,
         json!({"type":"scan","register":2,"side":"customer","code":BREAD})

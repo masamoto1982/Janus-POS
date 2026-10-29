@@ -76,7 +76,7 @@ describe("view helpers", () => {
     expect(customer).not.toContain("お渡し済");
   });
 
-  it("tells the semi-self customer that staff are on the way, except for the bell", () => {
+  it("shows the open calls only on the semi-self staff screen", () => {
     const call = (kind: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, created_at, detail: "" });
     const r = {
       staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], mat_down: [] },
@@ -86,12 +86,8 @@ describe("view helpers", () => {
     expect(staff).toContain("FF＆煙草");
     expect(staff).toContain("5秒経過");
     expect(callNotice(r, 6000, "staff")).toBe("");
-    expect(callNotice(r, 6000, "customer")).toContain("店員が向かっています");
-    const bell = {
-      staff: { calls: [call("customer_help", 1000)], mat_down: [] },
-      customer: { staff_called: true },
-    } as unknown as RegisterView;
-    expect(callNotice(bell, 6000, "customer")).toBe("");
+    const customer = callNotice(r, 6000, "customer");
+    expect(customer).toBe("");
   });
 
   it("tells the customer that staff are on the way in attended mode", () => {

@@ -534,7 +534,7 @@ const CALL_SHORT: Record<string, string> = {
 
 /**
  * 呼び出し中の表示。両画面同内容の原則の、表示上の例外：
- * お客様側には、呼び鈴（🔔）以外の呼び出しで「店員が向かっています」を出す（有人・セミセルフとも）。店員側は Bell の不通だけを知らせる。
+ * 有人モードのお客様側には「店員が向かっています」を出す。店員側は Bell の不通だけを知らせる。
  */
 export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
@@ -544,12 +544,9 @@ export function callNotice(r: RegisterView, _now: number, side: Side): string {
   if (side === "customer") {
     // 排出口に釣り銭が残ったまま 1 分たったら知らせる（2 分で店員を呼ぶ）
     const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
-    // 呼び鈴（ヘッダーの🔔）で呼んだときは、お客様自身が呼んだと分かっているので何も出さない。
-    // それ以外の呼び出し（FF・サービス・たばこのボタン、年確・荷物などの自動の呼び出し）は「店員が向かっています」
-    const others = calls.filter((c) => c.kind !== "customer_help");
     return (
       change +
-      (r.customer.staff_called && others.length
+      (r.mode === "attended" && r.customer.staff_called && (!ageOnScreen || calls.length)
         ? `<div class="banner call">店員が向かっています</div>`
         : "")
     );

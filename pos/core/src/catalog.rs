@@ -94,8 +94,8 @@ pub struct Product {
     pub category: Category,
     /// 「要店員」：お客様側で読まれたら店員呼び出しをかけ、店員の受付操作を待つ
     pub needs_staff: bool,
-    /// 公共料金の払込票（代行収納）。読み取った件数・金額を、お客様本人がお客様側の画面で確認する
-    pub customer_confirms: bool,
+    /// 公共料金の払込票（代行収納）。ほかの商品と一緒に登録できず、会計の後に店員が払込票の内容を確認する
+    pub utility_bill: bool,
     /// 現金でしか払えない（切手・代行収納）。ほかの商品と一緒に買えるが、
     /// キャッシュレスで払えるのはこれを除いた分だけ（有人・セミセルフ共通）
     pub cash_only: bool,
@@ -115,16 +115,16 @@ const fn p(
         tax,
         category,
         needs_staff: matches!(category, Category::Service),
-        customer_confirms: false,
+        utility_bill: false,
         cash_only: matches!(category, Category::Stamp),
     }
 }
 
-/// 公共料金の払込票（代行収納）。係員の受付は要らず、お客様が件数・金額を確認する。現金のみ
+/// 公共料金の払込票（代行収納）。読み取りは普通の商品と同じ。会計ボタンで店員を呼び、店員が内容を確認する。現金のみ
 const fn bill(code: &'static str, name: &'static str, price: u32) -> Product {
     Product {
         needs_staff: false,
-        customer_confirms: true,
+        utility_bill: true,
         cash_only: true,
         ..p(code, name, price, TaxRate::Standard10, Category::Service)
     }
@@ -164,7 +164,7 @@ pub const CATALOG: &[Product] = &[
     // 公共料金の払込票（金額は印字済み）。1 枚目を読むと全部の枚数を尋ね、
     // 申告した枚数を読み終えたらお客様が件数・金額を確認する。ほかの商品とは一緒に登録できない
     // 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは払込票ごとに手数料があり得るが、
-    // シミュレーターでは手数料の概念を扱わない（確認画面も受付点数と合計額だけ。web の billCard）
+    // シミュレーターでは手数料の概念を扱わない（店員の確認は種類ごとの枚数、お客様への案内は枚数だけ。web の billVerifyScreen）
     bill("2100000000021", "電気料金", 5000),
     bill("2100000000043", "水道料金", 4000),
     bill("2100000000050", "ガス料金", 3000),

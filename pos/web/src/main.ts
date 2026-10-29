@@ -19,6 +19,7 @@ import {
   editing,
   ffVerifying,
   ffvInput,
+  billInput,
   flashing,
   type FfUi,
   itemsPanel,
@@ -559,9 +560,6 @@ function form(b: HTMLElement): void {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
       break;
-    case "slips":
-      if (Number(val(`slips-${reg}`))) send({ type: "declare_bill_count", register: reg, side: b.dataset.side, count: Number(val(`slips-${reg}`)) });
-      break;
     case "birth":
       send({ type: "check_id", register: reg, side: "staff", birth: val(`birth-${reg}`), today: isoDate(new Date()) });
       break;
@@ -604,17 +602,20 @@ app.addEventListener("input", (e) => {
     send({ type: "check_ff", register: Number(reg), side, line_id: Number(line), handed: Number(el.value || 0) });
     return;
   }
+  // 払込票の確認：手元の払込票の枚数を種類ごとに入力するたびに判定する（FF のお渡し照合と同じ形）
+  if (el.dataset.billCheck) {
+    el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 2);
+    const [reg, side, code] = el.dataset.billCheck.split(":");
+    billInput.set(el.dataset.billCheck, el.value);
+    send({ type: "check_bill", register: Number(reg), side, code, count: Number(el.value || 0) });
+    return;
+  }
   if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
   el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
-});
-app.addEventListener("keydown", (e) => {
-  const el = e.target as HTMLInputElement;
-  if (!el.dataset?.slips || e.key !== "Enter" || e.isComposing) return;
-  el.closest(".bill-slips")?.querySelector<HTMLButtonElement>('[data-form="slips"]')?.click();
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
@@ -830,8 +831,6 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.cmd) {
     const cmd = JSON.parse(b.dataset.cmd) as Command;
-    // 年齢確認は、押した画面（お客様側だけ受け付ける）をコアに伝える
-    if (cmd.type === "confirm_bill_payment") cmd.side = b.closest<HTMLElement>("[data-drop]")?.dataset.drop?.split(":")[1] ?? "customer";
     // 個数変更・取り消しが済んだら、広げた行を閉じる
     if (send(cmd) && ["set_qty", "remove_line", "remove_coupon"].includes(cmd.type)) editing.delete(`${cmd.register}:${cmd.side}`);
   }

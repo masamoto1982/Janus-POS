@@ -20,6 +20,8 @@ pub enum CallKind {
     CustomerHelp,
     /// 排出口に釣り銭が残ったまま 2 分（有人モードは 1 分）たった（釣銭忘れ）
     ChangeLeft,
+    /// セミセルフで公共料金の会計ボタンが押された（店員が払込票の内容を確認し、収納印を押す）
+    Bill,
 }
 
 impl CallKind {
@@ -31,6 +33,7 @@ impl CallKind {
             CallKind::Tobacco => "たばこ",
             CallKind::CustomerHelp => "お呼び出し",
             CallKind::ChangeLeft => "釣銭忘れ",
+            CallKind::Bill => "公共料金",
         }
     }
 }

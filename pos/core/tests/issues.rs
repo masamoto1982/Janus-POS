@@ -1287,6 +1287,15 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
             ("電気料金", 5_000)
         ]
     );
+    // 払込票ごとに便宜的なバーコード番号（16 桁を 4 桁ずつ）。同じ事業者でも別の番号
+    let nos: Vec<_> = v.staff.bills.iter().map(|b| b.slip_no.clone()).collect();
+    for no in &nos {
+        assert_eq!(no.len(), 19, "{no}");
+        assert!(no
+            .split(' ')
+            .all(|g| g.len() == 4 && g.bytes().all(|c| c.is_ascii_digit())));
+    }
+    assert_ne!(nos[0], nos[3]);
     let ids = bill_ids(&s, 1);
     assert!(v.staff.payment_blocker.unwrap().contains("公共料金の内容"));
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":20000})).is_err());

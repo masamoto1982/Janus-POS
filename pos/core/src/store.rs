@@ -549,7 +549,9 @@ pub struct BillRow {
     /// 事業者（電気料金・水道料金・ガス料金）
     pub name: &'static str,
     pub amount: u32,
-    /// 店員が金額を確認した（チェックを入れた）
+    /// 払込票のバーコード番号（便宜的に作ったもの）
+    pub slip_no: String,
+    /// 店員が事業者・金額・バーコード番号を確かめた（チェックを入れた）
     pub checked: bool,
 }
 
@@ -608,6 +610,21 @@ pub struct Line {
     pub cash_only: bool,
     #[serde(flatten)]
     pub kind: LineKind,
+    /// 公共料金の払込票のバーコード番号（シミュレーターでは読み取ったときに便宜的に作る）
+    #[serde(skip)]
+    pub slip_no: Option<String>,
+}
+
+/// 払込票のバーコード番号を便宜的に作る（16 桁を 4 桁ずつ区切る）。
+/// 実物の払込票のバーコード（44 桁など）は事業者ごとに決まった形式だが、シミュレーターでは扱わない
+fn slip_no(seed: u64) -> String {
+    // splitmix64 で混ぜ、読み取りごとに別の番号にする
+    let mut x = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^= x >> 31;
+    let d = format!("91{:014}", x % 100_000_000_000_000);
+    format!("{} {} {} {}", &d[..4], &d[4..8], &d[8..12], &d[12..])
 }
 
 impl Line {
@@ -818,6 +835,7 @@ impl Txn {
                 code: l.code,
                 name: l.name,
                 amount: l.amount(),
+                slip_no: l.slip_no.clone().unwrap_or_default(),
                 checked: !matches!(
                     l.kind,
                     LineKind::Service {
@@ -892,6 +910,7 @@ impl Txn {
             category: p.category,
             cash_only: p.cash_only,
             kind,
+            slip_no: None,
         });
     }
 }
@@ -2342,6 +2361,11 @@ impl Store {
                     },
                     tax,
                 );
+                let seed = now ^ (u64::from(register) << 56) ^ (u64::from(r.txn.next_line) << 40);
+                let seed = seed ^ p.code.parse::<u64>().unwrap_or(0);
+                if let Some(l) = r.txn.lines.last_mut() {
+                    l.slip_no = Some(slip_no(seed));
+                }
                 done(format!("{} {}円{back}", p.name, p.price))
             }
             Scanned::Product(p) if p.needs_staff => {

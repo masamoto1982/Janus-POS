@@ -43,13 +43,14 @@ describe("view helpers", () => {
       1,
       "staff",
       [
-        { line_id: 1, code: "2100000000021", name: "電気料金", amount: 5000, checked: true },
-        { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, checked: false },
-        { line_id: 3, code: "2100000000021", name: "電気料金", amount: 5000, checked: false },
+        { line_id: 1, code: "2100000000021", name: "電気料金", amount: 5000, slip_no: "9100 1234 5678 9012", checked: true },
+        { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: false },
+        { line_id: 3, code: "2100000000021", name: "電気料金", amount: 5000, slip_no: "9100 5555 6666 7777", checked: false },
       ],
       { action: "check_bill", allowed: true, reason: null },
     );
-    for (const h of ["事業者", "金額", "確認"]) expect(html).toContain(`>${h}<`);
+    for (const h of ["事業者", "金額", "バーコード番号", "確認"]) expect(html).toContain(`>${h}<`);
+    expect(html).toContain("9100 2222 3333 4444");
     expect(html).not.toContain(">枚数<");
     // 同じ事業者でもまとめず、一枚ずつ
     expect(html.match(/電気料金/g)?.length).toBe(4);

@@ -118,7 +118,9 @@ export interface BillRow {
   /** 事業者（電気料金など） */
   name: string;
   amount: number;
-  /** 店員が事業者・金額を確認した（チェックを入れた） */
+  /** 払込票のバーコード番号（便宜的に作ったもの） */
+  slip_no: string;
+  /** 店員が事業者・金額・バーコード番号を確かめた（チェックを入れた） */
   checked: boolean;
 }
 

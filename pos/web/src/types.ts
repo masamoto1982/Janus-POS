@@ -42,6 +42,14 @@ export interface Parcel {
   region: string | null;
 }
 
+/** 荷物を受取る：お預かりの荷物の番号と、荷物のバーコードを読んで照合したか */
+export interface Pickup {
+  no: string;
+  matched: boolean;
+  /** 直前に読んだ、番号の違う荷物 */
+  wrong: string | null;
+}
+
 export type StaffLine = LineKind & {
   id: number;
   /** 最後に動きのあった順番（クーポンの id と同じ通し番号） */
@@ -57,6 +65,8 @@ export type StaffLine = LineKind & {
   limit: number | null;
   /** 荷物を送る明細だけにある */
   parcel?: Parcel;
+  /** 荷物を受取る明細だけにある */
+  pickup?: Pickup;
 };
 
 export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean };

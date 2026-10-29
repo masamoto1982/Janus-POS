@@ -401,9 +401,10 @@ fn fast_food_flow_in_semi_self_mode() {
     assert_eq!(reg(&s, 2).last_receipt.unwrap().total, 160 + 440);
 }
 
-/// 要店員のサービス商品：お客様が読むと呼び出し、店員の受付まで決済できない。
+/// 荷物を受取る：受取用バーコードを読むと係員を呼び、ログインした係員の画面にお預かりの番号が出る。
+/// 保管場所の荷物のバーコードを読んで番号が合えば、サインをもらって引き渡し、取引を終える（一件ずつ）
 #[test]
-fn service_item_needs_staff() {
+fn pickup_matches_the_parcel_then_hands_it_over() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", RECEIVE);
     assert!(s
@@ -411,14 +412,69 @@ fn service_item_needs_staff() {
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Service));
+    // 二件目の受け取りも、ほかの商品も一緒には扱わない
+    for code in [RECEIVE, BREAD, PARCEL] {
+        assert!(run(
+            &mut s,
+            json!({"type":"scan","register":2,"side":"customer","code":code})
+        )
+        .is_err());
+    }
     login_as(&mut s, 2, "ST001");
-    let id = reg(&s, 2).staff.lines[0].line.id;
-    ok(
-        &mut s,
-        json!({"type":"complete_service","register":2,"line_id":id,"amount":1200}),
-    );
     assert_eq!(reg(&s, 2).mode, Mode::Attended);
-    assert_eq!(reg(&s, 2).customer.total, 1200);
+    let no = reg(&s, 2).staff.lines[0]
+        .line
+        .pickup
+        .clone()
+        .expect("お預かりの番号")
+        .no;
+    // 照合の前は引き渡せず、金額の入力もできない。会計もできない
+    assert!(run(&mut s, json!({"type":"pickup_handover","register":2})).is_err());
+    let id = reg(&s, 2).staff.lines[0].line.id;
+    assert!(run(
+        &mut s,
+        json!({"type":"complete_service","register":2,"line_id":id,"amount":0})
+    )
+    .is_err());
+    assert!(!allowed(&reg(&s, 2), Side::Staff, Action::Checkout));
+    // 別の荷物（番号違い）は照合で止まる。お客様側の画面では読まない
+    let other = if no.starts_with('9') {
+        "PK000000000000"
+    } else {
+        "PK999999999999"
+    };
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"staff","code":other})
+    )
+    .is_err());
+    assert!(reg(&s, 2).staff.lines[0]
+        .line
+        .pickup
+        .as_ref()
+        .unwrap()
+        .wrong
+        .is_some());
+    let right = format!("PK{}", no.replace('-', ""));
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"customer","code":right})
+    )
+    .is_err());
+    scan(&mut s, 2, "staff", &right);
+    let pk = reg(&s, 2).staff.lines[0].line.pickup.clone().unwrap();
+    assert!(pk.matched && pk.wrong.is_none());
+    ok(&mut s, json!({"type":"pickup_handover","register":2}));
+    let v = reg(&s, 2);
+    assert!(v.staff.lines.is_empty());
+    assert!(v.last_receipt.is_none());
+    assert!(!s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.kind == CallKind::Service && c.register == 2));
+    // 引き渡しの後は、続けてお買い物ができる
+    scan(&mut s, 2, "staff", BREAD);
 }
 
 fn pending_parcel(s: &Store, r: u8) -> u32 {

@@ -18,7 +18,7 @@ use crate::catalog::{
     self, Category, Coupon, FfTab, Product, Scanned, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
 use crate::mat::{Bell, Mat};
-use crate::parcel::{self, Parcel};
+use crate::parcel::{self, Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 
@@ -35,6 +35,9 @@ const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一
 const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str =
     "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
+/// 荷物の受け取りは一件ずつ、ほかの商品と別に扱う
+const PICKUP_ALONE: &str =
+    "荷物のお受け取りは一件ずつ、ほかの商品と別にお取り扱いします（お受け取りが済んでから登録してください）";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
@@ -246,6 +249,10 @@ pub enum Command {
     ParcelNext {
         register: u8,
         more: bool,
+    },
+    /// 荷物を受取る：照合が済み、店舗控えにサインをもらって荷物を引き渡した（取引を終える）
+    PickupHandover {
+        register: u8,
     },
     RemoveLine {
         register: u8,
@@ -503,6 +510,7 @@ impl Command {
             | C::ParcelPostal { register, .. }
             | C::ParcelBack { register, .. }
             | C::ParcelNext { register, .. }
+            | C::PickupHandover { register }
             | C::RemoveLine { register, .. }
             | C::SetQty { register, .. }
             | C::RemoveCoupon { register, .. }
@@ -570,6 +578,7 @@ impl Command {
             | C::ParcelPostal { .. }
             | C::ParcelBack { .. }
             | C::ParcelNext { .. }
+            | C::PickupHandover { .. }
             | C::VoidTransaction { .. } => Some(Side::Staff),
             _ => None,
         }
@@ -654,18 +663,31 @@ pub struct Line {
     /// 荷物を送る：サイズ・届け先（受付の途中も含む）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parcel: Option<Parcel>,
+    /// 荷物を受取る：お預かりの荷物の番号と照合の結果
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pickup: Option<Pickup>,
 }
 
 /// 払込票のバーコード番号を便宜的に作る（16 桁を 4 桁ずつ区切る）。
 /// 実物の払込票のバーコード（44 桁など）は事業者ごとに決まった形式だが、シミュレーターでは扱わない
 fn slip_no(seed: u64) -> String {
-    // splitmix64 で混ぜ、読み取りごとに別の番号にする
+    let d = format!("91{:014}", mix(seed) % 100_000_000_000_000);
+    format!("{} {} {} {}", &d[..4], &d[4..8], &d[8..12], &d[12..])
+}
+
+/// お預かりの荷物の番号を便宜的に作る（12 桁を 4 桁ずつ区切る）。
+/// 実物は受取用バーコードから運送会社の荷物の番号を引くが、シミュレーターでは読み取ったときに作る
+fn pickup_no(seed: u64) -> String {
+    let d = format!("{:012}", mix(seed) % 1_000_000_000_000);
+    format!("{}-{}-{}", &d[..4], &d[4..8], &d[8..])
+}
+
+/// splitmix64 で混ぜ、読み取りごとに別の番号にする
+fn mix(seed: u64) -> u64 {
     let mut x = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
     x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    x ^= x >> 31;
-    let d = format!("91{:014}", x % 100_000_000_000_000);
-    format!("{} {} {} {}", &d[..4], &d[4..8], &d[8..12], &d[12..])
+    x ^ (x >> 31)
 }
 
 impl Line {
@@ -683,6 +705,11 @@ impl Line {
         !self.is_parcel()
             && !self.is_bill()
             && !matches!(self.category, Category::Stamp | Category::Tobacco)
+    }
+
+    /// 荷物を受取る
+    fn is_pickup(&self) -> bool {
+        self.pickup.is_some()
     }
 
     /// 公共料金の払込票
@@ -979,6 +1006,7 @@ impl Txn {
             kind,
             slip_no: None,
             parcel: p.parcel_send.then(Parcel::default),
+            pickup: None,
         });
     }
 }
@@ -1584,6 +1612,9 @@ impl Store {
                 if l.is_parcel() {
                     return Err("荷物の料金は、サイズと届け先の郵便番号で決まります".into());
                 }
+                if l.is_pickup() {
+                    return Err("荷物のバーコードを読んで照合してから、お渡しください".into());
+                }
                 l.unit_price = amount;
                 // 代行収納は、受付した内容・金額をお客様が会計時に確認する
                 l.kind = LineKind::Service {
@@ -1675,6 +1706,28 @@ impl Store {
                     tax,
                 );
                 done("次の荷物：取り扱いサイズを決定してください".to_string())
+            }
+            C::PickupHandover { register } => {
+                self.check_active(register, Action::CompleteService)?;
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                let pk = r
+                    .txn
+                    .lines
+                    .iter()
+                    .find_map(|l| l.pickup.as_ref())
+                    .ok_or("お受け取りの手続き中ではありません")?;
+                if !pk.matched {
+                    return Err(
+                        "先に荷物のバーコードを読んで、お預かりの番号と照合してください".into(),
+                    );
+                }
+                let no = pk.no.clone();
+                // 引き渡したら取引を終える（お支払いはない）。続けてお買い物をするときは次の取引で
+                r.txn = Txn::default();
+                r.last_receipt = None;
+                self.calls.resolve(register, CallKind::Service, now);
+                done(format!("荷物（{no}）をお渡ししました"))
             }
             C::RemoveLine {
                 register,
@@ -2466,6 +2519,9 @@ impl Store {
             });
         }
         self.check(register, side, Action::Scan)?;
+        if let Scanned::Pickup(no) = &scanned {
+            return self.match_pickup(register, side, no);
+        }
         if let Scanned::Product(p) = &scanned {
             self.check_limit(register, p.code, 1)?;
         }
@@ -2488,6 +2544,10 @@ impl Store {
         }
         // 公共料金の払込票は、ほかの商品と一緒に登録できない（どちらを先に読んでも）
         if let Scanned::Product(p) = &scanned {
+            if r.txn.lines.iter().any(Line::is_pickup) || p.parcel_pickup && !r.txn.lines.is_empty()
+            {
+                return Err(PICKUP_ALONE.into());
+            }
             let slips = r.txn.bill_slips();
             if p.utility_bill && r.txn.lines.iter().any(|l| !l.is_bill())
                 || !p.utility_bill && slips > 0
@@ -2512,7 +2572,7 @@ impl Store {
             ""
         };
         match scanned {
-            Scanned::Staff(_) => unreachable!(),
+            Scanned::Staff(_) | Scanned::Pickup(_) => unreachable!(),
             Scanned::Unknown => Err("登録されていないバーコードです".into()),
             Scanned::PointCard(no) => {
                 r.txn.point_card = Some(no);
@@ -2564,6 +2624,16 @@ impl Store {
                     },
                     tax,
                 );
+                if p.parcel_pickup {
+                    let seed = now ^ (u64::from(register) << 56) ^ 0x5049_434B;
+                    if let Some(l) = r.txn.lines.last_mut() {
+                        l.pickup = Some(Pickup {
+                            no: pickup_no(seed),
+                            matched: false,
+                            wrong: None,
+                        });
+                    }
+                }
                 // 次の荷物の伝票を読んだら、「次の荷物はありますか」には「ある」と答えたことになる
                 r.txn.parcel_ask = false;
                 let ready = r.staff_state() == StaffState::Ready;
@@ -2572,6 +2642,11 @@ impl Store {
                 }
                 done(if ready && p.parcel_send {
                     format!("{}：取り扱いサイズを決定してください{back}", p.name)
+                } else if ready && p.parcel_pickup {
+                    format!(
+                        "{}：保管場所から荷物を探し、バーコードを読み取ってください",
+                        p.name
+                    )
                 } else if ready {
                     format!("{}：受付内容を入力してください{back}", p.name)
                 } else {
@@ -2586,6 +2661,30 @@ impl Store {
                 done(format!("{} {}円{back}", p.name, p.price))
             }
         }
+    }
+
+    /// 保管場所から持ってきた荷物のバーコードを読み、お預かりの番号と照合する
+    fn match_pickup(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
+        let r = self.reg_mut(register)?;
+        if r.staff_state() != StaffState::Ready || side != Side::Staff {
+            return Err("お預かりの荷物のバーコードは、係員が店員側で読み取ります".into());
+        }
+        let pk = r
+            .txn
+            .lines
+            .iter_mut()
+            .find_map(|l| l.pickup.as_mut())
+            .ok_or("お受け取りの手続き中ではありません（先にお客様の受取用バーコードを読み取ってください）")?;
+        if !pk.matches(no) {
+            pk.wrong = Some(no.to_string());
+            return Err(format!(
+                "番号が違います。この荷物はお渡しできません（お受け取りの荷物は {}）",
+                pk.no
+            ));
+        }
+        pk.matched = true;
+        pk.wrong = None;
+        done("照合しました。店舗控えにサインをいただき、荷物をお渡しください")
     }
 
     fn register_ff(
@@ -2604,6 +2703,12 @@ impl Store {
             .is_some_and(|r| r.txn.lines.iter().any(Line::is_parcel))
         {
             return Err(PARCEL_ALONE.into());
+        }
+        if self
+            .reg(register)
+            .is_some_and(|r| r.txn.lines.iter().any(Line::is_pickup))
+        {
+            return Err(PICKUP_ALONE.into());
         }
         let p = catalog::find(code)
             .filter(|p| p.category == Category::FastFood)

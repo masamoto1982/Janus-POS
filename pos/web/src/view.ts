@@ -6,6 +6,7 @@ import type {
   ActionState,
   BillRow,
   Parcel,
+  Pickup,
   Unavailable,
   Coupon,
   Returned,
@@ -157,6 +158,38 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
         ${choose(false, "スキップ", "skip")}
       </div>
+    </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// 荷物を受取る：受取用バーコード → 係員がお預かりの荷物を探して読む（照合）→ サインをもらって引き渡す
+// ---------------------------------------------------------------------------
+
+/** 12 桁の荷物の番号を 4 桁ずつ区切る */
+const dashed = (no: string): string => (/^\d{12}$/.test(no) ? no.replace(/(\d{4})(\d{4})(\d{4})/, "$1-$2-$3") : no);
+
+/** 明細の札：照合の前と後 */
+function pickupTag(p: Pickup): string {
+  return p.matched ? `<span class="tag ok">照合済</span>` : `<span class="tag warn">照合待ち</span>`;
+}
+
+/**
+ * 店員側：お預かりの荷物の番号を大きく出し、荷物のバーコードを読むよう案内する。
+ * 照合が済んだら、サインをもらって引き渡すよう案内し、引き渡しのボタンを出す
+ */
+function pickupStep(reg: number, p: Pickup, st: ActionState): string {
+  if (!p.matched) {
+    return `<div class="point-screen pickup-step">
+        <div class="big">お預かりの荷物を探してください</div>
+        <p class="pickup-no">${esc(p.no)}</p>
+        ${p.wrong ? `<div class="banner danger">読み取った荷物（${esc(dashed(p.wrong))}）は番号が違います。お渡しできません</div>` : ""}
+        <p class="muted">保管場所から荷物を探し、荷物のバーコードを読み取ってください</p>
+      </div>`;
+  }
+  return `<div class="point-screen pickup-step">
+      <p class="pickup-no">${esc(p.no)} <span class="tag ok">照合済</span></p>
+      <div class="big">店舗控えにサインをいただき、荷物をお渡しください</div>
+      <div class="point-choices">${btn("お渡ししました", { type: "pickup_handover", register: reg }, st, "primary")}</div>
     </div>`;
 }
 
@@ -404,12 +437,13 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
   // 払込票（現金のみのサービス）は受付が要らないので、受付の札を出さない
   if (l.kind === "service" && l.parcel) tags.push(parcelTag(l.parcel, l.done));
+  else if (l.pickup) tags.push(pickupTag(l.pickup));
   else if (l.kind === "service" && !isBill(l)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
   tags.push(warnTags(l));
   const remove = find(v.actions, "remove_line");
   let svc = "";
   // 荷物を送るは、サイズと郵便番号を決める画面で料金を決める（金額は打ち込まない）
-  if (l.kind === "service" && !l.done && !ro && !l.parcel) {
+  if (l.kind === "service" && !l.done && !ro && !l.parcel && !l.pickup) {
     const a = find(v.actions, "complete_service");
     svc = `<div class="svc">
       <input type="number" inputmode="numeric" min="0" placeholder="金額" data-key="svc-${reg}-${l.id}" ${a.allowed ? "" : "disabled"} />
@@ -687,7 +721,7 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
 /** 有人モードの初期画面の案内ボタン（店員側で押す。お客様側には同じボタンを押せない形で映す） */
 const ATTENDED_GUIDES: [GuideKind, string, string][] = [
   ["shop", "お買い物", "商品のバーコードをスキャンしてください"],
-  ["parcel", "宅配便", "宅配便の伝票のバーコードをスキャンしてください"],
+  ["parcel", "宅配便", "宅配便の伝票、または受取用のバーコードをスキャンしてください"],
   ["bill", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
 ];
 
@@ -782,6 +816,14 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
   // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
   // 荷物を送る：店員がサイズと郵便番号を決める間、お客様には伝票の貼り付けをお願いする
+  // 荷物を受取る：店員がお預かりの荷物を探して照合する間は「お持ちします」、照合が済んだらサインをお願いする
+  const pickup = v.lines.find((l) => l.pickup)?.pickup;
+  if (!paying && pickup)
+    return screen(
+      side === "staff"
+        ? pickupStep(reg, pickup, a("complete_service"))
+        : pairNote(pickup.matched ? "受け取りのサインをお願いします" : "荷物をお持ちします", pickup.matched ? "" : "少々お待ちください"),
+    );
   const parcel = pendingParcel(v.lines);
   if (!paying && parcel)
     return screen(
@@ -1048,7 +1090,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
   if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
   // 荷物の発送はほかの商品と一緒に会計できないので、荷物の取引では FF タブを出さない（受付の画面を広く使う）
-  if (r.mode === "attended" && r.staff.lines.some((l) => l.parcel)) return "";
+  // 荷物の受け取りも、ほかの商品と別に一件ずつ扱うので FF タブを出さない
+  if (r.mode === "attended" && r.staff.lines.some((l) => l.parcel || l.pickup)) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -1420,6 +1463,9 @@ const SHELVES: Shelf[] = [
   { label: "オプション", match: (p) => p.category === "bag" },
 ];
 
+/** 荷物を受取る（お客様がコピー機で出した、またはスマホに出した受取用のバーコード） */
+const PICKUP_CODE = "2100000000038";
+
 /** 公共料金の払込票（電気・水道・ガス） */
 const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
 
@@ -1434,13 +1480,27 @@ function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCA
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
+/** 照合で止まることを試すための、別のお客様の荷物の番号（4 桁ずつの並びを入れ替える） */
+function otherParcel(no: string): string {
+  const [a, b, c] = no.split("-");
+  return [c, a, b].join("-") === no ? "0000-0000-0001" : [c, a, b].join("-");
+}
+
 /** Item：4 大分類ごとに小さな見出しを付けて並べる */
 export function shelfPanel(s: Snapshot): string {
   // たばこはカウンターの内側の商品。有人モードのレジがあるときだけ並べ、
   // たばこボタンで呼ばれて有人モードになったら（まだ登録していなければ）枠と文字を点滅させる
   const attended = s.registers.some((r) => r.mode === "attended");
   const asked = s.registers.some((r) => r.tobacco_asked);
-  return SHELVES.map((g) => {
+  // お預かり中の荷物：有人モードで受け取りの手続き中のレジがあるときだけ、保管場所の棚として並べる。
+  // お客様の荷物と、照合で止まることを試せるよう別のお客様の荷物も置く
+  const pickups = s.registers.flatMap((r) => (r.mode === "attended" ? r.staff.lines.flatMap((l) => (l.pickup ? [l.pickup.no] : [])) : []));
+  const stored = pickups.length
+    ? `<div class="shelf"><h3>お預かりの荷物</h3><div class="items uniform">${[...pickups, otherParcel(pickups[0])]
+        .map((no) => item(`PK${no.replace(/-/g, "")}`, "お預かりの荷物", esc(no), "pk"))
+        .join("")}</div></div>`
+    : "";
+  return stored + SHELVES.map((g) => {
     // 棚の並びは SHELVES に書いた順
     const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || attended);
     if (!items.length) return "";
@@ -1452,7 +1512,7 @@ export function shelfPanel(s: Snapshot): string {
           : item(
               p.code,
               p.name,
-              `${p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
+              `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
               p.category === "tobacco" && asked ? "call-blink" : "",
             ),
       )

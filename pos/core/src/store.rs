@@ -276,15 +276,15 @@ pub enum Command {
     DismissFfCollect {
         register: u8,
     },
-    /// 公共料金の払込票の内容確認（店員）。種類（電気・水道・ガス）ごとに手元の払込票の枚数を入力するたびに
-    /// 判定し、登録した枚数と合えば確認済み、合わなければ未確認に戻る（FF のお渡し照合と同じ形）。
-    /// すべて合うまで支払いに進めない。店員側の画面からだけ
+    /// 公共料金の払込票の内容確認（店員）。種類（電気・水道・ガス）ごとに、手元の払込票の金額と画面の金額が
+    /// 合っていればチェックを入れる（`checked` false で外す）。数字の打ち込みはさせない。
+    /// すべてにチェックが入るまで支払いに進めない。店員側の画面からだけ
     CheckBill {
         register: u8,
         #[serde(default = "staff_side")]
         side: Side,
         code: String,
-        count: u32,
+        checked: bool,
     },
     /// 決済の後、払込票に収納印を押してお客様に渡した（店員の「お渡し済」）
     HandOverBills {
@@ -546,7 +546,7 @@ pub struct BillRow {
     /// 登録した枚数
     pub count: u32,
     pub amount: u32,
-    /// 店員の照合が合っている
+    /// 店員が金額を確認した（チェックを入れた）
     pub checked: bool,
 }
 
@@ -1670,7 +1670,7 @@ impl Store {
                 register,
                 side,
                 code,
-                count,
+                checked,
             } => {
                 self.check(register, side, Action::CheckBill)?;
                 let now = self.now;
@@ -1685,21 +1685,19 @@ impl Store {
                     .first()
                     .map(|l| l.name)
                     .ok_or("払込票が見つかりません")?;
-                // 入力のたびに判定する。合えば確認済み（OK）、合わなければ未確認（NG）
-                let matched = count == bills.len() as u32;
                 for l in &mut bills {
                     l.kind = LineKind::Service {
                         done: true,
-                        confirm_pending: !matched,
+                        confirm_pending: !checked,
                     };
                 }
                 if !r.txn.bill_unchecked() {
                     self.calls.resolve(register, CallKind::Bill, now);
                 }
-                done(if matched {
-                    format!("{name}：照合 OK")
+                done(if checked {
+                    format!("{name}：金額を確認しました")
                 } else {
-                    format!("{name}：照合 NG（{count}枚が登録した枚数と合いません）")
+                    format!("{name}：確認を外しました")
                 })
             }
             C::HandOverBills { register, side } => {

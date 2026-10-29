@@ -662,3 +662,12 @@ body.dragging .drop-hint { display: inline; }
   .money-io { margin-top: 6px; }
   .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
 }
+
+/* 公共料金：受付枚数は合計金額より大事なので、どの確認画面でも大きく */
+.bill-n { font-size: 1.7em; font-weight: 800; margin: 0 .12em; line-height: 1; font-variant-numeric: tabular-nums; }
+.bill-verify > .big { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.bill-sum { font-size: 14px; font-weight: 600; margin-left: 12px; }
+.bill-verify > p { margin: 2px 0 0; font-size: 12px; }
+.bill-tick { text-align: center; width: 48px; }
+.bill-tick input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.bill-call { margin: 0; }

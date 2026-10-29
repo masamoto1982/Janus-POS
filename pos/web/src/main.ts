@@ -19,7 +19,6 @@ import {
   editing,
   ffVerifying,
   ffvInput,
-  billInput,
   flashing,
   type FfUi,
   itemsPanel,
@@ -602,12 +601,10 @@ app.addEventListener("input", (e) => {
     send({ type: "check_ff", register: Number(reg), side, line_id: Number(line), handed: Number(el.value || 0) });
     return;
   }
-  // 払込票の確認：手元の払込票の枚数を種類ごとに入力するたびに判定する（FF のお渡し照合と同じ形）
+  // 払込票の確認：金額が合っていれば種類ごとにチェックを入れる（外すこともできる）
   if (el.dataset.billCheck) {
-    el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 2);
     const [reg, side, code] = el.dataset.billCheck.split(":");
-    billInput.set(el.dataset.billCheck, el.value);
-    send({ type: "check_bill", register: Number(reg), side, code, count: Number(el.value || 0) });
+    send({ type: "check_bill", register: Number(reg), side, code, checked: el.checked });
     return;
   }
   if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);

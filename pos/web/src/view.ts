@@ -194,37 +194,39 @@ function ffCollectCard(reg: number, v: StaffView): string {
     </div>`;
 }
 
-/** 払込票の確認で入力した枚数（register:side:code → 入力中の文字列） */
-export const billInput = new Map<string, string>();
+/** 公共料金の受付枚数。合計金額よりも大事な情報なので、どの確認画面でも大きく出す */
+const billN = (n: number): string => `<span class="bill-n">${n}枚</span>`;
 
 /**
- * 公共料金の払込票の確認（店員）。会計ボタンの後、FF のお渡し照合と同じ形の表で 内容｜枚数｜確認｜照合。
- * 手元の払込票を種類ごとに数えて入力すると、その場で登録した枚数と比べて OK / NG を出す（判定ボタンはない）。
- * すべて OK になると、お客様側に現金での支払いを案内する。
+ * 公共料金の払込票の確認（店員）。会計ボタンの後、表で 内容｜枚数｜金額｜確認。
+ * 手元の払込票の金額を確かめ、合っていれば種類ごとにチェックを入れる（数字の打ち込みはさせない）。
+ * すべてにチェックが入ると、お客様側に現金での支払いを案内する。
  *
  * 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは、払込票ごとの支払いの内容・金額・手数料と合計額を
- * 確認画面に記載する。Janus POS はシミュレーターで表示エリアが足りないため、種類ごとの枚数と合計だけにし、
+ * 確認画面に記載する。Janus POS はシミュレーターで表示エリアが足りないため、種類ごとの枚数・金額と合計だけにし、
  * 手数料（収納手数料）の概念も扱わない。
  */
-export function billVerifyScreen(reg: number, side: Side, bills: BillRow[]): string {
+export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: ActionState): string {
+  const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const rows = bills
-    .map((b) => {
-      const key = `${reg}:${side}:${b.code}`;
-      const value = billInput.get(key) ?? (b.checked ? String(b.count) : "");
-      const judge = value === "" ? "" : b.checked ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
-      return `<tr><td>${esc(b.name)}</td><td class="num">${b.count}</td><td class="num"><input type="text" inputmode="numeric" autocomplete="off" class="ffv-input" value="${esc(value)}" data-key="billc-${key}" data-bill-check="${key}" aria-label="${esc(b.name)}の払込票の枚数" /></td><td class="ffv-judge">${judge}</td></tr>`;
-    })
+    .map(
+      (b) =>
+        `<tr><td>${esc(b.name)}</td><td class="num">${b.count}枚</td><td class="num">${yen(b.amount)}</td><td class="bill-tick"><input type="checkbox" ${b.checked ? "checked" : ""} data-bill-check="${reg}:${side}:${b.code}" aria-label="${esc(b.name)}の金額を確認した"${off} /></td></tr>`,
+    )
     .join("");
-  return `<div class="ffv-screen">
-      <div class="big">払込票の確認</div>
-      <table class="lines ffv"><thead><tr><th>内容</th><th class="num">枚数</th><th class="num">確認</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
+  const count = bills.reduce((n, b) => n + b.count, 0);
+  const total = bills.reduce((n, b) => n + b.amount, 0);
+  return `<div class="ffv-screen bill-verify">
+      <div class="big">受付 ${billN(count)}<span class="bill-sum">合計 ${yen(total)}</span></div>
+      <table class="lines ffv"><thead><tr><th>内容</th><th class="num">枚数</th><th class="num">金額</th><th class="bill-tick">確認</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="muted">払込票の金額が合っていれば、確認にチェックを入れてください</p>
     </div>`;
 }
 
 /** 店員の確認が済んだ公共料金の支払い（お客様側）。公共料金は現金のみ */
 export function billPayCard(count: number): string {
   return `<div class="point-screen bill-pay">
-      <div class="big">公共料金${count}枚を受け付けます。</div>
+      <div class="big">公共料金${billN(count)}を受け付けます。</div>
       <p>現金でお支払いください。</p>
     </div>`;
 }
@@ -236,22 +238,19 @@ export function billPayCard(count: number): string {
 export function billHandover(reg: number, side: Side, count: number, st: ActionState): string {
   if (side === "customer")
     return `<div class="point-screen bill-done">
-      <div class="big">支払いが完了しました</div>
+      <div class="big">公共料金${billN(count)}　支払いが完了しました</div>
       <p>払込票とレシート、お釣りをお受け取りください</p>
     </div>`;
   return `<div class="point-screen bill-done">
-      <div class="big">払込票に収納印を押してお渡しください</div>
-      <p class="muted">公共料金 ${count}枚</p>
+      <div class="big">公共料金${billN(count)}</div>
+      <p>払込票に収納印を押してお渡しください</p>
       <div class="point-choices">${btn("お渡し済", { type: "hand_over_bills", register: reg, side }, st, "primary")}</div>
     </div>`;
 }
 
-/** セミセルフで公共料金の会計ボタンが押され、係員を待つ間のお客様側の案内 */
-function billWait(): string {
-  return `<div class="point-screen">
-      <div class="big">係員をお呼びしました</div>
-      <p>払込票の内容を確認いたします。しばらくお待ちください</p>
-    </div>`;
+/** 公共料金の確認の最中に、操作しない側に出すメッセージ（受付枚数を大きく） */
+function billNote(count: number, sub: string): string {
+  return `<div class="point-screen pair-note"><div class="big">公共料金${billN(count)}</div><p>${esc(sub)}</p></div>`;
 }
 
 /** 確認画面の入れ物：登録画面の領域いっぱいに広げ、中身を上下左右とも中央に置く */
@@ -449,10 +448,13 @@ export function callScreen(r: RegisterView, now: number): string {
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
-  const details = [...new Set(v.calls.map((c) => c.detail).filter(Boolean))];
+  // 公共料金の受付枚数は大きく出す（合計金額より大事な情報）
+  const details = [...new Set(v.calls.filter((c) => c.kind !== "bill").map((c) => c.detail).filter(Boolean))];
+  const bill = v.calls.find((c) => c.kind === "bill");
   // 登録画面の領域いっぱいに広げて出す（最下段の FF・サービス・たばこボタンはそのまま）
   return `<div class="call-screen">${warn}
       <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
+      ${bill ? `<p class="bill-call"><span class="bill-n">${esc(bill.detail)}</span></p>` : ""}
       ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
       <p class="muted">${elapsed(v.calls, now, "", "　")}店員証でログインすると対応を始めます</p>
     </div>`;
@@ -657,7 +659,6 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.last_receipt && !v.lines.length) return notice + thanks();
-  if (!v.bills.length) for (const k of [...billInput.keys()]) if (k.startsWith(`${reg}:`)) billInput.delete(k);
   // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return attendedWelcome(r, notice, side);
@@ -713,8 +714,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
   const slips = v.bills.reduce((n, b) => n + b.count, 0);
   if (paying && slips && v.bill_unchecked)
-    return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills) : pairNote("店員が払込票を確認しています"));
-  if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : pairNote(`公共料金${slips}枚を受け付けました`, "お客様に現金でお支払いいただいています"));
+    return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "店員が払込票を確認しています"));
+  if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : billNote(slips, "お客様に現金でお支払いいただいています"));
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
     side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
@@ -1143,7 +1144,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
   // 公共料金：係員を待つ間は案内だけ。係員の確認が済んでいれば（その後にログアウトしても）現金で支払う
   const slips = c.bills.reduce((n, b) => n + b.count, 0);
-  if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billWait() : billPayCard(slips));
+  if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "係員をお呼びしました。払込票の内容を確認いたします") : billPayCard(slips));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",

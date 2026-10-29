@@ -198,28 +198,31 @@ function ffCollectCard(reg: number, v: StaffView): string {
 const billN = (n: number): string => `<span class="bill-n">${n}枚</span>`;
 
 /**
- * 公共料金の払込票の確認（店員）。会計ボタンの後、表で 内容｜枚数｜金額｜確認。
- * 手元の払込票の金額を確かめ、合っていれば種類ごとにチェックを入れる（数字の打ち込みはさせない）。
+ * 公共料金の払込票の確認（店員）。会計ボタンの後、表で 事業者｜金額｜バーコード番号｜確認。
+ * どれも同じ重みの確認項目なので、列は同じ間隔で中央にそろえる（金額だけが目立たないように）。
+ * 同じ事業者でも FF のようにまとめず、一枚ずつ並べる：ため込んだ払込票を大量に持ち込まれたとき、
+ * 店員が来るまでに読んだ払込票と読んでいない払込票がすり替わることや、控えを分けて持ち込まれ、
+ * スキャナーに通した本部控えと収納印を押すお客様控えで金額が違うことがあるため。
+ * 手元の払込票の事業者・金額・バーコード番号を確かめ、合っていればチェックを入れる（数字の打ち込みはさせない）。
  * すべてにチェックが入ると、お客様側に現金での支払いを案内する。
  *
- * 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは、払込票ごとの支払いの内容・金額・手数料と合計額を
- * 確認画面に記載する。Janus POS はシミュレーターで表示エリアが足りないため、種類ごとの枚数・金額と合計だけにし、
- * 手数料（収納手数料）の概念も扱わない。
+ * 設計メモ（ユーザー 2026-10-28・29）：実際の POS レジでは、払込票ごとの支払いの内容・金額・手数料と合計額に加え、
+ * 払込票のバーコード番号（実物の桁数・形式）も記載して、厳密な確認に耐えるようにする。Janus POS はシミュレーターで
+ * 表示エリアが足りないため、事業者・金額と便宜的なバーコード番号（16 桁）だけにし、手数料（収納手数料）の概念も扱わない。
  */
 export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: ActionState): string {
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const rows = bills
     .map(
       (b) =>
-        `<tr><td>${esc(b.name)}</td><td class="num">${b.count}枚</td><td class="num">${yen(b.amount)}</td><td class="bill-tick"><input type="checkbox" ${b.checked ? "checked" : ""} data-bill-check="${reg}:${side}:${b.code}" aria-label="${esc(b.name)}の金額を確認した"${off} /></td></tr>`,
+        `<tr><td>${esc(b.name)}</td><td>${yen(b.amount)}</td><td class="bill-no">${esc(b.slip_no)}</td><td class="bill-tick"><input type="checkbox" ${b.checked ? "checked" : ""} data-bill-check="${reg}:${side}:${b.line_id}" aria-label="${esc(b.name)} ${yen(b.amount)}を確認した"${off} /></td></tr>`,
     )
     .join("");
-  const count = bills.reduce((n, b) => n + b.count, 0);
   const total = bills.reduce((n, b) => n + b.amount, 0);
   return `<div class="ffv-screen bill-verify">
-      <div class="big">受付 ${billN(count)}<span class="bill-sum">合計 ${yen(total)}</span></div>
-      <table class="lines ffv"><thead><tr><th>内容</th><th class="num">枚数</th><th class="num">金額</th><th class="bill-tick">確認</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="muted">払込票の金額が合っていれば、確認にチェックを入れてください</p>
+      <div class="big">受付 ${billN(bills.length)}<span class="bill-sum">合計 ${yen(total)}</span></div>
+      <table class="lines ffv bill-table"><thead><tr><th>事業者</th><th>金額</th><th>バーコード番号</th><th class="bill-tick">確認</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="muted">事業者・金額・バーコード番号が合っていれば、一枚ずつチェックを入れてください</p>
     </div>`;
 }
 
@@ -712,7 +715,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
   // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
-  const slips = v.bills.reduce((n, b) => n + b.count, 0);
+  const slips = v.bills.length;
   if (paying && slips && v.bill_unchecked)
     return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "店員が払込票を確認しています"));
   if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : billNote(slips, "お客様に現金でお支払いいただいています"));
@@ -1143,7 +1146,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const screen = (body: string) => `${top}${notice}${confirm(body)}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
   // 公共料金：係員を待つ間は案内だけ。係員の確認が済んでいれば（その後にログアウトしても）現金で支払う
-  const slips = c.bills.reduce((n, b) => n + b.count, 0);
+  const slips = c.bills.length;
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "係員をお呼びしました。払込票の内容を確認いたします") : billPayCard(slips));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   const card = firstOf([

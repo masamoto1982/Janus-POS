@@ -276,14 +276,14 @@ pub enum Command {
     DismissFfCollect {
         register: u8,
     },
-    /// 公共料金の払込票の内容確認（店員）。種類（電気・水道・ガス）ごとに、手元の払込票の金額と画面の金額が
+    /// 公共料金の払込票の内容確認（店員）。一枚ずつ、手元の払込票の事業者・金額と画面が
     /// 合っていればチェックを入れる（`checked` false で外す）。数字の打ち込みはさせない。
     /// すべてにチェックが入るまで支払いに進めない。店員側の画面からだけ
     CheckBill {
         register: u8,
         #[serde(default = "staff_side")]
         side: Side,
-        code: String,
+        line_id: u32,
         checked: bool,
     },
     /// 決済の後、払込票に収納印を押してお客様に渡した（店員の「お渡し済」）
@@ -538,15 +538,20 @@ impl Command {
     }
 }
 
-/// 公共料金の払込票の種類ごとの内容（店員の照合と、お客様への案内に使う）
+/// 公共料金の払込票 1 枚ごとの内容（店員の確認と、お客様への案内に使う）。
+/// 同じ事業者でも FF のようにまとめない：持ち込んだ払込票のすり替わりや、控えを分けて持ち込んだときの
+/// 金額の食い違い（読んだ本部控えと収納印を押すお客様控えで金額が違う）を一枚ずつ確かめるため
 #[derive(Clone, Debug, Serialize)]
 pub struct BillRow {
+    /// 明細番号（確認のチェックの宛先）
+    pub line_id: u32,
     pub code: &'static str,
+    /// 事業者（電気料金・水道料金・ガス料金）
     pub name: &'static str,
-    /// 登録した枚数
-    pub count: u32,
     pub amount: u32,
-    /// 店員が金額を確認した（チェックを入れた）
+    /// 払込票のバーコード番号（便宜的に作ったもの）
+    pub slip_no: String,
+    /// 店員が事業者・金額・バーコード番号を確かめた（チェックを入れた）
     pub checked: bool,
 }
 
@@ -605,6 +610,21 @@ pub struct Line {
     pub cash_only: bool,
     #[serde(flatten)]
     pub kind: LineKind,
+    /// 公共料金の払込票のバーコード番号（シミュレーターでは読み取ったときに便宜的に作る）
+    #[serde(skip)]
+    pub slip_no: Option<String>,
+}
+
+/// 払込票のバーコード番号を便宜的に作る（16 桁を 4 桁ずつ区切る）。
+/// 実物の払込票のバーコード（44 桁など）は事業者ごとに決まった形式だが、シミュレーターでは扱わない
+fn slip_no(seed: u64) -> String {
+    // splitmix64 で混ぜ、読み取りごとに別の番号にする
+    let mut x = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    x ^= x >> 31;
+    let d = format!("91{:014}", x % 100_000_000_000_000);
+    format!("{} {} {} {}", &d[..4], &d[4..8], &d[8..12], &d[12..])
 }
 
 impl Line {
@@ -807,31 +827,24 @@ impl Txn {
 
     /// 払込票の種類ごとの枚数・金額（読み取った順）
     fn bill_rows(&self) -> Vec<BillRow> {
-        let mut rows: Vec<BillRow> = vec![];
-        for l in self.lines.iter().filter(|l| l.is_bill()) {
-            let pending = matches!(
-                l.kind,
-                LineKind::Service {
-                    confirm_pending: true,
-                    ..
-                }
-            );
-            match rows.iter_mut().find(|r| r.code == l.code) {
-                Some(r) => {
-                    r.count += 1;
-                    r.amount += l.amount();
-                    r.checked &= !pending;
-                }
-                None => rows.push(BillRow {
-                    code: l.code,
-                    name: l.name,
-                    count: 1,
-                    amount: l.amount(),
-                    checked: !pending,
-                }),
-            }
-        }
-        rows
+        self.lines
+            .iter()
+            .filter(|l| l.is_bill())
+            .map(|l| BillRow {
+                line_id: l.id,
+                code: l.code,
+                name: l.name,
+                amount: l.amount(),
+                slip_no: l.slip_no.clone().unwrap_or_default(),
+                checked: !matches!(
+                    l.kind,
+                    LineKind::Service {
+                        confirm_pending: true,
+                        ..
+                    }
+                ),
+            })
+            .collect()
     }
 
     /// 承認済みの年齢で、いまの年確商品がすべて足りている
@@ -897,6 +910,7 @@ impl Txn {
             category: p.category,
             cash_only: p.cash_only,
             kind,
+            slip_no: None,
         });
     }
 }
@@ -1669,28 +1683,23 @@ impl Store {
             C::CheckBill {
                 register,
                 side,
-                code,
+                line_id,
                 checked,
             } => {
                 self.check(register, side, Action::CheckBill)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
-                let mut bills: Vec<&mut Line> = r
+                let l = r
                     .txn
                     .lines
                     .iter_mut()
-                    .filter(|l| l.is_bill() && l.code == code)
-                    .collect();
-                let name = bills
-                    .first()
-                    .map(|l| l.name)
+                    .find(|l| l.is_bill() && l.id == line_id)
                     .ok_or("払込票が見つかりません")?;
-                for l in &mut bills {
-                    l.kind = LineKind::Service {
-                        done: true,
-                        confirm_pending: !checked,
-                    };
-                }
+                l.kind = LineKind::Service {
+                    done: true,
+                    confirm_pending: !checked,
+                };
+                let name = format!("{} {}円", l.name, l.amount());
                 if !r.txn.bill_unchecked() {
                     self.calls.resolve(register, CallKind::Bill, now);
                 }
@@ -2352,6 +2361,11 @@ impl Store {
                     },
                     tax,
                 );
+                let seed = now ^ (u64::from(register) << 56) ^ (u64::from(r.txn.next_line) << 40);
+                let seed = seed ^ p.code.parse::<u64>().unwrap_or(0);
+                if let Some(l) = r.txn.lines.last_mut() {
+                    l.slip_no = Some(slip_no(seed));
+                }
                 done(format!("{} {}円{back}", p.name, p.price))
             }
             Scanned::Product(p) if p.needs_staff => {

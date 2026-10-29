@@ -94,11 +94,10 @@ export interface StaffView {
   returned: Returned[];
   /** 「する」を選び、店員の生年月日の入力待ち */
   id_pending: boolean;
-  /** 会計時、お客様の確認待ちの代行収納の金額 */
-  bill_check: number | null;
-  bill_count: number;
-  /** 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない） */
-  bill_slips: BillSlips | null;
+  /** 公共料金の払込票の種類ごとの枚数・金額（払込票がなければ空） */
+  bills: BillRow[];
+  /** 店員がまだ内容を確認していない払込票がある */
+  bill_unchecked: boolean;
   point_pending: boolean;
   method: Method | null;
   inserted: number;
@@ -111,11 +110,15 @@ export interface StaffView {
   mat_down: string[];
 }
 
-/** 公共料金の払込票の読み取りの進み具合 */
-export interface BillSlips {
-  /** お客様が答えた全部の枚数（まだなら null） */
-  declared: number | null;
-  scanned: number;
+/** 公共料金の払込票の種類ごとの内容 */
+export interface BillRow {
+  code: string;
+  name: string;
+  /** 登録した枚数 */
+  count: number;
+  amount: number;
+  /** 店員の照合が合っている */
+  checked: boolean;
 }
 
 export interface CustomerView {
@@ -130,10 +133,8 @@ export interface CustomerView {
   due: number;
   point_card: boolean;
   point_pending: boolean;
-  bill_check: number | null;
-  bill_count: number;
-  /** 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない） */
-  bill_slips: BillSlips | null;
+  bills: BillRow[];
+  bill_unchecked: boolean;
   staff_called: boolean;
   age_wait: number | null;
   staff_present: boolean;
@@ -184,6 +185,8 @@ export interface RegisterView {
   cashless_due: number;
   unavailable: Unavailable[];
   last_receipt: Receipt | null;
+  /** 公共料金の決済の後、払込票のお渡し待ち（枚数）。店員の「お渡し済」で消える */
+  bill_handover: number | null;
 }
 
 export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer" | "journal" | "waste" | "ff_fresh";

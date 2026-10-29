@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billCard, btn, callNotice, callScreen, esc, itemCount, regTop, sideOf } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, callNotice, callScreen, esc, itemCount, regTop, sideOf } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -38,17 +38,30 @@ describe("view helpers", () => {
     expect(regTop(0, 0, `<button>会計</button>`)).toBe("");
   });
 
-  it("marks the bill-payment confirmation as a customer-only button", () => {
-    const html = billCard(1, 2, 8640, { action: "confirm_bill_payment", allowed: true, reason: null });
-    expect(html).toContain("customer-only");
-    expect(html).toContain("8,640");
-    expect(html).toContain("2点");
-    expect(html).toContain("確認しました");
-    expect(html).toContain("お支払いをやめる");
-    expect(html).not.toContain("スキップ");
-    // 取りやめ（白紙に戻る）は左下、確認しましたは右下
-    expect(html.indexOf("お支払いをやめる")).toBeLessThan(html.indexOf("確認しました"));
-    expect(sideOf({ type: "confirm_bill_payment", register: 1 })).toBe("customer");
+  it("checks utility bills by count per kind, then asks the customer to pay in cash", () => {
+    const html = billVerifyScreen(1, "staff", [
+      { code: "2100000000021", name: "電気料金", count: 2, amount: 10000, checked: true },
+      { code: "2100000000050", name: "ガス料金", count: 1, amount: 3000, checked: false },
+    ]);
+    expect(html).toContain("払込票の確認");
+    for (const h of ["内容", "枚数", "確認", "照合"]) expect(html).toContain(`>${h}<`);
+    expect(html).toContain('data-bill-check="1:staff:2100000000021"');
+    expect(html).toContain('value="2"');
+    expect(html).toContain("OK");
+    const pay = billPayCard(3);
+    expect(pay).toContain("公共料金3枚を受け付けます。");
+    expect(pay).toContain("現金でお支払いください。");
+  });
+
+  it("shows the stamp-and-hand-over step after a utility bill payment", () => {
+    const st = { action: "hand_over_bills", allowed: true, reason: null };
+    const staff = billHandover(1, "staff", 3, st);
+    expect(staff).toContain("払込票に収納印を押してお渡しください");
+    expect(staff).toContain("お渡し済");
+    const customer = billHandover(1, "customer", 3, st);
+    expect(customer).toContain("支払いが完了しました");
+    expect(customer).toContain("払込票とレシート、お釣りをお受け取りください");
+    expect(customer).not.toContain("お渡し済");
   });
 
   it("shows the open calls only on the semi-self staff screen", () => {

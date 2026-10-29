@@ -245,7 +245,7 @@ impl TaxSettings {
         if before == to {
             return Err("変更はありません".into());
         }
-        if Self::default_class(p.tax) == id && !p.customer_confirms {
+        if Self::default_class(p.tax) == id && !p.utility_bill {
             self.products.remove(code);
         } else {
             self.products.insert(code.into(), id.into());

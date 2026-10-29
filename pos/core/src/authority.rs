@@ -7,8 +7,8 @@
 //!
 //! 何ができるかは **モード** だけで決まる。名札でログインした係員がいれば有人モード、
 //! いなければセミセルフモード（[`rules`]）。どちらの画面から操作するかは関係ない。
-//! 例外はお客様本人が押すボタン（年齢確認・代行収納の内容確認）で、お客様側の
-//! 画面からしか押せない（問題5、[`is_customer_only`]）。
+//! 例外は店員本人が判断・確認するボタン（年齢確認・公共料金の払込票の確認とお渡し）で、
+//! 店員側の画面からしか押せない（問題5、[`is_staff_only`]）。
 //!
 //! 片方の画面だけが操作できる状態は純粋関数 [`active_side`] で決まる。店舗メニューは
 //! お客様側、セミセルフ（係員なし）もお客様側。有人モードでは、触れている一瞬だけ
@@ -108,10 +108,10 @@ pub enum Action {
     ChooseAgeCheck,
     /// 「する」を選んだ後、店員が身分証の生年月日を入力して判定する
     CheckId,
-    /// 代行収納の支払い内容・金額の確認（お客様の承認）
-    ConfirmBillPayment,
-    /// 公共料金の払込票が全部で何枚かを入力する（1 枚目を読んだ後）
-    DeclareBillCount,
+    /// 公共料金の払込票の内容確認（店員が種類ごとの枚数を照合する。会計ボタンの後）
+    CheckBill,
+    /// 決済の後、払込票に収納印を押してお渡しした（店員の「お渡し済」）
+    HandOverBills,
     InsertCash,
     TapEmoney,
     CallStaff,
@@ -142,8 +142,8 @@ pub const ACTIONS: &[Action] = &[
     Action::ConfirmPointCard,
     Action::ChooseAgeCheck,
     Action::CheckId,
-    Action::ConfirmBillPayment,
-    Action::DeclareBillCount,
+    Action::CheckBill,
+    Action::HandOverBills,
     Action::InsertCash,
     Action::TapEmoney,
     Action::CallStaff,
@@ -173,10 +173,12 @@ pub struct Context {
     pub has_ff: bool,
     /// 店員の受付が済んでいないサービス商品がある
     pub service_pending: bool,
-    /// 代行収納の支払い内容・金額を、お客様がまだ確認していない
-    pub bill_pending: bool,
-    /// 公共料金の払込票の枚数の申告待ちか、申告した枚数をまだ読み終えていない
-    pub bill_counting: bool,
+    /// 公共料金の払込票がある
+    pub has_bills: bool,
+    /// 店員がまだ内容を確認していない払込票がある
+    pub bill_unchecked: bool,
+    /// 公共料金の決済の後、払込票のお渡し待ち
+    pub bill_handover: bool,
     /// 会計に進んだが、ポイントカードの最終確認がまだ
     pub point_pending: bool,
     /// 読み取ったクーポンがある
@@ -210,10 +212,8 @@ impl Context {
     pub fn payment_blocker(&self) -> Option<&'static str> {
         if self.emoney_short {
             Some(EMONEY_SHORT)
-        } else if self.bill_counting {
-            Some(BILL_COUNTING)
-        } else if self.bill_pending {
-            Some(BILL_UNCONFIRMED)
+        } else if self.bill_unchecked {
+            Some(BILL_UNCHECKED)
         } else if self.age_choice_pending {
             Some("店員が年齢確認をするか選んでいません")
         } else if self.id_pending {
@@ -239,8 +239,7 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 /// 似て非なる商品をクーポンのつもりで定価で買ってしまう事故を防ぐため、決済を止める
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります。対象商品を確かめるか、クーポンを取り消してください";
-const BILL_UNCONFIRMED: Denial = "お客様が代行収納の支払い内容・金額を確認していません";
-const BILL_COUNTING: Denial = "払込票をすべて読み取っていません（枚数の入力と読み取り）";
+const BILL_UNCHECKED: Denial = "店員が公共料金の内容を確認していません";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";
 
 /// 電子マネーのチャージ・残高確認（残高不足の対応中は、その選択肢から）
@@ -257,30 +256,34 @@ fn resolve_emoney_short(c: &Context) -> Result<(), Denial> {
     require(c.emoney_short, "電子マネーの残高は足りています")
 }
 
-/// 代行収納の内容・金額・件数の確認。受け付けたらすぐ（どちらのモードでも、お客様が押す）
-fn confirm_bill(c: &Context) -> Result<(), Denial> {
-    require(c.bill_pending, "確認が必要な代行収納はありません")
+/// 公共料金の払込票の内容確認。会計ボタンの後、店員が名札でログインしてから
+fn check_bill(c: &Context) -> Result<(), Denial> {
+    require(c.has_bills, "公共料金の払込票はありません")?;
+    require(c.phase == Phase::Paying, "会計ボタンを押してから確認します")
 }
 
-/// 払込票の枚数の入力（読み取りの途中ならいつでも訂正できる）
-fn declare_bill(c: &Context) -> Result<(), Denial> {
-    require(c.bill_counting, "枚数を入力する払込票はありません")
+/// 払込票のお渡し（決済の後）
+fn hand_over_bills(c: &Context) -> Result<(), Denial> {
+    require(c.bill_handover, "お渡しする払込票はありません")
 }
 
 /// お客様本人の意思表示・申告にあたる操作。お客様側の画面からしか押せず、
 /// どちらの画面が操作側でも押せる（画面の排他の例外）。
 ///
-/// いまは代行収納の内容・金額の確認だけ（年確は店員が判断する）。同じ性質の操作として、
+/// いまはない（公共料金の内容は店員が確認する）。同じ性質の操作として、
 /// クレジット・デビットの暗証番号入力（現実には専用端末で行うため扱わない）や
 /// 宅配便の危険物・禁制品がないことの申告（ラベル・ステッカーで行うため扱わない）がある。
-pub fn is_customer_only(action: Action) -> bool {
-    matches!(action, Action::ConfirmBillPayment)
+pub fn is_customer_only(_action: Action) -> bool {
+    false
 }
 
 /// 店員本人が判断・確認する操作。店員側の画面からしか押せず、どちらの画面が操作側でも押せる。
-/// いまは年確の「する／しない」の選択と、身分証の生年月日の入力。
+/// 年確の「する／しない」の選択と身分証の生年月日の入力、公共料金の払込票の確認とお渡し。
 pub fn is_staff_only(action: Action) -> bool {
-    matches!(action, Action::ChooseAgeCheck | Action::CheckId)
+    matches!(
+        action,
+        Action::ChooseAgeCheck | Action::CheckId | Action::CheckBill | Action::HandOverBills
+    )
 }
 
 /// その操作を押せる画面が決まっているなら、その側（画面の排他の例外）
@@ -350,8 +353,8 @@ pub fn is_device_action(action: Action) -> bool {
 ///
 /// 何ができるかは **モード（有人・セミセルフ）** だけで決まり、どちらの画面かは関係ない。
 /// 二つの画面は同じ内容を映し、操作は排他（操作側の画面だけが押せる）。
-/// 例外はお客様本人が押すボタン（代行収納の内容確認。`is_customer_only`）で、
-/// これはお客様側の画面からしか押せない。
+/// 例外は店員本人が判断・確認するボタン（年確・払込票の確認とお渡し。`is_staff_only`）で、
+/// これは店員側の画面からしか押せない。
 pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> {
     rules(action, c)?;
     if let Some(fixed) = fixed_side(action) {
@@ -359,10 +362,12 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
         // どちらの画面が操作側でも押せる
         return if side == fixed {
             Ok(())
+        } else if matches!(action, Action::CheckBill | Action::HandOverBills) {
+            Err("払込票の確認・お渡しは店員側の画面で行います")
         } else if is_staff_only(action) {
             Err("年齢確認は店員側の画面で行います")
         } else {
-            Err("支払い内容・金額の確認はお客様側の画面で押していただきます")
+            Err("お客様側の画面で押していただきます")
         };
     }
     if !is_device_action(action) && active_side(c).is_some_and(|s| s != side) {
@@ -450,7 +455,6 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
-            require(!c.bill_counting, BILL_COUNTING)?;
             require(!c.ff_waiting, FF_UNCHECKED)
         }
         Action::BackToRegistering => require(paying, "会計画面ではありません"),
@@ -461,8 +465,8 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::ConfirmPointCard => confirm_point(c),
         Action::ChooseAgeCheck => choose_age_check(c),
         Action::CheckId => check_id(c),
-        Action::ConfirmBillPayment => confirm_bill(c),
-        Action::DeclareBillCount => declare_bill(c),
+        Action::CheckBill => check_bill(c),
+        Action::HandOverBills => hand_over_bills(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
         // 一人で手に負えないとき、店員が仲間に SOS を出す（Bell を鳴らすだけで、呼び出しの記録・画面表示はなし）
@@ -491,7 +495,6 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでにお会計中です")?;
             require(c.has_lines, "商品を登録してください")?;
-            require(!c.bill_counting, BILL_COUNTING)?;
             require(!c.ff_waiting, FF_UNCHECKED)
         }
         Action::BackToRegistering => require(paying, "お会計中ではありません"),
@@ -505,8 +508,13 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
             choose_age_check(c)?;
             Err("年齢確認は係員が名札でログインしてから行います")
         }
-        Action::ConfirmBillPayment => confirm_bill(c),
-        Action::DeclareBillCount => declare_bill(c),
+        // 払込票の確認は係員が来て（名札でログインして有人モードになって）から
+        Action::CheckBill => {
+            check_bill(c)?;
+            Err("払込票の確認は係員が名札でログインしてから行います")
+        }
+        // 決済の後に係員がログアウトしていても、お渡しは済ませられる
+        Action::HandOverBills => hand_over_bills(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::CallStaff => Ok(()),
         Action::Emoney => emoney(c),
@@ -533,7 +541,7 @@ mod tests {
                 for has_lines in b {
                     for age_choice_pending in b {
                         for (ff_waiting, has_ff) in [(false, false), (false, true), (true, true)] {
-                            for (service_pending, bill_pending) in
+                            for (service_pending, bill_unchecked) in
                                 [(false, false), (true, false), (false, true)]
                             {
                                 for method in
@@ -559,8 +567,9 @@ mod tests {
                                             ff_waiting,
                                             has_ff,
                                             service_pending,
-                                            bill_pending,
-                                            bill_counting: false,
+                                            has_bills: bill_unchecked,
+                                            bill_unchecked,
+                                            bill_handover: false,
                                             method,
                                         });
                                     }
@@ -641,7 +650,7 @@ mod tests {
     fn payment_is_gated_until_blockers_clear() {
         for c in contexts().into_iter().filter(|c| c.phase == Phase::Paying) {
             let blocked =
-                c.age_choice_pending || c.bill_pending || c.ff_waiting || c.service_pending;
+                c.age_choice_pending || c.bill_unchecked || c.ff_waiting || c.service_pending;
             for a in [Action::InsertCash, Action::TapEmoney] {
                 if blocked {
                     assert!(permitted(Side::Customer, a, &c).is_err());
@@ -650,25 +659,26 @@ mod tests {
         }
     }
 
-    /// 代行収納の支払い内容・金額の確認も、年確と同じくお客様側の画面からだけ押せる。
-    /// 係員が画面を持っていても、セミセルフでも。
+    /// 公共料金の払込票の確認は、年確と同じく店員側の画面からだけ、係員がログインしてから。
+    /// 確認が済むまで支払いに進めない
     #[test]
-    fn bill_payment_confirmation_is_pressed_on_the_customer_side() {
-        let pending: Vec<_> = contexts().into_iter().filter(|c| c.bill_pending).collect();
-        assert!(!pending.is_empty());
-        for c in pending {
-            assert!(
-                permitted(Side::Customer, Action::ConfirmBillPayment, &c).is_ok(),
+    fn bill_check_is_done_by_staff_on_the_staff_side() {
+        let unchecked: Vec<_> = contexts()
+            .into_iter()
+            .filter(|c| c.bill_unchecked && c.phase == Phase::Paying)
+            .collect();
+        assert!(!unchecked.is_empty());
+        for c in unchecked {
+            assert!(permitted(Side::Customer, Action::CheckBill, &c).is_err());
+            assert_eq!(
+                permitted(Side::Staff, Action::CheckBill, &c).is_ok(),
+                c.mode == Mode::Attended,
                 "{c:?}"
             );
-            assert!(
-                permitted(Side::Staff, Action::ConfirmBillPayment, &c).is_err(),
-                "{c:?}"
-            );
-            assert_eq!(c.payment_blocker().is_some(), true);
+            assert!(c.payment_blocker().is_some());
         }
-        for c in contexts().into_iter().filter(|c| !c.bill_pending) {
-            assert!(permitted(Side::Customer, Action::ConfirmBillPayment, &c).is_err());
+        for c in contexts().into_iter().filter(|c| !c.has_bills) {
+            assert!(permitted(Side::Staff, Action::CheckBill, &c).is_err());
         }
     }
 }

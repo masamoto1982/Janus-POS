@@ -4,7 +4,7 @@
 
 import type {
   ActionState,
-  BillSlips,
+  BillRow,
   Unavailable,
   Coupon,
   Returned,
@@ -194,28 +194,63 @@ function ffCollectCard(reg: number, v: StaffView): string {
     </div>`;
 }
 
+/** 払込票の確認で入力した枚数（register:side:code → 入力中の文字列） */
+export const billInput = new Map<string, string>();
+
 /**
- * 代行収納の支払い内容・件数・金額の確認。受け付けたらすぐ、お客様本人がお客様側の画面で押す。
- * 手数料などで手持ちが足りないときは「スキップ」で代行収納の支払いを取りやめられる
- * （.customer-only：どちらが操作側でも、お客様側の画面でだけ押せる）
- */
-/**
- * 公共料金のお支払い内容の確認（受付点数と合計額）。確認できなければ支払いは成立しないので、
- * 取りやめ（白紙に戻る）は左下の消極ボタン、確認しましたは右下。
+ * 公共料金の払込票の確認（店員）。会計ボタンの後、FF のお渡し照合と同じ形の表で 内容｜枚数｜確認｜照合。
+ * 手元の払込票を種類ごとに数えて入力すると、その場で登録した枚数と比べて OK / NG を出す（判定ボタンはない）。
+ * すべて OK になると、お客様側に現金での支払いを案内する。
  *
- * 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは、この画面に払込票ごとの支払いの内容・金額・手数料と
- * 合計額を記載する。Janus POS はシミュレーターで表示エリアが足りないため、受付点数と合計額だけにし、
+ * 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは、払込票ごとの支払いの内容・金額・手数料と合計額を
+ * 確認画面に記載する。Janus POS はシミュレーターで表示エリアが足りないため、種類ごとの枚数と合計だけにし、
  * 手数料（収納手数料）の概念も扱わない。
  */
-export function billCard(reg: number, count: number, amount: number, st: ActionState): string {
-  return `<div class="card bill-card customer-only">
-      <div class="big">お支払い内容の確認</div>
-      <p>受付点数 <b>${count}点</b>　合計 <b>${yen(amount)}</b><br>払込票の枚数と合計金額をご確認ください</p>
-      ${!st.allowed && st.reason ? `<p class="muted">${esc(st.reason)}</p>` : ""}
-      <div class="bill-foot">
-        ${btn("お支払いをやめる", { type: "confirm_bill_payment", register: reg, skip: true }, st, "neg")}
-        ${btn("確認しました", { type: "confirm_bill_payment", register: reg }, st, "primary")}
-      </div>
+export function billVerifyScreen(reg: number, side: Side, bills: BillRow[]): string {
+  const rows = bills
+    .map((b) => {
+      const key = `${reg}:${side}:${b.code}`;
+      const value = billInput.get(key) ?? (b.checked ? String(b.count) : "");
+      const judge = value === "" ? "" : b.checked ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
+      return `<tr><td>${esc(b.name)}</td><td class="num">${b.count}</td><td class="num"><input type="text" inputmode="numeric" autocomplete="off" class="ffv-input" value="${esc(value)}" data-key="billc-${key}" data-bill-check="${key}" aria-label="${esc(b.name)}の払込票の枚数" /></td><td class="ffv-judge">${judge}</td></tr>`;
+    })
+    .join("");
+  return `<div class="ffv-screen">
+      <div class="big">払込票の確認</div>
+      <table class="lines ffv"><thead><tr><th>内容</th><th class="num">枚数</th><th class="num">確認</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+/** 店員の確認が済んだ公共料金の支払い（お客様側）。公共料金は現金のみ */
+export function billPayCard(count: number): string {
+  return `<div class="point-screen bill-pay">
+      <div class="big">公共料金${count}枚を受け付けます。</div>
+      <p>現金でお支払いください。</p>
+    </div>`;
+}
+
+/**
+ * 公共料金の決済の後。店員側には収納印を押してお渡しする案内と「お渡し済」、
+ * お客様側には払込票（控え）・レシート・お釣りの受け取りの案内（「お渡し済」まで出す）
+ */
+export function billHandover(reg: number, side: Side, count: number, st: ActionState): string {
+  if (side === "customer")
+    return `<div class="point-screen bill-done">
+      <div class="big">支払いが完了しました</div>
+      <p>払込票とレシート、お釣りをお受け取りください</p>
+    </div>`;
+  return `<div class="point-screen bill-done">
+      <div class="big">払込票に収納印を押してお渡しください</div>
+      <p class="muted">公共料金 ${count}枚</p>
+      <div class="point-choices">${btn("お渡し済", { type: "hand_over_bills", register: reg, side }, st, "primary")}</div>
+    </div>`;
+}
+
+/** セミセルフで公共料金の会計ボタンが押され、係員を待つ間のお客様側の案内 */
+function billWait(): string {
+  return `<div class="point-screen">
+      <div class="big">係員をお呼びしました</div>
+      <p>払込票の内容を確認いたします。しばらくお待ちください</p>
     </div>`;
 }
 
@@ -223,30 +258,6 @@ export function billCard(reg: number, count: number, amount: number, st: ActionS
 const confirm = (body: string): string => `<div class="confirm">${body}</div>`;
 
 /** 確認の最中に、操作しない側に出す対のメッセージ */
-/**
- * 公共料金の払込票の読み取り。1 枚目を読んだら全部の枚数を尋ね、答えた後は残りの枚数を案内する
- * （読み終えたら、お客様がお支払い内容を確認する）。読み取っている側の画面に出す
- */
-function billSlipsCard(reg: number, side: Side, s: BillSlips, st: ActionState): string {
-  const off = st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`;
-  if (s.declared === null)
-    return `<div class="point-screen bill-slips">
-      <div class="big">払込票は全部で何枚ですか？</div>
-      <p class="muted">1枚目を読み取りました</p>
-      <div class="point-choices">
-        <input type="number" inputmode="numeric" min="${s.scanned}" max="10" placeholder="枚数" autocomplete="off" data-key="slips-${reg}" data-slips="${reg}" aria-label="払込票の枚数" ${off} />
-        <button class="primary" data-form="slips" data-reg="${reg}" data-side="${side}" ${off}>決定</button>
-      </div>
-    </div>`;
-  return `<div class="point-screen bill-slips">
-      <div class="big">残りの払込票を読み取ってください</div>
-      <p>全 <b>${s.declared}枚</b> のうち <b>${s.scanned}枚</b> を読み取りました（あと ${s.declared - s.scanned}枚）</p>
-      <div class="point-choices">
-        ${btn("枚数を訂正", { type: "declare_bill_count", register: reg, side, count: 0 }, st, "neg")}
-      </div>
-    </div>`;
-}
-
 function pairNote(head: string, sub = ""): string {
   return `<div class="point-screen pair-note"><div class="big">${esc(head)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}</div>`;
 }
@@ -393,6 +404,7 @@ const CALL_SHORT: Record<string, string> = {
   service: "サービス",
   customer_help: "呼び出し",
   age_check: "年確",
+  bill: "公共料金",
   change_left: "釣銭忘れ",
 };
 
@@ -643,7 +655,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
+  if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.last_receipt && !v.lines.length) return notice + thanks();
+  if (!v.bills.length) for (const k of [...billInput.keys()]) if (k.startsWith(`${reg}:`)) billInput.delete(k);
   // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return attendedWelcome(r, notice, side);
@@ -696,10 +710,11 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 取引中止の確認は、ほかのどの確認よりも先に出す（どの場面からでも中止できる）
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
-  if (v.bill_slips)
-    return screen(side === "staff" ? billSlipsCard(reg, side, v.bill_slips, a("declare_bill_count")) : pairNote("払込票を読み取っています"));
-  if (v.bill_check !== null)
-    return screen(side === "customer" ? billCard(reg, v.bill_count, v.bill_check, a("confirm_bill_payment")) : pairNote("お客様がお支払い内容を確認しています"));
+  // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
+  const slips = v.bills.reduce((n, b) => n + b.count, 0);
+  if (paying && slips && v.bill_unchecked)
+    return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills) : pairNote("店員が払込票を確認しています"));
+  if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : pairNote(`公共料金${slips}枚を受け付けました`, "お客様に現金でお支払いいただいています"));
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
     side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
@@ -950,7 +965,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
   // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
-  if (r.mode === "attended" && (r.staff.bill_check !== null || r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
+  if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -1088,8 +1103,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
+  if (r.bill_handover && !c.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.last_receipt && !c.lines.length) return notice + thanks();
-
 
   // 新しい動きのあった行ほど上に出す
   const lineRows = c.lines.map((l): Row => {
@@ -1126,8 +1141,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）
   const screen = (body: string) => `${top}${notice}${confirm(body)}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
-  if (c.bill_slips) return screen(billSlipsCard(reg, side, c.bill_slips, a("declare_bill_count")));
-  if (c.bill_check !== null) return screen(billCard(reg, c.bill_count, c.bill_check, a("confirm_bill_payment")));
+  // 公共料金：係員を待つ間は案内だけ。係員の確認が済んでいれば（その後にログアウトしても）現金で支払う
+  const slips = c.bills.reduce((n, b) => n + b.count, 0);
+  if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billWait() : billPayCard(slips));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
@@ -1390,7 +1406,7 @@ export function walletPanel(emoneyBalance: number): string {
 /** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */
 export function sideOf(cmd: Command): "staff" | "customer" | "store" {
   if (cmd.side === "staff" || cmd.side === "customer") return cmd.side;
-  if (["ff_button", "confirm_bill_payment", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
+  if (["ff_button", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
   if (typeof cmd.register === "number") return "staff";
   return "store";
 }

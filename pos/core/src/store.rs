@@ -32,7 +32,6 @@ const NO_CASH_MIX: &str =
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
-const BILL_COUNT_FIRST: &str = "払込票が全部で何枚か、先に入力してください";
 const NO_POINTS: &str = "切手・お支払い・たばこにはポイントを使えません";
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
@@ -277,21 +276,21 @@ pub enum Command {
     DismissFfCollect {
         register: u8,
     },
-    /// 代行収納の支払い内容・金額の確認ボタン。年確と同じくお客様側の画面からしか押せない。
-    /// `skip` は「お支払いをやめる」：手数料などで手持ちが足りないとき、確認待ちの代行収納を取りやめる（白紙に戻る）
-    ConfirmBillPayment {
+    /// 公共料金の払込票の内容確認（店員）。種類（電気・水道・ガス）ごとに手元の払込票の枚数を入力するたびに
+    /// 判定し、登録した枚数と合えば確認済み、合わなければ未確認に戻る（FF のお渡し照合と同じ形）。
+    /// すべて合うまで支払いに進めない。店員側の画面からだけ
+    CheckBill {
         register: u8,
-        #[serde(default = "customer_side")]
+        #[serde(default = "staff_side")]
         side: Side,
-        #[serde(default)]
-        skip: bool,
-    },
-    /// 公共料金の払込票の 1 枚目を読んだ後の「全部で何枚ですか」への答え（読み取っている側の画面で入力する）。
-    /// 0 は「枚数を訂正」：申告を取り消して、もう一度枚数を尋ねる
-    DeclareBillCount {
-        register: u8,
-        side: Side,
+        code: String,
         count: u32,
+    },
+    /// 決済の後、払込票に収納印を押してお客様に渡した（店員の「お渡し済」）
+    HandOverBills {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
     },
     InsertCash {
         register: u8,
@@ -482,8 +481,8 @@ impl Command {
             | C::CheckId { register, .. }
             | C::DismissConfiscated { register }
             | C::DismissFfCollect { register }
-            | C::ConfirmBillPayment { register, .. }
-            | C::DeclareBillCount { register, .. }
+            | C::CheckBill { register, .. }
+            | C::HandOverBills { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
             | C::TapEmoney { register, .. }
@@ -520,7 +519,8 @@ impl Command {
             | C::BackToRegistering { side, .. }
             | C::SelectPayment { side, .. }
             | C::ConfirmPointCard { side, .. }
-            | C::DeclareBillCount { side, .. }
+            | C::CheckBill { side, .. }
+            | C::HandOverBills { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
             | C::ResolveEmoneyShort { side, .. }
@@ -538,13 +538,16 @@ impl Command {
     }
 }
 
-/// 公共料金の払込票の読み取りの進み具合
-#[derive(Clone, Copy, Debug, Serialize)]
-pub struct BillSlips {
-    /// お客様が答えた全部の枚数（まだなら None）
-    pub declared: Option<u32>,
-    /// 読み取った枚数
-    pub scanned: u32,
+/// 公共料金の払込票の種類ごとの内容（店員の照合と、お客様への案内に使う）
+#[derive(Clone, Debug, Serialize)]
+pub struct BillRow {
+    pub code: &'static str,
+    pub name: &'static str,
+    /// 登録した枚数
+    pub count: u32,
+    pub amount: u32,
+    /// 店員の照合が合っている
+    pub checked: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -578,7 +581,7 @@ pub enum LineKind {
     Ff {
         state: FfState,
     },
-    /// `confirm_pending`：受付した内容・金額をお客様がまだ確認していない（代行収納）
+    /// `confirm_pending`：公共料金の払込票の内容を、店員がまだ確認していない
     Service {
         done: bool,
         confirm_pending: bool,
@@ -611,7 +614,7 @@ impl Line {
 
     /// 公共料金の払込票
     fn is_bill(&self) -> bool {
-        catalog::find(self.code).is_some_and(|p| p.customer_confirms)
+        catalog::find(self.code).is_some_and(|p| p.utility_bill)
     }
 }
 
@@ -655,8 +658,6 @@ struct Txn {
     emoney_partial: bool,
     /// その案内を確認し、電子マネーをかざすのを待っている（確認前にかざしても引き落とさない）
     emoney_partial_ok: bool,
-    /// 公共料金の払込票が全部で何枚か（1 枚目を読んだ後にお客様が答える。まだなら None）
-    bill_declared: Option<u32>,
 }
 
 impl Txn {
@@ -790,48 +791,47 @@ impl Txn {
         self.lines.iter().filter(|l| l.is_bill()).count() as u32
     }
 
-    /// 払込票の枚数の申告待ちか、申告した枚数をまだ読み終えていない
-    fn bill_counting(&self) -> bool {
-        let n = self.bill_slips();
-        n > 0 && self.bill_declared != Some(n)
+    /// 店員がまだ内容を確認していない払込票がある
+    fn bill_unchecked(&self) -> bool {
+        self.lines.iter().any(|l| {
+            l.is_bill()
+                && matches!(
+                    l.kind,
+                    LineKind::Service {
+                        confirm_pending: true,
+                        ..
+                    }
+                )
+        })
     }
 
-    /// お客様の確認待ちの代行収納の金額の合計（なければ None）。申告した枚数を読み終えてから確認する
-    fn bill_pending(&self) -> Option<u32> {
-        if self.bill_counting() {
-            return None;
+    /// 払込票の種類ごとの枚数・金額（読み取った順）
+    fn bill_rows(&self) -> Vec<BillRow> {
+        let mut rows: Vec<BillRow> = vec![];
+        for l in self.lines.iter().filter(|l| l.is_bill()) {
+            let pending = matches!(
+                l.kind,
+                LineKind::Service {
+                    confirm_pending: true,
+                    ..
+                }
+            );
+            match rows.iter_mut().find(|r| r.code == l.code) {
+                Some(r) => {
+                    r.count += 1;
+                    r.amount += l.amount();
+                    r.checked &= !pending;
+                }
+                None => rows.push(BillRow {
+                    code: l.code,
+                    name: l.name,
+                    count: 1,
+                    amount: l.amount(),
+                    checked: !pending,
+                }),
+            }
         }
-        let mut pending = self
-            .lines
-            .iter()
-            .filter(|l| {
-                matches!(
-                    l.kind,
-                    LineKind::Service {
-                        confirm_pending: true,
-                        ..
-                    }
-                )
-            })
-            .peekable();
-        pending.peek()?;
-        Some(pending.map(Line::amount).sum())
-    }
-
-    /// お客様の確認待ちの代行収納の件数
-    fn bill_count(&self) -> u32 {
-        self.lines
-            .iter()
-            .filter(|l| {
-                matches!(
-                    l.kind,
-                    LineKind::Service {
-                        confirm_pending: true,
-                        ..
-                    }
-                )
-            })
-            .count() as u32
+        rows
     }
 
     /// 承認済みの年齢で、いまの年確商品がすべて足りている
@@ -928,6 +928,9 @@ struct Register {
     txn: Txn,
     drawer: Drawer,
     last_receipt: Option<Receipt>,
+    /// 公共料金の決済が済み、店員が払込票に収納印を押してお渡しするのを待っている（枚数）。
+    /// 店員の「お渡し済」まで、お客様側には払込票・レシート・お釣りの受け取りを案内する
+    bill_handover: Option<u32>,
     /// 最後に操作された時刻（無操作でセミセルフに戻すため）
     last_op: u64,
     /// 排出口（売り場側）にたまっているお金。取り出すまで残る
@@ -1011,22 +1014,23 @@ impl Register {
             },
             staff: self.staff_state(),
             has_lines: !t.lines.is_empty(),
-            // 確認の優先順：代行収納の金額と件数（受付で即座に）＞年確＞ポイントカード＞決済手段。
+            // 確認の優先順：年確＞ポイントカード＞決済手段。
             // 一つの画面で複数の確認をしないよう、先の確認が済むまで後の確認は始めない
-            age_choice_pending: t.age_choice_pending() && t.bill_pending().is_none(),
-            id_pending: t.id_pending() && t.bill_pending().is_none(),
+            // （公共料金はほかの商品と一緒に登録できないので、年確と重ならない）
+            age_choice_pending: t.age_choice_pending(),
+            id_pending: t.id_pending(),
             ff_waiting: t.any_ff(FfState::Waiting),
             has_ff: t
                 .lines
                 .iter()
                 .any(|l| matches!(l.kind, LineKind::Ff { .. })),
             service_pending: t.service_pending(),
-            bill_pending: t.bill_pending().is_some(),
-            bill_counting: t.bill_counting(),
+            has_bills: t.bill_slips() > 0,
+            bill_unchecked: t.bill_unchecked(),
+            bill_handover: self.bill_handover.is_some(),
             // 年確が先。年確で販売が成立しないこともあるので、ポイントカードの確認はその後
             point_pending: t.paying
                 && !t.point_checked
-                && t.bill_pending().is_none()
                 && !(t.age_choice_pending() || t.id_pending()),
             has_coupons: !t.coupons.is_empty(),
             coupon_unmatched: t.paying && t.coupon_unmatched(),
@@ -1077,10 +1081,6 @@ pub struct Store {
     receipts: u32,
     /// 財布の電子マネーの残高
     emoney_balance: u32,
-}
-
-fn customer_side() -> Side {
-    Side::Customer
 }
 
 /// 年確のやり方（店員が選ぶ）
@@ -1202,6 +1202,7 @@ impl Store {
                     txn: Txn::default(),
                     drawer: Drawer::default(),
                     last_receipt: None,
+                    bill_handover: None,
                     last_op: 0,
                     outlet: Cash::default(),
                     outlet_since: None,
@@ -1249,7 +1250,9 @@ impl Store {
                 r.touch = None;
             }
             // お礼の画面は、排出口の釣り銭が取り出されるまで初期画面に戻さない
+            // （公共料金は、店員が払込票をお渡しするまで）
             if r.outlet.total() == 0
+                && r.bill_handover.is_none()
                 && r.last_receipt
                     .as_ref()
                     .is_some_and(|rc| rc.at + THANKS_MS <= now)
@@ -1319,6 +1322,7 @@ impl Store {
                 }
                 r.menu = None;
                 r.menu_code = None;
+                r.bill_handover = None;
                 r.last_op = now;
             }
         }
@@ -1358,6 +1362,7 @@ impl Store {
             CallKind::FastFood,
             CallKind::Service,
             CallKind::Tobacco,
+            CallKind::Bill,
         ] {
             self.calls.resolve(register, k, now);
         }
@@ -1497,7 +1502,7 @@ impl Store {
                 // 代行収納は、受付した内容・金額をお客様が会計時に確認する
                 l.kind = LineKind::Service {
                     done: true,
-                    confirm_pending: catalog::find(l.code).is_some_and(|p| p.customer_confirms),
+                    confirm_pending: catalog::find(l.code).is_some_and(|p| p.utility_bill),
                 };
                 let name = l.name;
                 if !self.reg_mut(register)?.txn.service_pending() {
@@ -1661,79 +1666,47 @@ impl Store {
                 r.txn.ff_collect.clear();
                 done("FF を回収しました")
             }
-            C::ConfirmBillPayment {
+            C::CheckBill {
                 register,
                 side,
-                skip,
-            } => {
-                self.check(register, side, Action::ConfirmBillPayment)?;
-                let r = self.reg_mut(register)?;
-                let amount = r.txn.bill_pending().unwrap_or(0);
-                if skip {
-                    r.txn.lines.retain(|l| {
-                        !matches!(
-                            l.kind,
-                            LineKind::Service {
-                                confirm_pending: true,
-                                ..
-                            }
-                        )
-                    });
-                    if r.txn.bill_slips() == 0 {
-                        r.txn.bill_declared = None;
-                    }
-                    // ほかに何も残っていなければ、会計の途中でも登録画面に戻る
-                    if r.txn.lines.is_empty() && r.txn.prepaid == 0 {
-                        r.txn.paying = false;
-                        r.txn.method = None;
-                        r.txn.customer_turn = false;
-                    }
-                    if !r.txn.service_pending() {
-                        self.calls.resolve(register, CallKind::Service, self.now);
-                    }
-                    return done(format!(
-                        "お客様が代行収納（{amount}円）のお支払いを取りやめました"
-                    ));
-                }
-                for l in &mut r.txn.lines {
-                    if let LineKind::Service {
-                        confirm_pending, ..
-                    } = &mut l.kind
-                    {
-                        *confirm_pending = false;
-                    }
-                }
-                done(format!(
-                    "お客様が代行収納の支払い内容・金額（{amount}円）を確認しました"
-                ))
-            }
-            C::DeclareBillCount {
-                register,
-                side,
+                code,
                 count,
             } => {
-                self.check(register, side, Action::DeclareBillCount)?;
+                self.check(register, side, Action::CheckBill)?;
+                let now = self.now;
                 let r = self.reg_mut(register)?;
-                let slips = r.txn.bill_slips();
-                if count == 0 {
-                    r.txn.bill_declared = None;
-                    return done("払込票の枚数を入力し直してください");
+                let mut bills: Vec<&mut Line> = r
+                    .txn
+                    .lines
+                    .iter_mut()
+                    .filter(|l| l.is_bill() && l.code == code)
+                    .collect();
+                let name = bills
+                    .first()
+                    .map(|l| l.name)
+                    .ok_or("払込票が見つかりません")?;
+                // 入力のたびに判定する。合えば確認済み（OK）、合わなければ未確認（NG）
+                let matched = count == bills.len() as u32;
+                for l in &mut bills {
+                    l.kind = LineKind::Service {
+                        done: true,
+                        confirm_pending: !matched,
+                    };
                 }
-                if count < slips {
-                    return Err(format!("読み取った枚数（{slips}枚）より少なくはできません"));
+                if !r.txn.bill_unchecked() {
+                    self.calls.resolve(register, CallKind::Bill, now);
                 }
-                if count > MAX_ITEMS {
-                    return Err(ITEMS_FULL.into());
-                }
-                r.txn.bill_declared = Some(count);
-                done(if count == slips {
-                    format!("払込票 {count}枚をすべて読み取りました")
+                done(if matched {
+                    format!("{name}：照合 OK")
                 } else {
-                    format!(
-                        "払込票は全部で {count}枚。残りの {}枚を読み取ってください",
-                        count - slips
-                    )
+                    format!("{name}：照合 NG（{count}枚が登録した枚数と合いません）")
                 })
+            }
+            C::HandOverBills { register, side } => {
+                self.check(register, side, Action::HandOverBills)?;
+                let r = self.reg_mut(register)?;
+                let n = r.bill_handover.take().unwrap_or(0);
+                done(format!("払込票 {n}枚をお渡ししました"))
             }
             C::InsertCash {
                 register,
@@ -2313,6 +2286,8 @@ impl Store {
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
+        // 次のお買い物が始まったら、払込票のお渡しは済んだものとする
+        r.bill_handover = None;
         // ポイントカードの最終確認中に読まれたポイントカードは、そのまま確認済みにして支払いへ
         if let Scanned::PointCard(no) = &scanned {
             if r.txn.paying && !r.txn.point_checked {
@@ -2321,22 +2296,12 @@ impl Store {
                 return done("ポイントカードを読みました。お支払い方法を選んでください");
             }
         }
-        // 公共料金の払込票は、ほかの商品と一緒に登録できない（どちらを先に読んでも）。
-        // 1 枚目の後は、全部の枚数を答えてから、その枚数まで読む
+        // 公共料金の払込票は、ほかの商品と一緒に登録できない（どちらを先に読んでも）
         if let Scanned::Product(p) = &scanned {
             let slips = r.txn.bill_slips();
-            if p.customer_confirms {
-                if r.txn.lines.iter().any(|l| !l.is_bill()) {
-                    return Err(BILL_ALONE.into());
-                }
-                match r.txn.bill_declared {
-                    None if slips > 0 => return Err(BILL_COUNT_FIRST.into()),
-                    Some(n) if slips >= n => {
-                        return Err(format!("申告した枚数（{n}枚）をすべて読み取っています"))
-                    }
-                    _ => {}
-                }
-            } else if slips > 0 {
+            if p.utility_bill && r.txn.lines.iter().any(|l| !l.is_bill())
+                || !p.utility_bill && slips > 0
+            {
                 return Err(BILL_ALONE.into());
             }
         }
@@ -2379,7 +2344,7 @@ impl Store {
                     format!("{}を読みました{back}", c.name)
                 })
             }
-            Scanned::Product(p) if p.customer_confirms => {
+            Scanned::Product(p) if p.utility_bill => {
                 r.txn.push(
                     p,
                     1,
@@ -2389,17 +2354,7 @@ impl Store {
                     },
                     tax,
                 );
-                let slips = r.txn.bill_slips();
-                done(match r.txn.bill_declared {
-                    None => format!("{} {}円：払込票は全部で何枚ですか{back}", p.name, p.price),
-                    Some(n) if n == slips => format!("払込票 {n}枚をすべて読み取りました{back}"),
-                    Some(n) => format!(
-                        "{} {}円：払込票はあと {}枚{back}",
-                        p.name,
-                        p.price,
-                        n - slips
-                    ),
-                })
+                done(format!("{} {}円{back}", p.name, p.price))
             }
             Scanned::Product(p) if p.needs_staff => {
                 r.txn.push(
@@ -2557,6 +2512,23 @@ impl Store {
         let ready = r.staff_state() == StaffState::Ready;
         let pending = r.txn.age_choice_pending();
         let mode = r.mode;
+        // 公共料金は現金のみ。会計ボタンで店員を呼び、店員が払込票の内容を確認してから現金で払う
+        // （ストアスタンプ＝収納印の押印は店員の作業。非プロに任せるセルフレジでは扱わせない）
+        let slips = r.txn.bill_slips();
+        if slips > 0 {
+            r.txn.method = Some(PaymentMethod::Cash);
+            if !r.txn.bill_unchecked() {
+                return done(format!("公共料金 {slips}枚：現金でお支払いください"));
+            }
+            if mode != Mode::Attended && !ready {
+                self.calls
+                    .raise(register, CallKind::Bill, self.now, format!("{slips}枚"));
+                return done("公共料金のお支払いのため係員をお呼びしました");
+            }
+            return done(format!(
+                "公共料金 {slips}枚：店員側の画面で払込票の内容を確認してください"
+            ));
+        }
         if pending && mode != Mode::Attended && !ready {
             self.calls.raise(
                 register,
@@ -2781,6 +2753,9 @@ impl Store {
         // おつりは排出口に出る（お客様が取り出すまで残る）
         r.outlet.merge(&change);
         let txn = std::mem::take(&mut r.txn);
+        // 公共料金は、決済の後に店員が払込票に収納印を押してお渡しする
+        let slips = txn.bill_slips();
+        r.bill_handover = (slips > 0).then_some(slips);
         let receipt = Receipt {
             no,
             at: now,
@@ -2814,6 +2789,7 @@ impl Store {
             CallKind::FastFood,
             CallKind::Service,
             CallKind::Tobacco,
+            CallKind::Bill,
         ] {
             self.calls.resolve(register, k, now);
         }
@@ -3220,12 +3196,8 @@ impl Store {
                 id_pending: c.id_pending,
                 coupon_unmatched: c.coupon_unmatched,
                 returned: returned.clone(),
-                bill_check: t.bill_pending().filter(|_| c.bill_pending),
-                bill_count: t.bill_count(),
-                bill_slips: t.bill_counting().then(|| BillSlips {
-                    declared: t.bill_declared,
-                    scanned: t.bill_slips(),
-                }),
+                bills: t.bill_rows(),
+                bill_unchecked: c.bill_unchecked,
                 point_pending: c.point_pending,
                 method: t.method,
                 inserted,
@@ -3249,12 +3221,8 @@ impl Store {
                 due: t.due().saturating_sub(inserted),
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
-                bill_check: t.bill_pending().filter(|_| c.bill_pending),
-                bill_count: t.bill_count(),
-                bill_slips: t.bill_counting().then(|| BillSlips {
-                    declared: t.bill_declared,
-                    scanned: t.bill_slips(),
-                }),
+                bills: t.bill_rows(),
+                bill_unchecked: c.bill_unchecked,
                 staff_called,
                 age_wait: t
                     .required_age
@@ -3306,6 +3274,7 @@ impl Store {
             })
             .collect(),
             last_receipt: r.last_receipt.clone(),
+            bill_handover: r.bill_handover,
         }
     }
 }
@@ -3374,12 +3343,10 @@ pub struct StaffView {
     pub returned: Vec<ReturnedCoupon>,
     /// 「する」を選び、店員の生年月日の入力待ち
     pub id_pending: bool,
-    /// 会計時、お客様の確認待ちの代行収納の金額
-    pub bill_check: Option<u32>,
-    /// 確認待ちの代行収納の件数
-    pub bill_count: u32,
-    /// 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない）
-    pub bill_slips: Option<BillSlips>,
+    /// 公共料金の払込票の種類ごとの枚数・金額（払込票がなければ空）
+    pub bills: Vec<BillRow>,
+    /// 店員がまだ内容を確認していない払込票がある
+    pub bill_unchecked: bool,
     /// ポイントカードの最終確認待ち（会計ボタンの直後）
     pub point_pending: bool,
     pub method: Option<PaymentMethod>,
@@ -3410,12 +3377,10 @@ pub struct CustomerView {
     pub due: u32,
     pub point_card: bool,
     pub point_pending: bool,
-    /// お客様の確認待ちの代行収納の金額
-    pub bill_check: Option<u32>,
-    /// 確認待ちの代行収納の件数
-    pub bill_count: u32,
-    /// 公共料金の払込票の読み取り中（枚数の申告待ちか、申告した枚数をまだ読み終えていない）
-    pub bill_slips: Option<BillSlips>,
+    /// 公共料金の払込票の種類ごとの枚数・金額（払込票がなければ空）
+    pub bills: Vec<BillRow>,
+    /// 店員がまだ内容を確認していない払込票がある
+    pub bill_unchecked: bool,
     pub staff_called: bool,
     /// セミセルフで年確の係員を待っている間の年齢（身分証の準備を案内する）
     pub age_wait: Option<u8>,
@@ -3479,6 +3444,8 @@ pub struct RegisterView {
     /// いまの取引で使えない支払方法とその理由
     pub unavailable: Vec<Unavailable>,
     pub last_receipt: Option<Receipt>,
+    /// 公共料金の決済の後、払込票のお渡し待ち（枚数）。店員の「お渡し済」で消える
+    pub bill_handover: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize)]

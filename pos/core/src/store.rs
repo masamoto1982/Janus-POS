@@ -35,13 +35,15 @@ const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一
 const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str =
     "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
+/// 荷物の受け取りの照合と引き渡しは、名札でログインした係員が行う
+const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、係員が名札でログインしてから行います";
 /// 荷物の受け取りは一件ずつ、ほかの商品と別に扱う
 const PICKUP_ALONE: &str =
     "荷物のお受け取りは一件ずつ、ほかの商品と別にお取り扱いします（お受け取りが済んでから登録してください）";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
-    "ポイントを使える商品がありません（宅配便・公共料金・切手・たばこにはポイントを使えません）";
+    "ポイントを使える商品がありません（宅配便・代金引換・公共料金・切手・たばこにはポイントを使えません）";
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
 
@@ -708,9 +710,10 @@ impl Line {
         self.parcel.is_some()
     }
 
-    /// ポイント付与の対象（宅配便・公共料金・切手・たばこは対象外）
+    /// ポイント付与の対象（宅配便・代金引換・公共料金・切手・たばこは対象外）
     fn earns_points(&self) -> bool {
         !self.is_parcel()
+            && !self.is_pickup()
             && !self.is_bill()
             && !matches!(self.category, Category::Stamp | Category::Tobacco)
     }
@@ -718,6 +721,22 @@ impl Line {
     /// 荷物を受取る
     fn is_pickup(&self) -> bool {
         self.pickup.is_some()
+    }
+
+    /// 荷物を受取る：保管場所に荷物が「有り」（Some(true)）なら代金引換の金額で受付済みにし、
+    /// 「無し」（Some(false)）・探し直し（None）なら受付待ちに戻す
+    fn set_pickup_found(&mut self, found: Option<bool>) {
+        let Some(pk) = self.pickup.as_mut() else {
+            return;
+        };
+        pk.matched = found == Some(true);
+        pk.missing = found == Some(false);
+        pk.wrong = None;
+        self.unit_price = if pk.matched { pk.amount } else { 0 };
+        self.kind = LineKind::Service {
+            done: pk.matched,
+            confirm_pending: false,
+        };
     }
 
     /// 公共料金の払込票
@@ -1049,6 +1068,8 @@ struct Register {
     /// 公共料金の決済が済み、店員が払込票に収納印を押してお渡しするのを待っている（枚数）。
     /// 店員の「お渡し済」まで、お客様側には払込票・レシート・お釣りの受け取りを案内する
     bill_handover: Option<u32>,
+    /// 代金引換の決済が済み、店員が店舗控えにサインをもらって荷物を引き渡すのを待っている（荷物の番号）
+    pickup_handover: Option<String>,
     /// 最後に操作された時刻（無操作でセミセルフに戻すため）
     last_op: u64,
     /// 排出口（売り場側）にたまっているお金。取り出すまで残る
@@ -1322,6 +1343,7 @@ impl Store {
                     drawer: Drawer::default(),
                     last_receipt: None,
                     bill_handover: None,
+                    pickup_handover: None,
                     last_op: 0,
                     outlet: Cash::default(),
                     outlet_since: None,
@@ -1372,6 +1394,7 @@ impl Store {
             // （公共料金は、店員が払込票をお渡しするまで）
             if r.outlet.total() == 0
                 && r.bill_handover.is_none()
+                && r.pickup_handover.is_none()
                 && r.last_receipt
                     .as_ref()
                     .is_some_and(|rc| rc.at + THANKS_MS <= now)
@@ -1442,6 +1465,7 @@ impl Store {
                 r.menu = None;
                 r.menu_code = None;
                 r.bill_handover = None;
+                r.pickup_handover = None;
                 r.last_op = now;
             }
         }
@@ -1716,47 +1740,62 @@ impl Store {
                 done("次の荷物：取り扱いサイズを決定してください".to_string())
             }
             C::PickupHandover { register } => {
-                self.check_active(register, Action::CompleteService)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
+                if r.staff_state() != StaffState::Ready {
+                    return Err(PICKUP_STAFF.into());
+                }
+                // 代金引換の決済が済んだ荷物：サインをもらって引き渡す
+                if let Some(no) = r.pickup_handover.take() {
+                    return done(format!("荷物（{no}）をお渡ししました"));
+                }
                 let pk = r
                     .txn
                     .lines
                     .iter()
                     .find_map(|l| l.pickup.as_ref())
                     .ok_or("お受け取りの手続き中ではありません")?;
-                if !pk.matched && !pk.missing {
-                    return Err(
-                        "先に荷物のバーコードを読んで、お預かりの番号と照合してください".into(),
-                    );
+                if !pk.missing {
+                    return Err(if pk.matched {
+                        "代金引換のお会計を済ませてから、荷物をお渡しください"
+                    } else {
+                        "先に保管場所の荷物を照合してください"
+                    }
+                    .into());
                 }
-                let (no, missing) = (pk.no.clone(), pk.missing);
-                // 引き渡したら取引を終える（お支払いはない）。続けてお買い物をするときは次の取引で
+                let no = pk.no.clone();
+                // 荷物が見つからなければ、お受け取りをやめて取引を終える（お支払いはない）
                 r.txn = Txn::default();
                 r.last_receipt = None;
                 self.calls.resolve(register, CallKind::Service, now);
-                done(if missing {
-                    format!("荷物（{no}）が見つからないため、お受け取りを終えました")
-                } else {
-                    format!("荷物（{no}）をお渡ししました")
-                })
+                done(format!(
+                    "荷物（{no}）が見つからないため、お受け取りを終えました"
+                ))
             }
             C::PickupFound { register, found } => {
-                self.check_active(register, Action::CompleteService)?;
-                let pk = self
-                    .reg_mut(register)?
+                let r = self.reg_mut(register)?;
+                if r.staff_state() != StaffState::Ready {
+                    return Err(PICKUP_STAFF.into());
+                }
+                if r.txn.paying {
+                    return Err("お会計中です（登録に戻ってから選び直してください）".into());
+                }
+                let l = r
                     .txn
                     .lines
                     .iter_mut()
-                    .find_map(|l| l.pickup.as_mut())
+                    .find(|l| l.is_pickup())
                     .ok_or("お受け取りの手続き中ではありません")?;
-                pk.matched = found == Some(true);
-                pk.missing = found == Some(false);
-                pk.wrong = None;
+                l.set_pickup_found(found);
+                let amount = l.unit_price;
+                let now = self.now;
+                if found == Some(true) {
+                    self.calls.resolve(register, CallKind::Service, now);
+                }
                 done(match found {
-                    Some(true) => "店舗控えにサインをいただき、荷物をお渡しください",
-                    Some(false) => "お客様にお詫びし、運送会社へお問い合わせください",
-                    None => "保管場所から荷物を探してください",
+                    Some(true) => format!("代金引換 {amount}円をお預かりしてください"),
+                    Some(false) => "お客様にお詫びし、運送会社へお問い合わせください".into(),
+                    None => "保管場所から荷物を探してください".into(),
                 })
             }
             C::RemoveLine {
@@ -2562,8 +2601,9 @@ impl Store {
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
-        // 次のお買い物が始まったら、払込票のお渡しは済んだものとする
+        // 次のお買い物が始まったら、払込票・荷物のお渡しは済んだものとする
         r.bill_handover = None;
+        r.pickup_handover = None;
         // ポイントカードの最終確認中に読まれたポイントカードは、そのまま確認済みにして支払いへ
         if let Scanned::PointCard(no) = &scanned {
             if r.txn.paying && !r.txn.point_checked {
@@ -2659,6 +2699,8 @@ impl Store {
                     if let Some(l) = r.txn.lines.last_mut() {
                         l.pickup = Some(Pickup {
                             no: pickup_no(seed),
+                            // 代金引換の金額は、シミュレーターでは 1,000〜9,900円（100円単位）を便宜的に決める
+                            amount: 1_000 + (mix(seed ^ 0xC0D) % 90) as u32 * 100,
                             matched: false,
                             wrong: None,
                             missing: false,
@@ -2713,9 +2755,18 @@ impl Store {
                 pk.no
             ));
         }
-        pk.matched = true;
-        pk.wrong = None;
-        done("照合しました。店舗控えにサインをいただき、荷物をお渡しください")
+        let now = self.now;
+        if let Some(l) = self
+            .reg_mut(register)?
+            .txn
+            .lines
+            .iter_mut()
+            .find(|l| l.is_pickup())
+        {
+            l.set_pickup_found(Some(true));
+        }
+        self.calls.resolve(register, CallKind::Service, now);
+        done("照合しました。代金引換の金額をお預かりしてください")
     }
 
     fn register_ff(
@@ -3103,6 +3154,12 @@ impl Store {
         // 公共料金は、決済の後に店員が払込票に収納印を押してお渡しする
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
+        // 荷物の受け取りは、代金引換の決済の後にサインをもらって引き渡す
+        r.pickup_handover = txn
+            .lines
+            .iter()
+            .find_map(|l| l.pickup.as_ref())
+            .map(|p| p.no.clone());
         let receipt = Receipt {
             no,
             at: now,
@@ -3636,6 +3693,7 @@ impl Store {
             .collect(),
             last_receipt: r.last_receipt.clone(),
             bill_handover: r.bill_handover,
+            pickup_handover: r.pickup_handover.clone(),
         }
     }
 }
@@ -3811,6 +3869,8 @@ pub struct RegisterView {
     pub last_receipt: Option<Receipt>,
     /// 公共料金の決済の後、払込票のお渡し待ち（枚数）。店員の「お渡し済」で消える
     pub bill_handover: Option<u32>,
+    /// 代金引換の決済の後、荷物の引き渡し待ち（荷物の番号）。店員の「お渡ししました」で消える
+    pub pickup_handover: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]

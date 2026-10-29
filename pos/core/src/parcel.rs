@@ -147,6 +147,8 @@ pub struct Parcel {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Pickup {
     pub no: String,
+    /// 代金引換の金額（円）。荷物が「有り」と決まったら明細の金額になり、会計で受け取る
+    pub amount: u32,
     pub matched: bool,
     /// 直前に読んだ、番号の違う荷物（店員側の画面に「お渡しできません」と出す）
     pub wrong: Option<String>,
@@ -194,6 +196,7 @@ mod tests {
     fn pickup_number_ignores_separators() {
         let p = Pickup {
             no: "1234-5678-9012".into(),
+            amount: 1_000,
             matched: false,
             wrong: None,
             missing: false,

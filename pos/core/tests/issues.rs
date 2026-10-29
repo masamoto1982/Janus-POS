@@ -1244,16 +1244,16 @@ fn staff_skipping_the_age_check_needs_no_customer_button() {
     assert_eq!(reg(&s, 1).staff.payment_blocker, None);
 }
 
-/// 店員が払込票の種類ごとに手元の枚数を入力する（照合）
-fn check_bill(s: &mut Store, r: u8, code: &str, count: u32) {
+/// 店員が払込票の種類ごとの金額を確かめ、チェックを入れる（false で外す）
+fn check_bill(s: &mut Store, r: u8, code: &str, checked: bool) {
     ok(
         s,
-        json!({"type":"check_bill","register":r,"side":"staff","code":code,"count":count}),
+        json!({"type":"check_bill","register":r,"side":"staff","code":code,"checked":checked}),
     );
 }
 
 /// 公共料金の支払い：払込票は普通の商品と同じに読み取り、会計ボタンの後に店員が払込票の内容を
-/// 種類ごとの枚数で照合する（店員側の画面だけ）。照合が済むまで支払いに進めない。
+/// 種類ごとの金額を確かめてチェックを入れる（店員側の画面だけ）。すべて確認するまで支払いに進めない。
 /// 現金のみで、ポイントの確認・年確はない。決済の後は、店員が収納印を押して「お渡し済」を押すまで
 /// お客様に払込票・レシート・お釣りの受け取りを案内する
 #[test]
@@ -1289,17 +1289,19 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":20000})).is_err());
     let e = run(
         &mut s,
-        json!({"type":"check_bill","register":1,"side":"customer","code":BILL,"count":2}),
+        json!({"type":"check_bill","register":1,"side":"customer","code":BILL,"checked":true}),
     )
     .unwrap_err();
     assert!(e.contains("店員側"), "{e}");
-    // 枚数が合わなければ未確認のまま
-    check_bill(&mut s, 1, BILL, 1);
+    // チェックは外せる（外せば未確認に戻る）
+    check_bill(&mut s, 1, BILL, true);
+    assert!(reg(&s, 1).staff.bills[0].checked);
+    check_bill(&mut s, 1, BILL, false);
     assert!(!reg(&s, 1).staff.bills[0].checked);
-    check_bill(&mut s, 1, BILL, 2);
-    check_bill(&mut s, 1, WATER_BILL, 1);
+    check_bill(&mut s, 1, BILL, true);
+    check_bill(&mut s, 1, WATER_BILL, true);
     assert!(reg(&s, 1).staff.bill_unchecked);
-    check_bill(&mut s, 1, GAS_BILL, 1);
+    check_bill(&mut s, 1, GAS_BILL, true);
     let v = reg(&s, 1);
     assert!(!v.staff.bill_unchecked);
     assert_eq!(v.staff.payment_blocker, None);
@@ -1338,7 +1340,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
 }
 
 /// セミセルフでは、会計ボタンで係員を呼ぶ（呼び出しは「公共料金」と枚数）。係員がログインして
-/// 払込票を照合するまで、お客様は支払いに進めない
+/// 払込票の金額を確認するまで、お客様は支払いに進めない
 #[test]
 fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
     let mut s = Store::new(1, 2, 1);
@@ -1358,12 +1360,12 @@ fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":10000})).is_err());
     assert!(run(
         &mut s,
-        json!({"type":"check_bill","register":1,"side":"staff","code":GAS_BILL,"count":2})
+        json!({"type":"check_bill","register":1,"side":"staff","code":GAS_BILL,"checked":true})
     )
     .is_err());
     login(&mut s, 1);
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
-    check_bill(&mut s, 1, GAS_BILL, 2);
+    check_bill(&mut s, 1, GAS_BILL, true);
     assert!(s.snapshot().calls.is_empty());
     ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));

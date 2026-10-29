@@ -38,23 +38,25 @@ describe("view helpers", () => {
     expect(regTop(0, 0, `<button>会計</button>`)).toBe("");
   });
 
-  it("checks utility bill amounts with a checkbox per kind and shows the slip count large", () => {
+  it("lists every utility bill slip with its payee and amount to tick, and shows the slip count large", () => {
     const html = billVerifyScreen(
       1,
       "staff",
       [
-        { code: "2100000000021", name: "電気料金", count: 2, amount: 10000, checked: true },
-        { code: "2100000000050", name: "ガス料金", count: 1, amount: 3000, checked: false },
+        { line_id: 1, code: "2100000000021", name: "電気料金", amount: 5000, checked: true },
+        { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, checked: false },
+        { line_id: 3, code: "2100000000021", name: "電気料金", amount: 5000, checked: false },
       ],
       { action: "check_bill", allowed: true, reason: null },
     );
-    for (const h of ["内容", "枚数", "金額", "確認"]) expect(html).toContain(`>${h}<`);
-    expect(html).toContain('type="checkbox" checked data-bill-check="1:staff:2100000000021"');
-    expect(html).toContain('type="checkbox"  data-bill-check="1:staff:2100000000050"');
-    expect(html).toContain("10,000円");
+    for (const h of ["事業者", "金額", "確認"]) expect(html).toContain(`>${h}<`);
+    expect(html).not.toContain(">枚数<");
+    // 同じ事業者でもまとめず、一枚ずつ
+    expect(html.match(/電気料金/g)?.length).toBe(4);
+    expect(html).toContain('type="checkbox" checked data-bill-check="1:staff:1"');
+    expect(html).toContain('type="checkbox"  data-bill-check="1:staff:3"');
     expect(html).toContain(`<span class="bill-n">3枚</span>`);
     expect(html).toContain("合計 13,000円");
-    expect(html).not.toContain("<input type=\"text\"");
     const pay = billPayCard(3);
     expect(pay).toContain(`公共料金<span class="bill-n">3枚</span>を受け付けます。`);
     expect(pay).toContain("現金でお支払いください。");

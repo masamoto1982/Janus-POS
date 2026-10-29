@@ -669,5 +669,5 @@ body.dragging .drop-hint { display: inline; }
 .bill-sum { font-size: 14px; font-weight: 600; margin-left: 12px; }
 .bill-verify > p { margin: 2px 0 0; font-size: 12px; }
 .bill-tick { text-align: center; width: 48px; }
-.bill-tick input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.bill-tick input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .bill-call { margin: 0; }

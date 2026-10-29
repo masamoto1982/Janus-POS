@@ -94,7 +94,7 @@ export interface StaffView {
   returned: Returned[];
   /** 「する」を選び、店員の生年月日の入力待ち */
   id_pending: boolean;
-  /** 公共料金の払込票の種類ごとの枚数・金額（払込票がなければ空） */
+  /** 公共料金の払込票（1 枚ずつ。なければ空） */
   bills: BillRow[];
   /** 店員がまだ内容を確認していない払込票がある */
   bill_unchecked: boolean;
@@ -110,14 +110,15 @@ export interface StaffView {
   mat_down: string[];
 }
 
-/** 公共料金の払込票の種類ごとの内容 */
+/** 公共料金の払込票 1 枚ごとの内容（同じ事業者でもまとめない） */
 export interface BillRow {
+  /** 明細番号（確認のチェックの宛先） */
+  line_id: number;
   code: string;
+  /** 事業者（電気料金など） */
   name: string;
-  /** 登録した枚数 */
-  count: number;
   amount: number;
-  /** 店員の照合が合っている */
+  /** 店員が事業者・金額を確認した（チェックを入れた） */
   checked: boolean;
 }
 

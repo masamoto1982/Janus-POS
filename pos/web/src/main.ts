@@ -601,10 +601,10 @@ app.addEventListener("input", (e) => {
     send({ type: "check_ff", register: Number(reg), side, line_id: Number(line), handed: Number(el.value || 0) });
     return;
   }
-  // 払込票の確認：金額が合っていれば種類ごとにチェックを入れる（外すこともできる）
+  // 払込票の確認：事業者・金額が合っていれば一枚ずつチェックを入れる（外すこともできる）
   if (el.dataset.billCheck) {
-    const [reg, side, code] = el.dataset.billCheck.split(":");
-    send({ type: "check_bill", register: Number(reg), side, code, checked: el.checked });
+    const [reg, side, line] = el.dataset.billCheck.split(":");
+    send({ type: "check_bill", register: Number(reg), side, line_id: Number(line), checked: el.checked });
     return;
   }
   if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);

@@ -174,18 +174,12 @@ function pickupTag(p: Pickup): string {
 /**
  * 店員側：お預かりの荷物の番号を大きく出し、保管場所に荷物が有るかを選ぶ。
  * 本来は荷物のバーコードを読んで照合するが、シミュレーターでは「有り」「無し」の二択で次の工程に進める。
- * 有り：サインをもらって引き渡す。無し：お詫びしてお受け取りを終える。どちらからも探し直せる
+ * 有り：代金引換の金額が明細に付き、登録画面に戻って会計する（決済の後にサインをもらって引き渡す）。
+ * 無し：お詫びしてお受け取りを終える。どちらからも探し直せる
  */
 function pickupStep(reg: number, p: Pickup, st: ActionState): string {
   const found = (v: boolean | null) => ({ type: "pickup_found", register: reg, found: v });
   const end = { type: "pickup_handover", register: reg };
-  if (p.matched) {
-    return `<div class="point-screen pickup-step">
-        <p class="pickup-no">${esc(p.no)} <span class="tag ok">照合済</span></p>
-        <div class="big">店舗控えにサインをいただき、荷物をお渡しください</div>
-        <div class="point-choices">${btn("探し直す", found(null), st, "ghost")}${btn("お渡ししました", end, st, "primary")}</div>
-      </div>`;
-  }
   if (p.missing) {
     return `<div class="point-screen pickup-step">
         <p class="pickup-no">${esc(p.no)} <span class="tag warn">見つかりません</span></p>
@@ -194,9 +188,23 @@ function pickupStep(reg: number, p: Pickup, st: ActionState): string {
       </div>`;
   }
   return `<div class="point-screen pickup-step">
-      <p class="pickup-no">${esc(p.no)}</p>
-      <div class="big">保管場所から荷物を探してください。荷物はありましたか？</div>
+      <p class="pickup-no">${esc(p.no)} <span class="tag">代金引換 ${yen(p.amount)}</span></p>
+      <div class="big">保管場所に荷物はありましたか？</div>
       <div class="point-choices">${btn("無し", found(false), st, "ghost")}${btn("有り", found(true), st, "primary")}</div>
+    </div>`;
+}
+
+/** 代金引換の決済の後：店員側はサインをもらって引き渡し、お客様側にはサインをお願いする */
+function pickupHandover(reg: number, side: Side, no: string): string {
+  if (side === "customer")
+    return `<div class="point-screen pickup-step">
+      <div class="big">受け取りのサインをお願いします</div>
+      <p>レシートとお釣りをお受け取りください</p>
+    </div>`;
+  return `<div class="point-screen pickup-step">
+      <p class="pickup-no">${esc(no)}</p>
+      <div class="big">店舗控えにサインをいただき、荷物をお渡しください</div>
+      <div class="point-choices">${btn("お渡ししました", { type: "pickup_handover", register: reg }, undefined, "primary")}</div>
     </div>`;
 }
 
@@ -457,6 +465,9 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
       <button data-form="service" data-reg="${reg}" data-line="${l.id}" ${a.allowed ? "" : "disabled"}>受付</button>
     </div>`;
   }
+  // 荷物を「有り」にした後でも、会計の前なら探し直せる（取り違えに気づいたとき）
+  if (l.pickup?.matched && !ro && v.phase !== "paying")
+    svc = `<div class="svc">${btn("探し直す", { type: "pickup_found", register: reg, found: null }, undefined, "ghost")}</div>`;
   return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${ro || isBill(l) ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
@@ -768,6 +779,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.pickup_handover && !v.lines.length) return notice + confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.last_receipt && !v.lines.length) return notice + thanks();
   // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
@@ -823,15 +835,15 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
   // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
   // 荷物を送る：店員がサイズと郵便番号を決める間、お客様には伝票の貼り付けをお願いする
-  // 荷物を受取る：店員がお預かりの荷物を探して照合する間は「お持ちします」、照合が済んだらサインをお願いする
+  // 荷物を受取る：店員がお預かりの荷物を探す間は「お持ちします」。「有り」なら代金引換の金額が付いた登録画面に戻る
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
-  if (!paying && pickup)
+  if (!paying && pickup && !pickup.matched)
     return screen(
       side === "staff"
         ? pickupStep(reg, pickup, a("complete_service"))
         : pickup.missing
           ? pairNote("申し訳ございません", "お預かりの荷物が見つかりませんでした")
-          : pairNote(pickup.matched ? "受け取りのサインをお願いします" : "荷物をお持ちします", pickup.matched ? "" : "少々お待ちください"),
+          : pairNote("荷物をお持ちします", "少々お待ちください"),
     );
   const parcel = pendingParcel(v.lines);
   if (!paying && parcel)
@@ -1101,6 +1113,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // 荷物の発送はほかの商品と一緒に会計できないので、荷物の取引では FF タブを出さない（受付の画面を広く使う）
   // 荷物の受け取りも、ほかの商品と別に一件ずつ扱うので FF タブを出さない
   if (r.mode === "attended" && r.staff.lines.some((l) => l.parcel || l.pickup)) return "";
+  // 代金引換の決済の後、荷物を引き渡す画面も登録画面を置き換えるので FF タブを出さない
+  if (r.mode === "attended" && r.pickup_handover && !r.staff.lines.length) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);

@@ -45,6 +45,8 @@ export interface Parcel {
 /** 荷物を受取る：お預かりの荷物の番号と、荷物のバーコードを読んで照合したか */
 export interface Pickup {
   no: string;
+  /** 代金引換の金額（荷物が「有り」と決まったら明細の金額になる） */
+  amount: number;
   matched: boolean;
   /** 直前に読んだ、番号の違う荷物 */
   wrong: string | null;
@@ -216,6 +218,8 @@ export interface RegisterView {
   last_receipt: Receipt | null;
   /** 公共料金の決済の後、払込票のお渡し待ち（枚数）。店員の「お渡し済」で消える */
   bill_handover: number | null;
+  /** 代金引換の決済の後、荷物の引き渡し待ち（荷物の番号） */
+  pickup_handover: string | null;
 }
 
 export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer" | "journal" | "waste" | "ff_fresh";

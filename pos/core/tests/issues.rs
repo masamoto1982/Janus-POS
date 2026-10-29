@@ -464,10 +464,33 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     scan(&mut s, 2, "staff", &right);
     let pk = reg(&s, 2).staff.lines[0].line.pickup.clone().unwrap();
     assert!(pk.matched && pk.wrong.is_none());
+    // 照合が済むと代金引換の金額が明細に付き、お客様側にも合計として出る。会計の前には引き渡せない
+    let v = reg(&s, 2);
+    assert!(pk.amount >= 1_000);
+    assert_eq!(v.customer.total, pk.amount);
+    assert!(run(&mut s, json!({"type":"pickup_handover","register":2})).is_err());
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    );
+    // 代金引換はポイント付与の対象外なので、ポイントカードの確認は出ない
+    assert!(!reg(&s, 2).staff.point_pending);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":2,"side":"staff","method":"cash"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"insert_cash","register":2,"denomination":10000,"count":1}),
+    );
+    ok(&mut s, json!({"type":"finish_insert","register":2}));
+    let v = reg(&s, 2);
+    assert_eq!(v.last_receipt.as_ref().map(|r| r.total), Some(pk.amount));
+    // 決済の後、サインをもらって引き渡す
+    assert_eq!(v.pickup_handover.as_deref(), Some(pk.no.as_str()));
     ok(&mut s, json!({"type":"pickup_handover","register":2}));
     let v = reg(&s, 2);
-    assert!(v.staff.lines.is_empty());
-    assert!(v.last_receipt.is_none());
+    assert!(v.staff.lines.is_empty() && v.pickup_handover.is_none());
     assert!(!s
         .snapshot()
         .calls

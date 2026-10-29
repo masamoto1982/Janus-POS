@@ -749,7 +749,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.prepaid && !v.inserted && !v.payment_blocker ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due) : cashOnlyNote(r)}
+        ${r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due) : cashOnlyNote(r)}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -963,7 +963,9 @@ function emoneyScreen(r: RegisterView, side: Side): string {
 /** 残りを現金で払うとき、電子マネーで払った分を知らせる */
 /** キャッシュレスで先に払ったあと、残りを現金で払う案内（一行に収める） */
 function prepaidNote(r: RegisterView, due: number): string {
-  return `<p>${esc(r.prepaid_method ?? "")}で ${yen(r.prepaid)} お支払い済み。残り <b>${yen(due)}</b> を現金で</p>`;
+  // ポイントで払った後の残り（たばこなど）は、現金のみの商品だけでなければ支払方法を選び直す
+  const rest = r.cashless_due ? "のお支払い方法をお選びください" : "を現金で";
+  return `<p>${esc(r.prepaid_method ?? "")}で ${yen(r.prepaid)} お支払い済み。残り <b>${yen(due)}</b> ${rest}</p>`;
 }
 
 /** 現金のみの商品（切手・代行収納）があるとき、支払方法を選ぶ前に知らせる */
@@ -1235,7 +1237,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
     return screen(`<div class="paybox center">
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due)}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due)}
       </div>`);
   if (ffVerifying.has(`${reg}:${side}`) && ffVerifyRows(reg, side, c.lines).length)
     return screen(ffVerifyScreen(reg, side, c.lines, true));

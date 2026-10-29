@@ -37,7 +37,8 @@ const PARCEL_ALONE: &str =
     "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
-const NO_POINTS: &str = "切手・お支払い・たばこにはポイントを使えません";
+const NO_POINTS: &str =
+    "ポイントを使える商品がありません（宅配便・公共料金・切手・たばこにはポイントを使えません）";
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
 
@@ -801,20 +802,32 @@ impl Txn {
         self.due().saturating_sub(self.cash_only())
     }
 
+    /// これから払う額のうち、ポイントで払える分（ポイント付与の対象商品の分だけ。ポイントは一度だけ使える）。
+    /// ポイントが付く商品とポイントを使える商品は同じ（宅配便・公共料金・切手・たばこは付かず、使えない）
+    fn points_due(&self) -> u32 {
+        if self.prepaid > 0 {
+            return 0;
+        }
+        let eligible: u32 = self
+            .lines
+            .iter()
+            .filter(|l| l.earns_points())
+            .map(Line::amount)
+            .sum();
+        eligible.min(self.due())
+    }
+
     /// その支払方法が使えない理由（使えれば None）。決済の組み合わせの原則（有人・セミセルフ共通）：
     /// 現金と併用できるのは電子マネーだけ。クレジットカード・バーコード決済は現金と併用できないので、
-    /// 現金のみの商品（切手・代行収納）がある取引では使えない。ポイントは現金のみの商品とたばこには使えない
+    /// 現金のみの商品（切手・代行収納）がある取引では使えない。
+    /// ポイントはポイント付与の対象商品の分だけに使え、残りはほかの支払方法で払う
     fn method_refusal(&self, m: PaymentMethod) -> Option<&'static str> {
         match m {
             PaymentMethod::Cash => None,
+            PaymentMethod::Points if self.points_due() == 0 => Some(NO_POINTS),
+            PaymentMethod::Points => None,
             _ if self.cashless_due() == 0 => Some(CASH_ONLY),
             PaymentMethod::Qr | PaymentMethod::Credit if self.cash_only() > 0 => Some(NO_CASH_MIX),
-            PaymentMethod::Points
-                if self.cash_only() > 0
-                    || self.lines.iter().any(|l| l.category == Category::Tobacco) =>
-            {
-                Some(NO_POINTS)
-            }
             _ => None,
         }
     }
@@ -1717,7 +1730,7 @@ impl Store {
                 self.check(register, side, Action::BackToRegistering)?;
                 let r = self.reg_mut(register)?;
                 if r.txn.prepaid > 0 {
-                    return Err("一部お支払い済みです。残りを現金でお支払いください".into());
+                    return Err("一部お支払い済みです。残りをお支払いください".into());
                 }
                 r.txn.paying = false;
                 r.txn.method = None;
@@ -1900,6 +1913,26 @@ impl Store {
                 }
                 let method = chosen;
                 let due = r.txn.due();
+                // ポイントで払うのは、ポイント付与の対象商品の分だけ。残り（たばこ・切手など）はほかの支払方法で
+                if method == PaymentMethod::Points {
+                    let part = r.txn.points_due();
+                    if part == 0 {
+                        return Err(NO_POINTS.into());
+                    }
+                    if part < due {
+                        r.txn.prepaid += part;
+                        r.txn.prepaid_method = Some(method);
+                        // 残りが現金のみの商品だけなら現金、ほかは支払方法を選び直す
+                        let cash = r.txn.cashless_due() == 0;
+                        r.txn.method = cash.then_some(PaymentMethod::Cash);
+                        let rest = r.txn.due();
+                        return done(if cash {
+                            format!("ポイントで {part}円 お支払いしました。残り {rest}円を現金でお支払いください")
+                        } else {
+                            format!("ポイントで {part}円 お支払いしました。残り {rest}円のお支払い方法を選んでください")
+                        });
+                    }
+                }
                 // 現金のみの商品（切手・代行収納）があれば、キャッシュレスで払うのはそれを除いた分だけ。残りは現金で
                 let part = r.txn.cashless_due();
                 if part == 0 {
@@ -2938,11 +2971,16 @@ impl Store {
             no,
             at: now,
             total,
-            method: match txn.prepaid_method.filter(|_| txn.prepaid > 0) {
-                Some(PaymentMethod::Emoney) => "電子マネー・現金",
-                Some(PaymentMethod::Qr) => "バーコード決済・現金",
-                Some(PaymentMethod::Credit) => "クレジットカード・現金",
-                Some(PaymentMethod::Points) => "ポイント利用・現金",
+            method: match (txn.prepaid_method.filter(|_| txn.prepaid > 0), method) {
+                (Some(PaymentMethod::Points), PaymentMethod::Emoney) => "ポイント利用・電子マネー",
+                (Some(PaymentMethod::Points), PaymentMethod::Qr) => "ポイント利用・バーコード決済",
+                (Some(PaymentMethod::Points), PaymentMethod::Credit) => {
+                    "ポイント利用・クレジットカード"
+                }
+                (Some(PaymentMethod::Points), _) => "ポイント利用・現金",
+                (Some(PaymentMethod::Emoney), _) => "電子マネー・現金",
+                (Some(PaymentMethod::Qr), _) => "バーコード決済・現金",
+                (Some(PaymentMethod::Credit), _) => "クレジットカード・現金",
                 _ => method.label(),
             },
             paid,

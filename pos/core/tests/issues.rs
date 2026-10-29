@@ -1608,24 +1608,42 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
     assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
-/// たばこにはポイントを使えない
+/// ポイントはポイント付与の対象商品の分だけに使える（付く商品＝使える商品）。
+/// FF・サンドイッチ・たばこなら、ポイントで払うのはたばこ以外。残りのたばこはほかの支払方法で払う
 #[test]
-fn points_cannot_pay_for_tobacco() {
+fn points_pay_only_for_point_eligible_goods() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
+    scan(&mut s, 1, "staff", "PC12345678");
     scan(&mut s, 1, "staff", TOBACCO);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "staff", SANDWICH);
+    let price = |s: &Store, code: &str| {
+        reg(s, 1)
+            .staff
+            .lines
+            .iter()
+            .find(|l| l.line.code == code)
+            .map(|l| l.amount)
+            .unwrap()
+    };
+    let (tob, sand) = (price(&s, TOBACCO), price(&s, SANDWICH));
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     no_id_check(&mut s, 1);
-    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"points"}),
+    );
     let v = reg(&s, 1);
-    assert!(v
-        .unavailable
-        .iter()
-        .any(|u| u.method == PaymentMethod::Points));
+    assert_eq!(v.prepaid, sand);
+    assert_eq!(v.staff.due, tob);
+    // 残りのたばこは、ポイント以外の手段で払う
     assert!(run(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"})
@@ -1635,6 +1653,29 @@ fn points_cannot_pay_for_tobacco() {
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
     );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"credit"}),
+    );
+    let r = reg(&s, 1).last_receipt.expect("決済済み");
+    assert_eq!(r.method, "ポイント利用・クレジットカード");
+    // ポイントで払った分にもポイントは付く対象だが、付与は対象商品（サンドイッチ）の分だけ
+    assert_eq!(r.points, sand / 100);
+
+    // たばこだけならポイントは使えない
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", "PC12345678");
+    scan(&mut s, 1, "staff", TOBACCO);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    no_id_check(&mut s, 1);
+    assert!(reg(&s, 1)
+        .unavailable
+        .iter()
+        .any(|u| u.method == PaymentMethod::Points));
 }
 
 /// 切手は現金のみ（非課税）。ほかの商品と一緒に買えるが、キャッシュレスで払えるのは切手を除いた分だけ

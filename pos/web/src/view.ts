@@ -787,7 +787,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     return screen(
       side === "staff"
         ? parcelStep(reg, parcel, a("complete_service"), v.lines.filter((l) => l.parcel).length)
-        : pairNote("伝票の貼り付けをお願いします", parcel.parcel?.size ? "お届け先の郵便番号を確認しています" : "荷物の大きさと重さを測っています"),
+        : pairNote(parcel.parcel?.size ? "お届け先を入力しています" : "取り扱いサイズを入力しています", "伝票の貼り付けをお願いします"),
     );
   if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("ほかにお送りする荷物はございますか？"));
   const slips = v.bills.length;

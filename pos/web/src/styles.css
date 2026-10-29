@@ -463,10 +463,62 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-/* 店員側もお客様側も、4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す */
-.staff-screen, .customer-screen { filter: grayscale(1); }
-/* 操作できる側の画面は、白と 4 段階の青で表す（グレーの濃淡をそのまま置き換える。main.ts の rampFilter） */
-.staff-screen.operable, .customer-screen.operable { filter: url(#ramp); }
+/* 店員側もお客様側も、4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す。
+   画面全体にグレースケールのフィルターを掛けると、中の部品だけを青にできない（フィルターは親子で重なる）ため、
+   画面の中で使う色の変数を、グレースケールにしたときと同じグレーに置き換えておく */
+.staff-screen, .customer-screen {
+  --base-pink: #d4d4d4; --base-cream: #f6f6f6; --base-lime: #e1e1e1; --base-sky: #dedede;
+  --base-beige: #d0d0d0; --base-green: #c1c1c1; --base-purple: #b6b6b6; --ac-red: #6c6c6c;
+  --ac-yellow: #e3e3e3; --ac-green: #878787; --ac-blue: #535353; --ac-sky: #afafaf;
+  --ac-pink: #9b9b9b; --ac-orange: #aeaeae; --ac-purple: #2c2c2c; --ac-brown: #494949;
+  --bg: #f5f5f5; --accent: #535353; --accent-soft: rgb(83 83 83 / 0.08); --staff-bg: #282828;
+  --staff-ink: #f4f4f4; --staff-line: #404040; --warn: #606060; --warn-bg: #ededed;
+  --danger: #515151; --danger-bg: #eaeaea; --ok: #5e5e5e; --call: #464646;
+  --call-bg: #eaeaea; --ff: #aeaeae; --service: #878787; --tob: #535353;
+  --flash: rgb(227 227 227 / 0.7); --bill-bg: #f1f1f1; --coin-bg: #f0f0f0; --pay-bg: #f1f1f1;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.staff-screen, .customer-screen) {
+    --base-pink: #d4d4d4; --base-cream: #f6f6f6; --base-lime: #e1e1e1; --base-sky: #dedede;
+    --base-beige: #d0d0d0; --base-green: #c1c1c1; --base-purple: #b6b6b6; --ac-red: #6c6c6c;
+    --ac-yellow: #e3e3e3; --ac-green: #878787; --ac-blue: #535353; --ac-sky: #afafaf;
+    --ac-pink: #9b9b9b; --ac-orange: #aeaeae; --ac-purple: #2c2c2c; --ac-brown: #494949;
+    --bg: #111111; --panel: #1b1b1b; --ink: #e7e7e7; --line: #2f2f2f;
+    --msg-strong: #e7e7e7; --off-bg: #2f2f2f; --accent: #afafaf; --accent-soft: rgb(175 175 175 / 0.12);
+    --staff-bg: #181818; --staff-ink: #f4f4f4; --staff-line: #323232; --cust-bg: #1b1b1b;
+    --warn: #aeaeae; --warn-bg: #383838; --danger: #989898; --danger-bg: #2f2f2f;
+    --ok: #878787; --call: #afafaf; --call-bg: #2c2c2c; --ff: #aeaeae;
+    --service: #878787; --tob: #535353; --flash: rgb(227 227 227 / 0.7); --bill-bg: #303030;
+    --coin-bg: #353535; --pay-bg: #313131;
+  }
+}
+:root[data-theme="dark"] :is(.staff-screen, .customer-screen) {
+  --base-pink: #d4d4d4; --base-cream: #f6f6f6; --base-lime: #e1e1e1; --base-sky: #dedede;
+  --base-beige: #d0d0d0; --base-green: #c1c1c1; --base-purple: #b6b6b6; --ac-red: #6c6c6c;
+  --ac-yellow: #e3e3e3; --ac-green: #878787; --ac-blue: #535353; --ac-sky: #afafaf;
+  --ac-pink: #9b9b9b; --ac-orange: #aeaeae; --ac-purple: #2c2c2c; --ac-brown: #494949;
+  --bg: #111111; --panel: #1b1b1b; --ink: #e7e7e7; --line: #2f2f2f;
+  --msg-strong: #e7e7e7; --off-bg: #2f2f2f; --accent: #afafaf; --accent-soft: rgb(175 175 175 / 0.12);
+  --staff-bg: #181818; --staff-ink: #f4f4f4; --staff-line: #323232; --cust-bg: #1b1b1b;
+  --warn: #aeaeae; --warn-bg: #383838; --danger: #989898; --danger-bg: #2f2f2f;
+  --ok: #878787; --call: #afafaf; --call-bg: #2c2c2c; --ff: #aeaeae;
+  --service: #878787; --tob: #535353; --flash: rgb(227 227 227 / 0.7); --bill-bg: #303030;
+  --coin-bg: #353535; --pay-bg: #313131;
+}
+/* 色の付いたボタン（硬貨・電子マネーなど）やチェックボックスの既定色も、操作できない部品ではグレーで描く */
+.screen :is(button, input, select, summary) { filter: grayscale(1); }
+/* 操作できる部品だけを、白と 4 段階の青で表す（グレーの濃淡をそのまま置き換える。main.ts の rampFilter）。
+   操作できる側の画面の部品・お客様本人が押すボタン（お客様側の画面）・身分証などを確かめる店員のボタン（店員側の画面）・稼働モードのバッジ。
+   押せないボタン（売り切れなど）は下の :disabled でグレーに戻す */
+.screen.operable [data-region] :is(button, input, select, summary),
+.customer-screen [data-region] .customer-only button,
+.staff-screen [data-region] .staff-only button,
+.screen [data-region] .mode-badge { filter: url(#ramp); }
+.screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
+/* 店員側の画面に映るお客様本人のボタンは押せない（下の pointer-events）のでグレー */
+.staff-screen [data-region] .customer-only button { filter: grayscale(1); }
+/* 絵文字のアイコン（呼び出し理由・ポイントサービス）は文字なので、操作できない箇所としてグレー */
+.screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
 /* 操作できない側の画面（排他）：表示はそのまま（薄くしない）で、押せなくするだけ */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
@@ -475,10 +527,10 @@ body.dragging .drop-hint { display: inline; }
 }
 /* 例外：お客様本人が押すボタン（年齢確認・代行収納の内容確認）はお客様側の画面でだけ、
    どちらが操作側でも押せる。係員側では押せない */
-.customer-screen.inactive [data-region] .customer-only button { pointer-events: auto; filter: none; opacity: 1; }
+.customer-screen.inactive [data-region] .customer-only button { pointer-events: auto; opacity: 1; }
 .staff-screen .customer-only button { pointer-events: none; }
 /* 身分証の確認は店員本人が行う：店員側の画面でだけ押せる */
-.staff-screen.inactive [data-region] .staff-only button:not(:disabled) { pointer-events: auto; filter: none; opacity: 1; }
+.staff-screen.inactive [data-region] .staff-only button:not(:disabled) { pointer-events: auto; opacity: 1; }
 /* 押せないボタン（売り切れなど）は半透明にせず、四色のグレーで描く（塗り #D4D4D4・文字 #878787）。枠線だけの補助ボタンは塗らない。
    もう一方の画面が操作中で、この画面から触れないだけのボタンは、薄くせずふだんの色のまま表示する */
 .screen button:disabled {
@@ -553,7 +605,7 @@ body.dragging .drop-hint { display: inline; }
 /* 歯車は両方の画面に出る。操作できない側の歯車は押せない。
    ただし店舗メニューを開いたバッジは、開いている間も押して閉じられる（開いた所で閉じる） */
 /* 稼働モードのバッジ（店舗メニュー）は、もう一方の画面が操作中でも押せる（2026-10-28 ユーザー：有人モードのお客様側でも押せる） */
-.screen.inactive [data-region] .mode-badge { pointer-events: auto; filter: none; opacity: 1; }
+.screen.inactive [data-region] .mode-badge { pointer-events: auto; opacity: 1; }
 .mode-badge[aria-expanded="true"] .caret { display: inline-block; transform: rotate(180deg); }
 
 /* セミセルフの店員呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ） */

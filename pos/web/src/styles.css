@@ -541,6 +541,11 @@ body.dragging .drop-hint { display: inline; }
 .id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
 .id-head button { min-width: 64px; }
 /* 荷物の受付は入力欄とボタンを一画面に収める（年確の入力より詰める） */
+/* お預かりの荷物は番号が長いので、二つで棚一段（三つ分）の幅にする */
+.items.uniform .item.pk { width: 164px; }
+.item.pk .item-sub { font-variant-numeric: tabular-nums; }
+/* 荷物の受け取り：お預かりの番号は離れても読めるよう大きく */
+.pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 .parcel-entry, .parcel-ask { padding: 12px; gap: 10px; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: 6px; font-size: 15px; }

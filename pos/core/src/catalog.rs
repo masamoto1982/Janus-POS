@@ -101,6 +101,8 @@ pub struct Product {
     pub cash_only: bool,
     /// 宅配便の発送（荷物を送る）。サイズと届け先の郵便番号で料金が決まる。ほかの商品と一緒に会計できない
     pub parcel_send: bool,
+    /// 荷物を受取る（お客様の受取用バーコード）。お預かりの荷物を一件ずつ、ほかの商品と別に引き渡す
+    pub parcel_pickup: bool,
 }
 
 const fn p(
@@ -120,6 +122,7 @@ const fn p(
         utility_bill: false,
         cash_only: matches!(category, Category::Stamp),
         parcel_send: false,
+        parcel_pickup: false,
     }
 }
 
@@ -166,7 +169,10 @@ pub const CATALOG: &[Product] = &[
         parcel_send: true,
         ..p("2100000000014", "荷物を送る", 0, Standard10, Service)
     },
-    p("2100000000038", "荷物を受取る", 0, Standard10, Service),
+    Product {
+        parcel_pickup: true,
+        ..p("2100000000038", "荷物を受取る", 0, Standard10, Service)
+    },
     // 公共料金の払込票（金額は印字済み）。1 枚目を読むと全部の枚数を尋ね、
     // 申告した枚数を読み終えたらお客様が件数・金額を確認する。ほかの商品とは一緒に登録できない
     // 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは払込票ごとに手数料があり得るが、
@@ -306,11 +312,15 @@ pub enum Scanned {
     PointCard(String),
     Coupon(&'static Coupon),
     Staff(String),
+    /// 保管場所から持ってきた、お預かり中の荷物のバーコード（荷物の番号）
+    Pickup(String),
     Unknown,
 }
 
 pub const POINT_CARD_PREFIX: &str = "PC";
 pub const COUPON_PREFIX: &str = "CP";
+/// お預かり中の荷物に貼ったバーコード（PK + 荷物の番号 12 桁）
+pub const PICKUP_PREFIX: &str = "PK";
 
 /// クーポンの効き方
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -365,6 +375,9 @@ pub fn classify(code: &str) -> Scanned {
     }
     if let Some(id) = code.strip_prefix(STAFF_PREFIX) {
         return Scanned::Staff(id.to_string());
+    }
+    if let Some(no) = code.strip_prefix(PICKUP_PREFIX) {
+        return Scanned::Pickup(no.to_string());
     }
     if code.starts_with(COUPON_PREFIX) {
         return COUPONS

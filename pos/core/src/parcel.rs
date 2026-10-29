@@ -142,6 +142,24 @@ pub struct Parcel {
     pub region: Option<&'static str>,
 }
 
+/// 荷物を受取る：お預かりしている荷物の番号（お客様の受取用バーコードから引く）と、
+/// 保管場所から持ってきた荷物のバーコードを読んで番号が合ったか
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Pickup {
+    pub no: String,
+    pub matched: bool,
+    /// 直前に読んだ、番号の違う荷物（店員側の画面に「お渡しできません」と出す）
+    pub wrong: Option<String>,
+}
+
+impl Pickup {
+    /// 荷物のバーコードの番号がお預かりの番号と合うか（区切りの「-」は見ない）
+    pub fn matches(&self, scanned: &str) -> bool {
+        let digits = |s: &str| s.chars().filter(char::is_ascii_digit).collect::<String>();
+        digits(&self.no) == digits(scanned)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,5 +186,16 @@ mod tests {
         assert_eq!(fee(60, Region::Kanto), 940);
         assert!(fee(60, Region::Kyushu) > fee(60, Region::Kansai));
         assert!(fee(80, Region::Kanto) > fee(60, Region::Kanto));
+    }
+
+    #[test]
+    fn pickup_number_ignores_separators() {
+        let p = Pickup {
+            no: "1234-5678-9012".into(),
+            matched: false,
+            wrong: None,
+        };
+        assert!(p.matches("123456789012"));
+        assert!(!p.matches("1234-5678-9013"));
     }
 }

@@ -531,10 +531,10 @@ body.dragging .drop-hint { display: inline; }
 .staff-screen .customer-only button { pointer-events: none; }
 /* 身分証の確認は店員本人が行う：店員側の画面でだけ押せる */
 .staff-screen.inactive [data-region] .staff-only button:not(:disabled) { pointer-events: auto; opacity: 1; }
-/* 押せないボタン（売り切れなど）は半透明にせず、四色のグレーで描く（塗り #D4D4D4・文字 #878787）。枠線だけの補助ボタンは塗らない。
+/* 押せないボタン（売り切れなど）は半透明にせず、四色のグレーで描く（塗り #D4D4D4・文字 #878787。絵文字のアイコンもグレー）。枠線だけの補助ボタンは塗らない。
    もう一方の画面が操作中で、この画面から触れないだけのボタンは、薄くせずふだんの色のまま表示する */
 .screen button:disabled {
-  opacity: 1 !important; filter: none !important; background: var(--off-bg) !important; color: var(--off-ink) !important; border-color: var(--border);
+  opacity: 1 !important; filter: grayscale(1) !important; background: var(--off-bg) !important; color: var(--off-ink) !important; border-color: var(--border);
 }
 .screen .guide-btn:disabled { background: transparent !important; }
 .id-card { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; }

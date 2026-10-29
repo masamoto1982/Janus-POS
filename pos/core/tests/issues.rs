@@ -1647,7 +1647,7 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
-    confirm_point(&mut s, 1);
+    // 切手はポイント付与の対象外なので、切手だけの会計ではポイントカードの確認を出さない
     for m in ["emoney", "qr", "credit", "points"] {
         assert!(
             run(
@@ -2660,4 +2660,48 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
         json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
     );
     assert_eq!(reg(&s, 1).staff.ff_collect[0].qty, 2);
+}
+
+/// 宅配便・公共料金・切手・たばこはポイント付与の対象外。付与は対象商品の金額だけから計算し、
+/// 対象商品のない会計ではポイントカードの確認を出さない
+#[test]
+fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", "PC12345678");
+    scan(&mut s, 1, "staff", TOBACCO);
+    scan(&mut s, 1, "staff", STAMP);
+    scan(&mut s, 1, "staff", BREAD);
+    let bread = reg(&s, 1)
+        .staff
+        .lines
+        .iter()
+        .find(|l| l.line.code == BREAD)
+        .map(|l| l.amount)
+        .unwrap();
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    no_id_check(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"insert_cash","register":1,"denomination":10000,"count":1}),
+    );
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.map(|r| r.points), Some(bread / 100));
+
+    // 切手だけの会計では、ポイントカードの確認を出さない
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", STAMP);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    assert!(!reg(&s, 1).staff.point_pending);
 }

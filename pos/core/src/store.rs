@@ -723,7 +723,7 @@ impl Line {
         self.pickup.is_some()
     }
 
-    /// 荷物を受取る：保管場所に荷物が「有り」（Some(true)）なら代金引換の金額で受付済みにし、
+    /// 荷物を受取る：保管場所に荷物が「有り」（Some(true)）なら受付済みにして会計できるようにし、
     /// 「無し」（Some(false)）・探し直し（None）なら受付待ちに戻す
     fn set_pickup_found(&mut self, found: Option<bool>) {
         let Some(pk) = self.pickup.as_mut() else {
@@ -732,7 +732,8 @@ impl Line {
         pk.matched = found == Some(true);
         pk.missing = found == Some(false);
         pk.wrong = None;
-        self.unit_price = if pk.matched { pk.amount } else { 0 };
+        // 金額は受取用バーコードを読んだときから出している。有無が決まるまで会計はできない
+        self.unit_price = pk.amount;
         self.kind = LineKind::Service {
             done: pk.matched,
             confirm_pending: false,
@@ -2697,14 +2698,17 @@ impl Store {
                 if p.parcel_pickup {
                     let seed = now ^ (u64::from(register) << 56) ^ 0x5049_434B;
                     if let Some(l) = r.txn.lines.last_mut() {
-                        l.pickup = Some(Pickup {
+                        let pk = Pickup {
                             no: pickup_no(seed),
                             // 代金引換の金額は、シミュレーターでは 1,000〜9,900円（100円単位）を便宜的に決める
                             amount: 1_000 + (mix(seed ^ 0xC0D) % 90) as u32 * 100,
                             matched: false,
                             wrong: None,
                             missing: false,
-                        });
+                        };
+                        // 代金引換の合計は、受取用バーコードを読んだときから両方の画面に出す
+                        l.unit_price = pk.amount;
+                        l.pickup = Some(pk);
                     }
                 }
                 // 次の荷物の伝票を読んだら、「次の荷物はありますか」には「ある」と答えたことになる

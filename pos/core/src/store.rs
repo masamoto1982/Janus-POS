@@ -254,6 +254,12 @@ pub enum Command {
     PickupHandover {
         register: u8,
     },
+    /// 荷物を受取る：保管場所に荷物が「有り」（照合済みとする）「無し」、None は探し直す。
+    /// 本来は荷物のバーコードを読んで照合するが、シミュレーターでは二択で次の工程に進める
+    PickupFound {
+        register: u8,
+        found: Option<bool>,
+    },
     RemoveLine {
         register: u8,
         side: Side,
@@ -511,6 +517,7 @@ impl Command {
             | C::ParcelBack { register, .. }
             | C::ParcelNext { register, .. }
             | C::PickupHandover { register }
+            | C::PickupFound { register, .. }
             | C::RemoveLine { register, .. }
             | C::SetQty { register, .. }
             | C::RemoveCoupon { register, .. }
@@ -579,6 +586,7 @@ impl Command {
             | C::ParcelBack { .. }
             | C::ParcelNext { .. }
             | C::PickupHandover { .. }
+            | C::PickupFound { .. }
             | C::VoidTransaction { .. } => Some(Side::Staff),
             _ => None,
         }
@@ -1717,17 +1725,39 @@ impl Store {
                     .iter()
                     .find_map(|l| l.pickup.as_ref())
                     .ok_or("お受け取りの手続き中ではありません")?;
-                if !pk.matched {
+                if !pk.matched && !pk.missing {
                     return Err(
                         "先に荷物のバーコードを読んで、お預かりの番号と照合してください".into(),
                     );
                 }
-                let no = pk.no.clone();
+                let (no, missing) = (pk.no.clone(), pk.missing);
                 // 引き渡したら取引を終える（お支払いはない）。続けてお買い物をするときは次の取引で
                 r.txn = Txn::default();
                 r.last_receipt = None;
                 self.calls.resolve(register, CallKind::Service, now);
-                done(format!("荷物（{no}）をお渡ししました"))
+                done(if missing {
+                    format!("荷物（{no}）が見つからないため、お受け取りを終えました")
+                } else {
+                    format!("荷物（{no}）をお渡ししました")
+                })
+            }
+            C::PickupFound { register, found } => {
+                self.check_active(register, Action::CompleteService)?;
+                let pk = self
+                    .reg_mut(register)?
+                    .txn
+                    .lines
+                    .iter_mut()
+                    .find_map(|l| l.pickup.as_mut())
+                    .ok_or("お受け取りの手続き中ではありません")?;
+                pk.matched = found == Some(true);
+                pk.missing = found == Some(false);
+                pk.wrong = None;
+                done(match found {
+                    Some(true) => "店舗控えにサインをいただき、荷物をお渡しください",
+                    Some(false) => "お客様にお詫びし、運送会社へお問い合わせください",
+                    None => "保管場所から荷物を探してください",
+                })
             }
             C::RemoveLine {
                 register,
@@ -2631,6 +2661,7 @@ impl Store {
                             no: pickup_no(seed),
                             matched: false,
                             wrong: None,
+                            missing: false,
                         });
                     }
                 }

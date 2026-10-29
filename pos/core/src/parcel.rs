@@ -150,6 +150,8 @@ pub struct Pickup {
     pub matched: bool,
     /// 直前に読んだ、番号の違う荷物（店員側の画面に「お渡しできません」と出す）
     pub wrong: Option<String>,
+    /// 保管場所に荷物が見つからなかった（シミュレーターでは店員が「無し」を選ぶ）
+    pub missing: bool,
 }
 
 impl Pickup {
@@ -194,6 +196,7 @@ mod tests {
             no: "1234-5678-9012".into(),
             matched: false,
             wrong: None,
+            missing: false,
         };
         assert!(p.matches("123456789012"));
         assert!(!p.matches("1234-5678-9013"));

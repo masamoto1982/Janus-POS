@@ -477,6 +477,37 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     scan(&mut s, 2, "staff", BREAD);
 }
 
+/// シミュレーターでは、荷物のバーコードを読む代わりに「有り」「無し」の二択で進められる。
+/// 「無し」なら引き渡さずにお受け取りを終え、「探し直す」で照合の前に戻る
+#[test]
+fn pickup_can_be_decided_by_found_or_missing() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", RECEIVE);
+    login_as(&mut s, 2, "ST001");
+    let pk = |s: &Store| reg(s, 2).staff.lines[0].line.pickup.clone().unwrap();
+    ok(
+        &mut s,
+        json!({"type":"pickup_found","register":2,"found":false}),
+    );
+    assert!(pk(&s).missing && !pk(&s).matched);
+    ok(
+        &mut s,
+        json!({"type":"pickup_found","register":2,"found":null}),
+    );
+    assert!(!pk(&s).missing && !pk(&s).matched);
+    ok(
+        &mut s,
+        json!({"type":"pickup_found","register":2,"found":true}),
+    );
+    assert!(pk(&s).matched);
+    ok(
+        &mut s,
+        json!({"type":"pickup_found","register":2,"found":false}),
+    );
+    ok(&mut s, json!({"type":"pickup_handover","register":2}));
+    assert!(reg(&s, 2).staff.lines.is_empty());
+}
+
 fn pending_parcel(s: &Store, r: u8) -> u32 {
     reg(s, r)
         .staff

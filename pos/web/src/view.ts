@@ -165,31 +165,38 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
 // 荷物を受取る：受取用バーコード → 係員がお預かりの荷物を探して読む（照合）→ サインをもらって引き渡す
 // ---------------------------------------------------------------------------
 
-/** 12 桁の荷物の番号を 4 桁ずつ区切る */
-const dashed = (no: string): string => (/^\d{12}$/.test(no) ? no.replace(/(\d{4})(\d{4})(\d{4})/, "$1-$2-$3") : no);
-
-/** 明細の札：照合の前と後 */
+/** 明細の札：照合の前と後（見つからなかったときは「見つかりません」） */
 function pickupTag(p: Pickup): string {
+  if (p.missing) return `<span class="tag warn">見つかりません</span>`;
   return p.matched ? `<span class="tag ok">照合済</span>` : `<span class="tag warn">照合待ち</span>`;
 }
 
 /**
- * 店員側：お預かりの荷物の番号を大きく出し、荷物のバーコードを読むよう案内する。
- * 照合が済んだら、サインをもらって引き渡すよう案内し、引き渡しのボタンを出す
+ * 店員側：お預かりの荷物の番号を大きく出し、保管場所に荷物が有るかを選ぶ。
+ * 本来は荷物のバーコードを読んで照合するが、シミュレーターでは「有り」「無し」の二択で次の工程に進める。
+ * 有り：サインをもらって引き渡す。無し：お詫びしてお受け取りを終える。どちらからも探し直せる
  */
 function pickupStep(reg: number, p: Pickup, st: ActionState): string {
-  if (!p.matched) {
+  const found = (v: boolean | null) => ({ type: "pickup_found", register: reg, found: v });
+  const end = { type: "pickup_handover", register: reg };
+  if (p.matched) {
     return `<div class="point-screen pickup-step">
-        <div class="big">お預かりの荷物を探してください</div>
-        <p class="pickup-no">${esc(p.no)}</p>
-        ${p.wrong ? `<div class="banner danger">読み取った荷物（${esc(dashed(p.wrong))}）は番号が違います。お渡しできません</div>` : ""}
-        <p class="muted">保管場所から荷物を探し、荷物のバーコードを読み取ってください</p>
+        <p class="pickup-no">${esc(p.no)} <span class="tag ok">照合済</span></p>
+        <div class="big">店舗控えにサインをいただき、荷物をお渡しください</div>
+        <div class="point-choices">${btn("探し直す", found(null), st, "ghost")}${btn("お渡ししました", end, st, "primary")}</div>
+      </div>`;
+  }
+  if (p.missing) {
+    return `<div class="point-screen pickup-step">
+        <p class="pickup-no">${esc(p.no)} <span class="tag warn">見つかりません</span></p>
+        <div class="big">お客様にお詫びし、運送会社へお問い合わせください</div>
+        <div class="point-choices">${btn("探し直す", found(null), st, "ghost")}${btn("お受け取りを終える", end, st, "primary")}</div>
       </div>`;
   }
   return `<div class="point-screen pickup-step">
-      <p class="pickup-no">${esc(p.no)} <span class="tag ok">照合済</span></p>
-      <div class="big">店舗控えにサインをいただき、荷物をお渡しください</div>
-      <div class="point-choices">${btn("お渡ししました", { type: "pickup_handover", register: reg }, st, "primary")}</div>
+      <p class="pickup-no">${esc(p.no)}</p>
+      <div class="big">保管場所から荷物を探してください。荷物はありましたか？</div>
+      <div class="point-choices">${btn("無し", found(false), st, "ghost")}${btn("有り", found(true), st, "primary")}</div>
     </div>`;
 }
 
@@ -822,7 +829,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     return screen(
       side === "staff"
         ? pickupStep(reg, pickup, a("complete_service"))
-        : pairNote(pickup.matched ? "受け取りのサインをお願いします" : "荷物をお持ちします", pickup.matched ? "" : "少々お待ちください"),
+        : pickup.missing
+          ? pairNote("申し訳ございません", "お預かりの荷物が見つかりませんでした")
+          : pairNote(pickup.matched ? "受け取りのサインをお願いします" : "荷物をお持ちします", pickup.matched ? "" : "少々お待ちください"),
     );
   const parcel = pendingParcel(v.lines);
   if (!paying && parcel)
@@ -1480,27 +1489,13 @@ function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCA
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
-/** 照合で止まることを試すための、別のお客様の荷物の番号（4 桁ずつの並びを入れ替える） */
-function otherParcel(no: string): string {
-  const [a, b, c] = no.split("-");
-  return [c, a, b].join("-") === no ? "0000-0000-0001" : [c, a, b].join("-");
-}
-
 /** Item：4 大分類ごとに小さな見出しを付けて並べる */
 export function shelfPanel(s: Snapshot): string {
   // たばこはカウンターの内側の商品。有人モードのレジがあるときだけ並べ、
   // たばこボタンで呼ばれて有人モードになったら（まだ登録していなければ）枠と文字を点滅させる
   const attended = s.registers.some((r) => r.mode === "attended");
   const asked = s.registers.some((r) => r.tobacco_asked);
-  // お預かり中の荷物：有人モードで受け取りの手続き中のレジがあるときだけ、保管場所の棚として並べる。
-  // お客様の荷物と、照合で止まることを試せるよう別のお客様の荷物も置く
-  const pickups = s.registers.flatMap((r) => (r.mode === "attended" ? r.staff.lines.flatMap((l) => (l.pickup ? [l.pickup.no] : [])) : []));
-  const stored = pickups.length
-    ? `<div class="shelf"><h3>お預かりの荷物</h3><div class="items uniform">${[...pickups, otherParcel(pickups[0])]
-        .map((no) => item(`PK${no.replace(/-/g, "")}`, "お預かりの荷物", esc(no), "pk"))
-        .join("")}</div></div>`
-    : "";
-  return stored + SHELVES.map((g) => {
+  return SHELVES.map((g) => {
     // 棚の並びは SHELVES に書いた順
     const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || attended);
     if (!items.length) return "";

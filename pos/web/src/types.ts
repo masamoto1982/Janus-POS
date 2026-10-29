@@ -48,6 +48,8 @@ export interface Pickup {
   matched: boolean;
   /** 直前に読んだ、番号の違う荷物 */
   wrong: string | null;
+  /** 保管場所に荷物が見つからなかった */
+  missing: boolean;
 }
 
 export type StaffLine = LineKind & {

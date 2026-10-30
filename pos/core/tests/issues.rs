@@ -567,6 +567,80 @@ fn pending_parcel(s: &Store, r: u8) -> u32 {
         .expect("受付中の荷物")
 }
 
+/// 荷物を送る：サイズは二段階（三辺の合計 → 重さ）で決める。「戻る」は一段階ずつ引き返し、
+/// 三辺の合計から戻るとその荷物の受付をやめる（受付済みの荷物があれば「次の荷物はありますか」に戻る）
+#[test]
+fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL);
+    login_as(&mut s, 2, "ST001");
+    let id = pending_parcel(&s, 2);
+    let parcel = |s: &Store, id: u32| {
+        reg(s, 2)
+            .staff
+            .lines
+            .iter()
+            .find(|l| l.line.id == id)
+            .and_then(|l| l.line.parcel.clone())
+    };
+    assert!(run(
+        &mut s,
+        json!({"type":"parcel_length","register":2,"line_id":id,"sum_cm":170})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"parcel_length","register":2,"line_id":id,"sum_cm":58}),
+    );
+    assert_eq!(parcel(&s, id).unwrap().sum_cm, 58);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    // 郵便番号 → 重さ → 三辺の合計 と一段階ずつ戻る
+    ok(
+        &mut s,
+        json!({"type":"parcel_back","register":2,"line_id":id}),
+    );
+    let p = parcel(&s, id).unwrap();
+    assert!(p.size.is_none() && p.sum_cm == 58);
+    ok(
+        &mut s,
+        json!({"type":"parcel_back","register":2,"line_id":id}),
+    );
+    assert_eq!(parcel(&s, id).unwrap().sum_cm, 0);
+    // 三辺の合計から戻ると、この荷物の受付をやめて登録画面に戻る
+    ok(
+        &mut s,
+        json!({"type":"parcel_back","register":2,"line_id":id}),
+    );
+    assert!(reg(&s, 2).staff.lines.is_empty());
+    assert!(!reg(&s, 2).staff.parcel_ask);
+    // 二個目で戻ると「次の荷物はありますか」に戻る
+    scan(&mut s, 2, "customer", PARCEL);
+    let id = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":true}),
+    );
+    let id2 = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_back","register":2,"line_id":id2}),
+    );
+    let v = reg(&s, 2);
+    assert_eq!(v.staff.lines.len(), 1);
+    assert!(v.staff.parcel_ask);
+}
+
 /// 荷物を送る：伝票を読むと係員を呼び、係員がサイズ（三辺の合計・重さ）→ 郵便番号の順に決めると料金が決まる。
 /// 次の荷物が「ある」ならもう一度サイズから、「ない」なら会計に進める（支払方法の制限なし）
 #[test]

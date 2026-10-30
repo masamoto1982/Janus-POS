@@ -234,15 +234,26 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   const p = l.parcel as Parcel;
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
+  // 「戻る」は手続きを一段階引き返す（左）。三辺の合計から戻ると、この荷物の受付をやめる
+  const back = (label = "戻る") => btn(label, { type: "parcel_back", register: reg, line_id: l.id }, st, "ghost");
+  if (!p.size && !p.sum_cm) {
+    return `<div class="point-screen parcel-entry">
+        <div class="big">${no}取り扱いサイズを決定してください</div>
+        <p class="parcel-size">三辺の長さの合計を入力してください</p>
+        <div class="parcel-fields">
+          <label>三辺の合計<input type="number" inputmode="numeric" min="1" max="999" autocomplete="off" data-key="pcm-${reg}" data-parcel="${reg}" aria-label="荷物の三辺の合計（cm）" /><span>cm</span></label>
+        </div>
+        <div class="point-choices">${back()}<button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
+      </div>`;
+  }
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
+        <p class="parcel-size">重量を入力してください（三辺の合計 ${p.sum_cm}cm）</p>
         <div class="parcel-fields">
-          <label>三辺の合計<input type="number" inputmode="numeric" min="1" max="999" autocomplete="off" data-key="pcm-${reg}" data-parcel="${reg}" aria-label="荷物の三辺の合計（cm）" /><span>cm</span></label>
           <label>重さ<input type="number" inputmode="decimal" min="0.1" step="0.1" autocomplete="off" data-key="pkg-${reg}" data-parcel="${reg}" aria-label="荷物の重さ（kg）" /><span>kg</span></label>
         </div>
-        <div class="point-choices"><button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
-        <p class="muted">三辺の合計と重さの両方が収まるサイズに決まります（60〜160）</p>
+        <div class="point-choices">${back()}<button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}" data-cm="${p.sum_cm}"${off}>決定</button></div>
       </div>`;
   }
   return `<div class="point-screen parcel-entry">
@@ -250,7 +261,7 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
       <p class="parcel-size">${p.size}サイズ（三辺の合計 ${p.sum_cm}cm・${kg(p.weight_g)}）</p>
       <input type="text" inputmode="numeric" maxlength="8" placeholder="例 100-0001" autocomplete="off" data-key="ppost-${reg}" data-parcel="${reg}" aria-label="お届け先の郵便番号（7桁）" />
       <div class="point-choices">
-        ${btn("サイズに戻る", { type: "parcel_back", register: reg, line_id: l.id }, st, "ghost")}
+        ${back()}
         <button class="primary" data-form="parcel-postal" data-reg="${reg}" data-line="${l.id}"${off}>決定</button>
       </div>
     </div>`;

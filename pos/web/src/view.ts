@@ -236,6 +236,16 @@ const parcelErr = (reg: number): string => {
   return e ? `<p class="parcel-error" role="alert">${esc(e)}</p>` : "";
 };
 
+/**
+ * 有人モードのお客様側：店員がサイズ・届け先を入力する間の案内（店員側の入力画面と対）。
+ * 上限を超えて受け付けられないときは、その旨をお客様にも出す
+ */
+function parcelNote(reg: number, l: StaffLine): string {
+  const p = l.parcel as Parcel;
+  const head = p.size ? "お届け先を入力しています" : p.sum_cm ? "重さを計測しています" : "長さを計測しています";
+  return pairNote(head, parcelError.get(reg) ?? "伝票の貼り付けをお願いします");
+}
+
 /** セミセルフ：伝票を読んで係員を待つ間のお客様側の案内（登録画面の代わり） */
 function parcelWait(): string {
   return `<div class="point-screen pair-note parcel-wait">
@@ -885,7 +895,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     return screen(
       side === "staff"
         ? parcelStep(reg, parcel, a("complete_service"), v.lines.filter((l) => l.parcel).length)
-        : pairNote(parcel.parcel?.size ? "お届け先を入力しています" : "取り扱いサイズを入力しています", "伝票の貼り付けをお願いします"),
+        : parcelNote(reg, parcel),
     );
   if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("ほかにお送りする荷物はございますか？"));
   const slips = v.bills.length;

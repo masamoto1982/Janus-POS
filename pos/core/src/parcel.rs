@@ -6,23 +6,38 @@
 
 use serde::Serialize;
 
-/// 取り扱いサイズ（サイズ, 三辺の合計の上限 cm, 重さの上限 g）。小さい順
-pub const SIZES: [(u32, u32, u32); 6] = [
+/// 取り扱いサイズ（サイズ, 三辺の合計の上限 cm, 重さの上限 g）。小さい順。
+/// 受け付けられるのは三辺の合計 200cm 以内、かつ重さ 30kg 以内（ユーザー 2026-10-30）
+pub const SIZES: [(u32, u32, u32); 8] = [
     (60, 60, 2_000),
     (80, 80, 5_000),
     (100, 100, 10_000),
     (120, 120, 15_000),
     (140, 140, 20_000),
     (160, 160, 25_000),
+    (180, 180, 30_000),
+    (200, 200, 30_000),
 ];
+
+/// 受け付けられる上限（三辺の合計 cm・重さ g）
+const MAX_CM: u32 = SIZES[SIZES.len() - 1].1;
+const MAX_G: u32 = SIZES[SIZES.len() - 1].2;
+
+/// 上限を超えたときの案内。何 cm・何 kg まで受け付けるかが分かるように数字で示す
+fn too_long() -> String {
+    format!("{MAX_CM}cm を超える荷物は受け付けられません")
+}
+fn too_heavy() -> String {
+    format!("{}kg を超える荷物は受け付けられません", MAX_G / 1000)
+}
 
 /// 一段階目：三辺の合計がいちばん大きいサイズに収まるか
 pub fn check_length(sum_cm: u32) -> Result<(), String> {
     if sum_cm == 0 {
         return Err("長さを入力してください".into());
     }
-    if sum_cm > SIZES[SIZES.len() - 1].1 {
-        return Err("長さが 160cm を超える荷物は受け付けられません".into());
+    if sum_cm > MAX_CM {
+        return Err(too_long());
     }
     Ok(())
 }
@@ -37,10 +52,10 @@ pub fn size_for(sum_cm: u32, weight_g: u32) -> Result<u32, String> {
         .find(|&&(_, cm, g)| sum_cm <= cm && weight_g <= g)
         .map(|&(size, _, _)| size)
         .ok_or_else(|| {
-            if weight_g > SIZES[SIZES.len() - 1].2 {
-                "25kg を超える荷物は受け付けられません".into()
+            if weight_g > MAX_G {
+                too_heavy()
             } else {
-                "長さが 160cm を超える荷物は受け付けられません".into()
+                too_long()
             }
         })
 }
@@ -139,7 +154,9 @@ pub fn fee(size: u32, region: Region) -> u32 {
         100 => (1_530, 130),
         120 => (1_850, 140),
         140 => (2_190, 150),
-        _ => (2_510, 160),
+        160 => (2_510, 160),
+        180 => (2_840, 170),
+        _ => (3_170, 180),
     };
     base + step * region.tier()
 }
@@ -190,8 +207,11 @@ mod tests {
         assert_eq!(size_for(61, 1_000), Ok(80));
         // 小さくても重ければ重さで決まる
         assert_eq!(size_for(50, 9_000), Ok(100));
-        assert!(size_for(161, 1_000).is_err());
-        assert!(size_for(100, 26_000).is_err());
+        assert_eq!(size_for(161, 1_000), Ok(180));
+        assert_eq!(size_for(100, 26_000), Ok(180));
+        assert_eq!(size_for(200, 30_000), Ok(200));
+        assert!(size_for(201, 1_000).is_err());
+        assert!(size_for(100, 30_001).is_err());
         assert!(size_for(0, 1_000).is_err());
     }
 

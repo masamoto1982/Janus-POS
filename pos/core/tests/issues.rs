@@ -372,6 +372,18 @@ fn fast_food_flow_in_semi_self_mode() {
         &mut s,
         json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2}),
     );
+    // スタッフの照合の後、お客様が「確認しました」を押すまで会計に進めない（相互チェック）
+    let e = run(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    )
+    .unwrap_err();
+    assert!(e.contains("お受け取り"), "{e}");
+    ok(
+        &mut s,
+        json!({"type":"receive_ff","register":2,"side":"customer"}),
+    );
+    advance(&mut s, 1_000);
     ok(
         &mut s,
         json!({"type":"checkout","register":2,"side":"staff"}),
@@ -1376,6 +1388,11 @@ fn attended_screens_lock_only_while_touched() {
     advance(&mut s, 1_000);
     ok(
         &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"}),
+    );
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
@@ -1593,6 +1610,10 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     );
     ok(
         &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"}),
+    );
+    ok(
+        &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     let v = reg(&s, 1);
@@ -1627,6 +1648,10 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     ok(
         &mut s,
         json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"handed":1}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"}),
     );
     ok(
         &mut s,
@@ -3029,8 +3054,9 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     assert!(!reg(&s, 1).staff.point_pending);
 }
 
-/// 有人モードで、お客様側の「確認しました」は、お渡し前の FF をまとめてお渡し済みにし、会計に進める。
-/// お客様側の画面からだけ押せる。セミセルフではお受け取りの個数を入力して確かめる
+/// 有人モードの FF は相互チェック：スタッフ側の照合が済んでから、お客様側の「確認しました」を押せる。
+/// 両方が済むまで会計に進めない。「確認しました」はお客様側の画面からだけ押せ、照合の結果は変えない。
+/// 明細が増えたり個数が変わったりすると、お客様は確かめ直す
 #[test]
 fn customer_confirms_ff_receipt_in_attended_mode() {
     let mut s = Store::new(1, 1, 1);
@@ -3042,6 +3068,24 @@ fn customer_confirms_ff_receipt_in_attended_mode() {
         );
     }
     advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    let ids: Vec<u32> = v.staff.lines.iter().map(|l| l.line.id).collect();
+    assert!(v.staff.ff_unconfirmed);
+    // スタッフの照合の前は、お客様は確かめられない
+    assert!(!allowed(&v, Side::Customer, Action::ReceiveFf));
+    assert!(run(
+        &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"})
+    )
+    .is_err());
+    for &id in &ids {
+        ok(
+            &mut s,
+            json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
+        );
+    }
+    advance(&mut s, 1_000);
+    // スタッフの照合だけでは会計に進めない
     let v = reg(&s, 1);
     assert!(!allowed(&v, Side::Staff, Action::Checkout));
     assert!(allowed(&v, Side::Customer, Action::ReceiveFf));
@@ -3056,10 +3100,33 @@ fn customer_confirms_ff_receipt_in_attended_mode() {
     );
     advance(&mut s, 1_000);
     let v = reg(&s, 1);
+    assert!(!v.staff.ff_unconfirmed);
     assert!(
         !allowed(&v, Side::Customer, Action::ReceiveFf),
-        "nothing left to receive"
+        "nothing left to confirm"
     );
+    // FF を追加すると、照合も確かめもやり直し
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":1}),
+    );
+    advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert!(v.staff.ff_unconfirmed);
+    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    for l in v.staff.lines.iter().filter(|l| !ids.contains(&l.line.id)) {
+        ok(
+            &mut s,
+            json!({"type":"check_ff","register":1,"side":"staff","line_id":l.line.id,"handed":l.line.qty}),
+        );
+    }
+    advance(&mut s, 1_000);
+    assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
+    ok(
+        &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"}),
+    );
+    advance(&mut s, 1_000);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),

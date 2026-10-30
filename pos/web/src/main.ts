@@ -27,6 +27,7 @@ import {
   scanGuide,
   voidAsk,
   collected,
+  parcelError,
   matPanel,
   bellSettings,
   ownerPanel,
@@ -493,6 +494,11 @@ function send(cmd: Command): boolean {
     if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
     // 販売個数の上限はオーナーが決めた売り方なので、登録できない理由をその場で知らせる
     if (res.error?.includes("1回のお会計で")) setTimeout(() => alert(res.error), 0);
+  }
+  // 荷物の受付は、決定を押しても進めない理由を入力画面に出す（レジ画面にはトーストを出さないため）
+  if (cmd.type.startsWith("parcel_")) {
+    if (res.ok) parcelError.delete(Number(cmd.register));
+    else parcelError.set(Number(cmd.register), res.error ?? "受け付けられません");
   }
   // スキャナーと FF 登録の音（読めたら「ピッ」、受け付けられなければ「ブッブー」）
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok ? beepScan : beepError)();

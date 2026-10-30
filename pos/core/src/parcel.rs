@@ -19,10 +19,10 @@ pub const SIZES: [(u32, u32, u32); 6] = [
 /// 一段階目：三辺の合計がいちばん大きいサイズに収まるか
 pub fn check_length(sum_cm: u32) -> Result<(), String> {
     if sum_cm == 0 {
-        return Err("三辺の合計を入力してください".into());
+        return Err("長さを入力してください".into());
     }
     if sum_cm > SIZES[SIZES.len() - 1].1 {
-        return Err("三辺の合計が 160cm を超える荷物は受け付けられません".into());
+        return Err("長さが 160cm を超える荷物は受け付けられません".into());
     }
     Ok(())
 }
@@ -30,14 +30,18 @@ pub fn check_length(sum_cm: u32) -> Result<(), String> {
 /// 三辺の合計と重さの両方が収まる、いちばん小さいサイズ
 pub fn size_for(sum_cm: u32, weight_g: u32) -> Result<u32, String> {
     if sum_cm == 0 || weight_g == 0 {
-        return Err("三辺の合計と重さを入力してください".into());
+        return Err("重さを入力してください".into());
     }
     SIZES
         .iter()
         .find(|&&(_, cm, g)| sum_cm <= cm && weight_g <= g)
         .map(|&(size, _, _)| size)
         .ok_or_else(|| {
-            "160 サイズ（三辺の合計 160cm・25kg）を超える荷物は受け付けられません".into()
+            if weight_g > SIZES[SIZES.len() - 1].2 {
+                "25kg を超える荷物は受け付けられません".into()
+            } else {
+                "長さが 160cm を超える荷物は受け付けられません".into()
+            }
         })
 }
 

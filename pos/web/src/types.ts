@@ -73,7 +73,7 @@ export type StaffLine = LineKind & {
   pickup?: Pickup;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean; pickup: boolean };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean };
 
 export interface Call {
   id: number;

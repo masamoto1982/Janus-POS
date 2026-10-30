@@ -161,6 +161,9 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .screen .big, .screen .guide { color: var(--msg-strong); }
 .screen .guide { font-size: 14px; }
 .screen .muted, .welcome p:not(.guide), .pair-note p, .thanks > div:not(.big) { color: var(--msg-weak); font-size: 12px; }
+.parcel-wait p.lead { color: var(--msg-strong); font-size: 14px; }
+.parcel-wait p.fine { font-size: 11px; }
+.parcel-error { color: var(--danger); font-size: 14px; font-weight: 700; margin: 0; }
 .bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .bell-btn.pressing { background: var(--ac-yellow); box-shadow: inset 0 2px 6px rgba(0,0,0,.3); }
 /* FF タブ */
@@ -543,12 +546,12 @@ body.dragging .drop-hint { display: inline; }
 /* 荷物の受け取り：お預かりの番号は離れても読めるよう大きく */
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 /* 荷物の受付・受け取りは入力欄とボタンを一画面に収める（年確の入力より詰める） */
-.parcel-entry, .parcel-ask, .pickup-step { padding: 12px; gap: 10px; }
+.parcel-entry, .parcel-ask, .pickup-step, .parcel-wait { padding: 12px; gap: 10px; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
 .parcel-fields input { width: 84px; text-align: right; font-size: 18px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
 .parcel-entry input[data-key^="ppost-"] { width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
-.parcel-entry p, .parcel-ask p { margin: 0; }
+.parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-size { margin: 0; font-size: 15px; }
 .parcel-no { margin-right: 8px; padding: 1px 8px; border: 1.5px solid var(--msg-strong); border-radius: 999px; font-size: 14px; }
 .parcel-fee { margin: 0; font-size: 15px; }

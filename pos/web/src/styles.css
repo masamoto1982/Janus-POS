@@ -2,6 +2,8 @@
    ベースカラーは広い面積に、アクセントカラーは小さい面積に使う。
    文字は背景とのコントラスト比 4.5:1 以上の組み合わせだけにする（明るい色の上は黒文字）。 */
 :root {
+  /* 取引中止・お会計・FF・サービス・たばこ、Item と Wallet のボタンはすべてこの一つの大きさ（狭いところでは幅だけ縮む） */
+  --btn-w: 116px; --btn-h: 48px;
   /* ベースカラー：広い面積に用いる */
   --base-pink: #ffcabf;
   --base-cream: #ffff80;
@@ -208,14 +210,14 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .reg-top .count b { font-size: 28px; }
 .reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: 8px; min-width: 0; }
-.reg-top .void > button, .reg-top .action > button { width: 6.5em; max-width: 100%; height: 48px; padding: 4px 6px; white-space: nowrap; }
+.reg-top .void > button, .reg-top .action > button { width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; white-space: nowrap; }
 /* 帯が狭いとき（1024px 幅の有人など）は、合計とボタンの文字を詰める */
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
   .reg-top .mid { --sum-h: 26px; }
   .reg-top .total, .reg-top .count b { font-size: 22px; }
   .reg-top .sum { font-size: 13px; }
-  .reg-top .void > button, .reg-top .action > button { font-size: 13px; height: 44px; padding: 4px 2px; }
+  .reg-top .void > button, .reg-top .action > button { font-size: 13px; padding: 4px 2px; }
   .reg-top .info .emoney-link { font-size: 10px; }
 }
 /* 電子マネーのチャージ・残高確認は合計の下の段の中央に、下線の付いた文字リンクで（セミセルフの待ち受けと同じ表現） */
@@ -456,16 +458,15 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }
 .lines tr.coupon td { color: var(--danger); }
 .item.card { background: var(--call-bg); color: var(--call); margin: 0; }
-/* お金は金額だけ。紙幣は横長の札、硬貨は真円 */
+/* お金は金額だけ。紙幣はほかのボタンと同じ大きさの札、硬貨はその高さの真円 */
 .item.bill { background: var(--bill-bg); border-color: var(--border); justify-content: center; min-height: 34px; }
-.item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: 44px; height: 44px; padding: 0; align-items: center; justify-content: center; text-align: center; }
+.item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: var(--btn-h); height: var(--btn-h); padding: 0; align-items: center; justify-content: center; text-align: center; }
 .item.coin .item-name { font-size: 11px; white-space: nowrap; }
 .item.pay { background: var(--pay-bg); border-color: var(--border); }
 /* Item の商品と、Wallet のお金以外（ポイントカード・クーポン・決済手段）は、それぞれ同じ大きさ
    （いちばん長い名前・補足が収まる幅で、引き延ばさない）。文字は縦横とも中央に */
 .wallet-cards { margin-top: 4px; }
-.items.uniform .item, .wallet-cards .item { box-sizing: border-box; width: 108px; height: 44px; justify-content: center; align-items: center; text-align: center; }
-.wallet-cards .item { width: 136px; }
+.items.uniform .item, .wallet-cards .item, .item.bill { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); justify-content: center; align-items: center; text-align: center; }
 .items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* ドロップ先 */
@@ -651,11 +652,11 @@ body.dragging .drop-hint { display: inline; }
 .mode-badge[aria-expanded="true"] .caret { display: inline-block; transform: rotate(180deg); }
 
 /* セミセルフの店員呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ） */
-.call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: 6px; }
 .bell-btn:disabled { opacity: .45; }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { background: var(--btn-on) !important; color: var(--btn-on-ink) !important; transform: translateY(1px); box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
-.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
+.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; }
 

@@ -902,12 +902,11 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 
   // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
   // 電子マネーのチャージ・残高確認は、お買い物の途中でも（会計中でも）店員側から始められる。
-  // 「すべての操作はやりたいときにできる」：待ち受けに戻らなくてよいよう、会計ボタンの左に常に置く
-  const emoney = ro ? "" : emoneyEntry(reg, side, a("emoney"), "emoney-top");
+  // 「すべての操作はやりたいときにできる」：待ち受けに戻らなくてよいよう、上の段（ポイントの右）に常に置く
+  const emoney = ro ? "" : emoneyEntry(reg, side, a("emoney"), "emoney-info");
   const top = regTop(
     v.total,
     itemCount(v.lines),
-    emoney +
     // 「投入おわり」は例外なくお客様側だけに出す（入れ終わったかは、お客様にしか分からない）。
     // 会計ボタンは会計中に別のボタンに置き換えない（引き返す「商品登録に戻る」は確認画面の左下）
     (paying && v.method === "cash" && ro
@@ -918,6 +917,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     r.max_items,
     !!v.point_card,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
+    emoney,
   );
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞回収・クーポン＞ポイントカード＞決済手段。
@@ -1033,16 +1033,17 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
   return `<span class="customer-only">${btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary")}</span>`;
 }
 
-export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean, voidHtml = ""): string {
+export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean, voidHtml = "", infoHtml = ""): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
   // 上の段にポイントカードの読み取り状況を控えめに、下の段に「合計 x点 XXX円」を出す
   // （ポイントカードの状況はほかの場所には出さない。ボタンは合計額の右に出し、有無で点数・合計額の位置は動かない）
   const point =
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
-  // 取引中止は上の段の左寄り（会計ボタンから離す）。登録中・確認中・会計中のどこからでも押せる
-  const info = point || voidHtml ? `<small class="info">${point}${voidHtml}</small>` : "";
-  return `<div class="reg-top">${info}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
+  // 上の段：ポイントの読み取り状況と、電子マネーのチャージ・残高照会（お買い物の途中でも始められる）
+  const info = point || infoHtml ? `<small class="info">${point}${infoHtml}</small>` : "";
+  // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる
+  return `<div class="reg-top">${info}${voidHtml}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */
@@ -1382,7 +1383,6 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     c.total,
     itemCount(c.lines),
     // セミセルフではお買い物の途中に電子マネーのチャージ・残高確認はできない（ボタンを出さない）
-    (c.lines.length || c.coupons.length ? "" : emoneyEntry(reg, side, a("emoney"), "emoney-top")) +
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : c.method === "cash" && side === "customer"

@@ -227,6 +227,35 @@ export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
 const kg = (g: number): string => `${(g / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}kg`;
 
 /**
+ * 荷物の受付で、入力を受け付けられなかった理由（レジごと）。画面の中だけの状態。
+ * レジ画面にはトーストを出さないので、決定を押しても進めない理由を、入力の案内の行に差し替えて出す
+ */
+export const parcelError = new Map<number, string>();
+const parcelErr = (reg: number): string => {
+  const e = parcelError.get(reg);
+  return e ? `<p class="parcel-error" role="alert">${esc(e)}</p>` : "";
+};
+
+/**
+ * 有人モードのお客様側：店員がサイズ・届け先を入力する間の案内（店員側の入力画面と対）。
+ * 上限を超えて受け付けられないときは、その旨をお客様にも出す
+ */
+function parcelNote(reg: number, l: StaffLine): string {
+  const p = l.parcel as Parcel;
+  const head = p.size ? "お届け先を入力しています" : p.sum_cm ? "重さを計測しています" : "長さを計測しています";
+  return pairNote(head, parcelError.get(reg) ?? "伝票の貼り付けをお願いします");
+}
+
+/** セミセルフ：伝票を読んで係員を待つ間のお客様側の案内（登録画面の代わり） */
+function parcelWait(): string {
+  return `<div class="point-screen pair-note parcel-wait">
+      <div class="big">スタッフがお伺いします</div>
+      <p class="lead">伝票を貼り付けてお待ちください</p>
+      <p class="fine">伝票の貼り付け、梱包はお客様責となります</p>
+    </div>`;
+}
+
+/**
  * 店員側：受付中の荷物のサイズ決定、または届け先の郵便番号の入力。
  * 年確の生年月日の入力と同じ形（問いを一行、入力欄、ボタンの行。どれも中央に）
  */
@@ -239,9 +268,9 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   if (!p.size && !p.sum_cm) {
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
-        <p class="parcel-size">三辺の長さの合計を入力してください</p>
+        ${parcelErr(reg) || `<p class="parcel-size">三辺の長さの合計を入力してください</p>`}
         <div class="parcel-fields">
-          <label>三辺の合計<input type="number" inputmode="numeric" min="1" max="999" autocomplete="off" data-key="pcm-${reg}" data-parcel="${reg}" aria-label="荷物の三辺の合計（cm）" /><span>cm</span></label>
+          <label>長さ<input type="number" inputmode="numeric" min="1" max="999" autocomplete="off" data-key="pcm-${reg}" data-parcel="${reg}" aria-label="荷物の三辺の合計（cm）" /><span>cm</span></label>
         </div>
         <div class="point-choices">${back()}<button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
       </div>`;
@@ -249,7 +278,7 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
-        <p class="parcel-size">重量を入力してください（三辺の合計 ${p.sum_cm}cm）</p>
+        ${parcelErr(reg) || `<p class="parcel-size">重量を入力してください</p>`}
         <div class="parcel-fields">
           <label>重さ<input type="number" inputmode="decimal" min="0.1" step="0.1" autocomplete="off" data-key="pkg-${reg}" data-parcel="${reg}" aria-label="荷物の重さ（kg）" /><span>kg</span></label>
         </div>
@@ -258,7 +287,7 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   }
   return `<div class="point-screen parcel-entry">
       <div class="big">${no}お届け先の郵便番号を入力してください</div>
-      <p class="parcel-size">${p.size}サイズ（三辺の合計 ${p.sum_cm}cm・${kg(p.weight_g)}）</p>
+      ${parcelErr(reg) || `<p class="parcel-size">${p.size}サイズ（三辺の合計 ${p.sum_cm}cm・${kg(p.weight_g)}）</p>`}
       <input type="text" inputmode="numeric" maxlength="8" placeholder="例 100-0001" autocomplete="off" data-key="ppost-${reg}" data-parcel="${reg}" aria-label="お届け先の郵便番号（7桁）" />
       <div class="point-choices">
         ${back()}
@@ -860,11 +889,13 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
           : pairNote("荷物をお持ちします", "少々お待ちください"),
     );
   const parcel = pendingParcel(v.lines);
+  // 受付中の荷物がなくなったら、前の荷物の入力エラーは持ち越さない
+  if (!parcel) parcelError.delete(reg);
   if (!paying && parcel)
     return screen(
       side === "staff"
         ? parcelStep(reg, parcel, a("complete_service"), v.lines.filter((l) => l.parcel).length)
-        : pairNote(parcel.parcel?.size ? "お届け先を入力しています" : "取り扱いサイズを入力しています", "伝票の貼り付けをお願いします"),
+        : parcelNote(reg, parcel),
     );
   if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("ほかにお送りする荷物はございますか？"));
   const slips = v.bills.length;
@@ -1311,6 +1342,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const slips = c.bills.length;
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : billPayCard(slips));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
+  // 荷物を送る：伝票を読んで係員を待つ間は、登録画面ではなく案内だけを出す
+  if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
     returnedCard(reg, side, c.returned, true),

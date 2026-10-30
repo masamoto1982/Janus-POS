@@ -3615,6 +3615,7 @@ impl Store {
                 limit: self.age_rules.limit_for(l.code),
                 cash_only: l.cash_only,
                 pickup: l.is_pickup(),
+                parcel: l.is_parcel(),
                 kind: l.kind,
             })
             .collect();
@@ -3788,6 +3789,8 @@ pub struct CustomerLine {
     pub cash_only: bool,
     /// 荷物の受け取り（数量は変えられず、取り消しは取引中止で行う）
     pub pickup: bool,
+    /// 荷物を送る（受付中はお客様側に、係員を待つ案内を出す）
+    pub parcel: bool,
     #[serde(flatten)]
     pub kind: LineKind,
 }

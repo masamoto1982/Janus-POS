@@ -585,7 +585,7 @@ fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     };
     assert!(run(
         &mut s,
-        json!({"type":"parcel_length","register":2,"line_id":id,"sum_cm":170})
+        json!({"type":"parcel_length","register":2,"line_id":id,"sum_cm":201})
     )
     .is_err());
     ok(
@@ -666,12 +666,21 @@ fn parcel_fee_comes_from_size_and_postal_code() {
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"100-0001"})
     )
     .is_err());
-    // 160 サイズを超えると受け付けない
-    assert!(run(
+    // 三辺の合計 200cm・重さ 30kg を超えると受け付けない（上限は数字で案内する）
+    let err = run(
         &mut s,
-        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":170,"weight_g":3000})
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":201,"weight_g":3000}),
     )
-    .is_err());
+    .unwrap_err();
+    assert_eq!(err, "200cm を超える荷物は受け付けられません");
+    let err = run(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":100,"weight_g":30_100}),
+    )
+    .unwrap_err();
+    assert_eq!(err, "30kg を超える荷物は受け付けられません");
+    assert_eq!(janus_pos_core::parcel::size_for(200, 30_000), Ok(200));
+    assert_eq!(janus_pos_core::parcel::size_for(170, 3_000), Ok(180));
     ok(
         &mut s,
         json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),

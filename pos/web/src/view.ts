@@ -568,7 +568,7 @@ const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolea
 
 /**
  * 数量を打ち込んでいる明細（レジ:画面 → 明細番号と打った数字）。
- * 数量のボタンを押すと、最下段（FF タブ・呼び出しボタンの場所）がテンキーに替わる
+ * 数量のボタンを押すと、その画面の上にテンキーのポップアップが開く
  */
 export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
@@ -590,15 +590,24 @@ function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Ac
 }
 
 /**
- * 数量のテンキー（最下段）。左下に引き返す「やめる」、右下に進める「決定」。
- * 打った数で明細の数量を置き換える（0 は打てない。消すときは「削除」）
+ * 数量のテンキー（レジ画面の上に重ねるポップアップ。レジ画面で覆いかぶさる表示を出す唯一の例外）。
+ * 品名と今の数量を見せ、打った数で置き換える。左下に引き返す「やめる」、右下に進める「決定」。
+ * 0 では決定できない（消すときは「削除」）。外側を押してもやめる
  */
-function qtyPad(reg: number, side: Side, digits: string): string {
+export function qtyPopup(r: RegisterView, side: Side): string {
+  const reg = r.id;
+  const e = qtyEntry.get(`${reg}:${side}`);
+  const l = e && r.staff.lines.find((x) => x.id === e.id);
+  if (!e || !l) return "";
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-qtypad="${reg}:${side}:${key}">${label}</button>`;
-  const ok = digits !== "" && Number(digits) > 0;
-  return `<div class="qty-pad">
-      <div class="pad-row">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((d) => k(d)).join("")}</div>
-      <div class="pad-foot">${k("cancel", "やめる", "small neg")}${k("back", "1 文字消す", "small neg")}<button type="button" class="small primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+  const ok = e.digits !== "" && Number(e.digits) > 0;
+  return `<div class="qty-pop" data-qtypad-backdrop="${reg}:${side}">
+      <div class="qty-pop-box" role="dialog" aria-label="${esc(l.name)}の数量">
+        <div class="qty-pop-name">${esc(l.name)}<span class="muted">いまの数量 ${l.qty}</span></div>
+        <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
+        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("0", "0", "pad-key zero")}${k("back", "←", "pad-key neg")}</div>
+        <div class="qty-pop-foot">${k("cancel", "やめる", "neg")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+      </div>
     </div>`;
 }
 
@@ -1189,9 +1198,6 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
   if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
-  // 数量を打ち込んでいる間は、最下段をテンキーにする
-  const entry = qtyEntry.get(`${reg}:${side}`);
-  if (entry) return qtyPad(reg, side, entry.digits);
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>

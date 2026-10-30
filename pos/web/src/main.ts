@@ -22,6 +22,7 @@ import {
   flashing,
   type FfUi,
   itemsPanel,
+  qtyPopup,
   screenHead,
   isoDate,
   scanGuide,
@@ -118,6 +119,7 @@ function buildSkeleton(): void {
             <div class="screen-head" data-region="head-${r.id}-staff"></div>
             <div class="screen-main" data-region="staff-${r.id}"></div>
             <div class="screen-items" data-region="items-${r.id}-staff"></div>
+            <div data-region="pop-${r.id}-staff"></div>
           </section>
         </div>
         <div class="screen-wrap" data-wrap="${r.id}:customer">
@@ -126,6 +128,7 @@ function buildSkeleton(): void {
             <div class="screen-head" data-region="head-${r.id}-customer"></div>
             <div class="screen-main" data-region="cust-${r.id}"></div>
             <div class="screen-items" data-region="items-${r.id}-customer"></div>
+            <div data-region="pop-${r.id}-customer"></div>
           </section>
         </div>
       </div>
@@ -338,6 +341,7 @@ function render(): void {
       // レジ画面のヘッダー（稼働モードのバッジ・時刻・ベル。有人モードの店員側ではバッジが店舗メニューを開く）
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side));
       setRegion(`items-${r.id}-${side}`, items);
+      setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side));
       el?.classList.toggle("no-items", !items);
     }
     // モバイルモード：操作する面（アクティブ面）が変わったら、その面を表にする。
@@ -784,6 +788,9 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("touchend", unlockAudio, { capture: true });
 
 app.addEventListener("click", (e) => {
+  // テンキーのポップアップの外側（暗くした部分）を押すと、打ち込みをやめる
+  const backdrop = (e.target as HTMLElement).dataset?.qtypadBackdrop;
+  if (backdrop) return qtyKey(backdrop, "cancel");
   const b = (e.target as Element).closest("button");
   if (!b || b.disabled) return;
   if (b.hasAttribute("data-open-rules")) return rulesDlg().showModal();

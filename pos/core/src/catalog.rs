@@ -103,6 +103,8 @@ pub struct Product {
     pub parcel_send: bool,
     /// 荷物を受取る（お客様の受取用バーコード）。お預かりの荷物を一件ずつ、ほかの商品と別に引き渡す
     pub parcel_pickup: bool,
+    /// 荷物を送る：着払い（料金はお届け先で受け取る。レジでは 0 円）
+    pub parcel_collect: bool,
 }
 
 const fn p(
@@ -123,6 +125,7 @@ const fn p(
         cash_only: matches!(category, Category::Stamp),
         parcel_send: false,
         parcel_pickup: false,
+        parcel_collect: false,
     }
 }
 
@@ -165,9 +168,15 @@ pub const CATALOG: &[Product] = &[
     p("2000000000039", "フォーク", 3, Standard10, Bag),
     p("2000000000046", "スプーン", 3, Standard10, Bag),
     p("2000000000053", "お手拭き", 3, Standard10, Bag),
+    // 荷物を送るは、料金をレジで払う発払いと、お届け先で払う着払いの二つ
     Product {
         parcel_send: true,
-        ..p("2100000000014", "荷物を送る", 0, Standard10, Service)
+        ..p("2100000000014", "荷物を送る 発払い", 0, Standard10, Service)
+    },
+    Product {
+        parcel_send: true,
+        parcel_collect: true,
+        ..p("2100000000045", "荷物を送る 着払い", 0, Standard10, Service)
     },
     Product {
         parcel_pickup: true,
@@ -314,6 +323,8 @@ pub enum Scanned {
     Staff(String),
     /// 保管場所から持ってきた、お預かり中の荷物のバーコード（荷物の番号）
     Pickup(String),
+    /// 登録済みの荷物（荷物を送る）の伝票のバーコード。読むとその荷物の受付を取り消す
+    ParcelSlip(String),
     Unknown,
 }
 
@@ -321,6 +332,8 @@ pub const POINT_CARD_PREFIX: &str = "PC";
 pub const COUPON_PREFIX: &str = "CP";
 /// お預かり中の荷物に貼ったバーコード（PK + 荷物の番号 12 桁）
 pub const PICKUP_PREFIX: &str = "PK";
+/// 荷物を送るの伝票のバーコード（PS + 伝票の番号 12 桁）
+pub const SLIP_PREFIX: &str = "PS";
 
 /// クーポンの効き方
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -378,6 +391,9 @@ pub fn classify(code: &str) -> Scanned {
     }
     if let Some(no) = code.strip_prefix(PICKUP_PREFIX) {
         return Scanned::Pickup(no.to_string());
+    }
+    if let Some(no) = code.strip_prefix(SLIP_PREFIX) {
+        return Scanned::ParcelSlip(no.to_string());
     }
     if code.starts_with(COUPON_PREFIX) {
         return COUPONS

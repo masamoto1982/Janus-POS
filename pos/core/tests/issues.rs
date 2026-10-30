@@ -14,6 +14,7 @@ const LIGHTER: &str = "4900000000134";
 const SANDWICH: &str = "4900000000028";
 const TEA: &str = "4900000000035";
 const PARCEL: &str = "2100000000014";
+const PARCEL_COLLECT: &str = "2100000000045";
 /// 荷物を受取る
 const RECEIVE: &str = "2100000000038";
 const BILL: &str = "2100000000021";
@@ -565,6 +566,68 @@ fn pending_parcel(s: &Store, r: u8) -> u32 {
         .find(|l| matches!(l.line.kind, LineKind::Service { done: false, .. }))
         .map(|l| l.line.id)
         .expect("受付中の荷物")
+}
+
+/// 荷物を送る：着払いはレジで 0 円。登録済みの宅配便は、伝票のバーコードを読んで取り消す
+/// （明細の取り消しボタンでは取り消せない。お客様側では読まない）
+#[test]
+fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL_COLLECT);
+    login_as(&mut s, 2, "ST001");
+    let id = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    let pc = |s: &Store, i: usize| reg(s, 2).staff.lines[i].line.parcel.clone().unwrap();
+    assert!(pc(&s, 0).collect && pc(&s, 0).fee == 940);
+    assert_eq!(reg(&s, 2).customer.total, 0);
+    // 次の荷物は同じ着払いで受け付ける
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":true}),
+    );
+    let id2 = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id2,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id2,"postal":"1000001"}),
+    );
+    assert!(pc(&s, 1).collect);
+    let slip = pc(&s, 0).slip.replace('-', "");
+    assert_eq!(slip.len(), 12);
+    // 明細の取り消しボタンでは取り消せない
+    assert!(run(
+        &mut s,
+        json!({"type":"remove_line","register":2,"side":"staff","line_id":id})
+    )
+    .is_err());
+    // お客様側では読まない。違う伝票でも取り消さない
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"customer","code":format!("PS{slip}")})
+    )
+    .is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"staff","code":"PS000000000000"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"scan","register":2,"side":"staff","code":format!("PS{slip}")}),
+    );
+    let v = reg(&s, 2);
+    assert_eq!(v.staff.lines.len(), 1);
+    assert_eq!(v.staff.lines[0].line.id, id2);
 }
 
 /// 荷物を送る：サイズは二段階（三辺の合計 → 重さ）で決める。「戻る」は一段階ずつ引き返し、

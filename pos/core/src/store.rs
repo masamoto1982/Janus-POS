@@ -41,6 +41,8 @@ const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、係員が名札�
 const PICKUP_ALONE: &str =
     "荷物のお受け取りは一件ずつ、ほかの商品と別にお取り扱いします（お受け取りが済んでから登録してください）";
 const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引中止にしてください";
+const PARCEL_SLIP_TO_REMOVE: &str =
+    "宅配便を取り消すときは、取り消す荷物の伝票のバーコードを読み取ってください";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
@@ -694,6 +696,13 @@ fn slip_no(seed: u64) -> String {
     format!("{} {} {} {}", &d[..4], &d[4..8], &d[8..12], &d[12..])
 }
 
+/// 荷物を送るの伝票の番号を便宜的に作る（12 桁を 4 桁ずつ区切る）。
+/// 実物は伝票に印字されたバーコードを読むが、シミュレーターでは読み取ったときに作る
+fn parcel_slip(seed: u64) -> String {
+    let d = format!("{:012}", mix(seed ^ 0x534C_4950) % 1_000_000_000_000);
+    format!("{}-{}-{}", &d[..4], &d[4..8], &d[8..])
+}
+
 /// お預かりの荷物の番号を便宜的に作る（12 桁を 4 桁ずつ区切る）。
 /// 実物は受取用バーコードから運送会社の荷物の番号を引くが、シミュレーターでは読み取ったときに作る
 fn pickup_no(seed: u64) -> String {
@@ -1042,7 +1051,10 @@ impl Txn {
             cash_only: p.cash_only,
             kind,
             slip_no: None,
-            parcel: p.parcel_send.then(Parcel::default),
+            parcel: p.parcel_send.then(|| Parcel {
+                collect: p.parcel_collect,
+                ..Parcel::default()
+            }),
             pickup: None,
         });
     }
@@ -1678,12 +1690,9 @@ impl Store {
                 self.check_active(register, Action::CompleteService)?;
                 let size = parcel::size_for(sum_cm, weight_g)?;
                 let pc = self.pending_parcel(register, line_id)?;
-                *pc = Parcel {
-                    sum_cm,
-                    weight_g,
-                    size: Some(size),
-                    ..Parcel::default()
-                };
+                pc.sum_cm = sum_cm;
+                pc.weight_g = weight_g;
+                pc.size = Some(size);
                 done(format!(
                     "{size} サイズに決まりました。届け先の郵便番号を入力してください"
                 ))
@@ -1696,10 +1705,9 @@ impl Store {
                 self.check_active(register, Action::CompleteService)?;
                 parcel::check_length(sum_cm)?;
                 let pc = self.pending_parcel(register, line_id)?;
-                *pc = Parcel {
-                    sum_cm,
-                    ..Parcel::default()
-                };
+                pc.sum_cm = sum_cm;
+                pc.weight_g = 0;
+                pc.size = None;
                 done("重さを入力してください".to_string())
             }
             C::ParcelBack { register, line_id } => {
@@ -1738,10 +1746,13 @@ impl Store {
                 let fee = parcel::fee(size, region);
                 pc.postal = Some(format!("{}-{}", &code[..3], &code[3..]));
                 pc.region = Some(region.label());
+                pc.fee = fee;
+                // 着払いは料金をお届け先で受け取るので、レジでは 0 円
+                let charge = if pc.collect { 0 } else { fee };
                 let now = self.now;
                 let r = self.reg_mut(register)?;
                 if let Some(l) = r.txn.lines.iter_mut().find(|l| l.id == line_id) {
-                    l.unit_price = fee;
+                    l.unit_price = charge;
                     l.kind = LineKind::Service {
                         done: true,
                         confirm_pending: false,
@@ -1766,8 +1777,17 @@ impl Store {
                 if r.txn.item_count() >= MAX_ITEMS {
                     return Err(ITEMS_FULL.into());
                 }
-                let p = catalog::find(PARCEL_CODE).ok_or("荷物の商品が見つかりません")?;
+                // 次の荷物は、直前の荷物と同じ払い方（発払い・着払い）で受け付ける
+                let code = r
+                    .txn
+                    .lines
+                    .iter()
+                    .filter(|l| l.is_parcel())
+                    .max_by_key(|l| l.touched)
+                    .map_or(PARCEL_CODE, |l| l.code);
+                let p = catalog::find(code).ok_or("荷物の商品が見つかりません")?;
                 let tax = self.tax_for(p.code);
+                let now = self.now;
                 let r = self.reg_mut(register)?;
                 r.txn.push(
                     p,
@@ -1778,6 +1798,10 @@ impl Store {
                     },
                     tax,
                 );
+                let seed = now ^ (u64::from(register) << 56) ^ (u64::from(r.txn.next_line) << 40);
+                if let Some(pc) = r.txn.lines.last_mut().and_then(|l| l.parcel.as_mut()) {
+                    pc.slip = parcel_slip(seed);
+                }
                 done("次の荷物：取り扱いサイズを決定してください".to_string())
             }
             C::PickupHandover { register } => {
@@ -1860,6 +1884,10 @@ impl Store {
                 // 払えないときは取引中止で最初からやり直す
                 if r.txn.lines[i].is_bill() {
                     return Err(BILL_NO_REMOVE.into());
+                }
+                // 宅配便は、取り消す荷物の伝票のバーコードを読んで取り消す（取り違えを防ぐ）
+                if r.txn.lines[i].is_parcel() {
+                    return Err(PARCEL_SLIP_TO_REMOVE.into());
                 }
                 // 荷物の受け取りも同じ。受け取らないなら取引中止、受け取るなら会計する
                 if r.txn.lines[i].is_pickup() {
@@ -2640,6 +2668,9 @@ impl Store {
         if let Scanned::Pickup(no) = &scanned {
             return self.match_pickup(register, side, no);
         }
+        if let Scanned::ParcelSlip(no) = &scanned {
+            return self.cancel_parcel(register, side, no);
+        }
         if let Scanned::Product(p) = &scanned {
             self.check_limit(register, p.code, 1)?;
         }
@@ -2691,7 +2722,7 @@ impl Store {
             ""
         };
         match scanned {
-            Scanned::Staff(_) | Scanned::Pickup(_) => unreachable!(),
+            Scanned::Staff(_) | Scanned::Pickup(_) | Scanned::ParcelSlip(_) => unreachable!(),
             Scanned::Unknown => Err("登録されていないバーコードです".into()),
             Scanned::PointCard(no) => {
                 r.txn.point_card = Some(no);
@@ -2743,6 +2774,13 @@ impl Store {
                     },
                     tax,
                 );
+                if p.parcel_send {
+                    let seed =
+                        now ^ (u64::from(register) << 56) ^ (u64::from(r.txn.next_line) << 40);
+                    if let Some(pc) = r.txn.lines.last_mut().and_then(|l| l.parcel.as_mut()) {
+                        pc.slip = parcel_slip(seed);
+                    }
+                }
                 if p.parcel_pickup {
                     let seed = now ^ (u64::from(register) << 56) ^ 0x5049_434B;
                     if let Some(l) = r.txn.lines.last_mut() {
@@ -2789,6 +2827,43 @@ impl Store {
     }
 
     /// 保管場所から持ってきた荷物のバーコードを読み、お預かりの番号と照合する
+    /// 登録済みの宅配便の取り消し：取り消す荷物の伝票のバーコードを、係員が店員側で読む。
+    ///
+    /// 設計メモ（ユーザー 2026-10-30）：会計の済んだ荷物も、集荷の前なら伝票のバーコードを読んで
+    /// 取り消し・返品返金できるのが実際の運用。会計後・集荷前の取り消しにも伝票のスキャンを必須とする。
+    /// ただし Janus-POS はシミュレーターなので、会計後の取り消しはサポートの対象外とする
+    /// （ここで扱うのは、会計前の取引の中で登録した荷物だけ）
+    fn cancel_parcel(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
+        let now = self.now;
+        let r = self.reg_mut(register)?;
+        if r.staff_state() != StaffState::Ready || side != Side::Staff {
+            return Err("宅配便の取り消しは、係員が店員側で伝票を読み取って行います".into());
+        }
+        if r.txn.paying {
+            return Err("お会計中です（登録に戻ってから伝票を読み取ってください）".into());
+        }
+        let digits = |s: &str| s.chars().filter(char::is_ascii_digit).collect::<String>();
+        let i = r
+            .txn
+            .lines
+            .iter()
+            .position(|l| {
+                l.parcel
+                    .as_ref()
+                    .is_some_and(|pc| digits(&pc.slip) == digits(no))
+            })
+            .ok_or("この取引で受け付けた荷物の伝票ではありません")?;
+        let name = r.txn.lines[i].name;
+        r.txn.lines.remove(i);
+        if !r.txn.lines.iter().any(Line::is_parcel) {
+            r.txn.parcel_ask = false;
+        }
+        if !r.txn.service_pending() {
+            self.calls.resolve(register, CallKind::Service, now);
+        }
+        done(format!("{name}の受付を取り消しました"))
+    }
+
     fn match_pickup(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         if r.staff_state() != StaffState::Ready || side != Side::Staff {

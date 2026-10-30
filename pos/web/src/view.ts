@@ -563,7 +563,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
  * 個数変更・取り消しのために広げている行（レジ:画面 → 明細番号と変更後の個数）。
  * ポップアップは使わず、対象の行の下が一時的に広がって、登録画面の中で完結する
  */
-export const editing = new Map<string, { id: number; qty: number }>();
+export const editing = new Map<string, { id: number; qty: number; orig: number }>();
 
 const editingRow = (reg: number, side: Side, id: number): string => (editing.get(`${reg}:${side}`)?.id === id ? "editing" : "");
 
@@ -578,8 +578,8 @@ function qtyBtn(reg: number, side: Side, id: number, qty: number, st: ActionStat
 }
 
 /**
- * 広げた行の中身。ボタンは対で並べる：「閉じる」（消極・左端）⇔「数量変更」（積極・右端）、
- * 「−」（消極）⇔「＋」（積極）。数量が 1 のときの「−」は「削除」になる（別の取り消しボタンは置かない）
+ * 広げた行の中身：「閉じる」（消極・左端）と、数量の「−」「＋」（どちらも積極）。
+ * 数量が 1 のときの「−」は「削除」になる。変えた数量は「閉じる」で確定する（確定のボタンは置かない）
  */
 function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind: string; state?: string }, st: ActionState, semiSelf = false): string {
   const e = editing.get(`${reg}:${side}`);
@@ -588,11 +588,11 @@ function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind:
   if (semiSelf && l.kind === "ff" && l.state === "received")
     return editorRow(reg, side, `<span class="muted">お渡し済みの FF の数量はスタッフが変更します</span>`);
   const remove = { type: "remove_line", register: reg, side, line_id: l.id };
-  // サービス商品は数量を変えられない。できるのは削除だけなので、「閉じる」の対になる積極ボタン
+  // サービス商品は数量を変えられない（削除だけ）
   if (l.kind === "service")
     return editorRow(reg, side, `<span class="muted">この商品は数量を変えられません</span>${btn("削除", remove, st, "small primary")}`);
   const minus =
-    e.qty <= 1 ? btn("削除", remove, st, "small neg") : `<button class="small neg" data-edit-step="${reg}:${side}:-1">−</button>`;
+    e.qty <= 1 ? btn("削除", remove, st, "small primary") : `<button class="small" data-edit-step="${reg}:${side}:-1">−</button>`;
   return editorRow(
     reg,
     side,
@@ -600,8 +600,7 @@ function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind:
         ${minus}
         <b>${e.qty}</b>
         <button class="small" data-edit-step="${reg}:${side}:1">＋</button>
-      </span>
-      ${btn("数量変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`,
+      </span>`,
   );
 }
 

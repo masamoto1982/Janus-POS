@@ -663,9 +663,9 @@ body.dragging .drop-hint { display: inline; }
 .lines tr.editing td { background: var(--accent-soft); }
 .lines tr.edit-row td { background: var(--accent-soft); padding: 4px 8px 8px; }
 .edit-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.qty-edit { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
-/* 「閉じる」は引き返すボタンなので左端。数量の − ＋ はその右 */
-.edit-box:not(:has(.qty-edit)) .edit-close { margin-right: auto; }
+.qty-edit { display: inline-flex; align-items: center; gap: 6px; }
+/* 「閉じる」は引き返すボタンなので左端（閉じると変えた数量が確定する）。数量の − ＋ は右端 */
+.edit-close { margin-right: auto; }
 .qty-edit b { min-width: 2em; text-align: center; font-size: 15px; }
 .qty-edit button { min-width: 32px; }
 

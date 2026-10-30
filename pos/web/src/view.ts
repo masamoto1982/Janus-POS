@@ -797,7 +797,7 @@ function emoneyEntry(reg: number, side: Side, st: ActionState, cls: string): str
 
 /**
  * 取引中止の確認（レジ番号 → 中止ボタンを押した画面）。登録画面を置き換えて出し、
- * 「中止する」は長押しでだけ決まる（大量に登録した後の誤操作で、登録をやり直させない）
+ * 「はい」を押したときだけ中止する（大量に登録した後の誤操作で、登録をやり直させない）
  */
 export const voidAsk = new Map<number, Side>();
 
@@ -812,7 +812,6 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
   // 有人モードのお客様側には、店員側の確認と対になる知らせだけを出す
   if (r.mode === "attended" && side === "customer") return pairNote("取引の中止を確認しています");
   const st = find(r.mode === "attended" ? r.staff.actions : r.customer.actions, "void_transaction");
-  const cmd = esc(JSON.stringify({ type: "void_transaction", register: reg }));
   const back = [
     view.inserted ? `入れたお金 ${yen(view.inserted)} は出金ボックスに戻ります。` : "",
     r.prepaid && r.prepaid_method === "電子マネー" ? `電子マネーで払った ${yen(r.prepaid)} は残高に戻ります。` : "",
@@ -822,8 +821,8 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
       <div class="big">取引を中止しますか？</div>
       <p>登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します。${back}</p>
       <div class="void-choices">
-        <button type="button" class="primary" data-void-cancel="${reg}">続ける</button>
-        <button type="button" class="hold-confirm" data-hold-confirm="${cmd}"${st.allowed ? "" : " disabled"}><span class="hold-fill"></span><span class="hold-label">長押しで中止</span></button>
+        <button type="button" class="neg" data-void-cancel="${reg}">いいえ</button>
+        ${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}
       </div>
     </div>`;
 }
@@ -1042,8 +1041,9 @@ export function regTop(total: number, count: number, action: string, max = Infin
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
   // 上の段：ポイントの読み取り状況と、電子マネーのチャージ・残高照会（お買い物の途中でも始められる）
   const info = point || infoHtml ? `<small class="info">${point}${infoHtml}</small>` : "";
-  // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる
-  return `<div class="reg-top">${info}${voidHtml}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
+  // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる。
+  // 合計は左右の欄の有無にかかわらず常に中央（取引中止のない有人のお客様側でも店員側と同じ位置）
+  return `<div class="reg-top">${info}<span class="void">${voidHtml}</span><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

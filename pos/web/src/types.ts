@@ -40,6 +40,12 @@ export interface Parcel {
   size: number | null;
   postal: string | null;
   region: string | null;
+  /** 伝票の番号。登録済みの荷物は、この伝票のバーコードを読んで取り消す */
+  slip: string;
+  /** 着払い（レジでは 0 円） */
+  collect: boolean;
+  /** 料金（郵便番号を決めると入る） */
+  fee: number;
 }
 
 /** 荷物を受取る：お預かりの荷物の番号と、荷物のバーコードを読んで照合したか */

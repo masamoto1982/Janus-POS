@@ -224,7 +224,6 @@ export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
   return lines.find((l) => l.kind === "service" && !l.done && l.parcel);
 }
 
-const kg = (g: number): string => `${(g / 1000).toLocaleString(undefined, { maximumFractionDigits: 1 })}kg`;
 
 /**
  * 荷物の受付で、入力を受け付けられなかった理由（レジごと）。画面の中だけの状態。
@@ -242,8 +241,12 @@ const parcelErr = (reg: number): string => {
  */
 function parcelNote(reg: number, l: StaffLine): string {
   const p = l.parcel as Parcel;
-  const head = p.size ? "お届け先を入力しています" : p.sum_cm ? "重さを計測しています" : "長さを計測しています";
-  return pairNote(head, parcelError.get(reg) ?? "伝票の貼り付けをお願いします");
+  const [head, sub] = p.size
+    ? ["お届け先を入力しています", `${p.size}サイズでお取り扱いします`]
+    : p.sum_cm
+      ? ["重さを計測しています", "重さが30kg以内の荷物についてお取り扱いします"]
+      : ["長さを計測しています", "三辺の合計が200cm以内の荷物についてお取り扱いします"];
+  return pairNote(head, parcelError.get(reg) ?? sub);
 }
 
 /** セミセルフ：伝票を読んで係員を待つ間のお客様側の案内（登録画面の代わり） */
@@ -287,7 +290,7 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   }
   return `<div class="point-screen parcel-entry">
       <div class="big">${no}お届け先の郵便番号を入力してください</div>
-      ${parcelErr(reg) || `<p class="parcel-size">${p.size}サイズ（三辺の合計 ${p.sum_cm}cm・${kg(p.weight_g)}）</p>`}
+      ${parcelErr(reg)}
       <input type="text" inputmode="numeric" maxlength="8" placeholder="例 100-0001" autocomplete="off" data-key="ppost-${reg}" data-parcel="${reg}" aria-label="お届け先の郵便番号（7桁）" />
       <div class="point-choices">
         ${back()}
@@ -302,7 +305,7 @@ function parcelAsk(reg: number, lines: StaffLine[], st: ActionState): string {
   const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
   const p = last?.parcel;
   return `<div class="point-screen parcel-ask">
-      ${p && last ? `<p class="parcel-fee">${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b>${yen(last.amount)}</b></p>` : ""}
+      ${p && last ? `<p class="parcel-fee">${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b>${p.collect ? "着払い" : yen(last.amount)}</b></p>` : ""}
       <div class="big">次の荷物はありますか？</div>
       <div class="point-choices">
         ${btn("ある", { type: "parcel_next", register: reg, more: true }, st)}
@@ -511,7 +514,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   }
   return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
-    <td class="num">${ro || isBill(l) || l.pickup ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
+    <td class="num">${ro || isBill(l) || l.pickup || l.parcel ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
     <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td>
   </tr>${lineEditor(reg, side, l, remove)}`;
 }
@@ -1309,7 +1312,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">係員が受付します</span>`
             : "";
-      const qty = c.phase === "registering" && !isBill(l) && !l.pickup ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
+      const qty = c.phase === "registering" && !isBill(l) && !l.pickup && !l.parcel ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
       const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line"), true) : "";
       return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>${editor}`];
     });
@@ -1536,6 +1539,9 @@ const SHELVES: Shelf[] = [
   { label: "オプション", match: (p) => p.category === "bag" },
 ];
 
+/** 荷物を送る（発払い・着払い） */
+const PARCEL_CODES = ["2100000000014", "2100000000045"];
+
 /** 荷物を受取る（お客様がコピー機で出した、またはスマホに出した受取用のバーコード） */
 const PICKUP_CODE = "2100000000038";
 
@@ -1568,7 +1574,10 @@ export function shelfPanel(s: Snapshot): string {
         // 払込票は一行目に「公共料金」、二行目に種類と金額（例：電気 5,000円）
         BILL_CODES.includes(p.code)
           ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
-          : item(
+          : // 荷物を送るは二行（一行目に「荷物を送る」、二行目に発払い・着払い）
+            PARCEL_CODES.includes(p.code)
+            ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
+            : item(
               p.code,
               p.name,
               `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
@@ -1576,7 +1585,20 @@ export function shelfPanel(s: Snapshot): string {
             ),
       )
       .join("")}</div></div>`;
-  }).join("");
+  }).join("") + slipShelf(s);
+}
+
+/**
+ * 受付済みの荷物の伝票（レジのそばにある荷物に貼ったもの）。店員側に読むと、その荷物の受付を取り消す。
+ * 宅配便の取り消しは明細の取り消しボタンではなく、取り消す荷物の伝票のバーコードを読んで行う（取り違えを防ぐ）
+ */
+function slipShelf(s: Snapshot): string {
+  const slips = s.registers.flatMap((r) =>
+    r.staff.lines
+      .filter((l) => l.parcel?.slip && l.kind === "service" && l.done)
+      .map((l) => item(`PS${l.parcel!.slip.replace(/-/g, "")}`, `伝票 レジ${r.id}`, esc(l.parcel!.slip), "", "店員側に読むと、この荷物の受付を取り消します")),
+  );
+  return slips.length ? `<div class="shelf"><h3>荷物の伝票（取り消し用）</h3><div class="items uniform">${slips.join("")}</div></div>` : "";
 }
 
 // ---------------------------------------------------------------------------

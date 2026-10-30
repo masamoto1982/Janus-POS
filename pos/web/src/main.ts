@@ -18,6 +18,7 @@ import {
   FF_TABS,
   ffVerifying,
   ffvInput,
+  qtyEntry,
   flashing,
   type FfUi,
   itemsPanel,
@@ -320,6 +321,9 @@ function render(): void {
     }
     // もう一方が触れている一瞬（またはお客様側に限られる場面）は、この画面の操作が利かない
     for (const side of ["staff", "customer"] as const) {
+      // 数量を打ち込んでいる明細がなくなった・会計に進んだら、テンキーを閉じる
+      const entry = qtyEntry.get(`${r.id}:${side}`);
+      if (entry && (r.staff.phase !== "registering" || !r.staff.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
       const items = itemsPanel(r, snap, ffUi(r.id), side);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
@@ -475,6 +479,21 @@ function toast(where: string, text: string, error: boolean): void {
     where,
     window.setTimeout(() => (el.className = "toast"), error ? 4000 : 2500),
   );
+}
+
+/** テンキーの一打ち。数字は 2 桁まで（買い物点数の上限が 10 点のため）。「決定」で数量を置き換える */
+function qtyKey(key: string, k: string): void {
+  const e = qtyEntry.get(key);
+  if (!e) return;
+  if (k === "cancel") qtyEntry.delete(key);
+  else if (k === "back") e.digits = e.digits.slice(0, -1);
+  else if (k === "ok") {
+    if (!e.digits || Number(e.digits) <= 0) return;
+    const [register, side] = key.split(":");
+    send({ type: "set_qty", register: Number(register), side, line_id: e.id, qty: Number(e.digits) });
+    qtyEntry.delete(key);
+  } else if (/^[0-9]$/.test(k) && e.digits.length < 2) e.digits = (e.digits + k).replace(/^0+/, "");
+  frame();
 }
 
 function send(cmd: Command): boolean {
@@ -752,6 +771,15 @@ function lockRules(): void {
 // ブラウザは操作があるまで音を出せないので、最初のタッチ・キー入力で音を準備する
 document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
+// 数量のテンキーは、キーボードの数字・Backspace・Enter・Esc でも打てる（入力欄で打っているときは除く）
+document.addEventListener("keydown", (e) => {
+  if (!qtyEntry.size || e.isComposing || (e.target as HTMLElement).closest?.("input, select, textarea")) return;
+  const key = [...qtyEntry.keys()].at(-1)!;
+  const k = /^[0-9]$/.test(e.key) ? e.key : e.key === "Backspace" ? "back" : e.key === "Enter" ? "ok" : e.key === "Escape" ? "cancel" : null;
+  if (!k) return;
+  e.preventDefault();
+  qtyKey(key, k);
+});
 // iOS は pointerdown では音を出す準備ができないので、指を離したときにも準備する
 document.addEventListener("touchend", unlockAudio, { capture: true });
 
@@ -835,6 +863,20 @@ app.addEventListener("click", (e) => {
     ffVerifying.delete(b.dataset.ffverifyClose);
     for (const k of [...ffvInput.keys()]) if (k.startsWith(`${b.dataset.ffverifyClose}:`)) ffvInput.delete(k);
     frame();
+    return;
+  }
+  // 数量のボタン：テンキーで新しい数量を打ち込む（もう一度押すとやめる）
+  if (b.dataset.qtyentry) {
+    const [reg, side, id] = b.dataset.qtyentry.split(":");
+    const key = `${reg}:${side}`;
+    if (qtyEntry.get(key)?.id === Number(id)) qtyEntry.delete(key);
+    else qtyEntry.set(key, { id: Number(id), digits: "" });
+    frame();
+    return;
+  }
+  if (b.dataset.qtypad) {
+    const [reg, side, k] = b.dataset.qtypad.split(":");
+    qtyKey(`${reg}:${side}`, k);
     return;
   }
   if (b.dataset.cmd) send(JSON.parse(b.dataset.cmd) as Command);

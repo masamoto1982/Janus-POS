@@ -567,15 +567,39 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
 const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolean => l.kind === "service" && !!l.done && l.cash_only;
 
 /**
- * 数量の欄：数量の両脇に「−」と「＋」（どちらも積極）。押すとその場で数量が変わる（行を開く操作はない）。
- * 数量が 1 のときの「−」は「削除」。数量を変えられないもの（サービス商品・クーポン）は「削除」だけ。押せないときは数字だけ
+ * 数量を打ち込んでいる明細（レジ:画面 → 明細番号と打った数字）。
+ * 数量のボタンを押すと、最下段（FF タブ・呼び出しボタンの場所）がテンキーに替わる
+ */
+export const qtyEntry = new Map<string, { id: number; digits: string }>();
+
+/**
+ * 数量の欄：数量そのものが積極ボタンで、押すとテンキーで新しい数量を打ち込む。
+ * 両脇の「−」（数量 1 では「削除」）と「＋」は消極ボタンで、押すとその場で 1 つずつ変わる。
+ * 数量を変えられないもの（サービス商品・クーポン）は「削除」と数字だけ。押せないときは数字だけ
  */
 function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false): string {
   if (!st.allowed) return `${l.qty}`;
+  if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b></span>`;
   const step = (d: number): Command => ({ type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + d });
-  const minus = l.qty <= 1 || fixed ? btn("削除", remove, st, "small") : btn("−", step(-1), st, "small");
-  const plus = fixed ? "" : btn("＋", step(1), st, "small");
-  return `<span class="qty-step">${minus}<b>${l.qty}</b>${plus}</span>`;
+  const minus = l.qty <= 1 ? btn("削除", remove, st, "small neg") : btn("−", step(-1), st, "small neg");
+  const e = qtyEntry.get(`${reg}:${side}`);
+  const typing = e?.id === l.id;
+  const shown = typing ? e.digits || "　" : String(l.qty);
+  const key = `<button type="button" class="small qty-key${typing ? " typing" : ""}" data-qtyentry="${reg}:${side}:${l.id}" aria-label="数量 ${l.qty}。押すとテンキーで数量を入力">${esc(shown)}</button>`;
+  return `<span class="qty-step">${minus}${key}${btn("＋", step(1), st, "small neg")}</span>`;
+}
+
+/**
+ * 数量のテンキー（最下段）。左下に引き返す「やめる」、右下に進める「決定」。
+ * 打った数で明細の数量を置き換える（0 は打てない。消すときは「削除」）
+ */
+function qtyPad(reg: number, side: Side, digits: string): string {
+  const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-qtypad="${reg}:${side}:${key}">${label}</button>`;
+  const ok = digits !== "" && Number(digits) > 0;
+  return `<div class="qty-pad">
+      <div class="pad-row">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"].map((d) => k(d)).join("")}</div>
+      <div class="pad-foot">${k("cancel", "やめる", "small neg")}${k("back", "1 文字消す", "small neg")}<button type="button" class="small primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+    </div>`;
 }
 
 /** 呼び出しの種類の短い表示（店員側画面） */
@@ -1165,6 +1189,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
   if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
+  // 数量を打ち込んでいる間は、最下段をテンキーにする
+  const entry = qtyEntry.get(`${reg}:${side}`);
+  if (entry) return qtyPad(reg, side, entry.digits);
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>

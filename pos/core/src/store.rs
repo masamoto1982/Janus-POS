@@ -798,6 +798,8 @@ struct Txn {
     confiscated: Vec<(&'static str, u32)>,
     /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する。品名と個数）
     ff_collect: Vec<(&'static str, u32)>,
+    /// お客様がお受け取りを確かめた FF（明細番号と個数）。明細が増えたり個数が変わったりすると、確かめ直す
+    ff_confirmed: Vec<(u32, u32)>,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
@@ -947,6 +949,13 @@ impl Txn {
         self.lines
             .iter()
             .any(|l| matches!(l.kind, LineKind::Ff { state } if state == s))
+    }
+
+    /// お客様がまだお受け取りを確かめていない FF がある（有人モードの相互チェック）
+    fn ff_unconfirmed(&self) -> bool {
+        self.lines.iter().any(|l| {
+            matches!(l.kind, LineKind::Ff { .. }) && !self.ff_confirmed.contains(&(l.id, l.qty))
+        })
     }
 
     fn service_pending(&self) -> bool {
@@ -1190,6 +1199,7 @@ impl Register {
             age_choice_pending: t.age_choice_pending(),
             id_pending: t.id_pending(),
             ff_waiting: t.any_ff(FfState::Waiting),
+            ff_unconfirmed: t.ff_unconfirmed(),
             has_ff: t
                 .lines
                 .iter()
@@ -1659,19 +1669,14 @@ impl Store {
             }
             C::ReceiveFf { register, side } => {
                 self.check(register, side, Action::ReceiveFf)?;
-                let r = self.reg_mut(register)?;
-                for l in &mut r.txn.lines {
-                    if matches!(
-                        l.kind,
-                        LineKind::Ff {
-                            state: FfState::Waiting
-                        }
-                    ) {
-                        l.kind = LineKind::Ff {
-                            state: FfState::Received,
-                        };
-                    }
-                }
+                // スタッフの照合が済んだ FF を、お客様が受け取ったと確かめる（照合の結果は変えない）
+                let t = &mut self.reg_mut(register)?.txn;
+                t.ff_confirmed = t
+                    .lines
+                    .iter()
+                    .filter(|l| matches!(l.kind, LineKind::Ff { .. }))
+                    .map(|l| (l.id, l.qty))
+                    .collect();
                 done("お客様が FF のお受け取りを確認しました")
             }
             C::CompleteService {
@@ -3766,6 +3771,7 @@ impl Store {
                     .iter()
                     .map(|&(name, qty)| Confiscated { name, qty })
                     .collect(),
+                ff_unconfirmed: c.ff_unconfirmed,
                 id_pending: c.id_pending,
                 coupon_unmatched: c.coupon_unmatched,
                 returned: returned.clone(),
@@ -3917,6 +3923,8 @@ pub struct StaffView {
     pub confiscated: Vec<Confiscated>,
     /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する）
     pub ff_collect: Vec<Confiscated>,
+    /// お客様がまだ FF のお受け取りを確かめていない（有人モードでは会計に進めない）
+    pub ff_unconfirmed: bool,
     /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
     pub coupon_unmatched: bool,
     /// 取り消して、お客様に返却するクーポン

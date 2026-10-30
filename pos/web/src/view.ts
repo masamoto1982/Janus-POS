@@ -367,18 +367,17 @@ function ffReturnCard(reg: number, v: StaffView): string {
 
 /**
  * 有人モードのお客様側：スタッフ側のお渡しの確認と対になる案内。お受け取りの個数は入力させず、
- * 右下の「確認しました」でお渡し前の FF をまとめてお受け取り済みにする（会計に進める）
+ * 右下の「確認しました」で受け取ったことを確かめる。スタッフ側の照合が済むまで押せない（相互チェック）。
+ * 会計には両方の確認が要る
  */
 function ffReceiveCard(reg: number, lines: StaffLine[], st: ActionState): string {
-  const rows = lines
-    .filter((l) => l.kind === "ff" && l.state === "waiting")
-    .sort((a, b) => b.touched - a.touched)
-    .map((l) => `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td></tr>`)
-    .join("");
+  const ff = lines.filter((l) => l.kind === "ff").sort((a, b) => b.touched - a.touched);
+  const rows = ff.map((l) => `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td></tr>`).join("");
+  const staffDone = !ff.some((l) => l.state === "waiting");
   return `<div class="ffv-screen ff-receive">
       <div class="big">FF のお受け取りの確認</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">個数</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="muted">お受け取りになったら「確認しました」を押してください</p>
+      <p class="muted">${staffDone ? "お受け取りになったら「確認しました」を押してください" : "スタッフがお渡しの個数を確認しています"}</p>
       <div class="ffv-foot end">${customerOnly(btn("確認しました", { type: "receive_ff", register: reg, side: "customer" }, st, "primary"))}</div>
     </div>`;
 }
@@ -960,8 +959,10 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (payStage) return screen(pay);
   if (!ro && !paying && ffVerifying.has(`${reg}:${side}`) && ffVerifyRows(reg, side, v.lines).length)
     return screen(ffVerifyScreen(reg, side, v.lines, false));
-  // スタッフ側がお渡しの確認をしている間、お客様側にはお受け取りの案内（「確認しました」で会計に進める）
-  if (ro && !paying && ffVerifying.has(`${reg}:staff`) && ffVerifyRows(reg, "staff", v.lines).length)
+  // お客様側のお受け取りの案内：スタッフ側がお渡しの確認をしている間と、照合が済んでお客様の確認を待つ間。
+  // 「確認しました」はスタッフの照合が済んでから押せる
+  const ffStaffDone = !v.lines.some((l) => l.kind === "ff" && l.state === "waiting");
+  if (ro && !paying && v.ff_unconfirmed && (ffStaffDone || (ffVerifying.has(`${reg}:staff`) && ffVerifyRows(reg, "staff", v.lines).length)))
     return screen(ffReceiveCard(reg, v.lines, a("receive_ff")));
   closeFfVerify(reg, side);
   return `${top}${notice}

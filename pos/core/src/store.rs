@@ -2637,12 +2637,10 @@ impl Store {
                 self.restock(code, old - qty);
             }
         }
+        // 数量の − ＋ は明細の行の上で押すので、行の並びは変えない（押した行が動くと、次に押す行を取り違える）
         let t = &mut self.reg_mut(register)?.txn;
-        t.next_line += 1;
-        let touched = t.next_line;
         let l = t.lines.iter_mut().find(|l| l.id == line_id).unwrap();
         l.qty = qty;
-        l.touched = touched;
         if received && qty > old {
             // 増やした分はまだ渡していないので、お渡し前に戻す（照合し直す）
             l.kind = LineKind::Ff {

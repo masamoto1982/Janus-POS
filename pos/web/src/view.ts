@@ -552,61 +552,30 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
       <button data-form="service" data-reg="${reg}" data-line="${l.id}" ${a.allowed ? "" : "disabled"}>受付</button>
     </div>`;
   }
-  return `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}">
+  const qty =
+    ro || isBill(l) || l.pickup || l.parcel
+      ? `${l.qty}`
+      : qtyCell(reg, side, l, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service");
+  return `<tr class="${flash(reg, l.id)}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
-    <td class="num">${ro || isBill(l) || l.pickup || l.parcel ? l.qty : qtyBtn(reg, side, l.id, l.qty, remove)}</td>
+    <td class="num">${qty}</td>
     <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td>
-  </tr>${lineEditor(reg, side, l, remove)}`;
+  </tr>`;
 }
-
-/**
- * 個数変更・取り消しのために広げている行（レジ:画面 → 明細番号と変更後の個数）。
- * ポップアップは使わず、対象の行の下が一時的に広がって、登録画面の中で完結する
- */
-export const editing = new Map<string, { id: number; qty: number; orig: number }>();
-
-const editingRow = (reg: number, side: Side, id: number): string => (editing.get(`${reg}:${side}`)?.id === id ? "editing" : "");
 
 /** 公共料金の払込票（明細ごとには取り消せない。やめるときは取引中止） */
 const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolean => l.kind === "service" && !!l.done && l.cash_only;
 
-/** 数量をボタンの形で出す。押すと行が広がって数量変更・削除ができる（もう一度押すと閉じる）。押せないときは数字だけ */
-function qtyBtn(reg: number, side: Side, id: number, qty: number, st: ActionState): string {
-  if (!st.allowed) return `${qty}`;
-  const open = editing.get(`${reg}:${side}`)?.id === id;
-  return `<button type="button" class="qty-btn ${open ? "on" : ""}" data-edit="${reg}:${side}:${id}:${qty}" title="数量変更・削除" aria-label="数量 ${qty}。押すと数量変更・削除">${qty}</button>`;
-}
-
 /**
- * 広げた行の中身：「閉じる」（消極・左端）と、数量の「−」「＋」（どちらも積極）。
- * 数量が 1 のときの「−」は「削除」になる。変えた数量は「閉じる」で確定する（確定のボタンは置かない）
+ * 数量の欄：数量の両脇に「−」と「＋」（どちらも積極）。押すとその場で数量が変わる（行を開く操作はない）。
+ * 数量が 1 のときの「−」は「削除」。数量を変えられないもの（サービス商品・クーポン）は「削除」だけ。押せないときは数字だけ
  */
-function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind: string; state?: string }, st: ActionState, semiSelf = false): string {
-  const e = editing.get(`${reg}:${side}`);
-  if (!e || e.id !== l.id || !st.allowed) return "";
-  // お渡し済みの FF の数量変更・削除はスタッフが行う（増やせばお渡し前に戻り、減らせば回収の案内が出る）
-  if (semiSelf && l.kind === "ff" && l.state === "received")
-    return editorRow(reg, side, `<span class="muted">お渡し済みの FF の数量はスタッフが変更します</span>`);
-  const remove = { type: "remove_line", register: reg, side, line_id: l.id };
-  // サービス商品は数量を変えられない（削除だけ）
-  if (l.kind === "service")
-    return editorRow(reg, side, `<span class="muted">この商品は数量を変えられません</span>${btn("削除", remove, st, "small primary")}`);
-  const minus =
-    e.qty <= 1 ? btn("削除", remove, st, "small primary") : `<button class="small" data-edit-step="${reg}:${side}:-1">−</button>`;
-  return editorRow(
-    reg,
-    side,
-    `<span class="qty-edit">
-        ${minus}
-        <b>${e.qty}</b>
-        <button class="small" data-edit-step="${reg}:${side}:1">＋</button>
-      </span>`,
-  );
-}
-
-function editorRow(reg: number, side: Side, body: string): string {
-  // 「閉じる」は引き返すボタンなので左端
-  return `<tr class="edit-row"><td colspan="3"><div class="edit-box"><button class="small ghost edit-close" data-edit-close="${reg}:${side}">閉じる</button>${body}</div></td></tr>`;
+function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false): string {
+  if (!st.allowed) return `${l.qty}`;
+  const step = (d: number): Command => ({ type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + d });
+  const minus = l.qty <= 1 || fixed ? btn("削除", remove, st, "small") : btn("−", step(-1), st, "small");
+  const plus = fixed ? "" : btn("＋", step(1), st, "small");
+  return `<span class="qty-step">${minus}<b>${l.qty}</b>${plus}</span>`;
 }
 
 /** 呼び出しの種類の短い表示（店員側画面） */
@@ -692,15 +661,13 @@ function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => Action
 export const flashing = new Set<string>();
 const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
 
-/** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい）。数量 1 のボタンで取り消しを開く */
+/** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい）。数量の欄の「削除」で取り消す */
 export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState, ro = false): Row[] {
   return coupons.map((c) => [
     c.id,
-    `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${ro ? "1" : qtyBtn(reg, side, c.id, 1, st)}</td><td class="num">${
-      c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
-    }</td></tr>${
-      !ro && editing.get(`${reg}:${side}`)?.id === c.id && st.allowed ? editorRow(reg, side, btn("削除", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small primary")) : ""
-    }`,
+    `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${
+      ro ? "1" : qtyCell(reg, side, { id: c.id, qty: 1 }, st, { type: "remove_coupon", register: reg, side, coupon_id: c.id }, true)
+    }</td><td class="num">${c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`}</td></tr>`,
   ]);
 }
 
@@ -1367,9 +1334,13 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">スタッフが受付します</span>`
             : "";
-      const qty = c.phase === "registering" && !isBill(l) && !l.pickup && !l.parcel ? qtyBtn(reg, side, l.id, l.qty, a("remove_line")) : `${l.qty}`;
-      const editor = c.phase === "registering" ? lineEditor(reg, side, l, a("remove_line"), true) : "";
-      return [l.touched, `<tr class="${flash(reg, l.id)} ${editingRow(reg, side, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>${editor}`];
+      // お渡し済みの FF の数量はスタッフが変える（増やせばお渡し前に戻り、減らせば回収の案内が出る）
+      const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
+      const qty =
+        c.phase === "registering" && !fixedHere
+          ? qtyCell(reg, side, l, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service")
+          : `${l.qty}`;
+      return [l.touched, `<tr class="${flash(reg, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 

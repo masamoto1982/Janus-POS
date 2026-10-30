@@ -2282,7 +2282,7 @@ fn same_item_merges_only_when_scanned_in_a_row() {
     assert_eq!(rows, [("パン", 3), ("サンドイッチ", 1), ("パン", 2)]);
 }
 
-/// 明細の個数を手で変えられる。変えた行は一番上に出て、点数の上限も守る。
+/// 明細の個数を手で変えられる。変えた行の並びは変わらず（数量の − ＋ を続けて押せるように）、点数の上限も守る。
 #[test]
 fn staff_or_customer_changes_a_line_quantity() {
     let mut s = Store::new(1, 2, 1);
@@ -2294,7 +2294,9 @@ fn staff_or_customer_changes_a_line_quantity() {
     ok(&mut s, set(3));
     let v = reg(&s, 1);
     let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
-    assert_eq!((top.name, top.qty), ("パン", 3));
+    assert_eq!(top.name, "サンドイッチ", "the changed line keeps its place");
+    let bread = v.customer.lines.iter().find(|l| l.id == id).unwrap();
+    assert_eq!(bread.qty, 3);
     assert_eq!(v.customer.total, 160 * 3 + 320);
     assert!(run(&mut s, set(10)).is_err(), "over the 10-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");

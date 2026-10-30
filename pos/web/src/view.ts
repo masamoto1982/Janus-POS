@@ -1041,12 +1041,12 @@ export function regTop(total: number, count: number, action: string, max = Infin
   const point =
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
   // 合計の上：ポイントの読み取り状況。合計の下：電子マネーのチャージ・残高照会（お買い物の途中でも始められる）
-  // 上下の段は中身がなくても同じ高さで出す（大は小を兼ねる：有人・セミセルフ、店員側・お客様側で帯の高さと合計の位置をそろえる）
-  const info = `<small class="info">${point}</small>`;
-  const below = `<small class="info below">${infoHtml}</small>`;
+  // 真ん中の欄は二行でも三行でも縦の中央にそろえる。帯の高さは三行のときに合わせる（大は小を兼ねる）
+  const info = point ? `<small class="info">${point}</small>` : "";
+  const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
   // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる。
   // 合計は左右の欄の有無にかかわらず常に中央（取引中止のない有人のお客様側でも店員側と同じ位置）
-  return `<div class="reg-top">${info}<span class="void">${voidHtml}</span><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span>${below}</div>`;
+  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid">${info}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span>${below}</span><span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

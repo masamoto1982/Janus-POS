@@ -510,7 +510,7 @@ function methodList(method: string | null, inserted: number, unavailable: Unavai
 }
 
 /**
- * 明細の列：品目・数量・小計。数量はボタンの形で、押すと数量変更・取り消しの行が広がる。
+ * 明細の列：品目・数量・小計。数量はボタンの形で、押すと数量変更・削除の行が広がる。
  * 押せない画面でも同じ幅にし、店員側とお客様側で列の位置がずれないようにする
  */
 const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /></colgroup>`;
@@ -570,31 +570,39 @@ const editingRow = (reg: number, side: Side, id: number): string => (editing.get
 /** 公共料金の払込票（明細ごとには取り消せない。やめるときは取引中止） */
 const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolean => l.kind === "service" && !!l.done && l.cash_only;
 
-/** 数量をボタンの形で出す。押すと行が広がって数量変更・取り消しができる（もう一度押すと閉じる）。押せないときは数字だけ */
+/** 数量をボタンの形で出す。押すと行が広がって数量変更・削除ができる（もう一度押すと閉じる）。押せないときは数字だけ */
 function qtyBtn(reg: number, side: Side, id: number, qty: number, st: ActionState): string {
   if (!st.allowed) return `${qty}`;
   const open = editing.get(`${reg}:${side}`)?.id === id;
-  return `<button type="button" class="qty-btn ${open ? "on" : ""}" data-edit="${reg}:${side}:${id}:${qty}" title="数量変更・取り消し" aria-label="数量 ${qty}。押すと数量変更・取り消し">${qty}</button>`;
+  return `<button type="button" class="qty-btn ${open ? "on" : ""}" data-edit="${reg}:${side}:${id}:${qty}" title="数量変更・削除" aria-label="数量 ${qty}。押すと数量変更・削除">${qty}</button>`;
 }
 
-/** 広げた行の中身：個数の − ＋ と「個数変更」、それに「取り消し」 */
+/**
+ * 広げた行の中身。ボタンは対で並べる：「閉じる」（消極・左端）⇔「数量変更」（積極・右端）、
+ * 「−」（消極）⇔「＋」（積極）。数量が 1 のときの「−」は「削除」になる（別の取り消しボタンは置かない）
+ */
 function lineEditor(reg: number, side: Side, l: { id: number; qty: number; kind: string; state?: string }, st: ActionState, semiSelf = false): string {
   const e = editing.get(`${reg}:${side}`);
   if (!e || e.id !== l.id || !st.allowed) return "";
-  // お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収の案内が出る）
+  // お渡し済みの FF の数量変更・削除はスタッフが行う（増やせばお渡し前に戻り、減らせば回収の案内が出る）
   if (semiSelf && l.kind === "ff" && l.state === "received")
     return editorRow(reg, side, `<span class="muted">お渡し済みの FF の数量はスタッフが変更します</span>`);
-  // サービス商品は数量を変えられない（取り消しだけ）
-  const fixed = l.kind === "service";
-  const qty = fixed
-    ? `<span class="muted">この商品は数量を変えられません</span>`
-    : `<span class="qty-edit">
-        <button class="small neg" data-edit-step="${reg}:${side}:-1" ${e.qty <= 1 ? "disabled" : ""}>−</button>
+  const remove = { type: "remove_line", register: reg, side, line_id: l.id };
+  // サービス商品は数量を変えられない。できるのは削除だけなので、「閉じる」の対になる積極ボタン
+  if (l.kind === "service")
+    return editorRow(reg, side, `<span class="muted">この商品は数量を変えられません</span>${btn("削除", remove, st, "small primary")}`);
+  const minus =
+    e.qty <= 1 ? btn("削除", remove, st, "small neg") : `<button class="small neg" data-edit-step="${reg}:${side}:-1">−</button>`;
+  return editorRow(
+    reg,
+    side,
+    `<span class="qty-edit">
+        ${minus}
         <b>${e.qty}</b>
-        <button class="small neg" data-edit-step="${reg}:${side}:1">＋</button>
+        <button class="small" data-edit-step="${reg}:${side}:1">＋</button>
       </span>
-      ${btn("数量変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`;
-  return editorRow(reg, side, `${qty}${btn("取り消し", { type: "remove_line", register: reg, side, line_id: l.id }, st, "small danger")}`);
+      ${btn("数量変更", { type: "set_qty", register: reg, side, line_id: l.id, qty: e.qty }, { ...st, allowed: e.qty !== l.qty }, "small primary")}`,
+  );
 }
 
 function editorRow(reg: number, side: Side, body: string): string {
@@ -692,7 +700,7 @@ export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Actio
     `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${ro ? "1" : qtyBtn(reg, side, c.id, 1, st)}</td><td class="num">${
       c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`
     }</td></tr>${
-      !ro && editing.get(`${reg}:${side}`)?.id === c.id && st.allowed ? editorRow(reg, side, btn("取り消し", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small danger")) : ""
+      !ro && editing.get(`${reg}:${side}`)?.id === c.id && st.allowed ? editorRow(reg, side, btn("削除", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small primary")) : ""
     }`,
   ]);
 }

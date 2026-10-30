@@ -194,26 +194,28 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .lines td, .lines th { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .num { text-align: right; white-space: nowrap; }
 
-/* 上の帯は 取引中止｜ポイント・合計・電子マネー｜会計 の三つの欄に分ける（幅が足りれば三等分、足りなければ真ん中を優先）。
-   左右のボタンは帯の高さいっぱい・欄の幅いっぱいに広げ、真ん中の三段は常に中央。
-   上下の段は中身がなくても同じ高さで出し、有人・セミセルフ、店員側・お客様側で帯の高さをそろえる */
-.reg-top { position: sticky; top: -8px; z-index: 1; display: grid; grid-template-columns: 1fr minmax(max-content, 1fr) 1fr; grid-template-rows: auto auto auto; align-items: stretch; gap: 0 8px; margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); }
+/* 上の帯は 取引中止｜ポイント・合計・電子マネー｜会計 の三つの欄に分ける。
+   真ん中の欄は二行（ポイント・合計）でも三行（＋電子マネー）でも縦の中央にそろえ、帯の高さは三行のときに合わせる
+   （有人・セミセルフ、店員側・お客様側で帯の高さと合計の位置がそろう）。
+   左右のボタンは真ん中の欄とつり合う大きさで、それぞれの欄の外側の端に縦の中央で置く */
+.reg-top { --row: 18px; --sum-h: 34px; position: sticky; top: -8px; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 8px; min-height: calc(var(--row) * 2 + var(--sum-h)); margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); box-sizing: content-box; }
+.reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
 .reg-top .total { font-size: 28px; }
-.reg-top .info { grid-column: 2; grid-row: 1; height: 18px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 0 14px; min-width: 0; font-size: 12px; white-space: nowrap; }
-.reg-top .info.below { grid-row: 3; }
+.reg-top .info { height: var(--row); display: flex; align-items: center; justify-content: center; gap: 0 14px; font-size: 12px; white-space: nowrap; }
 .reg-top .info .point { color: var(--msg-weak); }
 .reg-top .info .point.read { color: inherit; }
-.reg-top .sum { grid-column: 2; grid-row: 2; font-size: 16px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 0 4px; line-height: 1.2; }
+.reg-top .sum { height: var(--sum-h); font-size: 16px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 0 4px; line-height: 1.2; }
 .reg-top .count b { font-size: 28px; }
-.reg-top .void { grid-column: 1; grid-row: 1 / -1; display: flex; align-items: stretch; min-width: 0; }
-.reg-top .action { grid-column: 3; grid-row: 1 / -1; display: flex; align-items: stretch; gap: 8px; min-width: 0; }
-.reg-top .void > button, .reg-top .action > button { flex: 1; min-width: 0; padding: 4px 6px; white-space: nowrap; }
+.reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
+.reg-top .action { display: flex; justify-content: flex-end; gap: 8px; min-width: 0; }
+.reg-top .void > button, .reg-top .action > button { width: 6.5em; max-width: 100%; height: 48px; padding: 4px 6px; white-space: nowrap; }
 /* 帯が狭いとき（1024px 幅の有人など）は、合計とボタンの文字を詰める */
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
+  .reg-top .mid { --sum-h: 26px; }
   .reg-top .total, .reg-top .count b { font-size: 22px; }
   .reg-top .sum { font-size: 13px; }
-  .reg-top .void > button, .reg-top .action > button { font-size: 13px; padding: 4px 2px; }
+  .reg-top .void > button, .reg-top .action > button { font-size: 13px; height: 44px; padding: 4px 2px; }
   .reg-top .info .emoney-link { font-size: 10px; }
 }
 /* 電子マネーのチャージ・残高確認は合計の下の段の中央に、下線の付いた文字リンクで（セミセルフの待ち受けと同じ表現） */

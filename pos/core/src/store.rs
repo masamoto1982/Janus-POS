@@ -230,7 +230,13 @@ pub enum Command {
         line_id: u32,
         amount: u32,
     },
-    /// 荷物を送る：三辺の合計（cm）と重さ（g）から取り扱いサイズを決める
+    /// 荷物を送る：一段階目。三辺の合計（cm）を決める
+    ParcelLength {
+        register: u8,
+        line_id: u32,
+        sum_cm: u32,
+    },
+    /// 荷物を送る：三辺の合計（cm）と重さ（g）から取り扱いサイズを決める（二段階目の「決定」）
     ParcelSize {
         register: u8,
         line_id: u32,
@@ -243,7 +249,7 @@ pub enum Command {
         line_id: u32,
         postal: String,
     },
-    /// 荷物を送る：郵便番号の入力からサイズの決定に戻る
+    /// 荷物を送る：一段階戻る（郵便番号 → 重さ → 三辺の合計 → この荷物の受付をやめる）
     ParcelBack {
         register: u8,
         line_id: u32,
@@ -515,6 +521,7 @@ impl Command {
             | C::FfButton { register, .. }
             | C::CheckFf { register, .. }
             | C::CompleteService { register, .. }
+            | C::ParcelLength { register, .. }
             | C::ParcelSize { register, .. }
             | C::ParcelPostal { register, .. }
             | C::ParcelBack { register, .. }
@@ -584,6 +591,7 @@ impl Command {
             | C::CashOut { .. }
             | C::CashIn { .. } => Some(Side::Customer),
             C::CompleteService { .. }
+            | C::ParcelLength { .. }
             | C::ParcelSize { .. }
             | C::ParcelPostal { .. }
             | C::ParcelBack { .. }
@@ -1680,11 +1688,42 @@ impl Store {
                     "{size} サイズに決まりました。届け先の郵便番号を入力してください"
                 ))
             }
+            C::ParcelLength {
+                register,
+                line_id,
+                sum_cm,
+            } => {
+                self.check_active(register, Action::CompleteService)?;
+                parcel::check_length(sum_cm)?;
+                let pc = self.pending_parcel(register, line_id)?;
+                *pc = Parcel {
+                    sum_cm,
+                    ..Parcel::default()
+                };
+                done("重さを入力してください".to_string())
+            }
             C::ParcelBack { register, line_id } => {
                 self.check_active(register, Action::CompleteService)?;
                 let pc = self.pending_parcel(register, line_id)?;
-                pc.size = None;
-                done("取り扱いサイズを決め直します".to_string())
+                if pc.size.is_some() {
+                    pc.size = None;
+                    return done("重さを入力し直してください".to_string());
+                }
+                if pc.sum_cm > 0 {
+                    pc.sum_cm = 0;
+                    pc.weight_g = 0;
+                    return done("三辺の合計を入力し直してください".to_string());
+                }
+                // 三辺の合計の入力から戻ると、この荷物の受付をやめる
+                // （受付済みの荷物があれば「次の荷物はありますか」に、なければ登録画面に戻る）
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                r.txn.lines.retain(|l| l.id != line_id);
+                r.txn.parcel_ask = r.txn.lines.iter().any(|l| l.is_parcel());
+                if !r.txn.service_pending() {
+                    self.calls.resolve(register, CallKind::Service, now);
+                }
+                done("荷物の受付をやめました".to_string())
             }
             C::ParcelPostal {
                 register,

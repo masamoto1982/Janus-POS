@@ -562,12 +562,15 @@ function form(b: HTMLElement): void {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
       break;
+    case "parcel-length":
+      send({ type: "parcel_length", register: reg, line_id: Number(b.dataset.line), sum_cm: Math.round(Number(han(val(`pcm-${reg}`)) || 0)) });
+      break;
     case "parcel-size":
       send({
         type: "parcel_size",
         register: reg,
         line_id: Number(b.dataset.line),
-        sum_cm: Math.round(Number(han(val(`pcm-${reg}`)) || 0)),
+        sum_cm: Number(b.dataset.cm),
         weight_g: Math.round(Number(han(val(`pkg-${reg}`)) || 0) * 1000),
       });
       break;
@@ -629,7 +632,7 @@ app.addEventListener("keydown", (e) => {
   if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
   el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
 });
-// 荷物のサイズ・郵便番号の入力欄では Enter で決定（三辺の合計の欄では重さの欄へ進む）
+// 荷物のサイズ・郵便番号の入力欄では Enter で決定
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.parcel || e.key !== "Enter" || e.isComposing) return;

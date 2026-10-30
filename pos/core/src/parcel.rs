@@ -16,6 +16,17 @@ pub const SIZES: [(u32, u32, u32); 6] = [
     (160, 160, 25_000),
 ];
 
+/// 一段階目：三辺の合計がいちばん大きいサイズに収まるか
+pub fn check_length(sum_cm: u32) -> Result<(), String> {
+    if sum_cm == 0 {
+        return Err("三辺の合計を入力してください".into());
+    }
+    if sum_cm > SIZES[SIZES.len() - 1].1 {
+        return Err("三辺の合計が 160cm を超える荷物は受け付けられません".into());
+    }
+    Ok(())
+}
+
 /// 三辺の合計と重さの両方が収まる、いちばん小さいサイズ
 pub fn size_for(sum_cm: u32, weight_g: u32) -> Result<u32, String> {
     if sum_cm == 0 || weight_g == 0 {

@@ -100,20 +100,20 @@ function buildSkeleton(): void {
     .map(
       (r) => `<section class="register" data-register="${r.id}" aria-label="レジ${r.id}">
       <h2>レジ${r.id} <span class="lamp" data-lamp="${r.id}" role="img" aria-label="レジ${r.id}の呼び出しランプ"></span><span data-region="mode-${r.id}"></span>
-        <label class="login-sel">店員
-          <select data-login="${r.id}" aria-label="レジ${r.id}の店員ログイン">
+        <label class="login-sel">スタッフ
+          <select data-login="${r.id}" aria-label="レジ${r.id}のスタッフログイン">
             <option value="">未ログイン</option>
             ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.name)}${a.role === "owner" ? "（オーナー）" : ""}</option>`).join("")}
           </select>
         </label>
       </h2>
       <div class="swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
-        <button type="button" role="tab" class="on" data-swipe-to="${r.id}:staff">店員側</button>
+        <button type="button" role="tab" class="on" data-swipe-to="${r.id}:staff">スタッフ側</button>
         <button type="button" role="tab" data-swipe-to="${r.id}:customer">お客様側</button>
       </div>
       <div class="screens" data-swipe="${r.id}">
         <div class="screen-wrap" data-wrap="${r.id}:staff">
-          <div class="screen-cap">店員側<span class="drop-hint">ここに落とす＝店員側スキャナーで読む</span></div>
+          <div class="screen-cap">スタッフ側<span class="drop-hint">ここに落とす＝スタッフ側スキャナーで読む</span></div>
           <section class="screen staff-screen" data-drop="${r.id}:staff">
             <div class="screen-head" data-region="head-${r.id}-staff"></div>
             <div class="screen-main" data-region="staff-${r.id}"></div>
@@ -920,7 +920,7 @@ function setupDrag(): void {
     const t = target(e.clientX, e.clientY);
     end();
     if (!d.moved) {
-      toast("toast-store", "ドラッグして、レジの店員画面・お客様画面（お金は入金ボックスにも）に落としてください", false);
+      toast("toast-store", "ドラッグして、レジのスタッフ側の画面・お客様画面（お金は入金ボックスにも）に落としてください", false);
       return;
     }
     if (!t) return;
@@ -1020,7 +1020,7 @@ const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg")
 
 function openPicker(register: number, side: Side, kind: "item" | "wallet"): void {
   pickFor = { register, side, kind };
-  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "店員側" : "お客様側"}で読む商品` : `レジ${register}の入金ボックスに入れる・かざす`;
+  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の入金ボックスに入れる・かざす`;
   document.getElementById("picker-title")!.textContent = title;
   const body = document.getElementById("picker-body")!;
   body.innerHTML = kind === "item" ? shelfPanel(snap) : walletPanel(snap.emoney_balance);

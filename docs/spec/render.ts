@@ -37,7 +37,7 @@ function scene(s: Scene): string {
     `- 根拠：${s.rules.length ? s.rules.join("・") : "—"}　描画：\`${s.source}\``,
     ...(s.issues?.length ? [`- 判断が要る点：${s.issues.join("・")}`] : []),
   ].join("\n");
-  return `### ${s.id}　${s.title}（${s.mode}）\n\n${meta}\n\n| | 店員側 | 顧客側 |\n| --- | --- | --- |\n${body}\n`;
+  return `### ${s.id}　${s.title}（${s.mode}）\n\n${meta}\n\n| | スタッフ側 | 顧客側 |\n| --- | --- | --- |\n${body}\n`;
 }
 
 export function renderScreens(): string {
@@ -50,9 +50,9 @@ export function renderScreens(): string {
   }).join("\n");
   return `<!-- このファイルは 3-screens.ts から生成する。直接編集しない（pos で npx vitest run -u） -->
 
-# 第三階層　店員側と顧客側の対表
+# 第三階層　スタッフ側と顧客側の対表
 
-場面ごとに、店員側と顧客側の積極テキスト・消極テキスト・ボタンを並べる。〈 〉は値が入るところ。根拠の番号は [2-principles.md](2-principles.md) のルール。
+場面ごとに、スタッフ側と顧客側の積極テキスト・消極テキスト・ボタンを並べる。〈 〉は値が入るところ。根拠の番号は [2-principles.md](2-principles.md) のルール。
 
 ## 場面の一覧
 

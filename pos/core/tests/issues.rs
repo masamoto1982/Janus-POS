@@ -1743,7 +1743,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
         json!({"type":"check_bill","register":1,"side":"customer","line_id":ids[0],"checked":true}),
     )
     .unwrap_err();
-    assert!(e.contains("店員側"), "{e}");
+    assert!(e.contains("スタッフ側"), "{e}");
     // チェックは外せる（外せば未確認に戻る）
     check_bill(&mut s, 1, ids[0], true);
     let v = reg(&s, 1);
@@ -3027,4 +3027,41 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     assert!(!reg(&s, 1).staff.point_pending);
+}
+
+/// 有人モードで、お客様側の「確認しました」は、お渡し前の FF をまとめてお渡し済みにし、会計に進める。
+/// お客様側の画面からだけ押せる。セミセルフではお受け取りの個数を入力して確かめる
+#[test]
+fn customer_confirms_ff_receipt_in_attended_mode() {
+    let mut s = Store::new(1, 1, 1);
+    login(&mut s, 1);
+    for code in ["FF01", "FF02"] {
+        ok(
+            &mut s,
+            json!({"type":"register_ff","register":1,"side":"staff","code":code,"qty":1}),
+        );
+    }
+    advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    assert!(allowed(&v, Side::Customer, Action::ReceiveFf));
+    assert!(run(
+        &mut s,
+        json!({"type":"receive_ff","register":1,"side":"staff"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"}),
+    );
+    advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert!(
+        !allowed(&v, Side::Customer, Action::ReceiveFf),
+        "nothing left to receive"
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
 }

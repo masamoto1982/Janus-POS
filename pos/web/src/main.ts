@@ -420,34 +420,6 @@ function frame(): void {
   );
   render();
   app.querySelectorAll<HTMLElement>("[data-hold]").forEach((b) => b.classList.toggle("pressing", b.dataset.hold === held?.cmd));
-  app.querySelectorAll<HTMLElement>("[data-hold-confirm]").forEach((b) => b.classList.toggle("holding", b.dataset.holdConfirm === confirming?.cmd));
-}
-
-// ---------------------------------------------------------------------------
-// 長押しで決まるボタン（取引中止）：押し続けて HOLD_MS たつと送る。途中で離す・指が外れると取り消し
-// ---------------------------------------------------------------------------
-
-const HOLD_MS = 1500;
-let confirming: { cmd: string; pointer: number | null; timer: number } | null = null;
-
-function startConfirm(b: HTMLElement, pointer: number | null): void {
-  if (confirming || (b as HTMLButtonElement).disabled) return;
-  const cmd = b.dataset.holdConfirm!;
-  const timer = window.setTimeout(() => {
-    confirming = null;
-    const c = JSON.parse(cmd) as Command;
-    voidAsk.delete(c.register as number);
-    send(c);
-  }, HOLD_MS);
-  confirming = { cmd, pointer, timer };
-  frame();
-}
-
-function cancelConfirm(): void {
-  if (!confirming) return;
-  window.clearTimeout(confirming.timer);
-  confirming = null;
-  frame();
 }
 
 // ---------------------------------------------------------------------------
@@ -839,7 +811,7 @@ app.addEventListener("click", (e) => {
     send({ type: "take_outlet", register: Number(b.dataset.outlet) });
     return;
   }
-  // 取引中止：確認画面を開く・閉じる（決めるのは確認画面の長押しだけ）
+  // 取引中止：確認画面を開く・閉じる（決めるのは確認画面の「はい」だけ）
   if (b.dataset.voidAsk) {
     const [reg, side] = b.dataset.voidAsk.split(":");
     const r = Number(reg);
@@ -968,32 +940,6 @@ function setupDrag(): void {
     e.preventDefault();
     press(b, e.pointerId);
   });
-  app.addEventListener("pointerdown", (e) => {
-    const b = (e.target as Element).closest<HTMLElement>("[data-hold-confirm]");
-    if (!b || e.button !== 0) return;
-    e.preventDefault();
-    startConfirm(b, e.pointerId);
-  });
-  window.addEventListener("pointermove", (e) => {
-    if (!confirming || e.pointerId !== confirming.pointer) return;
-    const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-hold-confirm]");
-    if (over?.dataset.holdConfirm !== confirming.cmd) cancelConfirm();
-  });
-  for (const ev of ["pointerup", "pointercancel"] as const) {
-    window.addEventListener(ev, (e) => {
-      if (confirming && e.pointerId === confirming.pointer) cancelConfirm();
-    });
-  }
-  window.addEventListener("blur", cancelConfirm);
-  app.addEventListener("keydown", (e) => {
-    const b = (e.target as Element).closest<HTMLElement>("[data-hold-confirm]");
-    if (!b || e.repeat || (e.key !== " " && e.key !== "Enter")) return;
-    e.preventDefault();
-    startConfirm(b, null);
-  });
-  app.addEventListener("keyup", (e) => {
-    if (confirming && confirming.pointer === null && (e.key === " " || e.key === "Enter")) cancelConfirm();
-  });
   window.addEventListener("pointermove", (e) => {
     if (!held || e.pointerId !== held.pointer) return;
     // 指がボタンから外れたら離したのと同じ
@@ -1008,7 +954,7 @@ function setupDrag(): void {
   window.addEventListener("blur", release);
   document.addEventListener("visibilitychange", release);
   app.addEventListener("contextmenu", (e) => {
-    if ((e.target as Element).closest("[data-hold], [data-hold-confirm]")) e.preventDefault();
+    if ((e.target as Element).closest("[data-hold]")) e.preventDefault();
   });
   // キーボード：Space / Enter を押している間
   app.addEventListener("keydown", (e) => {

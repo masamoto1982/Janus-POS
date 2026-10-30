@@ -901,7 +901,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 
   // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
   // 電子マネーのチャージ・残高確認は、お買い物の途中でも（会計中でも）店員側から始められる。
-  // 「すべての操作はやりたいときにできる」：待ち受けに戻らなくてよいよう、上の段（ポイントの右）に常に置く
+  // 「すべての操作はやりたいときにできる」：待ち受けに戻らなくてよいよう、合計の下に常に置く
   const emoney = ro ? "" : emoneyEntry(reg, side, a("emoney"), "emoney-info");
   const top = regTop(
     v.total,
@@ -1035,15 +1035,16 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean, voidHtml = "", infoHtml = ""): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  // 上の段にポイントカードの読み取り状況を控えめに、下の段に「合計 x点 XXX円」を出す
+  // 合計「合計 x点 XXX円」の上にポイントカードの読み取り状況を控えめに、下に電子マネーを出す
   // （ポイントカードの状況はほかの場所には出さない。ボタンは合計額の右に出し、有無で点数・合計額の位置は動かない）
   const point =
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
-  // 上の段：ポイントの読み取り状況と、電子マネーのチャージ・残高照会（お買い物の途中でも始められる）
-  const info = point || infoHtml ? `<small class="info">${point}${infoHtml}</small>` : "";
+  // 合計の上：ポイントの読み取り状況。合計の下：電子マネーのチャージ・残高照会（お買い物の途中でも始められる）
+  const info = point ? `<small class="info">${point}</small>` : "";
+  const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
   // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる。
   // 合計は左右の欄の有無にかかわらず常に中央（取引中止のない有人のお客様側でも店員側と同じ位置）
-  return `<div class="reg-top">${info}<span class="void">${voidHtml}</span><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span></div>`;
+  return `<div class="reg-top">${info}<span class="void">${voidHtml}</span><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span>${below}</div>`;
 }
 
 /** 買い物点数（数量の合計） */

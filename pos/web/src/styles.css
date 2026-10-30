@@ -216,7 +216,7 @@ button.mode-badge { min-height: 0; cursor: pointer; }
   .reg-top .void > button, .reg-top .action > button { font-size: 13px; padding: 6px 8px; min-width: 5.5em; }
 }
 /* 電子マネー（チャージ・残高確認）は会計ボタンと同じ高さで、塗らずに枠線だけの控えめな表現 */
-/* 電子マネーのチャージ・残高確認は上の段（取引中止があった場所）に、取引中止と同じ控えめな大きさで */
+/* 電子マネーのチャージ・残高確認は合計の下の段の中央に、控えめな大きさで（ポイントの読み取り状況は合計の上の段） */
 .reg-top .emoney-info { font-size: 11px; padding: 2px 8px; font-weight: 400; }
 .reg-top .emoney-info b { font-weight: 400; }
 .reg-top .emoney-info small { font-size: 10px; margin-left: 4px; color: var(--msg-weak); }

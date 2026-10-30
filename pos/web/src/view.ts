@@ -902,7 +902,8 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
   // 電子マネーのチャージ・残高確認は、お買い物の途中でも（会計中でも）店員側から始められる。
   // 「すべての操作はやりたいときにできる」：待ち受けに戻らなくてよいよう、合計の下に常に置く
-  const emoney = ro ? "" : emoneyEntry(reg, side, a("emoney"), "emoney-info");
+  // セミセルフの待ち受けと同じ、下線の付いた文字リンクで出す（会計ボタンと取り違えない控えめな表現）
+  const emoney = ro ? "" : btn("電子マネーのチャージ・残高確認", { type: "start_emoney", register: reg, side, kind: "menu" }, a("emoney"), "emoney-link");
   const top = regTop(
     v.total,
     itemCount(v.lines),
@@ -1040,8 +1041,9 @@ export function regTop(total: number, count: number, action: string, max = Infin
   const point =
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
   // 合計の上：ポイントの読み取り状況。合計の下：電子マネーのチャージ・残高照会（お買い物の途中でも始められる）
-  const info = point ? `<small class="info">${point}</small>` : "";
-  const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
+  // 上下の段は中身がなくても同じ高さで出す（大は小を兼ねる：有人・セミセルフ、店員側・お客様側で帯の高さと合計の位置をそろえる）
+  const info = `<small class="info">${point}</small>`;
+  const below = `<small class="info below">${infoHtml}</small>`;
   // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる。
   // 合計は左右の欄の有無にかかわらず常に中央（取引中止のない有人のお客様側でも店員側と同じ位置）
   return `<div class="reg-top">${info}<span class="void">${voidHtml}</span><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span><span class="action">${action}</span>${below}</div>`;

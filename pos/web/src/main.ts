@@ -478,6 +478,15 @@ function toast(where: string, text: string, error: boolean): void {
   );
 }
 
+/** 広げた行を閉じる。数量を変えていれば、そのとき確定する（閉じると変更が保存される） */
+function closeEditor(key: string): void {
+  const e = editing.get(key);
+  editing.delete(key);
+  if (!e || e.qty === e.orig) return;
+  const [register, side] = key.split(":");
+  send({ type: "set_qty", register: Number(register), side, line_id: e.id, qty: e.qty });
+}
+
 function send(cmd: Command): boolean {
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
@@ -828,7 +837,7 @@ app.addEventListener("click", (e) => {
   // FF の「お渡し前」：お渡し照合の画面を開く（登録画面を置き換える）
   if (b.dataset.ffverify) {
     ffVerifying.add(b.dataset.ffverify);
-    editing.delete(b.dataset.ffverify);
+    closeEditor(b.dataset.ffverify);
     frame();
     return;
   }
@@ -839,12 +848,13 @@ app.addEventListener("click", (e) => {
     frame();
     return;
   }
-  // 明細の数量ボタン：行を広げて数量変更・削除（登録画面の中で完結。コアには決めたときだけ送る）
+  // 明細の数量ボタン：行を広げて数量変更・削除（登録画面の中で完結。変えた数量は閉じるときにコアへ送る）
   if (b.dataset.edit) {
     const [reg, side, id, qty] = b.dataset.edit.split(":");
     const key = `${reg}:${side}`;
-    if (editing.get(key)?.id === Number(id)) editing.delete(key);
-    else editing.set(key, { id: Number(id), qty: Number(qty) });
+    const same = editing.get(key)?.id === Number(id);
+    closeEditor(key);
+    if (!same) editing.set(key, { id: Number(id), qty: Number(qty), orig: Number(qty) });
     frame();
     return;
   }
@@ -856,14 +866,20 @@ app.addEventListener("click", (e) => {
     return;
   }
   if (b.dataset.editClose) {
-    editing.delete(b.dataset.editClose);
+    closeEditor(b.dataset.editClose);
     frame();
     return;
   }
   if (b.dataset.cmd) {
     const cmd = JSON.parse(b.dataset.cmd) as Command;
-    // 個数変更・取り消しが済んだら、広げた行を閉じる
-    if (send(cmd) && ["set_qty", "remove_line", "remove_coupon"].includes(cmd.type)) editing.delete(`${cmd.register}:${cmd.side}`);
+    const key = `${cmd.register}:${cmd.side}`;
+    // 削除したら広げた行を閉じる。ほかの操作の前には、広げた行で変えた数量を確定する
+    if (["remove_line", "remove_coupon"].includes(cmd.type)) {
+      if (send(cmd)) editing.delete(key);
+    } else {
+      closeEditor(key);
+      send(cmd);
+    }
   }
   else if (b.dataset.form) form(b);
 });

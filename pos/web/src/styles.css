@@ -659,8 +659,18 @@ body.dragging .drop-hint { display: inline; }
 
 /* 数量の両脇の − ＋（数量 1 では − が「削除」）。押すとその場で数量が変わる */
 .qty-step { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; }
-.qty-step b { min-width: 1.4em; text-align: center; }
 .qty-step button { min-width: 26px; padding: 1px 5px; }
+/* 数量そのものは積極ボタン。テンキーで打っている間は破線の枠（ここで入力を受け付ける） */
+.qty-step .qty-key { min-width: 30px; font-weight: 600; }
+.qty-step .qty-key.typing { outline: 2px dashed var(--accent); outline-offset: 1px; }
+.qty-fixed { min-width: 1.4em; text-align: center; }
+/* 数量のテンキー（最下段を置き換える） */
+.qty-pad { display: flex; flex-direction: column; gap: 3px; height: 100%; }
+.qty-pad .pad-row { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; flex: 1 1 0; min-height: 0; }
+.qty-pad .pad-key { padding: 0; font-size: 14px; font-weight: 600; min-height: 0; }
+/* 引き返す「やめる」は左端、進める「決定」は右端 */
+.qty-pad .pad-foot { display: flex; align-items: center; gap: 6px; }
+.qty-pad .pad-foot > :first-child { margin-right: auto; }
 
 .emoney-choices { display: flex; flex-direction: column; gap: 6px; align-items: stretch; width: min(100%, 280px); margin: 0 auto; }
 /* チャージと残高確認は横に並べ、やめるは次の行に置く */

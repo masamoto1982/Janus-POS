@@ -839,7 +839,7 @@ app.addEventListener("click", (e) => {
     frame();
     return;
   }
-  // 明細の数量ボタン：行を広げて数量変更・取り消し（登録画面の中で完結。コアには決めたときだけ送る）
+  // 明細の数量ボタン：行を広げて数量変更・削除（登録画面の中で完結。コアには決めたときだけ送る）
   if (b.dataset.edit) {
     const [reg, side, id, qty] = b.dataset.edit.split(":");
     const key = `${reg}:${side}`;

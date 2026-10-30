@@ -312,7 +312,7 @@ details summary h3 { display: inline; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 180px; width: 180px; min-width: 0; padding: 12px 16px; font-size: 14px; }
 /* お支払い内容の確認は、角の丸い枠に入れず登録エリアいっぱいに広げる（最上段と会計バーは除く。2026-10-28 ユーザー） */
-/* 数量はボタンの形（押すと数量変更・取り消しの行が広がる） */
+/* 数量はボタンの形（押すと数量変更・削除の行が広がる） */
 .qty-btn { min-width: 34px; padding: 2px 8px; font: inherit; font-weight: 600; text-align: center; border-radius: 6px; cursor: pointer; }
 /* FF の「お渡し前」は押せるアイコン（押すとお渡し照合の画面） */
 button.tag.ff-verify { font: inherit; font-size: 11px; border: 1px solid currentColor; cursor: pointer; }

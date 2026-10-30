@@ -512,8 +512,8 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::FfButton => Ok(()),
         Action::RegisterFf => Err("FF はスタッフにお申し付けください"),
         Action::CheckFf => check_ff(c),
-        // セミセルフでは、お受け取りの個数を入力して確かめる
-        Action::ReceiveFf => Err("お受け取りの個数を入力して確かめてください"),
+        // セミセルフでは FF を登録できない（スタッフがログインして有人モードで登録・お渡しする）
+        Action::ReceiveFf => Err("FF のお受け取りの確認は有人モードで行います"),
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")

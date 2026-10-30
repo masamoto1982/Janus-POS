@@ -331,9 +331,23 @@ button.tag.ff-verify:disabled { cursor: not-allowed; }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* 引き返すボタンは左下 */
 .ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 8px 0 0; }
+/* お客様の「確認しました」は右下 */
+.ffv-foot.end { justify-content: flex-end; }
+.ff-return-list { list-style: none; margin: 0 0 auto; padding: 0; font-size: 15px; }
 /* 引き返すボタンは左下、進むボタンは右下 */
 .emoney-screen:has(> .emoney-foot) { align-self: stretch; flex: 1 0 auto; }
 .emoney-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
+/* 確認画面の最下段：引き返すボタン（やめる・閉じる）は左下、お客様の「確認しました」は右下 */
+.point-screen:has(> .screen-foot) { align-self: stretch; flex: 1 0 auto; }
+.screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
+/* 会計中の「商品登録に戻る」は確認画面の左下（中身の中央寄せは崩さない） */
+.confirm { position: relative; }
+.confirm:has(> .back-foot) { padding-bottom: 28px; }
+/* セミセルフは最下段に呼び出しボタンがあって狭いので、ボタンの分だけ上下の余白を詰める */
+.confirm:has(> .back-foot) > .point-screen { padding-top: 4px; padding-bottom: 4px; }
+.confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
+.confirm:has(> .back-foot) > .paybox p { margin: 4px 0 0; }
+.back-foot { position: absolute; left: 0; bottom: 0; }
 /* 狭い画面（セミセルフは最下段に呼び出しボタンがある）でもボタンまで収まるよう、詰めて置く */
 .change { font-size: 18px; margin: 8px 0; }
 
@@ -650,6 +664,8 @@ body.dragging .drop-hint { display: inline; }
 .lines tr.edit-row td { background: var(--accent-soft); padding: 4px 8px 8px; }
 .edit-box { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .qty-edit { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
+/* 「閉じる」は引き返すボタンなので左端。数量の − ＋ はその右 */
+.edit-box:not(:has(.qty-edit)) .edit-close { margin-right: auto; }
 .qty-edit b { min-width: 2em; text-align: center; font-size: 15px; }
 .qty-edit button { min-width: 32px; }
 

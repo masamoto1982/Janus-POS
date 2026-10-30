@@ -96,7 +96,7 @@ describe("view helpers", () => {
       staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "" }], mat_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
-    expect(callNotice(r, 6000, "customer")).toContain("店員が向かっています");
+    expect(callNotice(r, 6000, "customer")).toContain("スタッフが向かっています");
     expect(callNotice(r, 6000, "staff")).toBe("");
   });
 

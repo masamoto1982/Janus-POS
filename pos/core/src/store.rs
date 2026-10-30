@@ -26,7 +26,8 @@ pub const MAX_REGISTERS: u8 = 10;
 pub const MAX_MATS: u8 = 5;
 
 /// お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収が要る）
-const FF_RECEIVED_SELF: &str = "お渡し済みの FF の数量は係員が変更します。係員をお呼びください";
+const FF_RECEIVED_SELF: &str =
+    "お渡し済みの FF の数量はスタッフが変更します。スタッフをお呼びください";
 const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現金でお支払いください";
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）";
@@ -36,7 +37,7 @@ const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str =
     "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
 /// 荷物の受け取りの照合と引き渡しは、名札でログインした係員が行う
-const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、係員が名札でログインしてから行います";
+const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、スタッフがログインしてから行います";
 /// 荷物の受け取りは一件ずつ、ほかの商品と別に扱う
 const PICKUP_ALONE: &str =
     "荷物のお受け取りは一件ずつ、ほかの商品と別にお取り扱いします（お受け取りが済んでから登録してください）";
@@ -226,6 +227,12 @@ pub enum Command {
         side: Side,
         line_id: u32,
         handed: u32,
+    },
+    /// 有人モードのお客様側の「確認しました」：お渡し前の FF をまとめてお渡し済みにする
+    /// （スタッフ側の個数の照合ほど厳格にはしない）
+    ReceiveFf {
+        register: u8,
+        side: Side,
     },
     CompleteService {
         register: u8,
@@ -522,6 +529,7 @@ impl Command {
             | C::RegisterFf { register, .. }
             | C::FfButton { register, .. }
             | C::CheckFf { register, .. }
+            | C::ReceiveFf { register, .. }
             | C::CompleteService { register, .. }
             | C::ParcelLength { register, .. }
             | C::ParcelSize { register, .. }
@@ -572,6 +580,7 @@ impl Command {
         match self {
             C::RegisterFf { side, .. }
             | C::CheckFf { side, .. }
+            | C::ReceiveFf { side, .. }
             | C::RemoveLine { side, .. }
             | C::SetQty { side, .. }
             | C::RemoveCoupon { side, .. }
@@ -1616,7 +1625,7 @@ impl Store {
                 self.check_active(register, Action::FfButton)?;
                 self.call(register, CallKind::FastFood, "FF のご注文");
                 self.press(register)?;
-                done("係員をお呼びしました。FF のご注文を伺います")
+                done("スタッフをお呼びしました。FF のご注文を伺います")
             }
             C::CheckFf {
                 register,
@@ -1647,6 +1656,23 @@ impl Store {
                 } else {
                     format!("{name}：照合 NG（お渡し数 {handed} が注文数と合いません）")
                 })
+            }
+            C::ReceiveFf { register, side } => {
+                self.check(register, side, Action::ReceiveFf)?;
+                let r = self.reg_mut(register)?;
+                for l in &mut r.txn.lines {
+                    if matches!(
+                        l.kind,
+                        LineKind::Ff {
+                            state: FfState::Waiting
+                        }
+                    ) {
+                        l.kind = LineKind::Ff {
+                            state: FfState::Received,
+                        };
+                    }
+                }
+                done("お客様が FF のお受け取りを確認しました")
             }
             C::CompleteService {
                 register,
@@ -2277,9 +2303,9 @@ impl Store {
                 self.call(register, kind, detail);
                 self.press(register)?;
                 done(match topic {
-                    Some(CallTopic::Service) => "係員をお呼びしました（サービス）",
-                    Some(CallTopic::Tobacco) => "係員をお呼びしました（たばこ）",
-                    None => "係員をお呼びしました",
+                    Some(CallTopic::Service) => "スタッフをお呼びしました（サービス）",
+                    Some(CallTopic::Tobacco) => "スタッフをお呼びしました（たばこ）",
+                    None => "スタッフをお呼びしました",
                 })
             }
             C::ConfirmPointCard { register, side } => {
@@ -2349,7 +2375,7 @@ impl Store {
             C::RequestMenuCode { register } => {
                 let r = self.reg(register).ok_or("レジがありません")?;
                 if r.staff_state() != StaffState::Ready {
-                    return Err("店舗メニューは名札でログインした店員だけが使えます".into());
+                    return Err("店舗メニューはログインしたスタッフだけが使えます".into());
                 }
                 if r.menu.is_some_and(|m| m.side == Side::Customer) {
                     return Err("店舗メニューを開いています".into());
@@ -2360,7 +2386,7 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 r.menu = None;
                 r.menu_code = Some(code);
-                done("店員画面に表示されたパスワードを入力してください")
+                done("スタッフ側の画面に表示されたパスワードを入力してください")
             }
             C::Insert { register, amount } => self.insert(register, amount),
             C::TakeOutlet { register } => {
@@ -2813,7 +2839,7 @@ impl Store {
                 } else if ready {
                     format!("{}：受付内容を入力してください{back}", p.name)
                 } else {
-                    format!("{}：係員をお呼びしました{back}", p.name)
+                    format!("{}：スタッフをお呼びしました{back}", p.name)
                 })
             }
             Scanned::Product(p) => {
@@ -2837,7 +2863,9 @@ impl Store {
         let now = self.now;
         let r = self.reg_mut(register)?;
         if r.staff_state() != StaffState::Ready || side != Side::Staff {
-            return Err("宅配便の取り消しは、係員が店員側で伝票を読み取って行います".into());
+            return Err(
+                "宅配便の取り消しは、スタッフがスタッフ側で伝票を読み取って行います".into(),
+            );
         }
         if r.txn.paying {
             return Err("お会計中です（登録に戻ってから伝票を読み取ってください）".into());
@@ -2867,7 +2895,7 @@ impl Store {
     fn match_pickup(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         if r.staff_state() != StaffState::Ready || side != Side::Staff {
-            return Err("お預かりの荷物のバーコードは、係員が店員側で読み取ります".into());
+            return Err("お預かりの荷物のバーコードは、スタッフがスタッフ側で読み取ります".into());
         }
         let pk = r
             .txn
@@ -3048,10 +3076,10 @@ impl Store {
             if mode != Mode::Attended && !ready {
                 self.calls
                     .raise(register, CallKind::Bill, self.now, format!("{slips}枚"));
-                return done("公共料金のお支払いのため係員をお呼びしました");
+                return done("公共料金のお支払いのためスタッフをお呼びしました");
             }
             return done(format!(
-                "公共料金 {slips}枚：店員側の画面で払込票の内容を確認してください"
+                "公共料金 {slips}枚：スタッフ側の画面で払込票の内容を確認してください"
             ));
         }
         if pending && mode != Mode::Attended && !ready {
@@ -3061,14 +3089,14 @@ impl Store {
                 self.now,
                 format!("{}歳以上", age.unwrap_or(0)),
             );
-            return done("年齢確認のため係員をお呼びしました");
+            return done("年齢確認のためスタッフをお呼びしました");
         }
         if !pending {
             self.calls.resolve(register, CallKind::AgeCheck, self.now);
         }
         if pending {
             done(format!(
-                "{}歳以上の年齢確認があります。店員画面で年齢確認をするか選んでください",
+                "{}歳以上の年齢確認があります。スタッフ側の画面で年齢確認をするか選んでください",
                 age.unwrap_or(0)
             ))
         } else {
@@ -3272,7 +3300,7 @@ impl Store {
                     }
                 }
                 self.receipts -= 1;
-                return Err(format!("{e}。係員をお呼びください"));
+                return Err(format!("{e}。スタッフをお呼びください"));
             }
         };
         // おつりは排出口に出る（お客様が取り出すまで残る）
@@ -3360,7 +3388,7 @@ impl Store {
         let now = self.now;
         let r = self.reg(register).ok_or("レジがありません")?;
         if r.staff_state() != StaffState::Ready {
-            return Err("店舗メニューは名札でログインした店員だけが使えます".into());
+            return Err("店舗メニューはログインしたスタッフだけが使えます".into());
         }
         let Some(screen) = screen else {
             // 閉じる（お客様側のパスワード入力をやめるときも）
@@ -3377,7 +3405,7 @@ impl Store {
         if screen.side().is_some_and(|s| s != side) {
             return Err(match side {
                 Side::Staff => "お金の出し入れは、お客様側の画面の店舗メニューで行います",
-                Side::Customer => "この項目は店員側の画面の店舗メニューにあります",
+                Side::Customer => "この項目はスタッフ側の画面の店舗メニューにあります",
             }
             .into());
         }
@@ -3392,7 +3420,7 @@ impl Store {
             // 店員側はパスワード不要。お客様側は、店員画面に出た使い捨てパスワードを見た人だけが開ける
             None if side == Side::Customer => {
                 let Some(expected) = r.menu_code.clone() else {
-                    return Err("店員画面にパスワードを出してから入力してください".into());
+                    return Err("スタッフ側の画面にパスワードを出してから入力してください".into());
                 };
                 let given = code.unwrap_or_default().trim().to_ascii_uppercase();
                 if let Err(e) = self.auth.verify_menu_code(&given, &expected, now) {

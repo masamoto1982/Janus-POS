@@ -95,6 +95,9 @@ pub enum Action {
     FfButton,
     /// FF の明細のお渡し確認チェック（入れる・外す）
     CheckFf,
+    /// 有人モードで、お客様が FF を受け取ったことを確かめる（お客様側の「確認しました」）。
+    /// スタッフ側の照合ほど厳格ではなく、お渡し前の FF をまとめてお渡し済みにする
+    ReceiveFf,
     CompleteService,
     /// 荷物の料金が決まった後、次の荷物があるか（「ある」「ない」）を答える
     ParcelNext,
@@ -135,6 +138,7 @@ pub const ACTIONS: &[Action] = &[
     Action::RegisterFf,
     Action::FfButton,
     Action::CheckFf,
+    Action::ReceiveFf,
     Action::CompleteService,
     Action::ParcelNext,
     Action::RemoveLine,
@@ -220,9 +224,9 @@ impl Context {
         } else if self.bill_unchecked {
             Some(BILL_UNCHECKED)
         } else if self.age_choice_pending {
-            Some("店員が年齢確認をするか選んでいません")
+            Some("スタッフが年齢確認をするか選んでいません")
         } else if self.id_pending {
-            Some("店員が身分証の生年月日を入力していません")
+            Some("スタッフが身分証の生年月日を入力していません")
         } else if self.point_pending {
             Some(POINT_UNCONFIRMED)
         } else if self.coupon_unmatched {
@@ -247,7 +251,7 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 /// 似て非なる商品をクーポンのつもりで定価で買ってしまう事故を防ぐため、決済を止める
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります。対象商品を確かめるか、クーポンを取り消してください";
-const BILL_UNCHECKED: Denial = "店員が公共料金の内容を確認していません";
+const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";
 
 /// 電子マネーのチャージ・残高確認（残高不足の対応中は、その選択肢から）
@@ -278,11 +282,11 @@ fn hand_over_bills(c: &Context) -> Result<(), Denial> {
 /// お客様本人の意思表示・申告にあたる操作。お客様側の画面からしか押せず、
 /// どちらの画面が操作側でも押せる（画面の排他の例外）。
 ///
-/// いまはない（公共料金の内容は店員が確認する）。同じ性質の操作として、
+/// 有人モードで FF を受け取ったことの確認（「確認しました」）。同じ性質の操作として、
 /// クレジット・デビットの暗証番号入力（現実には専用端末で行うため扱わない）や
 /// 宅配便の危険物・禁制品がないことの申告（ラベル・ステッカーで行うため扱わない）がある。
-pub fn is_customer_only(_action: Action) -> bool {
-    false
+pub fn is_customer_only(action: Action) -> bool {
+    matches!(action, Action::ReceiveFf)
 }
 
 /// 店員本人が判断・確認する操作。店員側の画面からしか押せず、どちらの画面が操作側でも押せる。
@@ -371,9 +375,9 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
         return if side == fixed {
             Ok(())
         } else if matches!(action, Action::CheckBill | Action::HandOverBills) {
-            Err("払込票の確認・お渡しは店員側の画面で行います")
+            Err("払込票の確認・お渡しはスタッフ側の画面で行います")
         } else if is_staff_only(action) {
-            Err("年齢確認は店員側の画面で行います")
+            Err("年齢確認はスタッフ側の画面で行います")
         } else {
             Err("お客様側の画面で押していただきます")
         };
@@ -453,6 +457,10 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CashOut => require(!c.has_lines, "取引中は出金操作ができません"),
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
         Action::CheckFf => check_ff(c),
+        Action::ReceiveFf => {
+            check_ff(c)?;
+            require(c.ff_waiting, "お渡し前の FF はありません")
+        }
         Action::CompleteService => require(c.service_pending, "受付待ちのサービス商品はありません"),
         Action::ParcelNext => require(c.parcel_ask, "次の荷物をお尋ねする場面ではありません"),
         Action::RemoveLine => {
@@ -496,8 +504,10 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         // 呼び出しボタンの一つ。サービス・たばこと同じく会計中（年確の呼び出し中も）押せる。
         // 係員は「商品登録に戻る」で登録画面に引き返して FF を追加する
         Action::FfButton => Ok(()),
-        Action::RegisterFf => Err("FF は係員にお申し付けください"),
+        Action::RegisterFf => Err("FF はスタッフにお申し付けください"),
         Action::CheckFf => check_ff(c),
+        // セミセルフでは、お受け取りの個数を入力して確かめる
+        Action::ReceiveFf => Err("お受け取りの個数を入力して確かめてください"),
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")
@@ -510,7 +520,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
             // 荷物などのサービス商品は、係員が来て受付を済ませてから
             require(
                 !c.service_pending,
-                "係員がサービス商品の受付をするまでお待ちください",
+                "スタッフがサービス商品の受付をするまでお待ちください",
             )
         }
         Action::BackToRegistering => require(paying, "お会計中ではありません"),
@@ -522,12 +532,12 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         // 年確は係員が来て（名札でログインして有人モードになって）から
         Action::ChooseAgeCheck | Action::CheckId => {
             choose_age_check(c)?;
-            Err("年齢確認は係員が名札でログインしてから行います")
+            Err("年齢確認はスタッフがログインしてから行います")
         }
         // 払込票の確認は係員が来て（名札でログインして有人モードになって）から
         Action::CheckBill => {
             check_bill(c)?;
-            Err("払込票の確認は係員が名札でログインしてから行います")
+            Err("払込票の確認はスタッフがログインしてから行います")
         }
         // 決済の後に係員がログアウトしていても、お渡しは済ませられる
         Action::HandOverBills => hand_over_bills(c),
@@ -542,7 +552,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         | Action::EndStaffMode
         | Action::Pause
         | Action::CashOut
-        | Action::CashIn => Err("係員の操作です（名札でログインしてください）"),
+        | Action::CashIn => Err("スタッフの操作です（スタッフバーコードでログインしてください）"),
     }
 }
 

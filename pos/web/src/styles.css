@@ -204,9 +204,10 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 .reg-top .sum { white-space: nowrap; }
 .reg-top .action { margin-left: auto; display: flex; align-items: stretch; gap: 8px; }
 /* 電子マネー（チャージ・残高確認）は会計ボタンと同じ高さで、塗らずに枠線だけの控えめな表現 */
-.reg-top .emoney-top { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2px 10px; line-height: 1.2; font-weight: 400; }
-.reg-top .emoney-top b { font-size: 12px; font-weight: 400; }
-.reg-top .emoney-top small { font-size: 9px; color: var(--msg-weak); }
+/* 電子マネーのチャージ・残高確認は上の段（取引中止があった場所）に、取引中止と同じ控えめな大きさで */
+.reg-top .emoney-info { font-size: 11px; padding: 2px 8px; font-weight: 400; }
+.reg-top .emoney-info b { font-weight: 400; }
+.reg-top .emoney-info small { font-size: 10px; margin-left: 4px; color: var(--msg-weak); }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 /* 登録の明細は表示エリアが狭いので小ぶりに */
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
@@ -228,7 +229,7 @@ button {
   background: var(--btn-on); color: var(--btn-on-ink);
 }
 button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
-.ff-tab, .ff-arrow, .ff-item, .guide-btn, .void-btn, .call-btn, .hold-confirm, .reg-top .emoney-top, .swipe-tabs button,
+.ff-tab, .ff-arrow, .ff-item, .guide-btn, .void-btn, .call-btn, .hold-confirm, .reg-top .emoney-info, .swipe-tabs button,
 .method-list .seg {
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong);
 }

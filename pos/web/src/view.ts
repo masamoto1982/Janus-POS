@@ -493,7 +493,7 @@ function methodRow(reg: number, side: Side, method: string | null, inserted: num
     const u = unavailable.find((x) => x.method === m);
     return u ? { action: st.action, allowed: false, reason: u.reason } : st;
   };
-  return `<div class="row wrap ${cls}">${METHODS
+  return `<div class="row method-row ${cls}">${METHODS
     .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, off(m), `seg ${method === m ? "on" : ""}`))
     .join("")}</div>`;
 }

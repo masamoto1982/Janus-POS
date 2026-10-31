@@ -1425,44 +1425,32 @@ export function storeMenu(r: RegisterView): string {
   }
 }
 
-const HOUR_MODE: Record<HourMode, { label: string; mark: string; cls: string }> = {
-  neutral: { label: "ニュートラル", mark: "－", cls: "neutral" },
-  attended: { label: "有人固定", mark: "有人", cls: "attended" },
-  semi_self: { label: "セミセルフ固定", mark: "セミ", cls: "semi" },
+const HOUR_MODE: Record<HourMode, string> = {
+  neutral: "ニュートラル",
+  attended: "有人固定",
+  semi_self: "セミセルフ固定",
 };
-/** モード設定で、時間帯に塗るモード（キーはレジ番号。既定は有人固定） */
-export const modeBrush = new Map<number, HourMode>();
 
 /**
- * モード設定：時間帯（0〜23 時台）ごとに稼働モードを選ぶ（変更はオーナーだけ）。
- * 上でモードを選び、下の 24 の時間帯を押すとそのモードになる（色を塗るように選ぶ）。
- * 時間帯は濃さと文字で見分ける：有人固定は濃い塗り、セミセルフ固定は薄い塗り、ニュートラルは枠だけ。
+ * モード設定：時間帯（0〜23 時台）のリストで、時間帯ごとにセレクタで稼働モードを選ぶ（変更はオーナーだけ）。
  * 推奨は「常時固定」か「時間帯に応じた固定」。混みあってきたら切り替えるような運用はしない（セミセルフはサブ）
  */
 function modeHoursMenu(r: RegisterView, head: string): string {
   const reg = r.id;
   const owner = r.staff.role === "owner";
-  const lock: ActionState | undefined = owner ? undefined : { action: "set_mode_hours", allowed: false, reason: "オーナーだけが変更できます" };
-  const brush = modeBrush.get(reg) ?? "attended";
   const now = new Date().getHours();
-  const palette = (Object.keys(HOUR_MODE) as HourMode[])
-    .map((m) => `<button type="button" class="seg brush${m === brush ? " on" : ""}" data-brush="${reg}:${m}"${owner ? "" : " disabled"}>${HOUR_MODE[m].label}</button>`)
-    .join("");
-  const cells = r.mode_hours
-    .map((m, h) =>
-      btn("", { type: "set_mode_hours", register: reg, hours: [h], mode: brush }, lock, `hour-cell ${HOUR_MODE[m].cls}${h === now ? " now" : ""}`).replace(
-        "></button>",
-        ` aria-label="${h}時台：${HOUR_MODE[m].label}"><b>${h}時</b><small>${HOUR_MODE[m].mark}</small></button>`,
-      ),
+  const rows = r.mode_hours
+    .map(
+      (m, h) => `<label class="hour-row${h === now ? " now" : ""}"><span>${h}時台</span><select data-hourmode="${reg}:${h}" aria-label="${h}時台の稼働モード"${owner ? "" : ' disabled title="オーナーだけが変更できます"'}>${(Object.keys(HOUR_MODE) as HourMode[])
+        .map((k) => `<option value="${k}"${k === m ? " selected" : ""}>${HOUR_MODE[k]}</option>`)
+        .join("")}</select></label>`,
     )
     .join("");
-  const all = btn("全時間帯", { type: "set_mode_hours", register: reg, hours: [...Array(24).keys()], mode: brush }, lock, "brush-all");
   return `${head}
-    <p class="muted">レジ${reg}${owner ? "" : "（変更はオーナーだけ）"}：モードを選んでから時間帯を押します</p>
-    <div class="row mode-brush">${palette}</div>
-    <div class="hour-grid" role="group" aria-label="時間帯ごとのモード">${cells}</div>
-    <div class="row mode-hours-foot"><span class="muted">枠の太い時間帯がいまの時間</span>${all}</div>
-    <p class="muted">ニュートラルは基本セミセルフで、名札で有人に切り替えます。有人固定の時間帯に店員がいなければ休止中にし、セミセルフ固定でも店員が手伝った取引が済めばセミセルフに戻ります。お客様の取引の途中ではモードを変えません。混雑に合わせた切り替えはしません（セミセルフはサブ）。</p>`;
+    <p class="muted">レジ${reg}の時間帯ごとの稼働モード${owner ? "" : "（変更はオーナーだけ）"}</p>
+    <div class="hour-list">${rows}</div>
+    <p class="muted">太字がいまの時間帯</p>
+    <p class="muted">ニュートラルは基本セミセルフで、スタッフバーコードで有人に切り替えます。有人固定の時間帯にスタッフがいなければ休止中にし、セミセルフ固定でもスタッフが手伝った取引が済めばセミセルフに戻ります。お客様の取引の途中ではモードを変えません。混雑に合わせた切り替えはしません（セミセルフはサブ）。</p>`;
 }
 
 // ---------------------------------------------------------------------------

@@ -28,7 +28,6 @@ import {
   emoneyFan,
   PAD,
   padValue,
-  modeBrush,
   padValueKey,
   type PadTarget,
   screenHead,
@@ -697,6 +696,12 @@ app.addEventListener("change", (e) => {
     frame();
     return;
   }
+  // モード設定：時間帯ごとの稼働モード
+  if (sel.dataset.hourmode) {
+    const [reg, h] = sel.dataset.hourmode.split(":").map(Number);
+    send({ type: "set_mode_hours", register: reg, hours: [h], mode: sel.value as HourMode });
+    return;
+  }
   if (sel.dataset.rulesTab !== undefined) {
     rulesTab = sel.value as RulesTab;
     render();
@@ -814,13 +819,6 @@ app.addEventListener("click", (e) => {
   }
   // 稼働モードのバッジ：開いた側の画面で店舗メニューを開く・閉じる。
   // お客様側は、店員画面に出る使い捨てパスワードを入力して開く
-  // モード設定：時間帯に塗るモードを選ぶ（画面の中だけの選択）
-  if (b.dataset.brush) {
-    const [reg, mode] = b.dataset.brush.split(":");
-    modeBrush.set(Number(reg), mode as HourMode);
-    frame();
-    return;
-  }
   if (b.dataset.gear) {
     const [reg, side] = b.dataset.gear.split(":") as [string, Side];
     const r = snap.registers.find((x) => x.id === Number(reg));

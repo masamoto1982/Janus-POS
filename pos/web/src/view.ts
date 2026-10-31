@@ -106,7 +106,7 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
   return `<div class="ffv-screen">
       <div class="big">お渡しの確認</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="ffv-foot"><button type="button" class="small ghost" data-ffverify-close="${reg}:${side}">商品登録に戻る</button></div>
+      <div class="ffv-foot"><button type="button" class="small ghost back-btn" data-ffverify-close="${reg}:${side}" aria-label="商品登録に戻る">商品登録に<br>戻る</button></div>
     </div>`;
 }
 
@@ -385,7 +385,8 @@ const customerOnly = (html: string): string => `<span class="customer-only">${ht
 
 /** 会計中の確認画面の左下に置く、手続きを引き返すボタン（引き返すボタンは左） */
 function backFoot(reg: number, side: Side, st: ActionState): string {
-  return `<div class="back-foot">${btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, st, "small ghost")}</div>`;
+  // 「商品登録に戻る」は小ボタン（二行にして収める）
+  return `<div class="back-foot">${btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, st, "small ghost back-btn").replace(">商品登録に戻る<", ">商品登録に<br>戻る<")}</div>`;
 }
 
 /** 公共料金の受付枚数。合計金額よりも大事な情報なので、どの確認画面でも大きく出す */

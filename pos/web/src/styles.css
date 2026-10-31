@@ -347,7 +347,7 @@ details summary h3 { display: inline; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: 14px; }
 /* 確認画面の選択肢は大きいボタン（取引中止・お会計と同じ大きさ） */
-.confirm button:not(.tag):not(.seg):not(.pad-field) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
+.confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 /* 支払方法は切り替えボタンの並び。セミセルフの狭い確認画面にも収まるよう、高さは小さいボタンにそろえる */
 .method-row { flex-wrap: wrap; justify-content: center; gap: 4px; }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
@@ -380,7 +380,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
 /* 会計中の「商品登録に戻る」は確認画面の左下（中身の中央寄せは崩さない） */
 .confirm { position: relative; }
-.confirm:has(> .back-foot) { padding-bottom: calc(var(--btn-h) + 4px); }
+.confirm:has(> .back-foot) { padding-bottom: calc(var(--btn-sm-h) + 4px); }
 /* セミセルフは最下段に呼び出しボタンがあって狭いので、ボタンの分だけ上下の余白を詰める */
 .confirm:has(> .back-foot) > .point-screen { padding-top: 2px; padding-bottom: 2px; gap: 6px; }
 .confirm:has(> .back-foot) > .point-screen .big { margin-bottom: 0; }
@@ -388,6 +388,8 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
 .confirm:has(> .back-foot) > .paybox p { margin: 2px 0 0; font-size: 12px; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
+/* 「商品登録に戻る」は小ボタン（56×26）。文字は二行にして収める */
+.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 2px; font-size: 10px; line-height: 1.1; white-space: nowrap; }
 /* 狭い画面（セミセルフは最下段に呼び出しボタンがある）でもボタンまで収まるよう、詰めて置く */
 .change { font-size: 18px; margin: 8px 0; }
 

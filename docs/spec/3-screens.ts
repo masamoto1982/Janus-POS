@@ -129,8 +129,8 @@ export const SCENES: Scene[] = [
     group: "常設部分",
     title: "会計中の引き返すボタン",
     when: "会計ボタンの後（年確・ポイント・公共料金・決済手段など、会計中のどの確認画面でも）",
-    staff: { buttons: [{ label: "商品登録に戻る", tone: "消極", note: "確認画面の左下。有人のスタッフ側。セミセルフでは顧客側と同じものを映す" }] },
-    customer: { buttons: [{ label: "商品登録に戻る", tone: "消極", note: "確認画面の左下。セミセルフだけ（有人の顧客側には出さない）" }] },
+    staff: { buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。確認画面の左下。有人のスタッフ側。セミセルフでは顧客側と同じものを映す" }] },
+    customer: { buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。確認画面の左下。セミセルフだけ（有人の顧客側には出さない）" }] },
     rules: ["P-05", "P-19"],
     source: "backFoot",
   },
@@ -298,7 +298,7 @@ export const SCENES: Scene[] = [
     staff: {
       strong: ["お渡しの確認"],
       parts: ["表：品目｜注文数｜お渡し数（入力欄。押すとテンキー）｜照合（OK／NG）"],
-      buttons: [{ label: "商品登録に戻る", tone: "消極", note: "左下" }],
+      buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。左下" }],
     },
     customer: {
       strong: ["FF のお受け取りの確認"],
@@ -884,7 +884,7 @@ export const SCENES: Scene[] = [
     customer: {
       strong: ["お渡しの確認"],
       parts: ["表：品目｜注文数｜お受け取り数（入力）｜照合"],
-      buttons: [{ label: "商品登録に戻る", tone: "消極", note: "左下" }],
+      buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。左下" }],
     },
     rules: ["P-08", "P-16", "P-19"],
     source: "ffVerifyScreen",

@@ -860,16 +860,19 @@ export function emoneyFan(r: RegisterView, side: Side, main: string): string {
   const welcomeShown = main.includes('class="welcome');
   const registering = v.phase === "registering" && main.includes('class="reg-top"') && !main.includes('class="confirm"');
   if (!welcomeShown && !registering) return "";
-  const label = `<span><b>電子マネー</b><small>チャージ<br>残高確認</small></span>`;
+  // 商品登録画面では登録の妨げにならないよう控えめな大きさにし、「電子マネー」だけを出す
+  const compact = !welcomeShown;
+  const label = compact ? `<span><b>電子マネー</b></span>` : `<span><b>電子マネー</b><small>チャージ<br>残高確認</small></span>`;
+  const cls = `emoney-fan${compact ? " compact" : ""}`;
   const own: Side = attended ? "staff" : "customer";
-  if (side !== own) return `<button type="button" class="emoney-fan mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;
+  if (side !== own) return `<button type="button" class="${cls} mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;
   if (!attended && registering) {
     // セミセルフのお買い物の途中：スタッフを呼ぶ
     const st = find(r.customer.actions, "call_staff");
     const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
-    return `<button type="button" class="emoney-fan" data-hold="${esc(JSON.stringify(cmd))}" title="スタッフを呼んで手続きします（押している間鳴ります）"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}>${label}</button>`;
+    return `<button type="button" class="${cls}" data-hold="${esc(JSON.stringify(cmd))}" title="スタッフを呼んで手続きします（押している間鳴ります）"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}>${label}</button>`;
   }
-  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, find(v.actions, "emoney"), "emoney-fan").replace("></button>", `>${label}</button>`);
+  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, find(v.actions, "emoney"), cls).replace("></button>", `>${label}</button>`);
 }
 
 /**

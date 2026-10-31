@@ -129,8 +129,8 @@ export const SCENES: Scene[] = [
     group: "常設部分",
     title: "会計中の引き返すボタン",
     when: "会計ボタンの後（年確・ポイント・公共料金・決済手段など、会計中のどの確認画面でも）",
-    staff: { buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。確認画面の左下。有人のスタッフ側。セミセルフでは顧客側と同じものを映す" }] },
-    customer: { buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。確認画面の左下。セミセルフだけ（有人の顧客側には出さない）" }] },
+    staff: { buttons: [{ label: "バック", tone: "消極", note: "小ボタン。確認画面の左下。有人のスタッフ側。セミセルフでは顧客側と同じものを映す" }] },
+    customer: { buttons: [{ label: "バック", tone: "消極", note: "小ボタン。確認画面の左下。セミセルフだけ（有人の顧客側には出さない）" }] },
     rules: ["P-05", "P-19"],
     source: "backFoot",
   },
@@ -278,7 +278,7 @@ export const SCENES: Scene[] = [
       parts: ["スタッフ：〈名前〉／税の内訳", "明細（品目・数量・小計）", "FF の札「お渡し前」（押すとお渡しの確認）／「お渡し済」"],
       buttons: [
         { label: "−（数量 1 では削除）", tone: "消極", note: "数量の左。押すとその場で数量が変わる" },
-        { label: "〈数量〉", tone: "入力欄", note: "押すとテンキーのポップアップが開き、新しい数量を打ち込む（やめる｜決定）" },
+        { label: "〈数量〉", tone: "入力欄", note: "押すとテンキーのポップアップが開き、新しい数量を打ち込む（バック｜決定）" },
         { label: "＋", tone: "消極", note: "数量の右。サービス商品とクーポンは削除と数字だけ" },
       ],
     },
@@ -298,7 +298,7 @@ export const SCENES: Scene[] = [
     staff: {
       strong: ["お渡しの確認"],
       parts: ["表：品目｜注文数｜お渡し数（入力欄。押すとテンキー）｜照合（OK／NG）"],
-      buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。左下" }],
+      buttons: [{ label: "バック", tone: "消極", note: "小ボタン。左下" }],
     },
     customer: {
       strong: ["FF のお受け取りの確認"],
@@ -389,7 +389,7 @@ export const SCENES: Scene[] = [
       weak: ["三辺の長さの合計を入力してください（入力エラーのときはその理由）"],
       parts: ["入力欄：長さ 〈 〉cm（押すとテンキー）"],
       buttons: [
-        { label: "戻る", tone: "消極", note: "この荷物の受付をやめる" },
+        { label: "バック", tone: "消極", note: "この荷物の受付をやめる" },
         { label: "決定", tone: "積極" },
       ],
     },
@@ -411,7 +411,7 @@ export const SCENES: Scene[] = [
       weak: ["重量を入力してください"],
       parts: ["入力欄：重さ 〈 〉kg（押すとテンキー。小数点あり）"],
       buttons: [
-        { label: "戻る", tone: "消極" },
+        { label: "バック", tone: "消極" },
         { label: "決定", tone: "積極" },
       ],
     },
@@ -429,7 +429,7 @@ export const SCENES: Scene[] = [
       strong: ["お届け先の郵便番号を入力してください"],
       parts: ["入力欄：例 100-0001（押すとテンキー）"],
       buttons: [
-        { label: "戻る", tone: "消極" },
+        { label: "バック", tone: "消極" },
         { label: "決定", tone: "積極" },
       ],
     },
@@ -672,7 +672,7 @@ export const SCENES: Scene[] = [
       buttons: [
         { label: "チャージ", tone: "積極" },
         { label: "残高確認", tone: "積極" },
-        { label: "やめる", tone: "消極", note: "左下" },
+        { label: "バック", tone: "消極", note: "左下" },
       ],
     },
     customer: {
@@ -693,7 +693,7 @@ export const SCENES: Scene[] = [
     staff: {
       strong: ["チャージする紙幣を入れてください"],
       weak: ["入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）／入れおわったら、電子マネーを入金ボックスにかざしてください"],
-      buttons: [{ label: "やめる", tone: "消極", note: "左下" }],
+      buttons: [{ label: "バック", tone: "消極", note: "左下" }],
     },
     customer: { mirror: true },
     rules: ["P-05", "P-19"],
@@ -709,7 +709,7 @@ export const SCENES: Scene[] = [
     staff: {
       strong: ["電子マネーを入金ボックスにかざしてください → かざした後：〈金額〉"],
       weak: ["かざした後：電子マネーの残高（金額の上）"],
-      buttons: [{ label: "やめる → かざした後：閉じる", tone: "消極", note: "左下" }],
+      buttons: [{ label: "バック → かざした後：閉じる", tone: "消極", note: "左下" }],
     },
     customer: { mirror: true },
     rules: ["P-05", "P-19"],
@@ -791,7 +791,7 @@ export const SCENES: Scene[] = [
       parts: ["入力欄：例 U8X3"],
       buttons: [
         { label: "開く", tone: "積極", note: "入力欄の右" },
-        { label: "やめる", tone: "消極", note: "左下" },
+        { label: "バック", tone: "消極", note: "左下" },
       ],
     },
     rules: ["P-07", "P-19"],
@@ -808,7 +808,7 @@ export const SCENES: Scene[] = [
       strong: ["店舗メニュー（太字）"],
       weak: ["担当：〈名前〉"],
       buttons: [
-        { label: "‹ 戻る", tone: "消極", note: "各項目の画面の左上" },
+        { label: "バック", tone: "消極", note: "各項目の画面の左上" },
         { label: "返品返金／緊急出金／取引外入金／経費支出／自動釣銭機（両替）", tone: "積極", note: "取引中は押せない" },
         { label: "ログアウト／レジ休止中", tone: "積極" },
       ],
@@ -884,7 +884,7 @@ export const SCENES: Scene[] = [
     customer: {
       strong: ["お渡しの確認"],
       parts: ["表：品目｜注文数｜お受け取り数（入力）｜照合"],
-      buttons: [{ label: "商品登録に戻る", tone: "消極", note: "小ボタン。左下" }],
+      buttons: [{ label: "バック", tone: "消極", note: "小ボタン。左下" }],
     },
     rules: ["P-08", "P-16", "P-19"],
     source: "ffVerifyScreen",

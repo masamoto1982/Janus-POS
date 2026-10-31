@@ -849,7 +849,7 @@ app.addEventListener("click", (e) => {
     frame();
     return;
   }
-  // 商品登録に戻る（照合の途中でも）。入力した数は消す
+  // バック：商品登録に戻る（照合の途中でも）。入力した数は消す
   if (b.dataset.ffverifyClose) {
     ffVerifying.delete(b.dataset.ffverifyClose);
     for (const k of [...ffvInput.keys()]) if (k.startsWith(`${b.dataset.ffverifyClose}:`)) ffvInput.delete(k);

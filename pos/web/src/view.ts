@@ -68,7 +68,7 @@ function ffTag(reg: number, side: Side, l: { kind: string; state?: FfState }, a:
   return `<button type="button" class="tag ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
 }
 
-/** お渡し照合の画面を開いている画面（レジ:画面）。「商品登録に戻る」で閉じる */
+/** お渡し照合の画面を開いている画面（レジ:画面）。「バック」で閉じる */
 export const ffVerifying = new Set<string>();
 /** 照合画面に入力したお渡し数（レジ:画面:明細番号 → 入力） */
 export const ffvInput = new Map<string, string>();
@@ -85,7 +85,7 @@ function ffVerifyRows<L extends { id: number; kind: string; state?: FfState }>(r
 }
 
 /**
- * お渡し照合：表で 品目｜注文数｜お渡し数｜照合。手続きを引き返す「商品登録に戻る」は左下に置く
+ * お渡し照合：表で 品目｜注文数｜お渡し数｜照合。手続きを引き返す「バック」は左下に置く
  * （物事は右へ進む感覚に合わせ、進めるボタンは右、引き返すボタンは左）。お渡し数を入力すると、その場で注文数と比べて OK / NG を出す
  * （判定ボタンはない）。注文数を見ながら数を打ち込むことで、いくつ渡したかに注意が向く。
  * 画面が切り替わると直前に見た数は忘れやすいので、注文数はここにも出す
@@ -106,7 +106,7 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
   return `<div class="ffv-screen">
       <div class="big">お渡しの確認</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="ffv-foot"><button type="button" class="small ghost back-btn" data-ffverify-close="${reg}:${side}" aria-label="商品登録に戻る">商品登録に<br>戻る</button></div>
+      <div class="ffv-foot"><button type="button" class="small ghost back-btn" data-ffverify-close="${reg}:${side}" >バック</button></div>
     </div>`;
 }
 
@@ -267,7 +267,7 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
   // 「戻る」は手続きを一段階引き返す（左）。三辺の合計から戻ると、この荷物の受付をやめる
-  const back = (label = "戻る") => btn(label, { type: "parcel_back", register: reg, line_id: l.id }, st, "ghost");
+  const back = (label = "バック") => btn(label, { type: "parcel_back", register: reg, line_id: l.id }, st, "ghost");
   const field = (target: PadTarget, placeholder: string, aria: string) =>
     padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`);
   if (!p.size && !p.sum_cm) {
@@ -385,8 +385,8 @@ const customerOnly = (html: string): string => `<span class="customer-only">${ht
 
 /** 会計中の確認画面の左下に置く、手続きを引き返すボタン（引き返すボタンは左） */
 function backFoot(reg: number, side: Side, st: ActionState): string {
-  // 「商品登録に戻る」は小ボタン（二行にして収める）
-  return `<div class="back-foot">${btn("商品登録に戻る", { type: "back_to_registering", register: reg, side }, st, "small ghost back-btn").replace(">商品登録に戻る<", ">商品登録に<br>戻る<")}</div>`;
+  // 「バック」は小ボタン（二行にして収める）
+  return `<div class="back-foot">${btn("バック", { type: "back_to_registering", register: reg, side }, st, "small ghost back-btn")}</div>`;
 }
 
 /** 公共料金の受付枚数。合計金額よりも大事な情報なので、どの確認画面でも大きく出す */
@@ -605,7 +605,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(l.name)}<span class="muted">いまの数量 ${l.qty}</span></div>
         <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("0", "0", "pad-key zero")}${k("back", "←", "pad-key neg")}</div>
-        <div class="qty-pop-foot">${k("cancel", "やめる", "neg")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-foot">${k("cancel", "バック", "neg")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -666,7 +666,7 @@ export function padPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(title)}${now}</div>
         <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}${k("back", "←", "pad-key neg")}</div>
-        <div class="qty-pop-foot">${k("cancel", "やめる", "neg")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-foot">${k("cancel", "バック", "neg")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -980,7 +980,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     v.total,
     itemCount(v.lines),
     // 「投入おわり」は例外なくお客様側だけに出す（入れ終わったかは、お客様にしか分からない）。
-    // 会計ボタンは会計中に別のボタンに置き換えない（引き返す「商品登録に戻る」は確認画面の左下）
+    // 会計ボタンは会計中に別のボタンに置き換えない（引き返す「バック」は確認画面の左下）
     (paying && v.method === "cash" && ro
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro || paying
@@ -992,7 +992,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   );
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞回収・クーポン＞ポイントカード＞決済手段。
-  // 会計中は、手続きを引き返す「商品登録に戻る」を確認画面の左下に置く（スタッフ側だけ）
+  // 会計中は、手続きを引き返す「バック」を確認画面の左下に置く（スタッフ側だけ）
   const back = paying && !ro ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${notice}${confirm(body + back)}`;
   // 取引中止の確認は、ほかのどの確認よりも先に出す（どの場面からでも中止できる）
@@ -1188,17 +1188,17 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     return `<div class="point-screen emoney-screen">
         <div class="big">電子マネー</div>
         <p class="muted">選択してください</p>
-        ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("やめる")}`}
+        ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("バック")}`}
       </div>`;
   }
   if (e.kind === "inquiry")
     return e.balance === null
-      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを入金ボックスにかざしてください</div>${close("やめる")}</div>`
+      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを入金ボックスにかざしてください</div>${close("バック")}</div>`
       : `<div class="point-screen emoney-screen"><p>電子マネーの残高</p><div class="big emoney-balance">${yen(e.balance)}</div>${close("閉じる")}</div>`;
   return `<div class="point-screen emoney-screen">
       <div class="big">チャージする紙幣を入れてください</div>
       <p>${e.inserted ? "入れおわったら、電子マネーを入金ボックスにかざしてください" : "入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）"}</p>
-      ${close("やめる")}
+      ${close("バック")}
     </div>`;
 }
 
@@ -1365,7 +1365,7 @@ function menuCode(r: RegisterView, side: Side): string {
         <input type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例 U8X3" data-menucode="1" data-key="mc-${reg}" aria-label="パスワード" />
         <button class="primary" data-form="menucode" data-reg="${reg}">開く</button>
       </div>
-      <div class="screen-foot">${btn("やめる", { type: "open_menu", register: reg, side: "customer", screen: null }, undefined, "ghost")}</div>
+      <div class="screen-foot">${btn("バック", { type: "open_menu", register: reg, side: "customer", screen: null }, undefined, "ghost")}</div>
     </div>`);
 }
 
@@ -1377,7 +1377,7 @@ export function storeMenu(r: RegisterView): string {
   const side = m.side;
   const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side, screen, ...extra });
   const head = (title: string) =>
-    `<div class="menu-head">${btn("‹ 戻る", go("top"), undefined, "small ghost")}<b>${esc(title)}</b></div>`;
+    `<div class="menu-head">${btn("バック", go("top"), undefined, "small ghost")}<b>${esc(title)}</b></div>`;
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   switch (m.screen) {
     case "top":
@@ -1470,7 +1470,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (!c.lines.length && !c.coupons.length) voidAsk.delete(reg);
   if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side, a("emoney"))}`;
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）。
-  // お会計中は、手続きを引き返す「商品登録に戻る」を確認画面の左下に置く
+  // お会計中は、手続きを引き返す「バック」を確認画面の左下に置く
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${notice}${confirm(body + back)}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));

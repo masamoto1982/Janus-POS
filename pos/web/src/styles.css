@@ -378,7 +378,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 /* 確認画面の最下段：引き返すボタン（やめる・閉じる）は左下、お客様の「確認しました」は右下 */
 .point-screen:has(> .screen-foot) { align-self: stretch; flex: 1 0 auto; }
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
-/* 会計中の「商品登録に戻る」は確認画面の左下（中身の中央寄せは崩さない） */
+/* 会計中の「バック」は確認画面の左下（中身の中央寄せは崩さない） */
 .confirm { position: relative; }
 .confirm:has(> .back-foot) { padding-bottom: calc(var(--btn-sm-h) + 4px); }
 /* セミセルフは最下段に呼び出しボタンがあって狭いので、ボタンの分だけ上下の余白を詰める */
@@ -388,8 +388,8 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
 .confirm:has(> .back-foot) > .paybox p { margin: 2px 0 0; font-size: 12px; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
-/* 「商品登録に戻る」は小ボタン（56×26）。文字は二行にして収める */
-.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 2px; font-size: 10px; line-height: 1.1; white-space: nowrap; }
+/* 「バック」（会計中に商品登録へ引き返す・お渡し照合を閉じる）は小ボタン（56×26） */
+.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
 /* 狭い画面（セミセルフは最下段に呼び出しボタンがある）でもボタンまで収まるよう、詰めて置く */
 .change { font-size: 18px; margin: 8px 0; }
 

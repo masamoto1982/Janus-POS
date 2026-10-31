@@ -79,6 +79,9 @@ function reset(registers: number, mats: number): void {
   sim?.free();
   sim = new PosSimulator(Date.now() & 0xffff, registers, mats);
   t0 = performance.now();
+  // 時間帯でのモード固定は、この端末の時計で決める
+  const d = new Date();
+  sim.dispatch(JSON.stringify({ type: "set_clock", day_ms: ((d.getHours() * 60 + d.getMinutes()) * 60 + d.getSeconds()) * 1000 + d.getMilliseconds() }));
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   buildSkeleton();
   wireSwipe();
@@ -633,6 +636,18 @@ function form(b: HTMLElement): void {
     case "parcel-postal":
       send({ type: "parcel_postal", register: reg, line_id: Number(b.dataset.line), postal: padValue.get(padValueKey(reg, "post", Number(b.dataset.line))) ?? "" });
       break;
+    case "modefix": {
+      const h = (t: PadTarget) => padValue.get(padValueKey(reg, t));
+      const r = snap.registers.find((x) => x.id === reg);
+      const cur = r?.mode_fix.kind === "schedule" ? r.mode_fix : undefined;
+      const from = Number(h("hfrom") ?? cur?.from);
+      const until = Number(h("huntil") ?? cur?.until);
+      if (send({ type: "set_mode_fix", register: reg, fix: { kind: "schedule", from, until } })) {
+        padValue.delete(padValueKey(reg, "hfrom"));
+        padValue.delete(padValueKey(reg, "huntil"));
+      }
+      break;
+    }
     case "birth":
       if (send({ type: "check_id", register: reg, side: "staff", birth: padValue.get(padValueKey(reg, "birth")) ?? "", today: isoDate(new Date()) })) padValue.delete(padValueKey(reg, "birth"));
       break;

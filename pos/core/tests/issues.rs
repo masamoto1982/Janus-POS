@@ -3158,3 +3158,88 @@ fn customer_confirms_ff_receipt_in_attended_mode() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
 }
+
+/// モード設定：レジごとに有人／セミセルフを固定できる（変更はオーナーだけ）。
+/// 有人に固定したレジは、店員がいない間は休止中になる（取引の途中では変えない）
+#[test]
+fn attended_fix_pauses_the_register_without_staff() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"set_mode_fix","register":1,"fix":{"kind":"attended"}})
+        )
+        .is_err(),
+        "オーナー以外は変えられない"
+    );
+    login_as(&mut s, 1, "ST000");
+    ok(
+        &mut s,
+        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"attended"}}),
+    );
+    assert_eq!(reg(&s, 1).mode_fix_label, "常時有人");
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    assert!(reg(&s, 1).paused, "店員がいなければ休止中");
+    assert!(!reg(&s, 2).paused, "ほかのレジはそのまま");
+    login(&mut s, 1);
+    let v = reg(&s, 1);
+    assert!(!v.paused);
+    assert_eq!(v.mode, Mode::Attended);
+}
+
+/// セミセルフに固定したレジでも、店員はいつでもログインして手伝える。その取引が済めばセミセルフに戻る
+#[test]
+fn semi_self_fix_returns_after_the_helped_transaction() {
+    let mut s = Store::new(1, 2, 1);
+    login_as(&mut s, 1, "ST000");
+    ok(
+        &mut s,
+        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"semi_self"}}),
+    );
+    assert_eq!(reg(&s, 1).mode, Mode::Attended, "取引がなければそのまま");
+    scan(&mut s, 1, "customer", BREAD);
+    login(&mut s, 1);
+    assert_eq!(reg(&s, 1).mode, Mode::Attended, "取引の途中は有人のまま");
+    ok(
+        &mut s,
+        json!({"type":"void_transaction","register":1,"side":"staff"}),
+    );
+    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf, "取引が済めばセミセルフ");
+}
+
+/// 時間帯で固定：有人の時間帯だけ有人。時間帯が変わっても、取引の途中ではモードを変えない
+#[test]
+fn schedule_fix_follows_the_clock_but_not_mid_transaction() {
+    const H: u64 = 60 * 60 * 1000;
+    let mut s = Store::new(1, 2, 1);
+    ok(&mut s, json!({"type":"set_clock","day_ms":7 * H - 60_000}));
+    login_as(&mut s, 1, "ST000");
+    assert!(run(
+        &mut s,
+        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"schedule","from":7,"until":7}})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"schedule","from":7,"until":23}}),
+    );
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    assert!(!reg(&s, 1).paused, "6時59分はセミセルフ");
+    scan(&mut s, 1, "customer", BREAD);
+    // 7 時を過ぎても、お客様の取引の途中は休止にしない
+    s.tick(s.now() + 2 * 60_000);
+    assert!(!reg(&s, 1).paused);
+    ok(
+        &mut s,
+        json!({"type":"void_transaction","register":1,"side":"customer"}),
+    );
+    assert!(
+        reg(&s, 1).paused,
+        "取引が済めば有人の時間（店員待ちの休止中）"
+    );
+    // 23 時を過ぎればセミセルフで開ける
+    s.tick(s.now() + 16 * H);
+    assert!(!reg(&s, 1).paused);
+    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+}

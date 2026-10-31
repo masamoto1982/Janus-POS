@@ -803,3 +803,6 @@ body.dragging .drop-hint { display: inline; }
 .bill-table th:nth-child(3) { width: 40%; }
 .bill-table th:nth-child(4) { width: 16%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
+/* モード設定：固定のしかたを選ぶ。時間帯は時刻を入れて決定 */
+.mode-fix-choices, .mode-fix-schedule { gap: 6px; flex-wrap: nowrap; align-items: center; margin: 8px 0; }
+.mode-fix-schedule button.pad-field.hour-field { width: 44px; height: auto; min-height: 1.6em; font-size: 16px; padding: 4px 8px; }

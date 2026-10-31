@@ -99,7 +99,7 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
       const key = `${reg}:${side}:${l.id}`;
       const value = ffvInput.get(key) ?? (l.state === "received" ? String(l.qty) : "");
       const judge = value === "" ? "" : l.state === "received" ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
-      return `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num"><input type="text" inputmode="numeric" autocomplete="off" class="ffv-input" value="${esc(value)}" data-key="ffv-${key}" data-ffv-line="${key}" aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}数" /></td><td class="ffv-judge">${judge}</td></tr>`;
+      return `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${customer ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
   // 見出しは「お渡しの確認」（荷物や支払いの控えのお渡しにも同じ形の画面を使える）
@@ -153,7 +153,7 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
   const st = a("check_id");
   return `<div class="point-screen id-entry">
       <div class="big">身分証の生年月日を入力してください</div>
-      <input type="text" inputmode="numeric" maxlength="8" placeholder="西暦8桁　例 19821002" autocomplete="off" data-key="birth-${reg}" data-birth="${reg}" aria-label="身分証の生年月日（西暦8桁）" />
+      ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "西暦8桁　例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field")}
       <div class="point-choices">
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
         ${choose(false, "スキップ", "skip")}
@@ -260,7 +260,7 @@ function parcelWait(): string {
 
 /**
  * 店員側：受付中の荷物のサイズ決定、または届け先の郵便番号の入力。
- * 長さ・重さは連続値なのでテンキーで打つ（「長さを入力」「重さを入力」でテンキーを開き、テンキーの「決定」で決まる）
+ * 長さ・重さ・郵便番号は入力欄を押してテンキーで打ち、画面の「決定」で送る
  */
 function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): string {
   const p = l.parcel as Parcel;
@@ -268,24 +268,28 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
   // 「戻る」は手続きを一段階引き返す（左）。三辺の合計から戻ると、この荷物の受付をやめる
   const back = (label = "戻る") => btn(label, { type: "parcel_back", register: reg, line_id: l.id }, st, "ghost");
+  const field = (target: PadTarget, placeholder: string, aria: string) =>
+    padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`);
   if (!p.size && !p.sum_cm) {
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
         ${parcelErr(reg) || `<p class="parcel-size">三辺の長さの合計を入力してください</p>`}
-        <div class="point-choices">${back()}${padOpen(reg, "staff", "pcm", l.id, "長さを入力", off)}</div>
+        <div class="parcel-fields"><label>長さ${field("pcm", "", "荷物の三辺の合計（cm）")}<span>cm</span></label></div>
+        <div class="point-choices">${back()}<button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
       </div>`;
   }
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
-        ${parcelErr(reg) || `<p class="parcel-size">三辺の合計 ${p.sum_cm}cm。重量を入力してください</p>`}
-        <div class="point-choices">${back()}${padOpen(reg, "staff", "pkg", l.id, "重さを入力", off, p.sum_cm)}</div>
+        ${parcelErr(reg) || `<p class="parcel-size">重量を入力してください</p>`}
+        <div class="parcel-fields"><label>重さ${field("pkg", "", "荷物の重さ（kg）")}<span>kg</span></label></div>
+        <div class="point-choices">${back()}<button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}" data-cm="${p.sum_cm}"${off}>決定</button></div>
       </div>`;
   }
   return `<div class="point-screen parcel-entry">
       <div class="big">${no}お届け先の郵便番号を入力してください</div>
       ${parcelErr(reg)}
-      <input type="text" inputmode="numeric" maxlength="8" placeholder="例 100-0001" autocomplete="off" data-key="ppost-${reg}" data-parcel="${reg}" aria-label="お届け先の郵便番号（7桁）" />
+      ${field("post", "例 100-0001", "お届け先の郵便番号（7桁）")}
       <div class="point-choices">
         ${back()}
         <button class="primary" data-form="parcel-postal" data-reg="${reg}" data-line="${l.id}"${off}>決定</button>
@@ -579,7 +583,7 @@ function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Ac
   const e = qtyEntry.get(`${reg}:${side}`);
   const typing = e?.id === l.id;
   const shown = typing ? e.digits || "　" : String(l.qty);
-  const key = `<button type="button" class="small qty-key${typing ? " typing" : ""}" data-qtyentry="${reg}:${side}:${l.id}" aria-label="数量 ${l.qty}。押すとテンキーで数量を入力">${esc(shown)}</button>`;
+  const key = `<button type="button" class="pad-field qty-key${typing ? " typing" : ""}" data-qtyentry="${reg}:${side}:${l.id}" aria-label="数量 ${l.qty}。押すとテンキーで数量を入力">${esc(shown)}</button>`;
   return `<span class="qty-step">${minus}${key}${btn("＋", step(1), st, "small neg")}</span>`;
 }
 
@@ -609,21 +613,39 @@ export function qtyPopup(r: RegisterView, side: Side): string {
  * テンキーで打ち込む連続値（数量のほかに、荷物の三辺の合計・重さ、入金ボックスの金額）。
  * 離散値は選択肢から選ぶので、テンキーを使うのは連続値だけ。キーは「レジ番号:画面」
  */
-export type PadTarget = "pcm" | "pkg" | "inlet";
-export type PadEntry = { target: PadTarget; line?: number; cm?: number; digits: string };
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "inlet";
+export type PadEntry = { target: PadTarget; line?: number; digits: string };
+/** いまテンキーを開いている入力欄（キーは「レジ:側」） */
 export const padEntry = new Map<string, PadEntry>();
-export const PAD: Record<PadTarget, { title: string; unit: string; max: number; decimal: boolean }> = {
-  pcm: { title: "三辺の長さの合計", unit: "cm", max: 3, decimal: false },
-  pkg: { title: "荷物の重さ", unit: "kg", max: 4, decimal: true },
-  inlet: { title: "入金", unit: "円", max: 6, decimal: false },
+/** テンキーで入力欄に入れた値（キーは「レジ:対象:明細」）。画面の「決定」「判定」で送る */
+export const padValue = new Map<string, string>();
+export const padValueKey = (reg: number, target: PadTarget, line?: number): string => `${reg}:${target}:${line ?? ""}`;
+/** max は打てる桁数、decimal は小数点（0.1 単位）を打てるか、code は先頭の 0 も打てる番号か */
+export const PAD: Record<PadTarget, { title: string; unit: string; max: number; decimal?: boolean; code?: boolean }> = {
+  pcm: { title: "三辺の長さの合計", unit: "cm", max: 3 },
+  pkg: { title: "荷物の重さ", unit: "kg", max: 3, decimal: true },
+  post: { title: "お届け先の郵便番号（7桁）", unit: "", max: 7, code: true },
+  birth: { title: "身分証の生年月日（西暦8桁）", unit: "", max: 8, code: true },
+  ffv: { title: "お渡し数", unit: "", max: 3, code: true },
+  inlet: { title: "入金", unit: "円", max: 6 },
 };
+/** 郵便番号は 3 桁目のあとにハイフンを入れて見せる */
+export const padShow = (target: PadTarget, digits: string): string => (target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
 
-/** テンキーを開く積極ボタン（押すと、その画面の上にテンキーのポップアップを出す） */
-function padOpen(reg: number, side: Side, target: PadTarget, line: number, label: string, off: string, cm?: number): string {
-  return `<button type="button" class="primary" data-padopen="${reg}:${side}:${target}:${line}:${cm ?? ""}"${off}>${label}</button>`;
+/**
+ * テンキーで打ち込む入力欄（角を丸めない箱。濃い枠線・濃い文字・背景なし）。押すと、その画面の上にテンキーが開く。
+ * テンキーは入力欄とだけ組み合わせる（ボタンからは開かない）
+ */
+function padField(reg: number, side: Side, target: PadTarget, value: string, placeholder: string, aria: string, line?: number, cls = ""): string {
+  const typing = padEntry.get(`${reg}:${side}`);
+  const on = typing?.target === target && typing.line === line;
+  const shown = padShow(target, value);
+  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-padopen="${reg}:${side}:${target}:${line ?? ""}" aria-label="${esc(aria)}（押すとテンキーで入力）">${
+    shown ? esc(shown) : `<span class="placeholder">${esc(placeholder)}</span>`
+  }</button>`;
 }
 
-/** 連続値のテンキー（数量のテンキーと同じ形のポップアップ）。左下に「やめる」、右下に「決定」 */
+/** テンキーのポップアップ（数量のテンキーと同じ形）。左下に「やめる」、右下に「決定」。決定で入力欄に入る */
 export function padPopup(r: RegisterView, side: Side): string {
   const reg = r.id;
   const e = padEntry.get(`${reg}:${side}`);
@@ -631,14 +653,17 @@ export function padPopup(r: RegisterView, side: Side): string {
   const d = PAD[e.target];
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-pad="${reg}:${side}:${key}">${label}</button>`;
   const inserted = e.target === "inlet" ? (r.emoney && !r.menu ? r.emoney.inserted : !r.menu ? r.staff.inserted : 0) : 0;
-  // 入金ボックスは、何も打たずに「決定」すると投入を終える（入れたお金があるとき）
-  const ok = (e.digits !== "" && Number(e.digits) > 0) || (e.target === "inlet" && !r.menu && inserted > 0);
+  // 入金ボックスは、何も打たずに「決定」すると投入を終える（入れたお金があるとき）。番号とお渡し数は 0 も打てる
+  const ok = e.digits !== "" ? d.code || Number(e.digits) > 0 : e.target === "inlet" && !r.menu && inserted > 0;
   const now = e.target === "inlet" && inserted ? `<span class="muted">入金済み ${yen(inserted)}</span>` : "";
+  const name = e.target === "ffv" ? r.staff.lines.find((l) => l.id === e.line)?.name : undefined;
+  const title = name ? `${name}の${side === "customer" ? "お受け取り数" : "お渡し数"}` : d.title;
   const last = d.decimal ? `${k("0")}${k(".", ".")}` : k("0", "0", "pad-key zero");
+  const shown = padShow(e.target, e.digits);
   return `<div class="qty-pop" data-pad-backdrop="${reg}:${side}">
-      <div class="qty-pop-box" role="dialog" aria-label="${esc(d.title)}">
-        <div class="qty-pop-name">${esc(d.title)}${now}</div>
-        <div class="qty-pop-value">${e.digits ? `${esc(e.digits)}<small> ${d.unit}</small>` : `<span class="muted">${d.unit}</span>`}</div>
+      <div class="qty-pop-box" role="dialog" aria-label="${esc(title)}">
+        <div class="qty-pop-name">${esc(title)}${now}</div>
+        <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}${k("back", "←", "pad-key neg")}</div>
         <div class="qty-pop-foot">${k("cancel", "やめる", "neg")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>

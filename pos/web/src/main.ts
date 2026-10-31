@@ -26,6 +26,8 @@ import {
   padEntry,
   padPopup,
   PAD,
+  padValue,
+  padValueKey,
   type PadTarget,
   screenHead,
   isoDate,
@@ -138,7 +140,7 @@ function buildSkeleton(): void {
       </div>
       <div class="money-io" aria-label="レジ${r.id}の投入口と排出口（お客様側だけにあります）">
         <div class="money-io-cust" data-cash-drop="${r.id}">
-        <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:customer:inlet::" aria-label="レジ${r.id}の投入口（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
+        <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:customer:inlet:" aria-label="レジ${r.id}の投入口（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
         <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の排出口（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
         </div>
       </div>
@@ -331,12 +333,6 @@ function render(): void {
       // 数量を打ち込んでいる明細がなくなった・会計に進んだら、テンキーを閉じる
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.staff.phase !== "registering" || !r.staff.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
-      // 荷物のテンキーは、その段階（長さ・重さ）を過ぎたら閉じる
-      const pad = padEntry.get(`${r.id}:${side}`);
-      if (pad && pad.target !== "inlet") {
-        const p = r.staff.lines.find((l) => l.id === pad.line)?.parcel;
-        if (!p || p.size || (pad.target === "pcm" ? !!p.sum_cm : !p.sum_cm)) padEntry.delete(`${r.id}:${side}`);
-      }
       const items = itemsPanel(r, snap, ffUi(r.id), side);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
@@ -351,6 +347,9 @@ function render(): void {
       // レジ画面のヘッダー（稼働モードのバッジ・時刻・ベル。有人モードの店員側ではバッジが店舗メニューを開く）
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side));
       setRegion(`items-${r.id}-${side}`, items);
+      // 打ち込んでいる入力欄が画面から消えたら（手続きが進んだ・戻ったなど）、テンキーを閉じる
+      const pad = padEntry.get(`${r.id}:${side}`);
+      if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side));
       el?.classList.toggle("no-items", !items);
     }
@@ -477,13 +476,8 @@ function padKey(key: string, k: string): void {
   else if (k === "back") e.digits = e.digits.slice(0, -1);
   else if (k === "ok") {
     const value = Number(e.digits || 0);
-    if (e.target === "pcm") {
-      if (value <= 0) return;
-      send({ type: "parcel_length", register, line_id: e.line!, sum_cm: Math.round(value) });
-    } else if (e.target === "pkg") {
-      if (value <= 0) return;
-      send({ type: "parcel_size", register, line_id: e.line!, sum_cm: e.cm!, weight_g: Math.round(value * 1000) });
-    } else {
+    const side = key.split(":")[1];
+    if (e.target === "inlet") {
       const r = snap.registers.find((x) => x.id === register);
       // 店舗メニューの入金・両替は、打ち込んだ金額をそのまま入れる
       if (r?.menu) {
@@ -493,6 +487,16 @@ function padKey(key: string, k: string): void {
         if (value > 0 && !send({ type: "insert", register, amount: value })) return;
         send({ type: "finish_insert", register });
       }
+    } else if (e.target === "ffv") {
+      // お渡し数：入れたその場で注文数と照合する（判定ボタンはない）
+      if (e.digits === "") return;
+      const ffKey = `${register}:${side}:${e.line}`;
+      ffvInput.set(ffKey, String(value));
+      send({ type: "check_ff", register, side, line_id: e.line!, handed: value });
+    } else {
+      // 入力欄に入れるだけ。送るのは画面の「決定」「判定」
+      if (e.digits === "" || (!d.code && value <= 0)) return;
+      padValue.set(padValueKey(register, e.target, e.line), d.code ? e.digits : String(value));
     }
     padEntry.delete(key);
   } else if (k === ".") {
@@ -501,7 +505,7 @@ function padKey(key: string, k: string): void {
     const next = e.digits + k;
     // 小数は第 1 位まで。整数の先頭の 0 は打てない
     if (/\.\d{2}$/.test(next)) return;
-    e.digits = next.includes(".") ? next : next.replace(/^0+/, "");
+    e.digits = next.includes(".") || d.code ? next : next.replace(/^0+/, "");
   }
   frame();
 }
@@ -608,11 +612,23 @@ function form(b: HTMLElement): void {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
       break;
+    case "parcel-length":
+      send({ type: "parcel_length", register: reg, line_id: Number(b.dataset.line), sum_cm: Number(padValue.get(padValueKey(reg, "pcm", Number(b.dataset.line))) ?? 0) });
+      break;
+    case "parcel-size":
+      send({
+        type: "parcel_size",
+        register: reg,
+        line_id: Number(b.dataset.line),
+        sum_cm: Number(b.dataset.cm),
+        weight_g: Math.round(Number(padValue.get(padValueKey(reg, "pkg", Number(b.dataset.line))) ?? 0) * 1000),
+      });
+      break;
     case "parcel-postal":
-      send({ type: "parcel_postal", register: reg, line_id: Number(b.dataset.line), postal: val(`ppost-${reg}`) });
+      send({ type: "parcel_postal", register: reg, line_id: Number(b.dataset.line), postal: padValue.get(padValueKey(reg, "post", Number(b.dataset.line))) ?? "" });
       break;
     case "birth":
-      send({ type: "check_id", register: reg, side: "staff", birth: val(`birth-${reg}`), today: isoDate(new Date()) });
+      if (send({ type: "check_id", register: reg, side: "staff", birth: padValue.get(padValueKey(reg, "birth")) ?? "", today: isoDate(new Date()) })) padValue.delete(padValueKey(reg, "birth"));
       break;
     case "cashout":
       send({
@@ -640,41 +656,17 @@ app.addEventListener("input", (e) => {
       .toUpperCase()
       .replace(/[^A-Z0-9]/g, "")
       .slice(0, 4);
-  // お渡し照合：お渡し数を入力するたびに判定する（判定ボタンはない）。全角の数字は半角に直す
-  if (el.dataset.ffvLine) {
-    el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 3);
-    const [reg, side, line] = el.dataset.ffvLine.split(":");
-    ffvInput.set(el.dataset.ffvLine, el.value);
-    send({ type: "check_ff", register: Number(reg), side, line_id: Number(line), handed: Number(el.value || 0) });
-    return;
-  }
   // 払込票の確認：事業者・金額が合っていれば一枚ずつチェックを入れる（外すこともできる）
   if (el.dataset.billCheck) {
     const [reg, side, line] = el.dataset.billCheck.split(":");
     send({ type: "check_bill", register: Number(reg), side, line_id: Number(line), checked: el.checked });
     return;
   }
-  if (el.dataset.birth) el.value = el.value.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/[^0-9]/g, "").slice(0, 8);
 });
 app.addEventListener("keydown", (e) => {
   const el = e.target as HTMLInputElement;
   if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
   el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
-});
-// 荷物のサイズ・郵便番号の入力欄では Enter で決定
-app.addEventListener("keydown", (e) => {
-  const el = e.target as HTMLInputElement;
-  if (!el.dataset?.parcel || e.key !== "Enter" || e.isComposing) return;
-  const box = el.closest(".parcel-entry");
-  const inputs = [...(box?.querySelectorAll<HTMLInputElement>("input[data-parcel]") ?? [])];
-  const next = inputs[inputs.indexOf(el) + 1];
-  if (next) next.focus();
-  else box?.querySelector<HTMLButtonElement>('[data-form^="parcel-"]')?.click();
-});
-app.addEventListener("keydown", (e) => {
-  const el = e.target as HTMLInputElement;
-  if (!el.dataset?.birth || e.key !== "Enter" || e.isComposing) return;
-  el.closest(".id-entry")?.querySelector<HTMLButtonElement>('[data-form="birth"]')?.click();
 });
 
 app.addEventListener("change", (e) => {
@@ -872,7 +864,7 @@ app.addEventListener("click", (e) => {
   }
   // 連続値のテンキーを開く（荷物の長さ・重さ、入金ボックス）。もう一度押すとやめる
   if (b.dataset.padopen) {
-    const [reg, s0, target, line, cm] = b.dataset.padopen.split(":");
+    const [reg, s0, target, line] = b.dataset.padopen.split(":");
     const r = snap.registers.find((x) => x.id === Number(reg));
     // 入金ボックスのテンキーは、店舗メニューの入金・両替なら開いた側の画面に出す
     const side = target === "inlet" ? (r?.menu?.side ?? s0) : s0;
@@ -880,7 +872,7 @@ app.addEventListener("click", (e) => {
     if (padEntry.get(key)?.target === target) padEntry.delete(key);
     else {
       qtyEntry.delete(key);
-      padEntry.set(key, { target: target as PadTarget, line: line ? Number(line) : undefined, cm: cm ? Number(cm) : undefined, digits: "" });
+      padEntry.set(key, { target: target as PadTarget, line: line ? Number(line) : undefined, digits: "" });
     }
     frame();
     return;

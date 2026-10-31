@@ -260,7 +260,7 @@ function parcelWait(): string {
 
 /**
  * 店員側：受付中の荷物のサイズ決定、または届け先の郵便番号の入力。
- * 年確の生年月日の入力と同じ形（問いを一行、入力欄、ボタンの行。どれも中央に）
+ * 長さ・重さは連続値なのでテンキーで打つ（「長さを入力」「重さを入力」でテンキーを開き、テンキーの「決定」で決まる）
  */
 function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): string {
   const p = l.parcel as Parcel;
@@ -272,20 +272,14 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
         ${parcelErr(reg) || `<p class="parcel-size">三辺の長さの合計を入力してください</p>`}
-        <div class="parcel-fields">
-          <label>長さ<input type="number" inputmode="numeric" min="1" max="999" autocomplete="off" data-key="pcm-${reg}" data-parcel="${reg}" aria-label="荷物の三辺の合計（cm）" /><span>cm</span></label>
-        </div>
-        <div class="point-choices">${back()}<button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
+        <div class="point-choices">${back()}${padOpen(reg, "staff", "pcm", l.id, "長さを入力", off)}</div>
       </div>`;
   }
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
-        ${parcelErr(reg) || `<p class="parcel-size">重量を入力してください</p>`}
-        <div class="parcel-fields">
-          <label>重さ<input type="number" inputmode="decimal" min="0.1" step="0.1" autocomplete="off" data-key="pkg-${reg}" data-parcel="${reg}" aria-label="荷物の重さ（kg）" /><span>kg</span></label>
-        </div>
-        <div class="point-choices">${back()}<button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}" data-cm="${p.sum_cm}"${off}>決定</button></div>
+        ${parcelErr(reg) || `<p class="parcel-size">三辺の合計 ${p.sum_cm}cm。重量を入力してください</p>`}
+        <div class="point-choices">${back()}${padOpen(reg, "staff", "pkg", l.id, "重さを入力", off, p.sum_cm)}</div>
       </div>`;
   }
   return `<div class="point-screen parcel-entry">
@@ -607,6 +601,46 @@ export function qtyPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("0", "0", "pad-key zero")}${k("back", "←", "pad-key neg")}</div>
         <div class="qty-pop-foot">${k("cancel", "やめる", "neg")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+      </div>
+    </div>`;
+}
+
+/**
+ * テンキーで打ち込む連続値（数量のほかに、荷物の三辺の合計・重さ、入金ボックスの金額）。
+ * 離散値は選択肢から選ぶので、テンキーを使うのは連続値だけ。キーは「レジ番号:画面」
+ */
+export type PadTarget = "pcm" | "pkg" | "inlet";
+export type PadEntry = { target: PadTarget; line?: number; cm?: number; digits: string };
+export const padEntry = new Map<string, PadEntry>();
+export const PAD: Record<PadTarget, { title: string; unit: string; max: number; decimal: boolean }> = {
+  pcm: { title: "三辺の長さの合計", unit: "cm", max: 3, decimal: false },
+  pkg: { title: "荷物の重さ", unit: "kg", max: 4, decimal: true },
+  inlet: { title: "入金", unit: "円", max: 6, decimal: false },
+};
+
+/** テンキーを開く積極ボタン（押すと、その画面の上にテンキーのポップアップを出す） */
+function padOpen(reg: number, side: Side, target: PadTarget, line: number, label: string, off: string, cm?: number): string {
+  return `<button type="button" class="primary" data-padopen="${reg}:${side}:${target}:${line}:${cm ?? ""}"${off}>${label}</button>`;
+}
+
+/** 連続値のテンキー（数量のテンキーと同じ形のポップアップ）。左下に「やめる」、右下に「決定」 */
+export function padPopup(r: RegisterView, side: Side): string {
+  const reg = r.id;
+  const e = padEntry.get(`${reg}:${side}`);
+  if (!e) return "";
+  const d = PAD[e.target];
+  const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-pad="${reg}:${side}:${key}">${label}</button>`;
+  const inserted = e.target === "inlet" ? (r.emoney && !r.menu ? r.emoney.inserted : !r.menu ? r.staff.inserted : 0) : 0;
+  // 入金ボックスは、何も打たずに「決定」すると投入を終える（入れたお金があるとき）
+  const ok = (e.digits !== "" && Number(e.digits) > 0) || (e.target === "inlet" && !r.menu && inserted > 0);
+  const now = e.target === "inlet" && inserted ? `<span class="muted">入金済み ${yen(inserted)}</span>` : "";
+  const last = d.decimal ? `${k("0")}${k(".", ".")}` : k("0", "0", "pad-key zero");
+  return `<div class="qty-pop" data-pad-backdrop="${reg}:${side}">
+      <div class="qty-pop-box" role="dialog" aria-label="${esc(d.title)}">
+        <div class="qty-pop-name">${esc(d.title)}${now}</div>
+        <div class="qty-pop-value">${e.digits ? `${esc(e.digits)}<small> ${d.unit}</small>` : `<span class="muted">${d.unit}</span>`}</div>
+        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}${k("back", "←", "pad-key neg")}</div>
+        <div class="qty-pop-foot">${k("cancel", "やめる", "neg")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }

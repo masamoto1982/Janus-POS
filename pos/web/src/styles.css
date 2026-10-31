@@ -268,8 +268,9 @@ button.seg { padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: 4px; }
 
+/* 入力フォームは角を丸めない箱：濃い枠線・濃い文字・背景なし。角の丸みはボタンだけの表現（P-29） */
 input, select {
-  padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--ink); min-width: 0;
+  padding: 6px 8px; border-radius: 0; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); min-width: 0;
 }
 
 .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }
@@ -586,9 +587,6 @@ body.dragging .drop-hint { display: inline; }
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 /* 荷物の受付・受け取りは入力欄とボタンを一画面に収める（年確の入力より詰める） */
 .parcel-entry, .parcel-ask, .pickup-step, .parcel-wait { padding: 12px; gap: 10px; }
-.parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
-.parcel-fields label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
-.parcel-fields input { width: 84px; text-align: right; font-size: 18px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
 .parcel-entry input[data-key^="ppost-"] { width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-size { margin: 0; font-size: 15px; }
@@ -642,19 +640,20 @@ body.dragging .drop-hint { display: inline; }
 .money-io { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust > * { min-width: 0; }
-/* 投入口・排出口はただの箱（角は丸めない）。中に「入金」「出金」のプレースホルダー */
+/* 投入口・排出口はただの箱（角は丸めない）。中に「入金」「出金」のプレースホルダー。
+   入金ボックスを押すとテンキーが開き、金額（連続値）を打ち込んで入れる */
 .money-io .inlet, .money-io .outlet {
-  height: 40px; padding: 0 12px; border: 1.5px solid var(--border); border-radius: 0;
-  background: var(--panel); color: var(--ink); font: inherit; font-size: 16px; text-align: right;
+  height: 40px; padding: 0 12px; border: 1.5px solid var(--ink); border-radius: 0;
+  background: transparent; color: var(--ink); font: inherit; font-size: 16px; text-align: right;
 }
-.money-io .outlet { display: flex; align-items: center; justify-content: flex-end; }
-.money-io .inlet::placeholder, .money-io .outlet .placeholder { color: var(--muted); font-weight: 400; }
+.money-io .inlet, .money-io .outlet { display: flex; align-items: center; justify-content: flex-end; cursor: pointer; }
+.money-io .inlet .placeholder, .money-io .outlet .placeholder { color: var(--muted); font-weight: 400; }
 /* 注意喚起は枠線の点滅：支払方法が決まったら入金ボックスの枠を、出金ボックスにお金があれば枠と金額を点滅させる。
    入金ボックスの中の文字は点滅させず、支払方法に合わせた案内（現金を入れる など）にする */
 @keyframes io-blink { 50% { color: transparent; } }
-@keyframes io-frame { 50% { border-color: var(--border); } }
+@keyframes io-frame { 50% { border-color: var(--ink); } }
 .money-io .inlet.blink, .money-io .outlet.blink { border: 2px solid var(--accent); animation: io-frame 1s steps(1) infinite; }
-.money-io .inlet.blink::placeholder { color: var(--ink); font-weight: 700; }
+.money-io .inlet.blink .placeholder { color: var(--ink); font-weight: 700; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-cust { grid-column: 1; } }
 /* 歯車は両方の画面に出る。操作できない側の歯車は押せない。
@@ -696,7 +695,7 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; color: var(--msg-strong); }
 .qty-pop-name .muted { font-size: 12px; white-space: nowrap; }
-.qty-pop-value { border: 1.5px dashed var(--accent); border-radius: 6px; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
+.qty-pop-value { border: 1.5px solid var(--ink); border-radius: 0; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
 .qty-pop-value .muted { font-size: 13px; font-weight: 400; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; flex: 1 1 auto; min-height: 0; }
 .qty-pop-keys .pad-key { padding: 4px 0; font-size: 16px; font-weight: 600; min-height: 0; }

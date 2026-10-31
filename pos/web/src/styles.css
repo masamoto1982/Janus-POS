@@ -269,9 +269,13 @@ button.seg { padding: 4px 10px; }
 .segs { display: inline-flex; gap: 4px; }
 
 /* 入力フォームは角を丸めない箱：濃い枠線・濃い文字・背景なし。角の丸みはボタンだけの表現（P-29） */
-input, select {
+input, select, button.pad-field {
   padding: 6px 8px; border-radius: 0; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); min-width: 0;
 }
+/* テンキーで打ち込む入力欄（押すとテンキーが開く）。見た目は入力欄そのもの。テンキーは入力欄とだけ組み合わせる */
+button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
+button.pad-field .placeholder { color: var(--muted); font-weight: 400; }
+button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }
 /* 年確は押せない注意のしるし：角を丸めず、枠線色の枠と文字だけ */
@@ -334,7 +338,7 @@ details summary h3 { display: inline; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: 14px; }
 /* 確認画面の選択肢は大きいボタン（取引中止・お会計と同じ大きさ） */
-.confirm button:not(.tag):not(.emoney-link):not(.seg) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
+.confirm button:not(.tag):not(.emoney-link):not(.seg):not(.pad-field) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 /* 支払方法は切り替えボタンの並び。セミセルフの狭い確認画面にも収まるよう、高さは小さいボタンにそろえる */
 .method-row { flex-wrap: wrap; justify-content: center; gap: 4px; }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
@@ -351,7 +355,7 @@ button.tag.ff-verify:disabled { cursor: not-allowed; }
 .ffv-screen .lines.ffv td { vertical-align: middle; text-align: left; }
 .ffv-screen .lines.ffv td.num, .ffv-screen .lines.ffv th.num { text-align: right; }
 .ffv-screen .lines.ffv .ffv-judge { text-align: center; width: 48px; }
-.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0 4px; text-align: right; }
+button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0 4px; }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* 引き返すボタンは左下 */
@@ -587,13 +591,16 @@ body.dragging .drop-hint { display: inline; }
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 /* 荷物の受付・受け取りは入力欄とボタンを一画面に収める（年確の入力より詰める） */
 .parcel-entry, .parcel-ask, .pickup-step, .parcel-wait { padding: 12px; gap: 10px; }
-.parcel-entry input[data-key^="ppost-"] { width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
+.parcel-fields label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.parcel-fields button.pad-field { width: 84px; height: auto; min-height: 1.6em; font-size: 18px; padding: 6px 8px; }
+.parcel-entry button.parcel-post { justify-content: center; height: auto; min-height: 1.6em; width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-size { margin: 0; font-size: 15px; }
 .parcel-no { margin-right: 8px; padding: 1px 8px; border: 1.5px solid var(--msg-strong); border-radius: 999px; font-size: 14px; }
 .parcel-fee { margin: 0; font-size: 15px; }
 .parcel-fee b { margin-left: 8px; font-size: 22px; }
-.id-entry input[data-birth] { width: 370px; max-width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; padding: 10px 12px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.id-entry button.birth-field { justify-content: center; height: auto; min-height: 1.5em; width: 370px; max-width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; padding: 10px 12px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; min-width: 370px; }
 .collect-list label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; cursor: pointer; text-align: left; }
 .collect-list input { width: 20px; height: 20px; cursor: pointer; }
@@ -687,8 +694,7 @@ body.dragging .drop-hint { display: inline; }
 .qty-step { display: flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; }
 .screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 2px; font-size: 11px; }
 /* 数量そのものは積極ボタン。テンキーで打っている間は破線の枠（ここで入力を受け付ける） */
-.qty-step .qty-key { font-weight: 600; }
-.qty-step .qty-key.typing { outline: 2px dashed var(--accent); outline-offset: 1px; }
+.screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: 13px; }
 .qty-fixed { min-width: 1.4em; text-align: center; }
 /* 数量のテンキー：レジ画面の上に重ねるポップアップ（レジ画面で覆いかぶさる表示を出す唯一の例外） */
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, #000 28%, transparent); }

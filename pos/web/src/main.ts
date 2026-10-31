@@ -8,7 +8,7 @@
 //   店員画面に落とせば店員側スキャナー、お客様画面に落とせばお客様側スキャナーで読んだことになる。
 
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { Command, HourMode, Side, Snapshot } from "./types";
+import type { Command, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 // 仮のロゴマーク（正式なロゴは後日差し替え）
@@ -79,9 +79,6 @@ function reset(registers: number, mats: number): void {
   sim?.free();
   sim = new PosSimulator(Date.now() & 0xffff, registers, mats);
   t0 = performance.now();
-  // 時間帯でのモード固定は、この端末の時計で決める
-  const d = new Date();
-  sim.dispatch(JSON.stringify({ type: "set_clock", day_ms: ((d.getHours() * 60 + d.getMinutes()) * 60 + d.getSeconds()) * 1000 + d.getMilliseconds() }));
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   buildSkeleton();
   wireSwipe();
@@ -694,12 +691,6 @@ app.addEventListener("change", (e) => {
     else set.delete(i);
     collected.set(reg, set);
     frame();
-    return;
-  }
-  // モード設定：時間帯ごとの稼働モード
-  if (sel.dataset.hourmode) {
-    const [reg, h] = sel.dataset.hourmode.split(":").map(Number);
-    send({ type: "set_mode_hours", register: reg, hours: [h], mode: sel.value as HourMode });
     return;
   }
   if (sel.dataset.rulesTab !== undefined) {

@@ -803,9 +803,3 @@ body.dragging .drop-hint { display: inline; }
 .bill-table th:nth-child(3) { width: 40%; }
 .bill-table th:nth-child(4) { width: 16%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
-/* モード設定：時間帯（0〜23 時台）のリスト。2 列に分けて、時間帯ごとにセレクタで選ぶ */
-.hour-list { display: grid; grid-auto-flow: column; grid-template-rows: repeat(12, auto); grid-template-columns: 1fr 1fr; gap: 4px 10px; margin: 8px 0; }
-.hour-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.hour-row > span { white-space: nowrap; width: 3.4em; }
-.hour-row.now > span { font-weight: 700; }
-.hour-row select { flex: 1; min-width: 0; max-width: 10em; padding: 3px 4px; font-size: 13px; }

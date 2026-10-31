@@ -89,8 +89,6 @@ pub enum MenuScreen {
     Waste,
     /// FF 鮮度管理：作成数の登録（店員側。仮設）
     FfFresh,
-    /// モード設定：時間帯ごとに稼働モードを決める（店員側。変更はオーナーだけ）
-    ModeHours,
 }
 
 impl MenuScreen {
@@ -103,10 +101,7 @@ impl MenuScreen {
             | MenuScreen::Deposit
             | MenuScreen::Expense
             | MenuScreen::Changer => Some(Side::Customer),
-            MenuScreen::Journal
-            | MenuScreen::Waste
-            | MenuScreen::FfFresh
-            | MenuScreen::ModeHours => Some(Side::Staff),
+            MenuScreen::Journal | MenuScreen::Waste | MenuScreen::FfFresh => Some(Side::Staff),
         }
     }
 }
@@ -114,44 +109,6 @@ impl MenuScreen {
 /// お客様側から店舗メニューを開くためのパスワードの文字（英大文字と数字）と桁数
 const MENU_CODE_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const MENU_CODE_LEN: usize = 4;
-
-/// 時間帯（1 時間ごと）の稼働モード（店舗メニューのモード設定で、レジごと・時間帯ごとに決める）。
-/// 推奨する運用は「常時固定」か「時間帯に応じた固定」。混みあってきたらモードを切り替えるような運用はしない：
-/// 並んだあとで有人とセミセルフが入れ替わると、お客様はどこに並べばよいか分からなくなる。
-/// コンビニではセミセルフはメインではなくサブ（有人レジを主にする）
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum HourMode {
-    /// ニュートラル：基本はセミセルフで、名札のログインで明示的に有人に切り替える
-    #[default]
-    Neutral,
-    /// 有人固定。店員がいない間は休止中にする
-    Attended,
-    /// セミセルフ固定。店員がログインして手伝っても、その取引が済めばセミセルフに戻る
-    SemiSelf,
-}
-
-impl HourMode {
-    /// 固定するモード（ニュートラルなら None）
-    pub fn fixed(self) -> Option<Mode> {
-        match self {
-            HourMode::Neutral => None,
-            HourMode::Attended => Some(Mode::Attended),
-            HourMode::SemiSelf => Some(Mode::SemiSelf),
-        }
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            HourMode::Neutral => "ニュートラル",
-            HourMode::Attended => "有人固定",
-            HourMode::SemiSelf => "セミセルフ固定",
-        }
-    }
-}
-
-const DAY_MS: u64 = 24 * 60 * 60 * 1000;
-const HOUR_MS: u64 = 60 * 60 * 1000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Menu {
@@ -563,17 +520,6 @@ pub enum Command {
         mat: usize,
         on: bool,
     },
-    /// 時間帯ごとの稼働モードを決める（店舗メニューのモード設定。ログインしたオーナーだけ）。
-    /// hours は 0〜23 時台（まとめて同じモードにできる）
-    SetModeHours {
-        register: u8,
-        hours: Vec<u8>,
-        mode: HourMode,
-    },
-    /// いまの時刻を合わせる（その日の 0 時から何ミリ秒か）。時間帯でのモード固定に使う
-    SetClock {
-        day_ms: u64,
-    },
 }
 
 impl Command {
@@ -625,8 +571,7 @@ impl Command {
             | C::RequestMenuCode { register }
             | C::Insert { register, .. }
             | C::TakeOutlet { register, .. }
-            | C::Claim { register, .. }
-            | C::SetModeHours { register, .. } => Some(*register),
+            | C::Claim { register, .. } => Some(*register),
             _ => None,
         }
     }
@@ -666,7 +611,6 @@ impl Command {
             | C::ParcelNext { .. }
             | C::PickupHandover { .. }
             | C::PickupFound { .. }
-            | C::SetModeHours { .. }
             | C::VoidTransaction { .. } => Some(Side::Staff),
             _ => None,
         }
@@ -1186,12 +1130,6 @@ struct Register {
     pressing: bool,
     /// 開いている電子マネーの手続き（チャージ・残高確認）
     emoney: Option<EmoneyTask>,
-    /// 時間帯（0〜23 時台）ごとの稼働モード（店舗メニューのモード設定）
-    hours: [HourMode; 24],
-    /// 有人に固定した時間に店員がいないので、休止中にしている（セミセルフの時間になれば開ける）
-    fix_paused: bool,
-    /// ログインした店員が、取引を手伝った（セミセルフ固定なら、取引が済めばログアウトする）
-    helped: bool,
 }
 
 impl Register {
@@ -1326,8 +1264,6 @@ pub struct Store {
     receipts: u32,
     /// 財布の電子マネーの残高
     emoney_balance: u32,
-    /// シミュレーション時刻 0 の時刻（その日の 0 時からのミリ秒）。時間帯でのモード固定に使う
-    day_origin: u64,
 }
 
 /// 年確のやり方（店員が選ぶ）
@@ -1460,9 +1396,6 @@ impl Store {
                     touch: None,
                     pressing: false,
                     emoney: None,
-                    hours: [HourMode::Neutral; 24],
-                    fix_paused: false,
-                    helped: false,
                 }
             })
             .collect();
@@ -1483,54 +1416,6 @@ impl Store {
             presses: 0,
             receipts: 0,
             emoney_balance: EMONEY_INITIAL,
-            day_origin: 0,
-        }
-    }
-
-    /// いまの時刻（時）
-    pub fn hour(&self) -> u8 {
-        (((self.day_origin + self.now) % DAY_MS) / HOUR_MS) as u8
-    }
-
-    /// モードの固定を守らせる。モードは取引の途中では変えない（お客様が並んだ・登録を始めたレジのモードは、
-    /// その取引が済むまでそのまま）。取引がない間に：
-    /// - 有人に固定した時間に店員がいなければ休止中にする（店員がスタッフバーコードで開ける）
-    /// - セミセルフの時間になったら、固定で休止中にしていたレジを開ける
-    /// - セミセルフに固定したレジで、手伝いにログインした店員は、その取引が済めばログアウトする
-    fn enforce_mode_fix(&mut self) {
-        let hour = self.hour();
-        for r in &mut self.registers {
-            if r.staff.is_some() && !r.idle() {
-                r.helped = true;
-            }
-            if !r.paused {
-                r.fix_paused = false;
-            }
-            let quiet = r.idle()
-                && r.bill_handover.is_none()
-                && r.pickup_handover.is_none()
-                && r.menu.is_none()
-                && r.menu_code.is_none();
-            match r.hours[usize::from(hour)].fixed() {
-                Some(Mode::Attended) => {
-                    if r.staff.is_none() && !r.paused && quiet {
-                        r.paused = true;
-                        r.fix_paused = true;
-                        r.touch = None;
-                    }
-                }
-                want => {
-                    if r.fix_paused {
-                        r.paused = false;
-                        r.fix_paused = false;
-                    }
-                    if want == Some(Mode::SemiSelf) && r.staff.is_some() && r.helped && quiet {
-                        r.staff = None;
-                        r.helped = false;
-                        r.sync_mode();
-                    }
-                }
-            }
         }
     }
 
@@ -1627,7 +1512,6 @@ impl Store {
                 r.last_op = now;
             }
         }
-        self.enforce_mode_fix();
     }
 
     /// 取引を中止する。入れたお金とチャージ用の紙幣は出金ボックスへ、電子マネーで払った分は残高へ戻す。
@@ -1733,7 +1617,6 @@ impl Store {
         for r in &mut self.registers {
             r.sync_mode();
         }
-        self.enforce_mode_fix();
         res
     }
 
@@ -2621,35 +2504,6 @@ impl Store {
                 self.mat_loss = percent.min(100);
                 done(format!("MAT の通信ロスを {}% にしました", self.mat_loss))
             }
-            C::SetModeHours {
-                register,
-                hours,
-                mode,
-            } => {
-                let r = self.reg(register).ok_or("レジがありません")?;
-                if r.staff.map(|s| s.account.role) != Some(Role::Owner) {
-                    return Err("モード設定はオーナーだけが変更できます".into());
-                }
-                if hours.is_empty() || hours.iter().any(|&h| h > 23) {
-                    return Err("時間帯は 0〜23 時台で選んでください".into());
-                }
-                let r = self.reg_mut(register)?;
-                for &h in &hours {
-                    r.hours[usize::from(h)] = mode;
-                }
-                done(match hours.as_slice() {
-                    [h] => format!("レジ{register}の{h}時台を「{}」にしました", mode.label()),
-                    _ => format!(
-                        "レジ{register}の{}時間を「{}」にしました",
-                        hours.len(),
-                        mode.label()
-                    ),
-                })
-            }
-            C::SetClock { day_ms } => {
-                self.day_origin = (day_ms % DAY_MS + DAY_MS - self.now % DAY_MS) % DAY_MS;
-                Ok(Outcome::default())
-            }
             C::SetBellOn { mat, on } => {
                 let bell = self.bell;
                 let m = self.mats.get_mut(mat).ok_or("MAT が見つかりません")?;
@@ -2822,8 +2676,6 @@ impl Store {
             let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.customer_turn;
             r.staff = Some(StaffSession { account: acc });
-            r.helped = false;
-            r.fix_paused = false;
             // ログイン後は両方の画面が操作できる（触れている一瞬だけ排他）
             r.touch = None;
             // ログインで店員側が操作できるようになる（お客様の支払い中でも）
@@ -3892,7 +3744,6 @@ impl Store {
             tobacco_asked: r.mode == Mode::Attended && t.tobacco_asked,
             mode: r.mode,
             mode_label: r.mode.label(),
-            mode_hours: r.hours.to_vec(),
             outlet: r.outlet.total(),
             outlet_detail: r.outlet.0.clone(),
             menu: r.menu,
@@ -4155,8 +4006,6 @@ pub struct RegisterView {
     pub tobacco_asked: bool,
     pub mode: Mode,
     pub mode_label: &'static str,
-    /// 時間帯（0〜23 時台）ごとの稼働モード（店舗メニューのモード設定）
-    pub mode_hours: Vec<HourMode>,
     /// 排出口にたまっているお金
     pub outlet: u32,
     pub outlet_detail: Vec<(u32, u32)>,

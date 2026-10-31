@@ -679,6 +679,7 @@ const CALL_SHORT: Record<string, string> = {
   age_check: "年確",
   bill: "公共料金",
   change_left: "釣銭忘れ",
+  emoney: "電子マネー",
 };
 
 /**
@@ -847,21 +848,28 @@ export function welcome(reg: number, side: Side, emoney?: ActionState): string {
 
 /**
  * 電子マネーのチャージ・残高確認の入口：画面（登録エリア）の右下端の、円を四分の一にした扇形。
- * 入口はモードによらずここだけ。有人は待ち受け画面と商品登録画面、セミセルフは待ち受け画面に出す
- * （セミセルフはお買い物の途中にチャージ・残高確認をしない）。確認画面・手続きの最中は出さない。
+ * 入口はモードによらずここだけで、両モードの待ち受け画面と商品登録画面に出す。確認画面・手続きの最中は出さない。
+ * セミセルフのお買い物の途中は、押すとスタッフを呼ぶ（ほかの呼び出しボタンと同じく押している間鳴る）。
+ * スタッフがログインした有人モードで手続きすれば安全で、お客様は取引を終えずに済む。
  * 押すのは操作する側（有人は店員側、セミセルフはお客様側）。もう一方の画面には押せない形で映す
  */
 export function emoneyFan(r: RegisterView, side: Side, main: string): string {
   if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null) return "";
   const attended = r.mode === "attended";
+  const v = attended ? r.staff : r.customer;
   const welcomeShown = main.includes('class="welcome');
-  const registering = attended && r.staff.phase === "registering" && main.includes('class="reg-top"') && !main.includes('class="confirm"');
+  const registering = v.phase === "registering" && main.includes('class="reg-top"') && !main.includes('class="confirm"');
   if (!welcomeShown && !registering) return "";
   const label = `<span><b>電子マネー</b><small>チャージ<br>残高確認</small></span>`;
   const own: Side = attended ? "staff" : "customer";
   if (side !== own) return `<button type="button" class="emoney-fan mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;
-  const st = find(attended ? r.staff.actions : r.customer.actions, "emoney");
-  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, st, "emoney-fan").replace("></button>", `>${label}</button>`);
+  if (!attended && registering) {
+    // セミセルフのお買い物の途中：スタッフを呼ぶ
+    const st = find(r.customer.actions, "call_staff");
+    const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
+    return `<button type="button" class="emoney-fan" data-hold="${esc(JSON.stringify(cmd))}" title="スタッフを呼んで手続きします（押している間鳴ります）"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}>${label}</button>`;
+  }
+  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, find(v.actions, "emoney"), "emoney-fan").replace("></button>", `>${label}</button>`);
 }
 
 /**

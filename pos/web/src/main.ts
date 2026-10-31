@@ -8,7 +8,7 @@
 //   店員画面に落とせば店員側スキャナー、お客様画面に落とせばお客様側スキャナーで読んだことになる。
 
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { Command, Side, Snapshot } from "./types";
+import type { Command, HourMode, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
 // 仮のロゴマーク（正式なロゴは後日差し替え）
@@ -636,18 +636,6 @@ function form(b: HTMLElement): void {
     case "parcel-postal":
       send({ type: "parcel_postal", register: reg, line_id: Number(b.dataset.line), postal: padValue.get(padValueKey(reg, "post", Number(b.dataset.line))) ?? "" });
       break;
-    case "modefix": {
-      const h = (t: PadTarget) => padValue.get(padValueKey(reg, t));
-      const r = snap.registers.find((x) => x.id === reg);
-      const cur = r?.mode_fix.kind === "schedule" ? r.mode_fix : undefined;
-      const from = Number(h("hfrom") ?? cur?.from);
-      const until = Number(h("huntil") ?? cur?.until);
-      if (send({ type: "set_mode_fix", register: reg, fix: { kind: "schedule", from, until } })) {
-        padValue.delete(padValueKey(reg, "hfrom"));
-        padValue.delete(padValueKey(reg, "huntil"));
-      }
-      break;
-    }
     case "birth":
       if (send({ type: "check_id", register: reg, side: "staff", birth: padValue.get(padValueKey(reg, "birth")) ?? "", today: isoDate(new Date()) })) padValue.delete(padValueKey(reg, "birth"));
       break;
@@ -706,6 +694,12 @@ app.addEventListener("change", (e) => {
     else set.delete(i);
     collected.set(reg, set);
     frame();
+    return;
+  }
+  // モード設定：時間帯ごとの稼働モード
+  if (sel.dataset.hourmode) {
+    const [reg, h] = sel.dataset.hourmode.split(":").map(Number);
+    send({ type: "set_mode_hours", register: reg, hours: [h], mode: sel.value as HourMode });
     return;
   }
   if (sel.dataset.rulesTab !== undefined) {

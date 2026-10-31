@@ -2,8 +2,11 @@
    ベースカラーは広い面積に、アクセントカラーは小さい面積に使う。
    文字は背景とのコントラスト比 4.5:1 以上の組み合わせだけにする（明るい色の上は黒文字）。 */
 :root {
-  /* 取引中止・お会計・FF・サービス・たばこ、Item と Wallet のボタンはすべてこの一つの大きさ（狭いところでは幅だけ縮む） */
+  /* ボタンの大きさは大と小の二つだけ（2026-10-30 ユーザー）。狭いところでは幅だけ縮む。
+     大：取引中止・お会計・FF・サービス・たばこ、確認画面の選択肢、Item と Wallet。
+     小：待ち受け画面の案内（商品・レジ袋など）、明細の数量・−（削除）・＋ */
   --btn-w: 116px; --btn-h: 48px;
+  --btn-sm-w: 56px; --btn-sm-h: 26px;
   /* ベースカラー：広い面積に用いる */
   --base-pink: #ffcabf;
   --base-cream: #ffff80;
@@ -145,7 +148,7 @@ button { touch-action: manipulation; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 /* レジ画面：ヘッダー ＋ 上 4/5 が登録画面 ＋ 下 1/5 がバーコードなしアイテム欄（複数のレジと MAT を一画面に収める） */
 /* レジ画面は角を丸めない（2026-10-25 ユーザー） */
-.screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(320px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
+.screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; height: 34px; padding: 0 4px; border-bottom: 1px solid var(--border); }
 .screen-head .head-r { justify-self: end; }
 /* 稼働モードのバッジ：有人は濃いグレーの塗りに白文字、セミセルフは白地に濃いグレーの枠と文字。塗りの有無で一目で区別する */
@@ -189,7 +192,9 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 /* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */
 .lines.cols3 { table-layout: fixed; }
 .lines.cols3 td { overflow-wrap: anywhere; }
-.lines.cols3 col.c-qty { width: 104px; }
+.lines.cols3 col.c-qty { width: 48px; }
+/* 数量を変えられる明細は小さいボタン三つ分。画面が狭いときは名前の欄を残してボタンの幅だけ縮める */
+.lines.cols3:has(.qty-step) col.c-qty { width: min(calc(var(--btn-sm-w) * 3 + 8px), 50%); }
 .lines.cols3 col.c-amt { width: 60px; }
 .lines th { text-align: left; font-weight: 500; font-size: 12px; color: var(--msg-weak); }
 .lines th.num { text-align: right; }
@@ -308,10 +313,10 @@ details summary h3 { display: inline; }
 .welcome p { font-size: 12px; margin: 4px 0 0; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 10px; }
 /* 押さなくても困らない補助ボタンは塗らずに枠線だけ。選択中は通常の選択色 */
-.guide-btn { font-size: 12px; padding: 4px 10px; border-radius: 999px; }
+.guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: 11px; padding: 0 2px; border-radius: 999px; white-space: nowrap; }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
 /* 有人モードの初期画面：二段目の電子マネーも、お買い物などと同じ枠線だけの丸い形と色 */
-.welcome .emoney-guide { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.25; padding: 4px 16px; }
+.welcome .emoney-guide { width: auto; height: auto; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.25; padding: 4px 16px; }
 .welcome .emoney-guide b { font-weight: inherit; }
 .welcome .emoney-guide small { font-size: 10px; }
 /* お客様側は押せないが、薄くせず店員側と同じ見た目で映す（選んだ用件も同じく塗る） */
@@ -326,7 +331,12 @@ details summary h3 { display: inline; }
 .point-services { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .point-service { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; }
 .point-service .icon { font-size: 30px; line-height: 1; }
-.point-choices button { flex: 0 1 180px; width: 180px; min-width: 0; padding: 12px 16px; font-size: 14px; }
+.point-choices button { flex: 0 1 auto; min-width: 0; font-size: 14px; }
+/* 確認画面の選択肢は大きいボタン（取引中止・お会計と同じ大きさ） */
+.confirm button:not(.tag):not(.emoney-link):not(.seg) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
+/* 支払方法は切り替えボタンの並び。セミセルフの狭い確認画面にも収まるよう、高さは小さいボタンにそろえる */
+.method-row { flex-wrap: wrap; justify-content: center; gap: 4px; }
+.method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
 /* お支払い内容の確認は、角の丸い枠に入れず登録エリアいっぱいに広げる（最上段と会計バーは除く。2026-10-28 ユーザー） */
 /* FF の「お渡し前」は押せるアイコン（押すとお渡し照合の画面） */
 button.tag.ff-verify { font: inherit; font-size: 11px; border: 1px solid currentColor; cursor: pointer; }
@@ -356,11 +366,13 @@ button.tag.ff-verify:disabled { cursor: not-allowed; }
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
 /* 会計中の「商品登録に戻る」は確認画面の左下（中身の中央寄せは崩さない） */
 .confirm { position: relative; }
-.confirm:has(> .back-foot) { padding-bottom: 28px; }
+.confirm:has(> .back-foot) { padding-bottom: calc(var(--btn-h) + 4px); }
 /* セミセルフは最下段に呼び出しボタンがあって狭いので、ボタンの分だけ上下の余白を詰める */
-.confirm:has(> .back-foot) > .point-screen { padding-top: 4px; padding-bottom: 4px; }
+.confirm:has(> .back-foot) > .point-screen { padding-top: 2px; padding-bottom: 2px; gap: 6px; }
+.confirm:has(> .back-foot) > .point-screen .big { margin-bottom: 0; }
+.confirm:has(> .back-foot) { gap: 4px; }
 .confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
-.confirm:has(> .back-foot) > .paybox p { margin: 4px 0 0; }
+.confirm:has(> .back-foot) > .paybox p { margin: 2px 0 0; font-size: 12px; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
 /* 狭い画面（セミセルフは最下段に呼び出しボタンがある）でもボタンまで収まるよう、詰めて置く */
 .change { font-size: 18px; margin: 8px 0; }
@@ -673,10 +685,10 @@ body.dragging .drop-hint { display: inline; }
 @media (prefers-reduced-motion: reduce) { .lines tr.flash td { animation: none; background: var(--flash); } }
 
 /* 数量の両脇の − ＋（数量 1 では − が「削除」）。押すとその場で数量が変わる */
-.qty-step { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; }
-.qty-step button { min-width: 26px; padding: 1px 5px; }
+.qty-step { display: flex; align-items: center; justify-content: flex-end; gap: 4px; white-space: nowrap; }
+.screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 2px; font-size: 11px; }
 /* 数量そのものは積極ボタン。テンキーで打っている間は破線の枠（ここで入力を受け付ける） */
-.qty-step .qty-key { min-width: 30px; font-weight: 600; }
+.qty-step .qty-key { font-weight: 600; }
 .qty-step .qty-key.typing { outline: 2px dashed var(--accent); outline-offset: 1px; }
 .qty-fixed { min-width: 1.4em; text-align: center; }
 /* 数量のテンキー：レジ画面の上に重ねるポップアップ（レジ画面で覆いかぶさる表示を出す唯一の例外） */
@@ -705,7 +717,7 @@ body.dragging .drop-hint { display: inline; }
 .void-btn { white-space: nowrap; }
 .staff-head { gap: 8px; }
 .void-choices { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-.void-choices > button { min-width: 140px; min-height: 44px; }
+
 
 /* セミセルフの待ち受け：右下の角を頂点に最も明るくなる背景。その明るい角に電子マネーの文字リンクを置く
    （バーコードを読む案内ボタンから離し、電子マネーにスキャンが要ると誤解させない） */

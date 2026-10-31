@@ -171,7 +171,7 @@ button.mode-badge { min-height: 0; cursor: pointer; }
 /* 商品登録画面では控えめな大きさ（「電子マネー」だけ）にして、登録の妨げにしない */
 .emoney-fan.compact { width: 56px; height: 56px; border-radius: 56px 0 0 0; }
 .emoney-fan.compact > span { padding: 0 4px 4px 0; }
-.emoney-fan.compact b { font-size: 9px; }
+.emoney-fan.compact b { font-size: 10px; line-height: 1.15; text-align: right; }
 .screen-body:has(.emoney-fan) .screen-main { padding-bottom: 60px; }
 .screen-body:has(.emoney-fan) .screen-main:has(> .welcome) { padding-bottom: 8px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }

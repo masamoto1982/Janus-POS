@@ -862,7 +862,7 @@ export function emoneyFan(r: RegisterView, side: Side, main: string): string {
   if (!welcomeShown && !registering) return "";
   // 商品登録画面では登録の妨げにならないよう控えめな大きさにし、「電子マネー」だけを出す
   const compact = !welcomeShown;
-  const label = compact ? `<span><b>電子マネー</b></span>` : `<span><b>電子マネー</b><small>チャージ<br>残高確認</small></span>`;
+  const label = compact ? `<span><b>電子<br>マネー</b></span>` : `<span><b>電子マネー</b><small>チャージ<br>残高確認</small></span>`;
   const cls = `emoney-fan${compact ? " compact" : ""}`;
   const own: Side = attended ? "staff" : "customer";
   if (side !== own) return `<button type="button" class="${cls} mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;

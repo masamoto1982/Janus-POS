@@ -265,7 +265,7 @@ export const SCENES: Scene[] = [
         { label: "電子マネー／チャージ・残高確認", tone: "表示のみ", note: "右下端の扇形" },
       ],
     },
-    rules: ["P-01", "P-05", "P-16", "P-18"],
+    rules: ["P-01", "P-05", "P-16", "P-18", "P-31"],
     source: "attendedWelcome",
   },
   {
@@ -837,7 +837,7 @@ export const SCENES: Scene[] = [
         { label: "電子マネー／チャージ・残高確認", tone: "積極", note: "右下端の扇形（F-emoney-fan）" },
       ],
     },
-    rules: ["P-01", "P-05", "P-18"],
+    rules: ["P-01", "P-05", "P-18", "P-31"],
     source: "welcome",
   },
   {

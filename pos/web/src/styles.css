@@ -268,9 +268,9 @@ button.seg { padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: 4px; }
 
-/* 入力フォームは角を丸めない箱：濃い枠線・濃い文字・背景なし。角の丸みはボタンだけの表現（P-29） */
+/* 入力フォームは角を丸めない箱：枠線は消極ボタンと同じ色（#535353）、濃い文字、背景なし。角の丸みはボタンだけの表現（P-29） */
 input, select, button.pad-field {
-  padding: 6px 8px; border-radius: 0; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); min-width: 0;
+  padding: 6px 8px; border-radius: 0; border: 1.5px solid var(--msg-strong); background: transparent; color: var(--ink); min-width: 0;
 }
 /* テンキーで打ち込む入力欄（押すとテンキーが開く）。見た目は入力欄そのもの。テンキーは入力欄とだけ組み合わせる */
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
@@ -650,7 +650,7 @@ body.dragging .drop-hint { display: inline; }
 /* 投入口・排出口はただの箱（角は丸めない）。中に「入金」「出金」のプレースホルダー。
    入金ボックスを押すとテンキーが開き、金額（連続値）を打ち込んで入れる */
 .money-io .inlet, .money-io .outlet {
-  height: 40px; padding: 0 12px; border: 1.5px solid var(--ink); border-radius: 0;
+  height: 40px; padding: 0 12px; border: 1.5px solid var(--msg-strong); border-radius: 0;
   background: transparent; color: var(--ink); font: inherit; font-size: 16px; text-align: right;
 }
 .money-io .inlet, .money-io .outlet { display: flex; align-items: center; justify-content: flex-end; cursor: pointer; }
@@ -658,7 +658,7 @@ body.dragging .drop-hint { display: inline; }
 /* 注意喚起は枠線の点滅：支払方法が決まったら入金ボックスの枠を、出金ボックスにお金があれば枠と金額を点滅させる。
    入金ボックスの中の文字は点滅させず、支払方法に合わせた案内（現金を入れる など）にする */
 @keyframes io-blink { 50% { color: transparent; } }
-@keyframes io-frame { 50% { border-color: var(--ink); } }
+@keyframes io-frame { 50% { border-color: var(--msg-strong); } }
 .money-io .inlet.blink, .money-io .outlet.blink { border: 2px solid var(--accent); animation: io-frame 1s steps(1) infinite; }
 .money-io .inlet.blink .placeholder { color: var(--ink); font-weight: 700; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
@@ -701,7 +701,7 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; color: var(--msg-strong); }
 .qty-pop-name .muted { font-size: 12px; white-space: nowrap; }
-.qty-pop-value { border: 1.5px solid var(--ink); border-radius: 0; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
+.qty-pop-value { border: 1.5px solid var(--msg-strong); border-radius: 0; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
 .qty-pop-value .muted { font-size: 13px; font-weight: 400; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; flex: 1 1 auto; min-height: 0; }
 .qty-pop-keys .pad-key { padding: 4px 0; font-size: 16px; font-weight: 600; min-height: 0; }

@@ -729,13 +729,11 @@ body.dragging .drop-hint { display: inline; }
 .void-choices { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
 
-/* 待ち受け画面の背景：明るい点を中心に、外へいくほど暗くなる円形グラデーション。
-   セミセルフは右下の角（電子マネーの扇形）へ、有人は画面中央へ視線を集める */
-.scan-welcome, .attended-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
+/* 待ち受け画面の背景：画面中央の明るい点から、外へいくほど暗くなる円形グラデーション。
+   両モードで同じ（主役はスキャンとご用件の案内。電子マネーの扇形は右下端にあるだけ）（P-31） */
+.scan-welcome, .attended-welcome { position: relative; --spot: 50% 50%; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
   --glow: color-mix(in srgb, var(--cust-bg) 65%, #ffffff); --dark: color-mix(in srgb, var(--cust-bg) 78%, var(--ink));
   background: radial-gradient(circle farthest-corner at var(--spot), var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
-.scan-welcome { --spot: 100% 100%; }
-.attended-welcome { --spot: 50% 50%; }
 /* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
 .menu-code-value { font-size: 40px; letter-spacing: .25em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; margin: 4px 0; padding-left: .25em; }
 .menu-code-form { justify-content: center; gap: 8px; }

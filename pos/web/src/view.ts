@@ -679,6 +679,7 @@ const CALL_SHORT: Record<string, string> = {
   age_check: "年確",
   bill: "公共料金",
   change_left: "釣銭忘れ",
+  emoney: "電子マネー",
 };
 
 /**
@@ -842,16 +843,33 @@ export function welcome(reg: number, side: Side, emoney?: ActionState): string {
         ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
       ).join("")}</div>
       ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
-      ${
-        // 電子マネーはバーコードを読まない用件なので、案内ボタンから離して右下の明るい角に文字リンクで置く
-        emoney ? btn("電子マネーのチャージ・残高確認", { type: "start_emoney", register: reg, side, kind: "menu" }, emoney, "emoney-link") : ""
-      }
     </div>`;
 }
 
-/** 電子マネーのチャージ・残高確認を始めるボタン（支払方法の「電子マネー」と取り違えないよう二行目を添える） */
-function emoneyEntry(reg: number, side: Side, st: ActionState, cls: string): string {
-  return btn("", { type: "start_emoney", register: reg, side, kind: "menu" }, st, cls).replace("></button>", "><b>電子マネー</b><small>チャージ・残高確認</small></button>");
+/**
+ * 電子マネーのチャージ・残高確認の入口：画面（登録エリア）の右下端の、円を四分の一にした扇形。
+ * 入口はモードによらずここだけで、両モードの待ち受け画面と商品登録画面に出す。確認画面・手続きの最中は出さない。
+ * セミセルフのお買い物の途中は、押すとスタッフを呼ぶ（ほかの呼び出しボタンと同じく押している間鳴る）。
+ * スタッフがログインした有人モードで手続きすれば安全で、お客様は取引を終えずに済む。
+ * 押すのは操作する側（有人は店員側、セミセルフはお客様側）。もう一方の画面には押せない形で映す
+ */
+export function emoneyFan(r: RegisterView, side: Side, main: string): string {
+  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null) return "";
+  const attended = r.mode === "attended";
+  const v = attended ? r.staff : r.customer;
+  const welcomeShown = main.includes('class="welcome');
+  const registering = v.phase === "registering" && main.includes('class="reg-top"') && !main.includes('class="confirm"');
+  if (!welcomeShown && !registering) return "";
+  const label = `<span><b>電子マネー</b><small>チャージ<br>残高確認</small></span>`;
+  const own: Side = attended ? "staff" : "customer";
+  if (side !== own) return `<button type="button" class="emoney-fan mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;
+  if (!attended && registering) {
+    // セミセルフのお買い物の途中：スタッフを呼ぶ
+    const st = find(r.customer.actions, "call_staff");
+    const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
+    return `<button type="button" class="emoney-fan" data-hold="${esc(JSON.stringify(cmd))}" title="スタッフを呼んで手続きします（押している間鳴ります）"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}>${label}</button>`;
+  }
+  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, find(v.actions, "emoney"), "emoney-fan").replace("></button>", `>${label}</button>`);
 }
 
 /**
@@ -895,7 +913,7 @@ const ATTENDED_GUIDES: [GuideKind, string, string][] = [
 
 /**
  * 有人モードの初期画面。あいさつと声かけの二行に、ご用件の案内ボタンを添える。
- * 一段目は お買い物・宅配便・お支払い（押すと読むバーコードを案内）、二段目は電子マネーのチャージ・残高確認。
+ * 一段目は お買い物・宅配便・お支払い（押すと読むバーコードを案内）。電子マネーは右下の扇形から（emoneyFan）。
  * 両方の画面に出し、操作できるのは店員側だけ（お客様側はどの用件を受け付けているかを見せる）
  */
 function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
@@ -907,14 +925,9 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
     ([k, label]) =>
       `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
   ).join("");
-  // お買い物・宅配便・お支払いと同じ形と色（二行目に「チャージ・残高確認」）
-  const emoney = ro
-    ? `<button type="button" class="guide-btn emoney-guide mirror-only" tabindex="-1" aria-disabled="true"><b>電子マネー</b><small>チャージ・残高確認</small></button>`
-    : emoneyEntry(reg, "staff", find(r.staff.actions, "emoney"), "guide-btn emoney-guide");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
   return `${notice}<div class="welcome attended-welcome"><div class="big">${head}</div><p>${sub}</p>
       <div class="guide-row">${guides}</div>
-      <div class="guide-row">${emoney}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
@@ -959,10 +972,6 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       : "";
 
   // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
-  // 電子マネーのチャージ・残高確認は、お買い物の途中でも（会計中でも）店員側から始められる。
-  // 「すべての操作はやりたいときにできる」：待ち受けに戻らなくてよいよう、合計の下に常に置く
-  // セミセルフの待ち受けと同じ、下線の付いた文字リンクで出す（会計ボタンと取り違えない控えめな表現）
-  const emoney = ro ? "" : btn("電子マネーのチャージ・残高確認", { type: "start_emoney", register: reg, side, kind: "menu" }, a("emoney"), "emoney-link");
   const top = regTop(
     v.total,
     itemCount(v.lines),
@@ -976,7 +985,6 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     r.max_items,
     !!v.point_card,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
-    emoney,
   );
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞回収・クーポン＞ポイントカード＞決済手段。

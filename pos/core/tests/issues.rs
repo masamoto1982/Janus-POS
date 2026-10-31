@@ -2646,6 +2646,30 @@ fn emoney_balance(s: &Store) -> u32 {
     s.snapshot().emoney_balance
 }
 
+/// セミセルフのお買い物の途中に電子マネーの扇形を押すと、スタッフを呼ぶ。
+/// スタッフがログインすると呼び出しは片付き、有人モードで手続きできる
+#[test]
+fn semi_self_emoney_fan_calls_staff_while_shopping() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"emoney"}),
+    );
+    let kinds =
+        |s: &Store| -> Vec<CallKind> { reg(s, 1).staff.calls.iter().map(|c| c.kind).collect() };
+    assert!(kinds(&s).contains(&CallKind::Emoney));
+    login(&mut s, 1);
+    assert!(
+        !kinds(&s).contains(&CallKind::Emoney),
+        "スタッフが来たら片付く"
+    );
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"staff","kind":"menu"}),
+    );
+}
+
 /// 「電子マネー」ボタンでチャージか残高確認を選ぶ。残高確認はかざすと残高が出る。
 /// セミセルフではお買い物の途中にチャージ・残高確認はできない
 #[test]

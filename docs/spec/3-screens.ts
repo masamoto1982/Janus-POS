@@ -389,7 +389,7 @@ export const SCENES: Scene[] = [
       weak: ["三辺の長さの合計を入力してください（入力エラーのときはその理由）"],
       parts: ["入力欄：長さ 〈 〉cm（押すとテンキー）"],
       buttons: [
-        { label: "バック", tone: "消極", note: "この荷物の受付をやめる" },
+        { label: "バック", tone: "消極", note: "小ボタン。左下。この荷物の受付をやめる" },
         { label: "決定", tone: "積極" },
       ],
     },
@@ -411,7 +411,7 @@ export const SCENES: Scene[] = [
       weak: ["重量を入力してください"],
       parts: ["入力欄：重さ 〈 〉kg（押すとテンキー。小数点あり）"],
       buttons: [
-        { label: "バック", tone: "消極" },
+        { label: "バック", tone: "消極", note: "小ボタン。左下" },
         { label: "決定", tone: "積極" },
       ],
     },
@@ -429,7 +429,7 @@ export const SCENES: Scene[] = [
       strong: ["お届け先の郵便番号を入力してください"],
       parts: ["入力欄：例 100-0001（押すとテンキー）"],
       buttons: [
-        { label: "バック", tone: "消極" },
+        { label: "バック", tone: "消極", note: "小ボタン。左下" },
         { label: "決定", tone: "積極" },
       ],
     },
@@ -672,7 +672,7 @@ export const SCENES: Scene[] = [
       buttons: [
         { label: "チャージ", tone: "積極" },
         { label: "残高確認", tone: "積極" },
-        { label: "バック", tone: "消極", note: "左下" },
+        { label: "バック", tone: "消極", note: "小ボタン。左下" },
       ],
     },
     customer: {
@@ -693,7 +693,7 @@ export const SCENES: Scene[] = [
     staff: {
       strong: ["チャージする紙幣を入れてください"],
       weak: ["入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）／入れおわったら、電子マネーを入金ボックスにかざしてください"],
-      buttons: [{ label: "バック", tone: "消極", note: "左下" }],
+      buttons: [{ label: "バック", tone: "消極", note: "小ボタン。左下" }],
     },
     customer: { mirror: true },
     rules: ["P-05", "P-19"],
@@ -709,7 +709,7 @@ export const SCENES: Scene[] = [
     staff: {
       strong: ["電子マネーを入金ボックスにかざしてください → かざした後：〈金額〉"],
       weak: ["かざした後：電子マネーの残高（金額の上）"],
-      buttons: [{ label: "バック → かざした後：閉じる", tone: "消極", note: "左下" }],
+      buttons: [{ label: "バック → かざした後：閉じる", tone: "消極", note: "小ボタン。左下" }],
     },
     customer: { mirror: true },
     rules: ["P-05", "P-19"],
@@ -791,7 +791,7 @@ export const SCENES: Scene[] = [
       parts: ["入力欄：例 U8X3"],
       buttons: [
         { label: "開く", tone: "積極", note: "入力欄の右" },
-        { label: "バック", tone: "消極", note: "左下" },
+        { label: "バック", tone: "消極", note: "小ボタン。左下" },
       ],
     },
     rules: ["P-07", "P-19"],
@@ -808,7 +808,7 @@ export const SCENES: Scene[] = [
       strong: ["店舗メニュー（太字）"],
       weak: ["担当：〈名前〉"],
       buttons: [
-        { label: "バック", tone: "消極", note: "各項目の画面の左上" },
+        { label: "バック", tone: "消極", note: "小ボタン。各項目の画面の左下" },
         { label: "返品返金／緊急出金／取引外入金／経費支出／自動釣銭機（両替）", tone: "積極", note: "取引中は押せない" },
         { label: "ログアウト／レジ休止中", tone: "積極" },
       ],

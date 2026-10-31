@@ -14,7 +14,6 @@ import type {
   CustomerView,
   FfState,
   MenuScreen,
-  HourMode,
   RegisterView,
   Snapshot,
   Rounding,
@@ -1338,13 +1337,12 @@ const MENU_LABEL: Record<MenuScreen, string> = {
   journal: "ジャーナル確認",
   waste: "廃棄登録",
   ff_fresh: "FF鮮度管理",
-  mode_hours: "モード設定",
 };
 
 /** 店舗メニューの項目：お客様側は自動釣銭機へのお金の出し入れ、店員側はそれ以外 */
 const MENU_ITEMS: Record<Side, MenuScreen[]> = {
   customer: ["refund", "emergency", "deposit", "expense", "changer"],
-  staff: ["journal", "waste", "ff_fresh", "mode_hours"],
+  staff: ["journal", "waste", "ff_fresh"],
 };
 
 /**
@@ -1390,8 +1388,6 @@ export function storeMenu(r: RegisterView): string {
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
           ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
         </div>`;
-    case "mode_hours":
-      return modeHoursMenu(r, head(MENU_LABEL.mode_hours));
     case "journal":
     case "waste":
     case "ff_fresh":
@@ -1423,34 +1419,6 @@ export function storeMenu(r: RegisterView): string {
         <p class="muted">釣銭機の ${m.exchange_to.toLocaleString()}円：残り ${have(m.exchange_to)} 枚　在高 ${yen(v.drawer_total)}</p>`;
     }
   }
-}
-
-const HOUR_MODE: Record<HourMode, string> = {
-  neutral: "ニュートラル",
-  attended: "有人固定",
-  semi_self: "セミセルフ固定",
-};
-
-/**
- * モード設定：時間帯（0〜23 時台）のリストで、時間帯ごとにセレクタで稼働モードを選ぶ（変更はオーナーだけ）。
- * 推奨は「常時固定」か「時間帯に応じた固定」。混みあってきたら切り替えるような運用はしない（セミセルフはサブ）
- */
-function modeHoursMenu(r: RegisterView, head: string): string {
-  const reg = r.id;
-  const owner = r.staff.role === "owner";
-  const now = new Date().getHours();
-  const rows = r.mode_hours
-    .map(
-      (m, h) => `<label class="hour-row${h === now ? " now" : ""}"><span>${h}時台</span><select data-hourmode="${reg}:${h}" aria-label="${h}時台の稼働モード"${owner ? "" : ' disabled title="オーナーだけが変更できます"'}>${(Object.keys(HOUR_MODE) as HourMode[])
-        .map((k) => `<option value="${k}"${k === m ? " selected" : ""}>${HOUR_MODE[k]}</option>`)
-        .join("")}</select></label>`,
-    )
-    .join("");
-  return `${head}
-    <p class="muted">レジ${reg}の時間帯ごとの稼働モード${owner ? "" : "（変更はオーナーだけ）"}</p>
-    <div class="hour-list">${rows}</div>
-    <p class="muted">太字がいまの時間帯</p>
-    <p class="muted">ニュートラルは基本セミセルフで、スタッフバーコードで有人に切り替えます。有人固定の時間帯にスタッフがいなければ休止中にし、セミセルフ固定でもスタッフが手伝った取引が済めばセミセルフに戻ります。お客様の取引の途中ではモードを変えません。混雑に合わせた切り替えはしません（セミセルフはサブ）。</p>`;
 }
 
 // ---------------------------------------------------------------------------

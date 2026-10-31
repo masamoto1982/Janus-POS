@@ -47,6 +47,14 @@ export function btn(label: string, cmd: Command, a?: ActionState, cls = ""): str
   return `<button class="${cls}" data-cmd="${esc(JSON.stringify(cmd))}"${disabled ? " disabled" : ""}${title}>${esc(label)}</button>`;
 }
 
+/** 手続きを引き返す「バック」。どこでも小ボタンにし、画面の左下に置く（`.screen-foot` などの左端） */
+export function backBtn(cmd: Command, a?: ActionState): string {
+  return btn("バック", cmd, a, "small ghost back-btn");
+}
+const backFootRow = (cmd: Command, a?: ActionState): string => `<div class="screen-foot">${backBtn(cmd, a)}</div>`;
+/** 確認画面（`.confirm`）の左下に置く「バック」。確認画面の中身の直後に並べる */
+const backCorner = (cmd: Command, a?: ActionState): string => `<div class="back-foot">${backBtn(cmd, a)}</div>`;
+
 const FF_LABEL: Record<FfState, string> = {
   waiting: "お渡し前",
   received: "お渡し済",
@@ -267,7 +275,7 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
   // 「戻る」は手続きを一段階引き返す（左）。三辺の合計から戻ると、この荷物の受付をやめる
-  const back = (label = "バック") => btn(label, { type: "parcel_back", register: reg, line_id: l.id }, st, "ghost");
+  const back = () => backCorner({ type: "parcel_back", register: reg, line_id: l.id }, st);
   const field = (target: PadTarget, placeholder: string, aria: string) =>
     padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`);
   if (!p.size && !p.sum_cm) {
@@ -275,26 +283,25 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
         <div class="big">${no}取り扱いサイズを決定してください</div>
         ${parcelErr(reg) || `<p class="parcel-size">三辺の長さの合計を入力してください</p>`}
         <div class="parcel-fields"><label>長さ${field("pcm", "", "荷物の三辺の合計（cm）")}<span>cm</span></label></div>
-        <div class="point-choices">${back()}<button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
-      </div>`;
+        <div class="point-choices"><button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
+      </div>${back()}`;
   }
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
         <div class="big">${no}取り扱いサイズを決定してください</div>
         ${parcelErr(reg) || `<p class="parcel-size">重量を入力してください</p>`}
         <div class="parcel-fields"><label>重さ${field("pkg", "", "荷物の重さ（kg）")}<span>kg</span></label></div>
-        <div class="point-choices">${back()}<button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}" data-cm="${p.sum_cm}"${off}>決定</button></div>
-      </div>`;
+        <div class="point-choices"><button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}" data-cm="${p.sum_cm}"${off}>決定</button></div>
+      </div>${back()}`;
   }
   return `<div class="point-screen parcel-entry">
       <div class="big">${no}お届け先の郵便番号を入力してください</div>
       ${parcelErr(reg)}
       ${field("post", "例 100-0001", "お届け先の郵便番号（7桁）")}
       <div class="point-choices">
-        ${back()}
         <button class="primary" data-form="parcel-postal" data-reg="${reg}" data-line="${l.id}"${off}>決定</button>
       </div>
-    </div>`;
+    </div>${back()}`;
 }
 
 /** 店員側：料金が決まった後の「次の荷物はありますか」。直前に受け付けた荷物の料金と、受付済みの個数を添える */
@@ -385,8 +392,7 @@ const customerOnly = (html: string): string => `<span class="customer-only">${ht
 
 /** 会計中の確認画面の左下に置く、手続きを引き返すボタン（引き返すボタンは左） */
 function backFoot(reg: number, side: Side, st: ActionState): string {
-  // 「バック」は小ボタン（二行にして収める）
-  return `<div class="back-foot">${btn("バック", { type: "back_to_registering", register: reg, side }, st, "small ghost back-btn")}</div>`;
+  return backCorner({ type: "back_to_registering", register: reg, side }, st);
 }
 
 /** 公共料金の受付枚数。合計金額よりも大事な情報なので、どの確認画面でも大きく出す */
@@ -605,7 +611,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(l.name)}<span class="muted">いまの数量 ${l.qty}</span></div>
         <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("0", "0", "pad-key zero")}${k("back", "←", "pad-key neg")}</div>
-        <div class="qty-pop-foot">${k("cancel", "バック", "neg")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-foot">${k("cancel", "バック", "small ghost back-btn")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -666,7 +672,7 @@ export function padPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(title)}${now}</div>
         <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}${k("back", "←", "pad-key neg")}</div>
-        <div class="qty-pop-foot">${k("cancel", "バック", "neg")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-foot">${k("cancel", "バック", "small ghost back-btn")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -1155,7 +1161,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   const actions = r.mode === "semi_self" ? r.customer.actions : r.staff.actions;
   // やめる・閉じるは手続きを引き返すボタンなので左下
   const close = (label: string) =>
-    ro ? "" : `<div class="screen-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip")}</div>`;
+    ro ? "" : label === "バック" ? backCorner({ type: "close_emoney", register: reg, side }, find(actions, "emoney")) : `<div class="screen-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip")}</div>`;
   if (r.emoney_partial !== null) {
     // 「不足分を現金で払う」：残高を引き出し残りを現金で払うことを確かめてから、電子マネーを受け付ける
     // （かざしたままの電子マネーで、案内を見ないうちに決済が走らないように）
@@ -1188,18 +1194,17 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     return `<div class="point-screen emoney-screen">
         <div class="big">電子マネー</div>
         <p class="muted">選択してください</p>
-        ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>${close("バック")}`}
-      </div>`;
+        ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>`}
+      </div>${close("バック")}`;
   }
   if (e.kind === "inquiry")
     return e.balance === null
-      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを入金ボックスにかざしてください</div>${close("バック")}</div>`
+      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを入金ボックスにかざしてください</div></div>${close("バック")}`
       : `<div class="point-screen emoney-screen"><p>電子マネーの残高</p><div class="big emoney-balance">${yen(e.balance)}</div>${close("閉じる")}</div>`;
   return `<div class="point-screen emoney-screen">
       <div class="big">チャージする紙幣を入れてください</div>
       <p>${e.inserted ? "入れおわったら、電子マネーを入金ボックスにかざしてください" : "入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）"}</p>
-      ${close("バック")}
-    </div>`;
+    </div>${close("バック")}`;
 }
 
 /** 残りを現金で払うとき、電子マネーで払った分を知らせる */
@@ -1365,8 +1370,7 @@ function menuCode(r: RegisterView, side: Side): string {
         <input type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例 U8X3" data-menucode="1" data-key="mc-${reg}" aria-label="パスワード" />
         <button class="primary" data-form="menucode" data-reg="${reg}">開く</button>
       </div>
-      <div class="screen-foot">${btn("バック", { type: "open_menu", register: reg, side: "customer", screen: null }, undefined, "ghost")}</div>
-    </div>`);
+    </div>${backCorner({ type: "open_menu", register: reg, side: "customer", screen: null })}`);
 }
 
 /** 一度に一つの画面だけを出す：一覧 → 各項目の画面 */
@@ -1376,9 +1380,10 @@ export function storeMenu(r: RegisterView): string {
   const m = r.menu!;
   const side = m.side;
   const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side, screen, ...extra });
-  const head = (title: string) =>
-    `<div class="menu-head">${btn("バック", go("top"), undefined, "small ghost")}<b>${esc(title)}</b></div>`;
+  const head = (title: string) => `<div class="menu-head"><b>${esc(title)}</b></div>`;
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
+  // 各項目の画面は、左下の「バック」で一覧に戻る
+  const screen = (body: string) => `<div class="menu-screen">${body}${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
       return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
@@ -1392,32 +1397,32 @@ export function storeMenu(r: RegisterView): string {
     case "journal":
     case "waste":
     case "ff_fresh":
-      return `${head(MENU_LABEL[m.screen])}
-        <p class="muted">準備中です（今後つくりこみます）。</p>`;
+      return screen(`${head(MENU_LABEL[m.screen])}
+        <p class="muted">準備中です（今後つくりこみます）。</p>`);
     case "refund":
     case "emergency":
     case "expense": {
       const cout = find(v.actions, "cash_out");
-      return `${head(MENU_LABEL[m.screen])}
+      return screen(`${head(MENU_LABEL[m.screen])}
         <p class="muted">お金を抜く操作です。お金は下の「出金」ボックスに出ます。記録は担当者名つきで残ります。</p>
         <div class="menu-form">
           <input type="number" inputmode="numeric" min="1" placeholder="金額" data-key="mo-amt-${reg}" />
           <button class="primary" data-form="cashout" data-reg="${reg}" data-kind="${m.screen}" ${cout.allowed ? "" : `disabled title="${esc(cout.reason ?? "")}"`}>出金</button>
-        </div>`;
+        </div>`);
     }
     case "deposit":
-      return `${head(MENU_LABEL.deposit)}
+      return screen(`${head(MENU_LABEL.deposit)}
         <p>入金する金額を下の<b>「入金」ボックス</b>に入れて Enter を押してください。</p>
-        <p class="muted">記録は担当者名つきで残ります。</p>`;
+        <p class="muted">記録は担当者名つきで残ります。</p>`);
     case "changer": {
       const have = (d: number) => v.drawer.find(([x]) => x === d)?.[1] ?? 0;
       const segs = [1000, 500, 100, 50, 10]
         .map((d) => btn(`${d.toLocaleString()}円`, go("changer", { exchange_to: d }), undefined, `seg small ${m.exchange_to === d ? "on" : ""}`))
         .join("");
-      return `${head(MENU_LABEL.changer)}
+      return screen(`${head(MENU_LABEL.changer)}
         <div class="row wrap">受け取る金種 ${segs}</div>
         <p>両替する金額を<b>「入金」ボックス</b>に入れて Enter を押してください。同じ額を ${m.exchange_to.toLocaleString()}円 で<b>「出金」ボックス</b>に出します。</p>
-        <p class="muted">釣銭機の ${m.exchange_to.toLocaleString()}円：残り ${have(m.exchange_to)} 枚　在高 ${yen(v.drawer_total)}</p>`;
+        <p class="muted">釣銭機の ${m.exchange_to.toLocaleString()}円：残り ${have(m.exchange_to)} 枚　在高 ${yen(v.drawer_total)}</p>`);
     }
   }
 }

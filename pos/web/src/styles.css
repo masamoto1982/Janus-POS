@@ -384,11 +384,14 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 /* セミセルフは最下段に呼び出しボタンがあって狭いので、ボタンの分だけ上下の余白を詰める */
 .confirm:has(> .back-foot) > .point-screen { padding-top: 2px; padding-bottom: 2px; gap: 6px; }
 .confirm:has(> .back-foot) > .point-screen .big { margin-bottom: 0; }
+.confirm:has(> .back-foot) > .point-screen.emoney-screen .big { margin-bottom: 16px; }
 .confirm:has(> .back-foot) { gap: 4px; }
 .confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
 .confirm:has(> .back-foot) > .paybox p { margin: 2px 0 0; font-size: 12px; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
-/* 「バック」（会計中に商品登録へ引き返す・お渡し照合を閉じる）は小ボタン（56×26） */
+/* 「バック」はどこでも小ボタン（56×26）で、画面（テンキーはポップアップ）の左下に置く */
+.menu-screen { display: flex; flex-direction: column; min-height: 100%; }
+.qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
 .confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
 /* 狭い画面（セミセルフは最下段に呼び出しボタンがある）でもボタンまで収まるよう、詰めて置く */
 .change { font-size: 18px; margin: 8px 0; }

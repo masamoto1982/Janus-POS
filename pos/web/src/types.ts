@@ -198,9 +198,8 @@ export interface RegisterView {
   tobacco_asked: boolean;
   mode: Mode;
   mode_label: string;
-  /** モードの固定（店舗メニューのモード設定） */
-  mode_fix: ModeFix;
-  mode_fix_label: string;
+  /** 時間帯（0〜23 時台）ごとの稼働モード（店舗メニューのモード設定） */
+  mode_hours: HourMode[];
   idle_revert_in: number | null;
   idle_voids: boolean;
   change_left: boolean;
@@ -232,9 +231,9 @@ export interface RegisterView {
   pickup_handover: string | null;
 }
 
-export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer" | "journal" | "waste" | "ff_fresh" | "mode_fix";
-/** レジのモード固定：固定しない・常時有人・常時セミセルフ・時間帯（from 時〜until 時は有人、ほかはセミセルフ） */
-export type ModeFix = { kind: "free" } | { kind: "attended" } | { kind: "semi_self" } | { kind: "schedule"; from: number; until: number };
+export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer" | "journal" | "waste" | "ff_fresh" | "mode_hours";
+/** 時間帯ごとの稼働モード：ニュートラル（基本はセミセルフ、名札で明示的に有人）・有人固定・セミセルフ固定 */
+export type HourMode = "neutral" | "attended" | "semi_self";
 
 export interface AgeRule {
   id: number;

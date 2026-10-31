@@ -14,7 +14,7 @@ import type {
   CustomerView,
   FfState,
   MenuScreen,
-  ModeFix,
+  HourMode,
   RegisterView,
   Snapshot,
   Rounding,
@@ -614,7 +614,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
  * テンキーで打ち込む連続値（数量のほかに、荷物の三辺の合計・重さ、入金ボックスの金額）。
  * 離散値は選択肢から選ぶので、テンキーを使うのは連続値だけ。キーは「レジ番号:画面」
  */
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "inlet" | "hfrom" | "huntil";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "inlet";
 export type PadEntry = { target: PadTarget; line?: number; digits: string };
 /** いまテンキーを開いている入力欄（キーは「レジ:側」） */
 export const padEntry = new Map<string, PadEntry>();
@@ -629,8 +629,6 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   birth: { title: "身分証の生年月日（西暦8桁）", unit: "", max: 8, code: true },
   ffv: { title: "お渡し数", unit: "", max: 3, code: true },
   inlet: { title: "入金", unit: "円", max: 6 },
-  hfrom: { title: "有人の時間帯の始まり（0〜23時）", unit: "時", max: 2, code: true },
-  huntil: { title: "有人の時間帯の終わり（0〜23時）", unit: "時", max: 2, code: true },
 };
 /** 郵便番号は 3 桁目のあとにハイフンを入れて見せる */
 export const padShow = (target: PadTarget, digits: string): string => (target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
@@ -1340,13 +1338,13 @@ const MENU_LABEL: Record<MenuScreen, string> = {
   journal: "ジャーナル確認",
   waste: "廃棄登録",
   ff_fresh: "FF鮮度管理",
-  mode_fix: "モード設定",
+  mode_hours: "モード設定",
 };
 
 /** 店舗メニューの項目：お客様側は自動釣銭機へのお金の出し入れ、店員側はそれ以外 */
 const MENU_ITEMS: Record<Side, MenuScreen[]> = {
   customer: ["refund", "emergency", "deposit", "expense", "changer"],
-  staff: ["journal", "waste", "ff_fresh", "mode_fix"],
+  staff: ["journal", "waste", "ff_fresh", "mode_hours"],
 };
 
 /**
@@ -1392,8 +1390,8 @@ export function storeMenu(r: RegisterView): string {
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
           ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
         </div>`;
-    case "mode_fix":
-      return modeFixMenu(r, head(MENU_LABEL.mode_fix));
+    case "mode_hours":
+      return modeHoursMenu(r, head(MENU_LABEL.mode_hours));
     case "journal":
     case "waste":
     case "ff_fresh":
@@ -1427,32 +1425,44 @@ export function storeMenu(r: RegisterView): string {
   }
 }
 
+const HOUR_MODE: Record<HourMode, { label: string; mark: string; cls: string }> = {
+  neutral: { label: "ニュートラル", mark: "－", cls: "neutral" },
+  attended: { label: "有人固定", mark: "有人", cls: "attended" },
+  semi_self: { label: "セミセルフ固定", mark: "セミ", cls: "semi" },
+};
+/** モード設定で、時間帯に塗るモード（キーはレジ番号。既定は有人固定） */
+export const modeBrush = new Map<number, HourMode>();
+
 /**
- * モード設定：このレジの有人／セミセルフを固定する（変更はオーナーだけ）。
- * 推奨は「常時固定」か「時間帯で固定」。混みあってきたら切り替えるような運用はしない
- * （並んだあとでモードが変わると、お客様がどこに並べばよいか分からなくなる）。
- * コンビニではセミセルフはサブ（有人レジが主）
+ * モード設定：時間帯（0〜23 時台）ごとに稼働モードを選ぶ（変更はオーナーだけ）。
+ * 上でモードを選び、下の 24 の時間帯を押すとそのモードになる（色を塗るように選ぶ）。
+ * 時間帯は濃さと文字で見分ける：有人固定は濃い塗り、セミセルフ固定は薄い塗り、ニュートラルは枠だけ。
+ * 推奨は「常時固定」か「時間帯に応じた固定」。混みあってきたら切り替えるような運用はしない（セミセルフはサブ）
  */
-function modeFixMenu(r: RegisterView, head: string): string {
+function modeHoursMenu(r: RegisterView, head: string): string {
   const reg = r.id;
-  const fix = r.mode_fix;
   const owner = r.staff.role === "owner";
-  const lock: ActionState | undefined = owner ? undefined : { action: "set_mode_fix", allowed: false, reason: "オーナーだけが変更できます" };
-  const choice = (label: string, f: ModeFix) =>
-    btn(label, { type: "set_mode_fix", register: reg, fix: f }, lock, `seg ${fix.kind === f.kind ? "on" : ""}`);
-  // 時間帯は、いまの設定を入力欄の初めの値にする（テンキーで打ち直せる）
-  const hour = (t: "hfrom" | "huntil", now?: number) => padValue.get(padValueKey(reg, t)) ?? (now === undefined ? "" : String(now));
-  const sched = fix.kind === "schedule" ? fix : undefined;
-  const from = hour("hfrom", sched?.from);
-  const until = hour("huntil", sched?.until);
+  const lock: ActionState | undefined = owner ? undefined : { action: "set_mode_hours", allowed: false, reason: "オーナーだけが変更できます" };
+  const brush = modeBrush.get(reg) ?? "attended";
+  const now = new Date().getHours();
+  const palette = (Object.keys(HOUR_MODE) as HourMode[])
+    .map((m) => `<button type="button" class="seg brush${m === brush ? " on" : ""}" data-brush="${reg}:${m}"${owner ? "" : " disabled"}>${HOUR_MODE[m].label}</button>`)
+    .join("");
+  const cells = r.mode_hours
+    .map((m, h) =>
+      btn("", { type: "set_mode_hours", register: reg, hours: [h], mode: brush }, lock, `hour-cell ${HOUR_MODE[m].cls}${h === now ? " now" : ""}`).replace(
+        "></button>",
+        ` aria-label="${h}時台：${HOUR_MODE[m].label}"><b>${h}時</b><small>${HOUR_MODE[m].mark}</small></button>`,
+      ),
+    )
+    .join("");
+  const all = btn("全時間帯", { type: "set_mode_hours", register: reg, hours: [...Array(24).keys()], mode: brush }, lock, "brush-all");
   return `${head}
-    <p>レジ${reg}：<b>${esc(r.mode_fix_label)}</b>${owner ? "" : `<span class="muted">（変更はオーナーだけ）</span>`}</p>
-    <div class="row wrap mode-fix-choices">${choice("固定しない", { kind: "free" })}${choice("常時有人", { kind: "attended" })}${choice("常時セミセルフ", { kind: "semi_self" })}</div>
-    <div class="row mode-fix-schedule">時間帯：
-      ${padField(reg, "staff", "hfrom", from, "", "有人の時間帯の始まり", undefined, "hour-field")}〜${padField(reg, "staff", "huntil", until, "", "有人の時間帯の終わり", undefined, "hour-field")}時は有人
-      <button class="${sched ? "primary on" : "primary"}" data-form="modefix" data-reg="${reg}"${owner && from !== "" && until !== "" ? "" : ` disabled title="${esc(owner ? "時刻を入れてください" : "オーナーだけが変更できます")}"`}>決定</button>
-    </div>
-    <p class="muted">時間帯の外はセミセルフ。有人の時間に店員がいなければ休止中にし、セミセルフでも店員が手伝った取引が済めばセミセルフに戻ります。お客様の取引の途中ではモードを変えません。混雑に合わせた切り替えはしません（セミセルフはサブ）。</p>`;
+    <p class="muted">レジ${reg}${owner ? "" : "（変更はオーナーだけ）"}：モードを選んでから時間帯を押します</p>
+    <div class="row mode-brush">${palette}</div>
+    <div class="hour-grid" role="group" aria-label="時間帯ごとのモード">${cells}</div>
+    <div class="row mode-hours-foot"><span class="muted">枠の太い時間帯がいまの時間</span>${all}</div>
+    <p class="muted">ニュートラルは基本セミセルフで、名札で有人に切り替えます。有人固定の時間帯に店員がいなければ休止中にし、セミセルフ固定でも店員が手伝った取引が済めばセミセルフに戻ります。お客様の取引の途中ではモードを変えません。混雑に合わせた切り替えはしません（セミセルフはサブ）。</p>`;
 }
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
-use janus_pos_core::store::{Command, FfState, LineKind, RegisterView, Store};
+use janus_pos_core::store::{Command, FfState, HourMode, LineKind, RegisterView, Store};
 use serde_json::{json, Value};
 
 const BREAD: &str = "4900000000011";
@@ -3159,26 +3159,26 @@ fn customer_confirms_ff_receipt_in_attended_mode() {
     );
 }
 
-/// モード設定：レジごとに有人／セミセルフを固定できる（変更はオーナーだけ）。
-/// 有人に固定したレジは、店員がいない間は休止中になる（取引の途中では変えない）
+fn all_hours(mode: &str) -> Value {
+    json!({"type":"set_mode_hours","register":1,"hours":(0..24).collect::<Vec<u8>>(),"mode":mode})
+}
+
+/// モード設定：レジごと・時間帯ごとに、ニュートラル／有人固定／セミセルフ固定を選ぶ（変更はオーナーだけ）。
+/// 有人固定の時間帯は、店員がいない間は休止中になる（取引の途中では変えない）
 #[test]
 fn attended_fix_pauses_the_register_without_staff() {
     let mut s = Store::new(1, 2, 1);
+    assert!(reg(&s, 1)
+        .mode_hours
+        .iter()
+        .all(|m| *m == HourMode::Neutral));
     login(&mut s, 1);
     assert!(
-        run(
-            &mut s,
-            json!({"type":"set_mode_fix","register":1,"fix":{"kind":"attended"}})
-        )
-        .is_err(),
+        run(&mut s, all_hours("attended")).is_err(),
         "オーナー以外は変えられない"
     );
     login_as(&mut s, 1, "ST000");
-    ok(
-        &mut s,
-        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"attended"}}),
-    );
-    assert_eq!(reg(&s, 1).mode_fix_label, "常時有人");
+    ok(&mut s, all_hours("attended"));
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert!(reg(&s, 1).paused, "店員がいなければ休止中");
     assert!(!reg(&s, 2).paused, "ほかのレジはそのまま");
@@ -3188,15 +3188,12 @@ fn attended_fix_pauses_the_register_without_staff() {
     assert_eq!(v.mode, Mode::Attended);
 }
 
-/// セミセルフに固定したレジでも、店員はいつでもログインして手伝える。その取引が済めばセミセルフに戻る
+/// セミセルフ固定でも、店員はいつでもログインして手伝える。その取引が済めばセミセルフに戻る
 #[test]
 fn semi_self_fix_returns_after_the_helped_transaction() {
     let mut s = Store::new(1, 2, 1);
     login_as(&mut s, 1, "ST000");
-    ok(
-        &mut s,
-        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"semi_self"}}),
-    );
+    ok(&mut s, all_hours("semi_self"));
     assert_eq!(reg(&s, 1).mode, Mode::Attended, "取引がなければそのまま");
     scan(&mut s, 1, "customer", BREAD);
     login(&mut s, 1);
@@ -3208,26 +3205,28 @@ fn semi_self_fix_returns_after_the_helped_transaction() {
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf, "取引が済めばセミセルフ");
 }
 
-/// 時間帯で固定：有人の時間帯だけ有人。時間帯が変わっても、取引の途中ではモードを変えない
+/// 時間帯ごとのモードは時計に従う。時間帯が変わっても、取引の途中ではモードを変えない
 #[test]
-fn schedule_fix_follows_the_clock_but_not_mid_transaction() {
+fn hour_modes_follow_the_clock_but_not_mid_transaction() {
     const H: u64 = 60 * 60 * 1000;
     let mut s = Store::new(1, 2, 1);
     ok(&mut s, json!({"type":"set_clock","day_ms":7 * H - 60_000}));
     login_as(&mut s, 1, "ST000");
     assert!(run(
         &mut s,
-        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"schedule","from":7,"until":7}})
+        json!({"type":"set_mode_hours","register":1,"hours":[24],"mode":"attended"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"set_mode_fix","register":1,"fix":{"kind":"schedule","from":7,"until":23}}),
+        json!({"type":"set_mode_hours","register":1,"hours":(7..23).collect::<Vec<u8>>(),"mode":"attended"}),
     );
+    assert_eq!(reg(&s, 1).mode_hours[6], HourMode::Neutral);
+    assert_eq!(reg(&s, 1).mode_hours[7], HourMode::Attended);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
-    assert!(!reg(&s, 1).paused, "6時59分はセミセルフ");
+    assert!(!reg(&s, 1).paused, "6時台はニュートラル（セミセルフ）");
     scan(&mut s, 1, "customer", BREAD);
-    // 7 時を過ぎても、お客様の取引の途中は休止にしない
+    // 7 時台に入っても、お客様の取引の途中は休止にしない
     s.tick(s.now() + 2 * 60_000);
     assert!(!reg(&s, 1).paused);
     ok(
@@ -3236,9 +3235,9 @@ fn schedule_fix_follows_the_clock_but_not_mid_transaction() {
     );
     assert!(
         reg(&s, 1).paused,
-        "取引が済めば有人の時間（店員待ちの休止中）"
+        "取引が済めば有人固定（店員待ちの休止中）"
     );
-    // 23 時を過ぎればセミセルフで開ける
+    // 23 時台はニュートラルに戻るので開ける
     s.tick(s.now() + 16 * H);
     assert!(!reg(&s, 1).paused);
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);

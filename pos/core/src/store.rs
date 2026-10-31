@@ -89,8 +89,8 @@ pub enum MenuScreen {
     Waste,
     /// FF 鮮度管理：作成数の登録（店員側。仮設）
     FfFresh,
-    /// モード設定：このレジの有人／セミセルフを固定する（店員側。変更はオーナーだけ）
-    ModeFix,
+    /// モード設定：時間帯ごとに稼働モードを決める（店員側。変更はオーナーだけ）
+    ModeHours,
 }
 
 impl MenuScreen {
@@ -103,9 +103,10 @@ impl MenuScreen {
             | MenuScreen::Deposit
             | MenuScreen::Expense
             | MenuScreen::Changer => Some(Side::Customer),
-            MenuScreen::Journal | MenuScreen::Waste | MenuScreen::FfFresh | MenuScreen::ModeFix => {
-                Some(Side::Staff)
-            }
+            MenuScreen::Journal
+            | MenuScreen::Waste
+            | MenuScreen::FfFresh
+            | MenuScreen::ModeHours => Some(Side::Staff),
         }
     }
 }
@@ -114,54 +115,37 @@ impl MenuScreen {
 const MENU_CODE_CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 const MENU_CODE_LEN: usize = 4;
 
-/// レジのモード固定（店舗メニューのモード設定で、レジごとに決める）。
-/// 推奨する運用は「常時固定」か「時間帯で固定」。混みあってきたらモードを切り替えるような運用はしない：
+/// 時間帯（1 時間ごと）の稼働モード（店舗メニューのモード設定で、レジごと・時間帯ごとに決める）。
+/// 推奨する運用は「常時固定」か「時間帯に応じた固定」。混みあってきたらモードを切り替えるような運用はしない：
 /// 並んだあとで有人とセミセルフが入れ替わると、お客様はどこに並べばよいか分からなくなる。
 /// コンビニではセミセルフはメインではなくサブ（有人レジを主にする）
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case")]
-pub enum ModeFix {
-    /// 固定しない（名札のログインで有人、いなければセミセルフ）
+#[serde(rename_all = "snake_case")]
+pub enum HourMode {
+    /// ニュートラル：基本はセミセルフで、名札のログインで明示的に有人に切り替える
     #[default]
-    Free,
-    /// 常時有人。店員がいない間は休止中にする
+    Neutral,
+    /// 有人固定。店員がいない間は休止中にする
     Attended,
-    /// 常時セミセルフ。店員がログインして手伝っても、その取引が済めばセミセルフに戻る
+    /// セミセルフ固定。店員がログインして手伝っても、その取引が済めばセミセルフに戻る
     SemiSelf,
-    /// 時間帯で固定：from 時から until 時までは有人、ほかの時間はセミセルフ（日をまたいでよい）
-    Schedule { from: u8, until: u8 },
 }
 
-impl ModeFix {
-    /// その時刻（時）に固定するモード（固定しないなら None）
-    pub fn mode_at(self, hour: u8) -> Option<Mode> {
+impl HourMode {
+    /// 固定するモード（ニュートラルなら None）
+    pub fn fixed(self) -> Option<Mode> {
         match self {
-            ModeFix::Free => None,
-            ModeFix::Attended => Some(Mode::Attended),
-            ModeFix::SemiSelf => Some(Mode::SemiSelf),
-            ModeFix::Schedule { from, until } => {
-                let attended = if from < until {
-                    (from..until).contains(&hour)
-                } else {
-                    hour >= from || hour < until
-                };
-                Some(if attended {
-                    Mode::Attended
-                } else {
-                    Mode::SemiSelf
-                })
-            }
+            HourMode::Neutral => None,
+            HourMode::Attended => Some(Mode::Attended),
+            HourMode::SemiSelf => Some(Mode::SemiSelf),
         }
     }
 
-    pub fn label(self) -> String {
+    pub fn label(self) -> &'static str {
         match self {
-            ModeFix::Free => "固定しない".into(),
-            ModeFix::Attended => "常時有人".into(),
-            ModeFix::SemiSelf => "常時セミセルフ".into(),
-            ModeFix::Schedule { from, until } => {
-                format!("{from}時〜{until}時は有人、ほかはセミセルフ")
-            }
+            HourMode::Neutral => "ニュートラル",
+            HourMode::Attended => "有人固定",
+            HourMode::SemiSelf => "セミセルフ固定",
         }
     }
 }
@@ -579,10 +563,12 @@ pub enum Command {
         mat: usize,
         on: bool,
     },
-    /// レジのモードを固定する（店舗メニューのモード設定。ログインしたオーナーだけ）
-    SetModeFix {
+    /// 時間帯ごとの稼働モードを決める（店舗メニューのモード設定。ログインしたオーナーだけ）。
+    /// hours は 0〜23 時台（まとめて同じモードにできる）
+    SetModeHours {
         register: u8,
-        fix: ModeFix,
+        hours: Vec<u8>,
+        mode: HourMode,
     },
     /// いまの時刻を合わせる（その日の 0 時から何ミリ秒か）。時間帯でのモード固定に使う
     SetClock {
@@ -640,7 +626,7 @@ impl Command {
             | C::Insert { register, .. }
             | C::TakeOutlet { register, .. }
             | C::Claim { register, .. }
-            | C::SetModeFix { register, .. } => Some(*register),
+            | C::SetModeHours { register, .. } => Some(*register),
             _ => None,
         }
     }
@@ -680,7 +666,7 @@ impl Command {
             | C::ParcelNext { .. }
             | C::PickupHandover { .. }
             | C::PickupFound { .. }
-            | C::SetModeFix { .. }
+            | C::SetModeHours { .. }
             | C::VoidTransaction { .. } => Some(Side::Staff),
             _ => None,
         }
@@ -1200,8 +1186,8 @@ struct Register {
     pressing: bool,
     /// 開いている電子マネーの手続き（チャージ・残高確認）
     emoney: Option<EmoneyTask>,
-    /// モードの固定（店舗メニューのモード設定）
-    fix: ModeFix,
+    /// 時間帯（0〜23 時台）ごとの稼働モード（店舗メニューのモード設定）
+    hours: [HourMode; 24],
     /// 有人に固定した時間に店員がいないので、休止中にしている（セミセルフの時間になれば開ける）
     fix_paused: bool,
     /// ログインした店員が、取引を手伝った（セミセルフ固定なら、取引が済めばログアウトする）
@@ -1474,7 +1460,7 @@ impl Store {
                     touch: None,
                     pressing: false,
                     emoney: None,
-                    fix: ModeFix::Free,
+                    hours: [HourMode::Neutral; 24],
                     fix_paused: false,
                     helped: false,
                 }
@@ -1525,7 +1511,7 @@ impl Store {
                 && r.pickup_handover.is_none()
                 && r.menu.is_none()
                 && r.menu_code.is_none();
-            match r.fix.mode_at(hour) {
+            match r.hours[usize::from(hour)].fixed() {
                 Some(Mode::Attended) => {
                     if r.staff.is_none() && !r.paused && quiet {
                         r.paused = true;
@@ -2635,25 +2621,30 @@ impl Store {
                 self.mat_loss = percent.min(100);
                 done(format!("MAT の通信ロスを {}% にしました", self.mat_loss))
             }
-            C::SetModeFix { register, fix } => {
+            C::SetModeHours {
+                register,
+                hours,
+                mode,
+            } => {
                 let r = self.reg(register).ok_or("レジがありません")?;
                 if r.staff.map(|s| s.account.role) != Some(Role::Owner) {
-                    return Err("モードの固定はオーナーだけが変更できます".into());
+                    return Err("モード設定はオーナーだけが変更できます".into());
                 }
-                if let ModeFix::Schedule { from, until } = fix {
-                    if from > 23 || until > 23 {
-                        return Err("時刻は 0〜23 時で入れてください".into());
-                    }
-                    if from == until {
-                        return Err("有人の時間帯の始まりと終わりを変えてください".into());
-                    }
+                if hours.is_empty() || hours.iter().any(|&h| h > 23) {
+                    return Err("時間帯は 0〜23 時台で選んでください".into());
                 }
                 let r = self.reg_mut(register)?;
-                r.fix = fix;
-                done(format!(
-                    "レジ{register}のモードを「{}」にしました",
-                    fix.label()
-                ))
+                for &h in &hours {
+                    r.hours[usize::from(h)] = mode;
+                }
+                done(match hours.as_slice() {
+                    [h] => format!("レジ{register}の{h}時台を「{}」にしました", mode.label()),
+                    _ => format!(
+                        "レジ{register}の{}時間を「{}」にしました",
+                        hours.len(),
+                        mode.label()
+                    ),
+                })
             }
             C::SetClock { day_ms } => {
                 self.day_origin = (day_ms % DAY_MS + DAY_MS - self.now % DAY_MS) % DAY_MS;
@@ -3901,8 +3892,7 @@ impl Store {
             tobacco_asked: r.mode == Mode::Attended && t.tobacco_asked,
             mode: r.mode,
             mode_label: r.mode.label(),
-            mode_fix: r.fix,
-            mode_fix_label: r.fix.label(),
+            mode_hours: r.hours.to_vec(),
             outlet: r.outlet.total(),
             outlet_detail: r.outlet.0.clone(),
             menu: r.menu,
@@ -4165,9 +4155,8 @@ pub struct RegisterView {
     pub tobacco_asked: bool,
     pub mode: Mode,
     pub mode_label: &'static str,
-    /// モードの固定（店舗メニューのモード設定）
-    pub mode_fix: ModeFix,
-    pub mode_fix_label: String,
+    /// 時間帯（0〜23 時台）ごとの稼働モード（店舗メニューのモード設定）
+    pub mode_hours: Vec<HourMode>,
     /// 排出口にたまっているお金
     pub outlet: u32,
     pub outlet_detail: Vec<(u32, u32)>,

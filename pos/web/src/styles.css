@@ -803,6 +803,16 @@ body.dragging .drop-hint { display: inline; }
 .bill-table th:nth-child(3) { width: 40%; }
 .bill-table th:nth-child(4) { width: 16%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
-/* モード設定：固定のしかたを選ぶ。時間帯は時刻を入れて決定 */
-.mode-fix-choices, .mode-fix-schedule { gap: 6px; flex-wrap: nowrap; align-items: center; margin: 8px 0; }
-.mode-fix-schedule button.pad-field.hour-field { width: 44px; height: auto; min-height: 1.6em; font-size: 16px; padding: 4px 8px; }
+/* モード設定：上でモードを選び、24 の時間帯（6 列 × 4 段）を押して塗る。
+   有人固定＝濃い塗り、セミセルフ固定＝ボタンの塗り、ニュートラル＝枠だけ（濃さと文字で見分ける） */
+.mode-brush { gap: 6px; margin: 6px 0; flex-wrap: nowrap; }
+.mode-brush .seg { width: var(--btn-w); height: var(--btn-h); padding: 0 4px; font-size: 13px; }
+.hour-grid { display: grid; grid-template-columns: repeat(6, var(--btn-sm-w)); gap: 4px; margin: 8px 0; }
+.hour-grid .hour-cell { width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0; display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 11px; line-height: 1; }
+.hour-grid .hour-cell small { font-size: 9px; }
+.hour-grid .hour-cell.neutral { background: transparent; color: var(--btn-ink); border: 1px solid var(--border); }
+.hour-grid .hour-cell.semi { background: var(--btn); color: var(--btn-ink); border: 1px solid var(--btn); }
+.hour-grid .hour-cell.attended { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); }
+.hour-grid .hour-cell.now { outline: 3px solid var(--btn-on); outline-offset: 1px; }
+.mode-hours-foot { justify-content: space-between; align-items: center; gap: 8px; }
+.mode-hours-foot .brush-all { width: var(--btn-w); height: var(--btn-h); }

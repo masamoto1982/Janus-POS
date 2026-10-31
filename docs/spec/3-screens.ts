@@ -368,17 +368,16 @@ export const SCENES: Scene[] = [
     staff: {
       strong: ["（2 個目から〈N〉個目）取り扱いサイズを決定してください"],
       weak: ["三辺の長さの合計を入力してください（入力エラーのときはその理由）"],
-      parts: ["入力欄：長さ 〈 〉cm"],
       buttons: [
         { label: "戻る", tone: "消極", note: "この荷物の受付をやめる" },
-        { label: "決定", tone: "積極" },
+        { label: "長さを入力", tone: "積極", note: "テンキーのポップアップで cm を打ち、「決定」で確定する" },
       ],
     },
     customer: {
       strong: ["長さを計測しています"],
       weak: ["三辺の合計が200cm以内の荷物についてお取り扱いします（入力エラーのときはその理由）"],
     },
-    rules: ["P-07", "P-08", "P-19"],
+    rules: ["P-07", "P-08", "P-19", "P-28"],
     source: "parcelStep / parcelNote",
   },
   {
@@ -389,15 +388,14 @@ export const SCENES: Scene[] = [
     when: "長さが決まった後",
     staff: {
       strong: ["取り扱いサイズを決定してください"],
-      weak: ["重量を入力してください"],
-      parts: ["入力欄：重さ 〈 〉kg"],
+      weak: ["三辺の合計 〈N〉cm。重量を入力してください"],
       buttons: [
         { label: "戻る", tone: "消極" },
-        { label: "決定", tone: "積極" },
+        { label: "重さを入力", tone: "積極", note: "テンキーのポップアップで kg を打ち（小数点あり）、「決定」で確定する" },
       ],
     },
     customer: { strong: ["重さを計測しています"], weak: ["重さが30kg以内の荷物についてお取り扱いします"] },
-    rules: ["P-07", "P-19"],
+    rules: ["P-07", "P-19", "P-28"],
     source: "parcelStep / parcelNote",
   },
   {

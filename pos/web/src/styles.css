@@ -158,7 +158,18 @@ button { touch-action: manipulation; }
 button.mode-badge { min-height: 0; cursor: pointer; }
 .mode-badge .caret { font-size: 10px; }
 .screen-head .clock { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
-.screen-main { flex: 4 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
+.screen-body { position: relative; flex: 4 1 0; min-height: 0; display: flex; flex-direction: column; }
+.screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
+/* 電子マネーの入口：登録エリアの右下端に、円を四分の一にした扇形（角の丸みはボタンの表現）。
+   有人は待ち受けと商品登録、セミセルフは待ち受けに出す。明細が下に隠れないよう、扇形の分だけ下に余白を足す */
+.fan-slot:empty { display: none; }
+.emoney-fan { position: absolute; right: 0; bottom: 0; z-index: 2; box-sizing: border-box; width: 72px; height: 72px; padding: 0;
+  border-radius: 72px 0 0 0; display: flex; align-items: flex-end; justify-content: flex-end; }
+.emoney-fan > span { display: flex; flex-direction: column; align-items: flex-end; padding: 0 6px 6px 0; line-height: 1.15; text-align: right; }
+.emoney-fan b { font-size: 11px; }
+.emoney-fan small { font-size: 9px; }
+.screen-body:has(.emoney-fan) .screen-main { padding-bottom: 76px; }
+.screen-body:has(.emoney-fan) .screen-main:has(> .welcome) { padding-bottom: 8px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
 .screen.no-items .screen-items { display: none; }
 /* 文字の強弱：強いメッセージ #535353、補足の弱いメッセージは枠線と同じ #878787。強いほうが必ず大きい */
@@ -223,11 +234,8 @@ button.mode-badge { min-height: 0; cursor: pointer; }
   .reg-top .total, .reg-top .count b { font-size: 22px; }
   .reg-top .sum { font-size: 13px; }
   .reg-top .void > button, .reg-top .action > button { font-size: 13px; padding: 4px 2px; }
-  .reg-top .info .emoney-link { font-size: 10px; }
 }
 /* 電子マネーのチャージ・残高確認は合計の下の段の中央に、下線の付いた文字リンクで（セミセルフの待ち受けと同じ表現） */
-.reg-top .emoney-link { padding: 0; background: none; border: 0; color: var(--ink); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
-.reg-top .emoney-link:disabled { background: none !important; }
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 /* 登録の明細は表示エリアが狭いので小ぶりに */
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
@@ -321,11 +329,8 @@ details summary h3 { display: inline; }
 .guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: 11px; padding: 0 2px; border-radius: 999px; white-space: nowrap; }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
 /* 有人モードの初期画面：二段目の電子マネーも、お買い物などと同じ枠線だけの丸い形と色 */
-.welcome .emoney-guide { width: auto; height: auto; display: inline-flex; flex-direction: column; align-items: center; line-height: 1.25; padding: 4px 16px; }
-.welcome .emoney-guide b { font-weight: inherit; }
-.welcome .emoney-guide small { font-size: 10px; }
 /* お客様側は押せないが、薄くせず店員側と同じ見た目で映す（選んだ用件も同じく塗る） */
-.attended-welcome .mirror-only { pointer-events: none; cursor: default; }
+.attended-welcome .mirror-only, .emoney-fan.mirror-only { pointer-events: none; cursor: default; }
 .big { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }
@@ -338,7 +343,7 @@ details summary h3 { display: inline; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: 14px; }
 /* 確認画面の選択肢は大きいボタン（取引中止・お会計と同じ大きさ） */
-.confirm button:not(.tag):not(.emoney-link):not(.seg):not(.pad-field) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
+.confirm button:not(.tag):not(.seg):not(.pad-field) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 /* 支払方法は切り替えボタンの並び。セミセルフの狭い確認画面にも収まるよう、高さは小さいボタンにそろえる */
 .method-row { flex-wrap: wrap; justify-content: center; gap: 4px; }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
@@ -724,17 +729,13 @@ body.dragging .drop-hint { display: inline; }
 .void-choices { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
 
 
-/* セミセルフの待ち受け：右下の角を頂点に最も明るくなる背景。その明るい角に電子マネーの文字リンクを置く
-   （バーコードを読む案内ボタンから離し、電子マネーにスキャンが要ると誤解させない） */
 /* 待ち受け画面の背景：明るい点を中心に、外へいくほど暗くなる円形グラデーション。
-   セミセルフは右下の角（電子マネーの文字リンク）へ、有人は画面中央へ視線を集める */
+   セミセルフは右下の角（電子マネーの扇形）へ、有人は画面中央へ視線を集める */
 .scan-welcome, .attended-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
   --glow: color-mix(in srgb, var(--cust-bg) 65%, #ffffff); --dark: color-mix(in srgb, var(--cust-bg) 78%, var(--ink));
   background: radial-gradient(circle farthest-corner at var(--spot), var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
-.scan-welcome { --spot: 100% 100%; padding-bottom: 36px; }
+.scan-welcome { --spot: 100% 100%; }
 .attended-welcome { --spot: 50% 50%; }
-.scan-welcome .emoney-link { position: absolute; right: 14px; bottom: 10px; padding: 2px 0; background: none; border: 0; color: var(--ink); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
-.screen .scan-welcome .emoney-link:disabled { background: none !important; }
 /* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
 .menu-code-value { font-size: 40px; letter-spacing: .25em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; margin: 4px 0; padding-left: .25em; }
 .menu-code-form { justify-content: center; gap: 8px; }

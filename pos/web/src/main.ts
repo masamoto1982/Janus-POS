@@ -25,6 +25,7 @@ import {
   qtyPopup,
   padEntry,
   padPopup,
+  emoneyFan,
   PAD,
   padValue,
   padValueKey,
@@ -123,7 +124,7 @@ function buildSkeleton(): void {
           <div class="screen-cap">スタッフ側<span class="drop-hint">ここに落とす＝スタッフ側スキャナーで読む</span></div>
           <section class="screen staff-screen" data-drop="${r.id}:staff">
             <div class="screen-head" data-region="head-${r.id}-staff"></div>
-            <div class="screen-main" data-region="staff-${r.id}"></div>
+            <div class="screen-body"><div class="screen-main" data-region="staff-${r.id}"></div><div class="fan-slot" data-region="fan-${r.id}-staff"></div></div>
             <div class="screen-items" data-region="items-${r.id}-staff"></div>
             <div data-region="pop-${r.id}-staff"></div>
           </section>
@@ -132,7 +133,7 @@ function buildSkeleton(): void {
           <div class="screen-cap">お客様側<span class="drop-hint">ここに落とす＝お客様側スキャナーで読む</span></div>
           <section class="screen customer-screen" data-drop="${r.id}:customer">
             <div class="screen-head" data-region="head-${r.id}-customer"></div>
-            <div class="screen-main" data-region="cust-${r.id}"></div>
+            <div class="screen-body"><div class="screen-main" data-region="cust-${r.id}"></div><div class="fan-slot" data-region="fan-${r.id}-customer"></div></div>
             <div class="screen-items" data-region="items-${r.id}-customer"></div>
             <div data-region="pop-${r.id}-customer"></div>
           </section>
@@ -373,8 +374,13 @@ function render(): void {
       }`,
     );
     // 両方の画面に同じ内容を出す（呼び出しの表示だけは側ごとに出し分ける）
-    setRegion(`staff-${r.id}`, sharedScreen(r, snap, "staff"));
-    setRegion(`cust-${r.id}`, sharedScreen(r, snap, "customer"));
+    // 電子マネーの入口（右下端の扇形）は、待ち受け・商品登録の画面にだけ重ねる
+    const staffMain = sharedScreen(r, snap, "staff");
+    const custMain = sharedScreen(r, snap, "customer");
+    setRegion(`staff-${r.id}`, staffMain);
+    setRegion(`cust-${r.id}`, custMain);
+    setRegion(`fan-${r.id}-staff`, emoneyFan(r, "staff", staffMain));
+    setRegion(`fan-${r.id}-customer`, emoneyFan(r, "customer", custMain));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -1073,7 +1079,7 @@ function wireSwipe(): void {
     const t = e.target as Element;
     const inlet = t.closest<HTMLElement>("[data-inlet]");
     // 最上部（呼び鈴など）と最下段（FF・サービス・たばこ）は長押しで操作するボタンがあるので対象外
-    const screen = t.closest(".screen-head, .screen-items") ? null : t.closest<HTMLElement>("[data-drop]");
+    const screen = t.closest(".screen-head, .screen-items, .emoney-fan") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;
     cancelLongPress();
     const timer = window.setTimeout(() => {

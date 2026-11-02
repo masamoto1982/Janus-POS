@@ -3006,9 +3006,20 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
     ));
     assert!(!allowed(&v, Side::Staff, Action::Checkout));
     advance(&mut s, 1_000);
+    // 照合するのは追加分（3 − 2 = 1）だけ。全数の 3 では合わない
     ok(
         &mut s,
         json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":3}),
+    );
+    assert!(matches!(
+        reg(&s, 1).staff.lines[0].line.kind,
+        LineKind::Ff {
+            state: FfState::Waiting
+        }
+    ));
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
     );
     advance(&mut s, 1_000);
     // 減らすと回収の案内（お渡し済みのまま）

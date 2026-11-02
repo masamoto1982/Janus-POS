@@ -681,6 +681,8 @@ pub struct Line {
     pub name: &'static str,
     pub unit_price: u32,
     pub qty: u32,
+    /// FF：すでにお渡しの照合が済んでいる個数。追加注文で数量が増えたときは、増えた分だけを照合する
+    pub ff_base: u32,
     /// 登録した時点の税区分と税率（あとで設定を変えても、登録済みの明細は変わらない）
     pub tax: String,
     pub rate_bp: u32,
@@ -1065,6 +1067,7 @@ impl Txn {
             name: p.name,
             unit_price: p.price,
             qty,
+            ff_base: 0,
             tax: tax.0,
             rate_bp: tax.1,
             category: p.category,
@@ -1656,7 +1659,8 @@ impl Store {
                     .ok_or("FF の明細が見つかりません")?;
                 let name = l.name;
                 // 入力のたびに判定する。合えばお渡し済み（OK）、合わなければお渡し前（NG）
-                let matched = handed == l.qty;
+                // すでに照合の済んだ分（追加注文の前）は数えず、追加分だけを比べる
+                let matched = handed == l.qty - l.ff_base;
                 l.kind = LineKind::Ff {
                     state: if matched {
                         FfState::Received
@@ -2647,10 +2651,23 @@ impl Store {
         let l = t.lines.iter_mut().find(|l| l.id == line_id).unwrap();
         l.qty = qty;
         if received && qty > old {
-            // 増やした分はまだ渡していないので、お渡し前に戻す（照合し直す）
+            // 増やした分はまだ渡していないので、お渡し前に戻す。照合し直すのは増やした分だけ
+            l.ff_base = old;
             l.kind = LineKind::Ff {
                 state: FfState::Waiting,
             };
+        }
+        if matches!(kind, LineKind::Ff { .. }) && !received && qty <= l.ff_base {
+            // 追加注文の途中で、すでにお渡しした分まで減らした：渡した分は回収してもらう
+            let handed = l.ff_base;
+            l.ff_base = qty;
+            l.kind = LineKind::Ff {
+                state: FfState::Received,
+            };
+            if handed > qty {
+                t.ff_collect.push((name, handed - qty));
+                return done(format!("{name}を{}点回収してください", handed - qty));
+            }
         }
         if received && qty < old {
             t.ff_collect.push((name, old - qty));
@@ -3724,6 +3741,7 @@ impl Store {
                 touched: l.touched,
                 name: l.name,
                 qty: l.qty,
+                ff_base: l.ff_base,
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
                 limit: self.age_rules.limit_for(l.code),
@@ -3897,6 +3915,8 @@ pub struct CustomerLine {
     pub touched: u32,
     pub name: &'static str,
     pub qty: u32,
+    /// FF：すでに照合の済んだ個数（追加注文のときは、残りの追加分だけを照合する）
+    pub ff_base: u32,
     pub amount: u32,
     pub age: Option<u8>,
     pub limit: Option<u32>,

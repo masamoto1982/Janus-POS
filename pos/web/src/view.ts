@@ -92,6 +92,13 @@ function ffVerifyRows<L extends { id: number; kind: string; state?: FfState }>(r
   return lines.filter((l) => l.kind === "ff" && (l.state === "waiting" || ffvInput.has(`${reg}:${side}:${l.id}`)));
 }
 
+/** 照合画面を開いたままにするか。出せる行があり、全部の照合が一致するまで開く（全部一致したら自動で登録画面へ戻る） */
+function ffVerifyOpen<L extends { id: number; kind: string; state?: FfState }>(reg: number, side: Side, lines: L[]): boolean {
+  if (!ffVerifying.has(`${reg}:${side}`)) return false;
+  const rows = ffVerifyRows(reg, side, lines);
+  return rows.length > 0 && !rows.every((l) => l.state === "received");
+}
+
 /**
  * お渡し照合：表で 品目｜注文数｜お渡し数｜照合。手続きを引き返す「バック」は左下に置く
  * （物事は右へ進む感覚に合わせ、進めるボタンは右、引き返すボタンは左）。お渡し数を入力すると、その場で注文数と比べて OK / NG を出す
@@ -107,6 +114,11 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
       const key = `${reg}:${side}:${l.id}`;
       const value = ffvInput.get(key) ?? (l.state === "received" ? String(l.qty) : "");
       const judge = value === "" ? "" : l.state === "received" ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
+      // 単品（注文数 1）は数を打たず、チェックボックスで照合する（チェック＝1 つお渡しした）
+      if (l.qty === 1) {
+        const done = l.state === "received";
+        return `<tr><td>${esc(l.name)}</td><td class="num">1</td><td class="num"><input type="checkbox" class="ffv-check" data-ffcheck="${l.id}" data-ffreg="${reg}:${side}" ${done ? "checked disabled" : ""} aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}を確認した" /></td><td class="ffv-judge">${done ? `<span class="ffv-ok">OK</span>` : ""}</td></tr>`;
+      }
       return `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${customer ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
@@ -1041,12 +1053,12 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
-  if (!ro && !paying && ffVerifying.has(`${reg}:${side}`) && ffVerifyRows(reg, side, v.lines).length)
+  if (!ro && !paying && ffVerifyOpen(reg, side, v.lines))
     return screen(ffVerifyScreen(reg, side, v.lines, false));
   // お客様側のお受け取りの案内：スタッフ側がお渡しの確認をしている間と、照合が済んでお客様の確認を待つ間。
   // 「確認しました」はスタッフの照合が済んでから押せる
   const ffStaffDone = !v.lines.some((l) => l.kind === "ff" && l.state === "waiting");
-  if (ro && !paying && v.ff_unconfirmed && (ffStaffDone || (ffVerifying.has(`${reg}:staff`) && ffVerifyRows(reg, "staff", v.lines).length)))
+  if (ro && !paying && v.ff_unconfirmed && (ffStaffDone || ffVerifyOpen(reg, "staff", v.lines)))
     return screen(ffReceiveCard(reg, v.lines, a("receive_ff")));
   closeFfVerify(reg, side);
   return `${top}${notice}
@@ -1496,7 +1508,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     return screen(`<div class="paybox center">
         ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due)}
       </div>`);
-  if (ffVerifying.has(`${reg}:${side}`) && ffVerifyRows(reg, side, c.lines).length)
+  if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));
   closeFfVerify(reg, side);
   return `${top}${notice}

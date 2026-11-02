@@ -682,6 +682,16 @@ app.addEventListener("change", (e) => {
     if (!send({ type: "set_bell_on", mat: Number(box.dataset.bellOn), on: box.checked })) box.checked = !box.checked;
     return;
   }
+  if (sel.dataset.ffcheck) {
+    // 単品の FF の照合：チェックを入れた＝1 つお渡しした。その場で注文数（1）と照合する
+    const box = sel as unknown as HTMLInputElement;
+    const [reg, side] = box.dataset.ffreg!.split(":");
+    if (!box.checked) return;
+    const line = Number(box.dataset.ffcheck);
+    ffvInput.set(`${reg}:${side}:${line}`, "1");
+    if (!send({ type: "check_ff", register: Number(reg), side: side as Side, line_id: line, handed: 1 })) box.checked = false;
+    return;
+  }
   if (sel.dataset.collect) {
     // 回収リストのチェック。画面の中だけで持ち、全部入ると「回収しました」が押せる
     const box = sel as unknown as HTMLInputElement;

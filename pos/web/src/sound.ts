@@ -39,6 +39,12 @@ export function beepScan(): void {
   tone(2400, 0, 0.09, "square", 0.08);
 }
 
+/** ボタンを押したときの「コッ」（押した表現は色を変えず、位置のずれとこの音だけ） */
+export function beepPress(): void {
+  if (!ready()) return;
+  tone(900, 0, 0.04, "triangle", 0.05);
+}
+
 /** 読めなかった・受け付けられなかったときの「ブッブー」 */
 export function beepError(): void {
   if (!ready()) return;

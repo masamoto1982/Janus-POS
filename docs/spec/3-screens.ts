@@ -509,7 +509,7 @@ export const SCENES: Scene[] = [
       strong: ["〈X〉歳以上の年齢確認をしますか？"],
       buttons: [
         { label: "する", tone: "積極" },
-        { label: "スキップ", tone: "消極" },
+        { label: "スキップ（右下）", tone: "消極" },
       ],
     },
     customer: { strong: ["年齢確認が必要な商品が含まれています"] },
@@ -527,7 +527,7 @@ export const SCENES: Scene[] = [
       parts: ["入力欄：西暦8桁　例 19821002（押すとテンキー）"],
       buttons: [
         { label: "判定", tone: "積極" },
-        { label: "スキップ", tone: "消極" },
+        { label: "スキップ（右下）", tone: "消極" },
       ],
     },
     customer: { strong: ["身分証を確認しています"] },
@@ -620,7 +620,7 @@ export const SCENES: Scene[] = [
       weak: ["（付与するを押したら）ポイントサービスのバーコードを読み取ってください。"],
       buttons: [
         { label: "付与する", tone: "積極" },
-        { label: "スキップ", tone: "消極" },
+        { label: "スキップ（右下）", tone: "消極" },
       ],
     },
     customer: { strong: ["ポイントをお付けします"], parts: ["アイコン：ポイントカード・ポイントアプリ"] },
@@ -972,7 +972,7 @@ export const SCENES: Scene[] = [
       weak: ["（付与するを押したら）ポイントサービスのバーコードを読み取ってください。"],
       buttons: [
         { label: "付与する", tone: "積極" },
-        { label: "スキップ", tone: "消極" },
+        { label: "スキップ（右下）", tone: "消極" },
       ],
     },
     rules: ["P-09", "P-16", "P-17", "P-19"],

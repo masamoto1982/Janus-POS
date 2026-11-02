@@ -54,6 +54,8 @@ export function backBtn(cmd: Command, a?: ActionState): string {
 const backFootRow = (cmd: Command, a?: ActionState): string => `<div class="screen-foot">${backBtn(cmd, a)}</div>`;
 /** 確認画面（`.confirm`）の左下に置く「バック」。確認画面の中身の直後に並べる */
 const backCorner = (cmd: Command, a?: ActionState): string => `<div class="back-foot">${backBtn(cmd, a)}</div>`;
+/** 先へ進むのを省く「スキップ」。「バック」と左右対称に、確認画面の右下へ小さな消極ボタンで置く */
+const skipCorner = (cmd: Command, a?: ActionState): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "small skip")}</div>`;
 
 const FF_LABEL: Record<FfState, string> = {
   waiting: "お渡し前",
@@ -166,8 +168,8 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
     // ポイントカードの確認と同じ形：問いを一行、ボタンをその下の行に、どちらも中央に
     return `<div class="point-screen">
         <div class="big">${age}歳以上の年齢確認をしますか？</div>
-        <div class="point-choices">${choose(true, "する", "primary")}${choose(false, "スキップ", "skip")}</div>
-      </div>`;
+        <div class="point-choices">${choose(true, "する", "primary")}</div>
+      </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
   }
   // 生年月日の入力もポイントカードの確認と同じ形：問いを一行、入力欄、ボタンの行。どれも中央に
   const st = a("check_id");
@@ -176,9 +178,8 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
       ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "西暦8桁　例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field")}
       <div class="point-choices">
         <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
-        ${choose(false, "スキップ", "skip")}
       </div>
-    </div>`;
+    </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1082,10 +1083,9 @@ function pointCheck(reg: number, side: Side, st: ActionState): string {
       <div class="big">ポイントを付与しますか？</div>
       <div class="point-choices">
         <button type="button" class="primary ${reading ? "on" : ""}" data-guide="${reg}:${side}:point">付与する</button>
-        ${btn("スキップ", { type: "confirm_point_card", register: reg, side }, st, "skip")}
-      </div>
+              </div>
       ${reading ? `<p class="guide">ポイントサービスのバーコードを読み取ってください。</p>` : ""}
-    </div>`;
+    </div>${skipCorner({ type: "confirm_point_card", register: reg, side }, st)}`;
 }
 
 /** このお店で使えるポイントサービス（お客様側の最終確認に並べるアイコン） */

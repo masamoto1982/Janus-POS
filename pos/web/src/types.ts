@@ -68,6 +68,8 @@ export type StaffLine = LineKind & {
   name: string;
   unit_price: number;
   qty: number;
+  /** FF：すでに照合の済んだ個数（追加注文のときは追加分だけを照合する） */
+  ff_base: number;
   category: string;
   cash_only: boolean;
   amount: number;
@@ -79,7 +81,7 @@ export type StaffLine = LineKind & {
   pickup?: Pickup;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; amount: number; age: number | null; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; ff_base: number; amount: number; age: number | null; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean };
 
 export interface Call {
   id: number;

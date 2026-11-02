@@ -73,9 +73,10 @@ const FF_LABEL: Record<FfState, string> = {
 function ffTag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: ActionState, ro: boolean, labels = FF_LABEL): string {
   if (l.kind !== "ff" || !l.state) return "";
   const text = labels[l.state];
-  if (l.state === "received" || ro) return `<span class="tag ff-${l.state}">${text}</span>`;
+  // お渡し前・お渡し済とも積極の小ボタンの見た目（お渡し前＝オレンジ、お渡し済＝グリーン）。押せるのはお渡し前だけ
+  if (l.state === "received" || ro) return `<span class="ff-btn ff-${l.state}">${text}</span>`;
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
-  return `<button type="button" class="tag ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
+  return `<button type="button" class="ff-btn ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
 }
 
 /** お渡し照合の画面を開いている画面（レジ:画面）。「バック」で閉じる */
@@ -107,21 +108,25 @@ function ffVerifyOpen<L extends { id: number; kind: string; state?: FfState }>(r
  * （判定ボタンはない）。注文数を見ながら数を打ち込むことで、いくつ渡したかに注意が向く。
  * 画面が切り替わると直前に見た数は忘れやすいので、注文数はここにも出す
  */
-function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number }[], customer: boolean): string {
+function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number; ff_base?: number }[], customer: boolean): string {
   // 並べるのは未照合の FF だけ（この画面で入力して OK になった行は、判定が見えるよう残す）。
   // 並びは登録画面と同じ（新しい動きのあった行ほど上）
   const ff = ffVerifyRows(reg, side, lines).sort((a, b) => b.touched - a.touched);
   const rows = ff
     .map((l) => {
       const key = `${reg}:${side}:${l.id}`;
-      const value = ffvInput.get(key) ?? (l.state === "received" ? String(l.qty) : "");
+      // 追加注文のときは、すでに照合の済んだ分を除いた追加分だけを照合する
+      const base = l.ff_base ?? 0;
+      const need = l.qty - base;
+      const name = base > 0 ? `${l.name}（追加分）` : l.name;
+      const value = ffvInput.get(key) ?? (l.state === "received" ? String(need) : "");
       const judge = value === "" ? "" : l.state === "received" ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
       // 単品（注文数 1）は数を打たず、チェックボックスで照合する（チェック＝1 つお渡しした）
-      if (l.qty === 1) {
+      if (need === 1) {
         const done = l.state === "received";
-        return `<tr><td>${esc(l.name)}</td><td class="num">1</td><td class="num"><input type="checkbox" class="ffv-check" data-ffcheck="${l.id}" data-ffreg="${reg}:${side}" ${done ? "checked disabled" : ""} aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}を確認した" /></td><td class="ffv-judge">${done ? `<span class="ffv-ok">OK</span>` : ""}</td></tr>`;
+        return `<tr><td>${esc(name)}</td><td class="num">1</td><td class="num"><input type="checkbox" class="ffv-check" data-ffcheck="${l.id}" data-ffreg="${reg}:${side}" ${done ? "checked disabled" : ""} aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}を確認した" /></td><td class="ffv-judge">${done ? `<span class="ffv-ok">OK</span>` : ""}</td></tr>`;
       }
-      return `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${customer ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
+      return `<tr><td>${esc(name)}</td><td class="num">${need}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${customer ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
   // 見出しは「お渡しの確認」（荷物や支払いの控えのお渡しにも同じ形の画面を使える）

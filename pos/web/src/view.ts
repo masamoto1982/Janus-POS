@@ -1123,7 +1123,7 @@ export function regTop(total: number, count: number, action: string, max = Infin
   const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
   // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる。
   // 合計は左右の欄の有無にかかわらず常に中央（取引中止のない有人のお客様側でも店員側と同じ位置）
-  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid">${info}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${yen(total)}</b></span>${below}</span><span class="action">${action}</span></div>`;
+  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid">${info}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${below}</span><span class="action">${action}</span></div>`;
 }
 
 /** 買い物点数（数量の合計） */

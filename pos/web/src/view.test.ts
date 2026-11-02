@@ -25,8 +25,8 @@ describe("view helpers", () => {
     const at = (t: string) => html.indexOf(t);
     expect(at("合計 ")).toBeGreaterThan(-1);
     expect(at("合計 ")).toBeLessThan(at("<b>3</b>点"));
-    expect(at("<b>3</b>点")).toBeLessThan(at("1,280円"));
-    expect(at("1,280円")).toBeLessThan(at("<button>会計"));
+    expect(at("<b>3</b>点")).toBeLessThan(at("1,280</b>"));
+    expect(at("1,280</b>")).toBeLessThan(at("<button>会計"));
   });
 
   it("counts items by quantity", () => {

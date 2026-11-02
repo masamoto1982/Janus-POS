@@ -10,7 +10,7 @@
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { Command, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
-import { beepError, beepScan, setMatRinging, unlockAudio } from "./sound";
+import { beepError, beepPress, beepScan, setMatRinging, unlockAudio } from "./sound";
 // 仮のロゴマーク（正式なロゴは後日差し替え）
 import logoUrl from "./logo.jpg";
 import {
@@ -757,6 +757,15 @@ function lockRules(): void {
 // ブラウザは操作があるまで音を出せないので、最初のタッチ・キー入力で音を準備する
 document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
+// どのボタン（タブも）も、押した瞬間に同じ音を鳴らす。見た目は CSS の :active（わずかな位置のずれ）だけ
+document.addEventListener(
+  "pointerdown",
+  (e) => {
+    const b = (e.target as Element | null)?.closest<HTMLButtonElement>("button");
+    if (b && !b.disabled) beepPress();
+  },
+  { capture: true },
+);
 // テンキー（数量・長さ・重さ・入金）は、キーボードの数字・小数点・Backspace・Enter・Esc でも打てる（入力欄で打っているときは除く）
 document.addEventListener("keydown", (e) => {
   if ((!qtyEntry.size && !padEntry.size) || e.isComposing || (e.target as HTMLElement).closest?.("input, select, textarea")) return;

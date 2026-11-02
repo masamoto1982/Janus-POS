@@ -278,10 +278,10 @@ button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
 /* 押した表現は色を変えず、元の位置からわずかにずらすことと音だけ（2026-11-02 ユーザー）。
    待ち受けの案内ボタン（商品・レジ袋・FF・サービス・たばこなど）は選択中でも色を変えない */
 button:not(:disabled):active, .pressed { transform: translate(1px, 2px); }
-.guide-btn.on, .ff-tab.on, .ff-tab[aria-pressed="true"] { background: transparent; color: var(--msg-strong); border-color: var(--msg-strong); }
-/* 選ばれているタブは色を変えず、太字と下線のしるしで示す */
-.ff-tab.on { font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
-button.on, button[aria-pressed="true"], .method-list .seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); opacity: 1; }
+/* 選ばれている切り替えボタン（タブ・案内・支払い方法など）も色を変えず、太字と下線のしるしで示す */
+.guide-btn.on, .ff-tab.on, .ff-tab[aria-pressed="true"], button.seg.on, .method-list .seg.on, .swipe-tabs button.on {
+  font-weight: 700; text-decoration: underline; text-underline-offset: 2px;
+}
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost:disabled { opacity: .3; }
@@ -707,7 +707,7 @@ body.dragging .drop-hint { display: inline; }
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: var(--gap); }
 .bell-btn:disabled { opacity: .45; }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.call-btn.pressing { background: var(--btn-on) !important; color: var(--btn-on-ink) !important; transform: translateY(1px); box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
+.call-btn.pressing { transform: translate(1px, 2px); box-shadow: inset 0 2px 6px rgba(0,0,0,.35); }
 .call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; }

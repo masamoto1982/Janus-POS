@@ -908,10 +908,10 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
       <div class="big">取引を中止しますか？</div>
       <p>登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します。${back}</p>
       <div class="void-choices">
-        <button type="button" class="neg" data-void-cancel="${reg}">いいえ</button>
         ${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}
       </div>
-    </div>`;
+    </div>
+    <div class="back-foot"><button type="button" class="small ghost back-btn" data-void-cancel="${reg}">バック</button></div>`;
 }
 
 /** 有人モードの初期画面の案内ボタン（店員側で押す。お客様側には同じボタンを押せない形で映す） */
@@ -1000,7 +1000,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞回収・クーポン＞ポイントカード＞決済手段。
   // 会計中は、手続きを引き返す「バック」を確認画面の左下に置く（スタッフ側だけ）
   const back = paying && !ro ? backFoot(reg, side, a("back_to_registering")) : "";
-  const screen = (body: string) => `${top}${notice}${confirm(body + back)}`;
+  const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   // 取引中止の確認は、ほかのどの確認よりも先に出す（どの場面からでも中止できる）
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
@@ -1477,7 +1477,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）。
   // お会計中は、手続きを引き返す「バック」を確認画面の左下に置く
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
-  const screen = (body: string) => `${top}${notice}${confirm(body + back)}`;
+  const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
   // 公共料金：係員を待つ間は案内だけ。係員の確認が済んでいれば（その後にログアウトしても）現金で支払う
   const slips = c.bills.length;

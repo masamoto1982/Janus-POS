@@ -17,8 +17,8 @@
   --safe-ink: color-mix(in srgb, var(--ac-green) 70%, black);
   --safe-line: var(--ac-green);
   /* 年確などの札（オレンジ）とお渡し済の札（グリーン）：濃い文字に淡い背景（2026-11-03 ユーザー） */
-  --flag-orange-ink: #8a4a00; --flag-orange-bg: #ffe5c4;
-  --flag-green-ink: #16683c; --flag-green-bg: #d8f1e0;
+  --flag-orange-ink: oklch(0.4772 0.113 59); --flag-orange-bg: oklch(0.9348 0.0518 74);
+  --flag-green-ink: oklch(0.4583 0.104 154); --flag-green-bg: oklch(0.9352 0.0347 156);
   /* 積極ボタンの濃い背景（白文字が読める濃さ）：注意＝オレンジ、安全・肯定＝グリーン */
   --caution-solid: color-mix(in srgb, var(--ac-orange) 68%, black);
   /* ベースカラー：広い面積に用いる */
@@ -42,25 +42,25 @@
   /* ボタンの色（2026-10-24 ユーザー指定）。グレー表示の画面から色を載せ直す第一歩
      標準色 = 押せる部品すべての地色（旧「FF」ボタンの薄いグレー）
      選択色 = 選ばれている・押している部品の地色（旧「たばこ」ボタンのグレー） */
-  --btn: #aeaeae;
-  --btn-ink: #000000;
-  --btn-on: #535353;
-  --btn-on-ink: #ffffff;
+  --btn: oklch(0.7508 0 0);
+  --btn-ink: oklch(0 0 0);
+  --btn-on: oklch(0.4423 0 0);
+  --btn-on-ink: oklch(1 0 0);
 
-  --bg: #f4f5f7;
-  --panel: #ffffff;
-  --ink: #000000;
-  --muted: #6b7280;
-  --line: #d4d4d4; --border: #878787; --msg-strong: #535353; --msg-weak: #878787; --off-bg: #d4d4d4; --off-ink: #878787;
+  --bg: oklch(0.97 0.00287 265);
+  --panel: oklch(1 0 0);
+  --ink: oklch(0 0 0);
+  --muted: oklch(0.551 0.0234 264);
+  --line: oklch(0.8699 0 0); --border: oklch(0.6234 0 0); --msg-strong: oklch(0.4423 0 0); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.8699 0 0); --off-ink: oklch(0.6234 0 0);
   --accent: var(--ac-blue);
-  --accent-ink: #ffffff;
+  --accent-ink: oklch(1 0 0);
   --accent-soft: color-mix(in srgb, var(--ac-blue) 8%, transparent);
-  --reg-top-bg: #d4d4d4; /* ボタン（#aeaeae）より一段薄いグレー。黒文字で読む */
-  --reg-top-ink: #000000;
-  --staff-bg: #1f2937;
-  --staff-ink: #f3f4f6;
-  --staff-line: #374151;
-  --cust-bg: #ffffff;
+  --reg-top-bg: oklch(0.8699 0 0); /* ボタン（#aeaeae）より一段薄いグレー。黒文字で読む */
+  --reg-top-ink: oklch(0 0 0);
+  --staff-bg: oklch(0.2781 0.0296 257);
+  --staff-ink: oklch(0.967 0.00287 265);
+  --staff-line: oklch(0.3729 0.0306 260);
+  --cust-bg: oklch(1 0 0);
   --warn: color-mix(in srgb, var(--ac-orange) 55%, black);
   --warn-bg: color-mix(in srgb, var(--ac-orange) 22%, white);
   --danger: color-mix(in srgb, var(--ac-red) 75%, black);
@@ -69,11 +69,11 @@
   --call: color-mix(in srgb, var(--ac-blue) 85%, black);
   --call-bg: color-mix(in srgb, var(--ac-blue) 12%, white);
   --ff: var(--ac-orange);
-  --ff-ink: #000000;
+  --ff-ink: oklch(0 0 0);
   --service: var(--ac-green);
-  --service-ink: #000000;
+  --service-ink: oklch(0 0 0);
   --tob: var(--ac-blue);
-  --tob-ink: #ffffff;
+  --tob-ink: oklch(1 0 0);
   --flash: color-mix(in srgb, var(--ac-yellow) 70%, transparent);
   --bill-bg: color-mix(in srgb, var(--ac-green) 12%, white);
   --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, white);
@@ -83,52 +83,52 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f1115;
-    --panel: #181b21;
-    --ink: #e5e7eb;
-    --muted: #9ca3af;
-    --line: #2a2f38; --border: #878787; --msg-strong: var(--ink); --msg-weak: #878787; --off-bg: #2a2f38; --off-ink: #878787;
-    --bill-bg: color-mix(in srgb, var(--ac-green) 20%, #181b21);
-    --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, #181b21);
-    --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, #181b21);
+    --bg: oklch(0.1773 0.00887 264);
+    --panel: oklch(0.2217 0.0126 264);
+    --ink: oklch(0.9276 0.00581 265);
+    --muted: oklch(0.7137 0.0192 261);
+    --line: oklch(0.3041 0.0177 262); --border: oklch(0.6234 0 0); --msg-strong: var(--ink); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.3041 0.0177 262); --off-ink: oklch(0.6234 0 0);
+    --bill-bg: color-mix(in srgb, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
+    --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
+    --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
     --accent: var(--ac-sky);
-    --accent-ink: #000000;
+    --accent-ink: oklch(0 0 0);
     --accent-soft: color-mix(in srgb, var(--ac-sky) 12%, transparent);
-    --staff-bg: #111827;
-    --staff-line: #2a3342;
-    --cust-bg: #1d1b16;
+    --staff-bg: oklch(0.2101 0.0318 265);
+    --staff-line: oklch(0.3193 0.0296 261);
+    --cust-bg: oklch(0.2226 0.0099 89);
     --warn: var(--ac-orange);
-    --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, #181b21);
+    --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
     --danger: color-mix(in srgb, var(--ac-red) 70%, white);
-    --danger-bg: color-mix(in srgb, var(--ac-red) 25%, #181b21);
+    --danger-bg: color-mix(in srgb, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
     --ok: var(--ac-green);
     --call: var(--ac-sky);
-    --call-bg: color-mix(in srgb, var(--ac-blue) 30%, #181b21);
+    --call-bg: color-mix(in srgb, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f1115;
-  --panel: #181b21;
-  --ink: #e5e7eb;
-  --muted: #9ca3af;
-  --line: #2a2f38; --border: #878787; --msg-strong: var(--ink); --msg-weak: #878787; --off-bg: #2a2f38; --off-ink: #878787;
-  --bill-bg: color-mix(in srgb, var(--ac-green) 20%, #181b21);
-  --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, #181b21);
-  --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, #181b21);
+  --bg: oklch(0.1773 0.00887 264);
+  --panel: oklch(0.2217 0.0126 264);
+  --ink: oklch(0.9276 0.00581 265);
+  --muted: oklch(0.7137 0.0192 261);
+  --line: oklch(0.3041 0.0177 262); --border: oklch(0.6234 0 0); --msg-strong: var(--ink); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.3041 0.0177 262); --off-ink: oklch(0.6234 0 0);
+  --bill-bg: color-mix(in srgb, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
+  --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
+  --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
   --accent: var(--ac-sky);
-  --accent-ink: #000000;
+  --accent-ink: oklch(0 0 0);
   --accent-soft: color-mix(in srgb, var(--ac-sky) 12%, transparent);
-  --staff-bg: #111827;
-  --staff-line: #2a3342;
-  --cust-bg: #1d1b16;
+  --staff-bg: oklch(0.2101 0.0318 265);
+  --staff-line: oklch(0.3193 0.0296 261);
+  --cust-bg: oklch(0.2226 0.0099 89);
   --warn: var(--ac-orange);
-  --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, #181b21);
+  --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
   --danger: color-mix(in srgb, var(--ac-red) 70%, white);
-  --danger-bg: color-mix(in srgb, var(--ac-red) 25%, #181b21);
+  --danger-bg: color-mix(in srgb, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
   --ok: var(--ac-green);
   --call: var(--ac-sky);
-  --call-bg: color-mix(in srgb, var(--ac-blue) 30%, #181b21);
+  --call-bg: color-mix(in srgb, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
   color-scheme: dark;
 }
 
@@ -168,7 +168,7 @@ button { touch-action: manipulation; }
 /* 稼働モードのバッジ：有人は濃いグレーの塗りに白文字、セミセルフは白地に濃いグレーの枠と文字。塗りの有無で一目で区別する */
 .mode-badge { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 8px; border-radius: 0; font-size: 12px; font-weight: 700; line-height: 1; white-space: nowrap; }
 .mode-badge.attended { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
-.mode-badge.semi { background: #ffffff; color: var(--msg-strong); border: 1px solid var(--msg-strong); }
+.mode-badge.semi { background: oklch(1 0 0); color: var(--msg-strong); border: 1px solid var(--msg-strong); }
 button.mode-badge { min-height: 0; cursor: pointer; }
 .mode-badge .caret { font-size: 10px; }
 .screen-head .clock { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
@@ -384,7 +384,7 @@ details summary h3 { display: inline; }
 .screen-main .lines .tag.age, .tag.age, .ff-done, .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; line-height: 1; white-space: nowrap; }
 /* 押すと位置がずれて音が鳴る（共通のボタンの動き）。お渡し前＝オレンジ、お渡し済＝グリーンの積極・小ボタン
    （濃い背景・白文字・枠線なし）。意味のある色なので、画面のグレー置き換えは受けない */
-.ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; border: none; border-radius: 4px; color: #fff; }
+.ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; border: none; border-radius: 4px; color: oklch(1 0 0); }
 .ff-btn.ff-waiting { background: var(--caution-solid); }
 button.ff-btn.ff-verify { cursor: pointer; }
 button.ff-btn.ff-verify:disabled { cursor: not-allowed; opacity: .35; }
@@ -435,7 +435,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 
 .toast {
   position: absolute; left: 10px; right: 10px; bottom: 8px; padding: 8px 10px; border-radius: 8px;
-  background: #111827; color: #fff; opacity: 0; transform: translateY(6px); pointer-events: none;
+  background: oklch(0.2101 0.0318 265); color: oklch(1 0 0); opacity: 0; transform: translateY(6px); pointer-events: none;
   transition: opacity .15s, transform .15s; font-size: 13px;
 }
 .toast.show { opacity: .95; transform: none; }
@@ -443,8 +443,8 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 
 button.cash { min-width: 56px; color: var(--ink); }
 button.cash.bill { background: var(--bill-bg); color: var(--ink); border: 1px solid var(--border); }
-button.cash.coin { background: var(--ac-orange); color: #000000; border-radius: 999px; }
-button.emoney { background: var(--ac-sky); color: #000000; }
+button.cash.coin { background: var(--ac-orange); color: oklch(0 0 0); border-radius: 999px; }
+button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 
 
 .mats { display: flex; gap: var(--gap); flex-wrap: wrap; }
@@ -470,11 +470,11 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .top h1 { font-size: 18px; margin: 0; }
 .top .logo { width: 73px; height: 73px; flex: none; }
 /* ビルド番号：白い文字が引き立つ濃い背景の角丸バッジ */
-.build-badge { font-size: 12px; font-weight: 600; color: #fff; background: #334155; padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
+.build-badge { font-size: 12px; font-weight: 600; color: oklch(1 0 0); background: oklch(0.3717 0.0392 257); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
 /* ホバーで案内を出すタイトル（ⓘ で案内があることを示す） */
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
-.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
 .tip:hover::after, .tip:focus-visible::after { opacity: 1; }
 .floor, .bottom {
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -523,7 +523,7 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .item.call-blink .item-name, .item.call-blink .item-sub, .item.call-blink .item-sub b { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .item.call-blink { animation: none; } }
 .item.staff { background: var(--staff-bg); color: var(--staff-ink); border-color: var(--border); }
-.item.staff .item-sub { color: #9ca3af; }
+.item.staff .item-sub { color: oklch(0.7137 0.0192 261); }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }
 .lines tr.coupon td { color: var(--danger); }
 .item.card { background: var(--call-bg); color: var(--call); margin: 0; }
@@ -549,7 +549,7 @@ body.dragging .drop-hint { display: inline; }
 .drag-ghost {
   position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none;
   background: var(--accent); color: var(--accent-ink); padding: 6px 10px; border-radius: 8px; font-weight: 600;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .25);
+  box-shadow: 0 6px 18px oklch(0 0 0 / .25);
 }
 
 .bottom { border-top: 1px solid var(--border); background: var(--panel); padding-block: 8px; }
@@ -566,43 +566,43 @@ body.dragging .drop-hint { display: inline; }
    画面全体にグレースケールのフィルターを掛けると、中の部品だけを青にできない（フィルターは親子で重なる）ため、
    画面の中で使う色の変数を、グレースケールにしたときと同じグレーに置き換えておく */
 .staff-screen, .customer-screen {
-  --base-pink: #d4d4d4; --base-cream: #f6f6f6; --base-lime: #e1e1e1; --base-sky: #dedede;
-  --base-beige: #d0d0d0; --base-green: #c1c1c1; --base-purple: #b6b6b6; --ac-red: #6c6c6c;
-  --ac-yellow: #e3e3e3; --ac-green: #878787; --ac-blue: #535353; --ac-sky: #afafaf;
-  --ac-pink: #9b9b9b; --ac-orange: #aeaeae; --ac-purple: #2c2c2c; --ac-brown: #494949;
-  --bg: #f5f5f5; --accent: #535353; --accent-soft: rgb(83 83 83 / 0.08); --staff-bg: #282828;
-  --staff-ink: #f4f4f4; --staff-line: #404040; --warn: #606060; --warn-bg: #ededed;
-  --danger: #515151; --danger-bg: #eaeaea; --ok: #5e5e5e; --call: #464646;
-  --call-bg: #eaeaea; --ff: #aeaeae; --service: #878787; --tob: #535353;
-  --flash: rgb(227 227 227 / 0.7); --bill-bg: #f1f1f1; --coin-bg: #f0f0f0; --pay-bg: #f1f1f1;
+  --base-pink: oklch(0.8699 0 0); --base-cream: oklch(0.9731 0 0); --base-lime: oklch(0.9097 0 0); --base-sky: oklch(0.9006 0 0);
+  --base-beige: oklch(0.8576 0 0); --base-green: oklch(0.8109 0 0); --base-purple: oklch(0.7763 0 0); --ac-red: oklch(0.5313 0 0);
+  --ac-yellow: oklch(0.9158 0 0); --ac-green: oklch(0.6234 0 0); --ac-blue: oklch(0.4423 0 0); --ac-sky: oklch(0.754 0 0);
+  --ac-pink: oklch(0.6895 0 0); --ac-orange: oklch(0.7508 0 0); --ac-purple: oklch(0.2931 0 0); --ac-brown: oklch(0.4054 0 0);
+  --bg: oklch(0.9702 0 0); --accent: oklch(0.4423 0 0); --accent-soft: oklch(0.4423 0 0 / 0.08); --staff-bg: oklch(0.2768 0 0);
+  --staff-ink: oklch(0.9672 0 0); --staff-line: oklch(0.3715 0 0); --warn: oklch(0.4891 0 0); --warn-bg: oklch(0.9461 0 0);
+  --danger: oklch(0.4349 0 0); --danger-bg: oklch(0.937 0 0); --ok: oklch(0.4819 0 0); --call: oklch(0.3942 0 0);
+  --call-bg: oklch(0.937 0 0); --ff: oklch(0.7508 0 0); --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0);
+  --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.9581 0 0); --coin-bg: oklch(0.9551 0 0); --pay-bg: oklch(0.9581 0 0);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) :is(.staff-screen, .customer-screen) {
-    --base-pink: #d4d4d4; --base-cream: #f6f6f6; --base-lime: #e1e1e1; --base-sky: #dedede;
-    --base-beige: #d0d0d0; --base-green: #c1c1c1; --base-purple: #b6b6b6; --ac-red: #6c6c6c;
-    --ac-yellow: #e3e3e3; --ac-green: #878787; --ac-blue: #535353; --ac-sky: #afafaf;
-    --ac-pink: #9b9b9b; --ac-orange: #aeaeae; --ac-purple: #2c2c2c; --ac-brown: #494949;
-    --bg: #111111; --panel: #1b1b1b; --ink: #e7e7e7; --line: #2f2f2f;
-    --msg-strong: #e7e7e7; --off-bg: #2f2f2f; --accent: #afafaf; --accent-soft: rgb(175 175 175 / 0.12);
-    --staff-bg: #181818; --staff-ink: #f4f4f4; --staff-line: #323232; --cust-bg: #1b1b1b;
-    --warn: #aeaeae; --warn-bg: #383838; --danger: #989898; --danger-bg: #2f2f2f;
-    --ok: #878787; --call: #afafaf; --call-bg: #2c2c2c; --ff: #aeaeae;
-    --service: #878787; --tob: #535353; --flash: rgb(227 227 227 / 0.7); --bill-bg: #303030;
-    --coin-bg: #353535; --pay-bg: #313131;
+    --base-pink: oklch(0.8699 0 0); --base-cream: oklch(0.9731 0 0); --base-lime: oklch(0.9097 0 0); --base-sky: oklch(0.9006 0 0);
+    --base-beige: oklch(0.8576 0 0); --base-green: oklch(0.8109 0 0); --base-purple: oklch(0.7763 0 0); --ac-red: oklch(0.5313 0 0);
+    --ac-yellow: oklch(0.9158 0 0); --ac-green: oklch(0.6234 0 0); --ac-blue: oklch(0.4423 0 0); --ac-sky: oklch(0.754 0 0);
+    --ac-pink: oklch(0.6895 0 0); --ac-orange: oklch(0.7508 0 0); --ac-purple: oklch(0.2931 0 0); --ac-brown: oklch(0.4054 0 0);
+    --bg: oklch(0.1776 0 0); --panel: oklch(0.2221 0 0); --ink: oklch(0.928 0 0); --line: oklch(0.3052 0 0);
+    --msg-strong: oklch(0.928 0 0); --off-bg: oklch(0.3052 0 0); --accent: oklch(0.754 0 0); --accent-soft: oklch(0.754 0 0 / 0.12);
+    --staff-bg: oklch(0.209 0 0); --staff-ink: oklch(0.9672 0 0); --staff-line: oklch(0.3171 0 0); --cust-bg: oklch(0.2221 0 0);
+    --warn: oklch(0.7508 0 0); --warn-bg: oklch(0.3407 0 0); --danger: oklch(0.6797 0 0); --danger-bg: oklch(0.3052 0 0);
+    --ok: oklch(0.6234 0 0); --call: oklch(0.754 0 0); --call-bg: oklch(0.2931 0 0); --ff: oklch(0.7508 0 0);
+    --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0); --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.3092 0 0);
+    --coin-bg: oklch(0.329 0 0); --pay-bg: oklch(0.3132 0 0);
   }
 }
 :root[data-theme="dark"] :is(.staff-screen, .customer-screen) {
-  --base-pink: #d4d4d4; --base-cream: #f6f6f6; --base-lime: #e1e1e1; --base-sky: #dedede;
-  --base-beige: #d0d0d0; --base-green: #c1c1c1; --base-purple: #b6b6b6; --ac-red: #6c6c6c;
-  --ac-yellow: #e3e3e3; --ac-green: #878787; --ac-blue: #535353; --ac-sky: #afafaf;
-  --ac-pink: #9b9b9b; --ac-orange: #aeaeae; --ac-purple: #2c2c2c; --ac-brown: #494949;
-  --bg: #111111; --panel: #1b1b1b; --ink: #e7e7e7; --line: #2f2f2f;
-  --msg-strong: #e7e7e7; --off-bg: #2f2f2f; --accent: #afafaf; --accent-soft: rgb(175 175 175 / 0.12);
-  --staff-bg: #181818; --staff-ink: #f4f4f4; --staff-line: #323232; --cust-bg: #1b1b1b;
-  --warn: #aeaeae; --warn-bg: #383838; --danger: #989898; --danger-bg: #2f2f2f;
-  --ok: #878787; --call: #afafaf; --call-bg: #2c2c2c; --ff: #aeaeae;
-  --service: #878787; --tob: #535353; --flash: rgb(227 227 227 / 0.7); --bill-bg: #303030;
-  --coin-bg: #353535; --pay-bg: #313131;
+  --base-pink: oklch(0.8699 0 0); --base-cream: oklch(0.9731 0 0); --base-lime: oklch(0.9097 0 0); --base-sky: oklch(0.9006 0 0);
+  --base-beige: oklch(0.8576 0 0); --base-green: oklch(0.8109 0 0); --base-purple: oklch(0.7763 0 0); --ac-red: oklch(0.5313 0 0);
+  --ac-yellow: oklch(0.9158 0 0); --ac-green: oklch(0.6234 0 0); --ac-blue: oklch(0.4423 0 0); --ac-sky: oklch(0.754 0 0);
+  --ac-pink: oklch(0.6895 0 0); --ac-orange: oklch(0.7508 0 0); --ac-purple: oklch(0.2931 0 0); --ac-brown: oklch(0.4054 0 0);
+  --bg: oklch(0.1776 0 0); --panel: oklch(0.2221 0 0); --ink: oklch(0.928 0 0); --line: oklch(0.3052 0 0);
+  --msg-strong: oklch(0.928 0 0); --off-bg: oklch(0.3052 0 0); --accent: oklch(0.754 0 0); --accent-soft: oklch(0.754 0 0 / 0.12);
+  --staff-bg: oklch(0.209 0 0); --staff-ink: oklch(0.9672 0 0); --staff-line: oklch(0.3171 0 0); --cust-bg: oklch(0.2221 0 0);
+  --warn: oklch(0.7508 0 0); --warn-bg: oklch(0.3407 0 0); --danger: oklch(0.6797 0 0); --danger-bg: oklch(0.3052 0 0);
+  --ok: oklch(0.6234 0 0); --call: oklch(0.754 0 0); --call-bg: oklch(0.2931 0 0); --ff: oklch(0.7508 0 0);
+  --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0); --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.3092 0 0);
+  --coin-bg: oklch(0.329 0 0); --pay-bg: oklch(0.3132 0 0);
 }
 /* 色の付いたボタン（硬貨・電子マネーなど）やチェックボックスの既定色も、操作できない部品ではグレーで描く */
 .screen :is(button, input, select, summary) { filter: grayscale(1); }
@@ -669,7 +669,7 @@ body.dragging .drop-hint { display: inline; }
 /* 年確ルール設定（売り場タイトルの右端から開く） */
 .rules-open { margin-left: auto; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
-.rules-dlg::backdrop { background: rgba(0, 0, 0, .45); }
+.rules-dlg::backdrop { background: oklch(0 0 0 / .45); }
 .rules-dlg .dlg-head { display: flex; align-items: center; gap: 8px; }
 .rules-dlg .dlg-head h2 { margin: 0; font-size: 16px; flex: 1; }
 .rules-dlg .toast { position: sticky; top: 0; z-index: 1; margin: 6px 0; }
@@ -749,8 +749,8 @@ body.dragging .drop-hint { display: inline; }
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: 13px; }
 .qty-fixed { min-width: 1.4em; text-align: center; }
 /* 数量のテンキー：レジ画面の上に重ねるポップアップ（レジ画面で覆いかぶさる表示を出す唯一の例外） */
-.qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, #000 28%, transparent); }
-.qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+.qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, oklch(0 0 0) 28%, transparent); }
+.qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 6px; box-shadow: 0 6px 18px oklch(0 0 0 / .25); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; color: var(--msg-strong); }
 .qty-pop-name .muted { font-size: 12px; white-space: nowrap; }
 .qty-pop-value { border: 1.5px solid var(--msg-strong); border-radius: 0; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
@@ -779,14 +779,14 @@ body.dragging .drop-hint { display: inline; }
 /* 待ち受け画面の背景：画面中央の明るい点から、外へいくほど暗くなる円形グラデーション。
    両モードで同じ（主役はスキャンとご用件の案内。電子マネーの扇形は右下端にあるだけ）（P-31） */
 .scan-welcome, .attended-welcome { position: relative; --spot: 50% 50%; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
-  --glow: color-mix(in srgb, var(--cust-bg) 65%, #ffffff); --dark: color-mix(in srgb, var(--cust-bg) 78%, var(--ink));
+  --glow: color-mix(in srgb, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in srgb, var(--cust-bg) 78%, var(--ink));
   background: radial-gradient(circle farthest-corner at var(--spot), var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
 /* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
 .menu-code-value { font-size: 40px; letter-spacing: .25em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; margin: 4px 0; padding-left: .25em; }
 .menu-code-form { justify-content: center; gap: 8px; }
 .menu-code-form input { width: 7.5em; font-size: 20px; letter-spacing: .2em; text-align: center; text-transform: uppercase; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; }
 /* 使い方の説明（Item・Wallet のボタンにカーソルを重ねると出る）。画面に固定して置くので横スクロールを生まない */
-.hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: #1f2937; color: #fff; font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
+.hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
 .hover-tip[hidden] { display: none; }
 
 /* ---------------------------------------------------------------------------

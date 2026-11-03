@@ -822,6 +822,8 @@ body.dragging .drop-hint { display: inline; }
   /* 長押しで選ぶので、文字選択やコンテキストメニューを出さない */
   .screen, [data-inlet] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .money-io { margin-top: 6px; }
+  /* スタッフ側の画面を見ている間は入金・出金ボックスを出さない（機器はお客様側向き） */
+  .money-io.staff-shown { display: none; }
   .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
 }
 

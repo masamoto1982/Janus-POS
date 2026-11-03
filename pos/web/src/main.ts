@@ -139,7 +139,7 @@ function buildSkeleton(): void {
           </section>
         </div>
       </div>
-      <div class="money-io" aria-label="レジ${r.id}の投入口と排出口（お客様側だけにあります）">
+      <div class="money-io staff-shown" aria-label="レジ${r.id}の投入口と排出口（お客様側だけにあります）">
         <div class="money-io-cust" data-cash-drop="${r.id}">
         <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:customer:inlet:" aria-label="レジ${r.id}の投入口（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
         <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の排出口（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
@@ -1075,6 +1075,8 @@ function syncSwipeTabs(reg: number): void {
     b.classList.toggle("on", on);
     b.setAttribute("aria-selected", String(on));
   });
+  // 入金・出金ボックスはお客様側向きの機器なので、モバイルでスタッフ側の画面を見ている間は隠す（CSS）
+  app.querySelector(`[data-swipe="${reg}"]`)?.parentElement?.querySelector(".money-io")?.classList.toggle("staff-shown", side === "staff");
 }
 
 function cancelLongPress(): void {

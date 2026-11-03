@@ -547,7 +547,9 @@ body.dragging, body.dragging * { cursor: grabbing !important; }
 /* アプリ全体の原則：枠線を点線にする＝操作を受け付けている、枠線の点滅＝注意喚起。
    ドラッグ中は、落とせる先（レジ画面、お金・決済なら入金ボックス）の枠線を太線（--frame-w の2倍）にして accent 色にする。
    通常の枠は --frame-w。内側に同じ幅の線を足すので、レイアウトはずれない */
-body.dragging .screen { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); }
+body.dragging .screen { border-color: var(--accent); }
+/* 内側の線は box-shadow だと子の背景（会計ボタンのある .reg-top など）に塗りつぶされるので、最前面の疑似要素で描く */
+body.dragging .screen::after { content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; border: var(--frame-w) solid var(--accent); }
 body.dragging-wallet .money-io .inlet { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); }
 body.dragging .drop-hint { display: inline; }
 .drag-ghost {

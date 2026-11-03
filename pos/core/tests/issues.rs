@@ -1502,14 +1502,19 @@ fn shortcut_buttons_call_staff() {
     // 宅配便のバーコードを直接読むと、サービスの呼び出しになる
     scan(&mut s, 2, "customer", PARCEL);
     assert!(kinds(&s, 2).contains(&CallKind::Service));
-    // 店員が来ると、たばこ・サービスのボタン呼び出しは片付く（FF は登録するまで残る）
+    // 店員が来ると、呼び出しはすべて解除される（ログアウトしても復活しない）
     login(&mut s, 1);
-    assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
+    assert!(kinds(&s, 1).is_empty());
+    // 買い物がないままログアウトしても、呼び出し（ランプ）は復活しない
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    assert!(kinds(&s, 1).is_empty());
+    assert!(!reg(&s, 1).lamp);
+    login(&mut s, 1);
     // 有人モードでは、店員が仲間に SOS を出すのに使う。Bell は鳴るが、呼び出しの記録は増えない
     ok(&mut s, json!({"type":"call_staff","register":1}));
     advance(&mut s, 1_000);
     assert!(s.snapshot().mats[0].buzzing, "SOS rings the bell");
-    assert_eq!(kinds(&s, 1), vec![CallKind::FastFood]);
+    assert!(kinds(&s, 1).is_empty());
 }
 
 /// 呼び出しボタンは触れている間だけ MAT を鳴らす。短く押して「押した」電文が失われても、
@@ -1826,8 +1831,9 @@ fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
     login(&mut s, 1);
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
     let ids = bill_ids(&s, 1);
+    // 呼び出しは店員のログインで解除される（伝票の確認そのものは続く）
+    assert!(s.snapshot().calls.is_empty());
     check_bill(&mut s, 1, ids[0], true);
-    assert!(!s.snapshot().calls.is_empty());
     check_bill(&mut s, 1, ids[1], true);
     assert!(s.snapshot().calls.is_empty());
     ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));

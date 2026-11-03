@@ -374,41 +374,16 @@ function ffCollectCard(reg: number, v: StaffView): string {
     </div>`;
 }
 
-/**
- * 有人モードのお客様側：スタッフ側の FF の回収と対になる案内。お客様が「確認しました」を押しても閉じる
- * （スタッフ側の「回収しました」ほど厳格にはしない）
- */
-function ffReturnCard(reg: number, v: StaffView): string {
+/** 有人モードのお客様側：スタッフ側の FF の回収と対になる案内（見るだけ。閉じるのはスタッフの「回収しました」） */
+function ffReturnCard(v: StaffView): string {
   if (!v.ff_collect.length) return "";
   const items = v.ff_collect.map((c) => `<li><b>${esc(c.name)}</b> × ${c.qty}</li>`).join("");
   return `<div class="ffv-screen ff-return">
       <div class="big">取り消した FF をお返しください</div>
       <ul class="ff-return-list">${items}</ul>
-      <p class="muted">お返しになったら「確認しました」を押してください</p>
-      <div class="ffv-foot end">${customerOnly(btn("確認しました", { type: "dismiss_ff_collect", register: reg }, undefined, "primary"))}</div>
     </div>`;
 }
 
-/**
- * 有人モードのお客様側：スタッフ側のお渡しの確認と対になる案内。お受け取りの個数は入力させず、
- * 右下の「確認しました」で受け取ったことを確かめる。スタッフ側の照合が済むまで押せない（相互チェック）。
- * 会計には両方の確認が要る
- */
-function ffReceiveCard(reg: number, lines: StaffLine[], st: ActionState): string {
-  // お客様がすでに確かめた分は出さず、追加分だけを確かめてもらう
-  const ff = lines.filter((l) => l.kind === "ff" && l.ff_seen < l.qty).sort((a, b) => b.touched - a.touched);
-  const rows = ff.map((l) => `<tr><td>${esc(l.ff_seen > 0 ? `${l.name}（追加分）` : l.name)}</td><td class="num">${l.qty - l.ff_seen}</td></tr>`).join("");
-  const staffDone = !lines.some((l) => l.kind === "ff" && l.state === "waiting");
-  return `<div class="ffv-screen ff-receive">
-      <div class="big">FF のお受け取りの確認</div>
-      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">個数</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="muted">${staffDone ? "お受け取りになったら「確認しました」を押してください" : "スタッフがお渡しの個数を確認しています"}</p>
-      <div class="ffv-foot end">${customerOnly(btn("確認しました", { type: "receive_ff", register: reg, side: "customer" }, st, "primary"))}</div>
-    </div>`;
-}
-
-/** お客様本人が押すボタン（有人モードでもお客様側の画面で押せる。色はお客様側の操作部品） */
-const customerOnly = (html: string): string => `<span class="customer-only">${html}</span>`;
 
 /** 会計中の確認画面の左下に置く、手続きを引き返すボタン（引き返すボタンは左） */
 function backFoot(reg: number, side: Side, st: ActionState): string {
@@ -1053,7 +1028,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
     side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
-    side === "staff" ? ffCollectCard(reg, v) : ffReturnCard(reg, v),
+    side === "staff" ? ffCollectCard(reg, v) : ffReturnCard(v),
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);
@@ -1063,11 +1038,6 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (payStage) return screen(pay);
   if (!ro && !paying && ffVerifyOpen(reg, side, v.lines))
     return screen(ffVerifyScreen(reg, side, v.lines, false));
-  // お客様側のお受け取りの案内：スタッフ側がお渡しの確認をしている間と、照合が済んでお客様の確認を待つ間。
-  // 「確認しました」はスタッフの照合が済んでから押せる
-  const ffStaffDone = !v.lines.some((l) => l.kind === "ff" && l.state === "waiting");
-  if (ro && !paying && v.ff_unconfirmed && (ffStaffDone || ffVerifyOpen(reg, "staff", v.lines)))
-    return screen(ffReceiveCard(reg, v.lines, a("receive_ff")));
   closeFfVerify(reg, side);
   return `${top}${notice}
     <div class="staff-head">

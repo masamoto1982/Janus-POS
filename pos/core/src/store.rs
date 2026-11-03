@@ -230,12 +230,6 @@ pub enum Command {
         line_id: u32,
         handed: u32,
     },
-    /// 有人モードのお客様側の「確認しました」：お渡し前の FF をまとめてお渡し済みにする
-    /// （スタッフ側の個数の照合ほど厳格にはしない）
-    ReceiveFf {
-        register: u8,
-        side: Side,
-    },
     CompleteService {
         register: u8,
         line_id: u32,
@@ -531,7 +525,6 @@ impl Command {
             | C::RegisterFf { register, .. }
             | C::FfButton { register, .. }
             | C::CheckFf { register, .. }
-            | C::ReceiveFf { register, .. }
             | C::CompleteService { register, .. }
             | C::ParcelLength { register, .. }
             | C::ParcelSize { register, .. }
@@ -582,7 +575,6 @@ impl Command {
         match self {
             C::RegisterFf { side, .. }
             | C::CheckFf { side, .. }
-            | C::ReceiveFf { side, .. }
             | C::RemoveLine { side, .. }
             | C::SetQty { side, .. }
             | C::RemoveCoupon { side, .. }
@@ -683,8 +675,6 @@ pub struct Line {
     pub qty: u32,
     /// FF：すでにお渡しの照合が済んでいる個数。追加注文で数量が増えたときは、増えた分だけを照合する
     pub ff_base: u32,
-    /// FF：お客様がお受け取りを確かめた個数。個数が増えたときは、増えた分だけを確かめ直す
-    pub ff_seen: u32,
     /// 登録した時点の税区分と税率（あとで設定を変えても、登録済みの明細は変わらない）
     pub tax: String,
     pub rate_bp: u32,
@@ -955,13 +945,6 @@ impl Txn {
             .any(|l| matches!(l.kind, LineKind::Ff { state } if state == s))
     }
 
-    /// お客様がまだお受け取りを確かめていない FF がある（有人モードの相互チェック）
-    fn ff_unconfirmed(&self) -> bool {
-        self.lines.iter().any(|l| {
-            matches!(l.kind, LineKind::Ff { .. }) && l.ff_seen < l.qty
-        })
-    }
-
     fn service_pending(&self) -> bool {
         self.lines
             .iter()
@@ -1068,7 +1051,6 @@ impl Txn {
             unit_price: p.price,
             qty,
             ff_base: 0,
-            ff_seen: 0,
             tax: tax.0,
             rate_bp: tax.1,
             category: p.category,
@@ -1205,7 +1187,6 @@ impl Register {
             age_choice_pending: t.age_choice_pending(),
             id_pending: t.id_pending(),
             ff_waiting: t.any_ff(FfState::Waiting),
-            ff_unconfirmed: t.ff_unconfirmed(),
             has_ff: t
                 .lines
                 .iter()
@@ -1674,17 +1655,6 @@ impl Store {
                 } else {
                     format!("{name}：照合 NG（お渡し数 {handed} が注文数と合いません）")
                 })
-            }
-            C::ReceiveFf { register, side } => {
-                self.check(register, side, Action::ReceiveFf)?;
-                // スタッフの照合が済んだ FF を、お客様が受け取ったと確かめる（照合の結果は変えない）
-                let t = &mut self.reg_mut(register)?.txn;
-                for l in t.lines.iter_mut() {
-                    if matches!(l.kind, LineKind::Ff { .. }) {
-                        l.ff_seen = l.qty;
-                    }
-                }
-                done("お客様が FF のお受け取りを確認しました")
             }
             C::CompleteService {
                 register,
@@ -3795,7 +3765,6 @@ impl Store {
                     .iter()
                     .map(|&(name, qty)| Confiscated { name, qty })
                     .collect(),
-                ff_unconfirmed: c.ff_unconfirmed,
                 id_pending: c.id_pending,
                 coupon_unmatched: c.coupon_unmatched,
                 returned: returned.clone(),
@@ -3949,8 +3918,6 @@ pub struct StaffView {
     pub confiscated: Vec<Confiscated>,
     /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する）
     pub ff_collect: Vec<Confiscated>,
-    /// お客様がまだ FF のお受け取りを確かめていない（有人モードでは会計に進めない）
-    pub ff_unconfirmed: bool,
     /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
     pub coupon_unmatched: bool,
     /// 取り消して、お客様に返却するクーポン

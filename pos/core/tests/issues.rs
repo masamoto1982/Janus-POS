@@ -372,17 +372,6 @@ fn fast_food_flow_in_semi_self_mode() {
         &mut s,
         json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2}),
     );
-    // スタッフの照合の後、お客様が「確認しました」を押すまで会計に進めない（相互チェック）
-    let e = run(
-        &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
-    )
-    .unwrap_err();
-    assert!(e.contains("お受け取り"), "{e}");
-    ok(
-        &mut s,
-        json!({"type":"receive_ff","register":2,"side":"customer"}),
-    );
     advance(&mut s, 1_000);
     ok(
         &mut s,
@@ -1386,10 +1375,6 @@ fn attended_screens_lock_only_while_touched() {
     advance(&mut s, 1_000);
     ok(&mut s, check(ids[1], "customer"));
     advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"}),
-    );
     advance(&mut s, 1_000);
     ok(
         &mut s,
@@ -1610,10 +1595,6 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     );
     ok(
         &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"}),
-    );
-    ok(
-        &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     let v = reg(&s, 1);
@@ -1648,10 +1629,6 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     ok(
         &mut s,
         json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"handed":1}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"}),
     );
     ok(
         &mut s,
@@ -3091,88 +3068,10 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     assert!(!reg(&s, 1).staff.point_pending);
 }
 
-/// 有人モードの FF は相互チェック：スタッフ側の照合が済んでから、お客様側の「確認しました」を押せる。
-/// 両方が済むまで会計に進めない。「確認しました」はお客様側の画面からだけ押せ、照合の結果は変えない。
-/// 明細が増えたり個数が変わったりすると、お客様は確かめ直す
+/// FF のお渡しはスタッフが責任をもつ：スタッフの照合だけで会計に進め、お客様側の確認操作はない。
+/// 個数を増やしたときも、増えた分をスタッフが照合するだけ
 #[test]
-fn customer_confirms_ff_receipt_in_attended_mode() {
-    let mut s = Store::new(1, 1, 1);
-    login(&mut s, 1);
-    for code in ["FF01", "FF02"] {
-        ok(
-            &mut s,
-            json!({"type":"register_ff","register":1,"side":"staff","code":code,"qty":1}),
-        );
-    }
-    advance(&mut s, 1_000);
-    let v = reg(&s, 1);
-    let ids: Vec<u32> = v.staff.lines.iter().map(|l| l.line.id).collect();
-    assert!(v.staff.ff_unconfirmed);
-    // スタッフの照合の前は、お客様は確かめられない
-    assert!(!allowed(&v, Side::Customer, Action::ReceiveFf));
-    assert!(run(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"})
-    )
-    .is_err());
-    for &id in &ids {
-        ok(
-            &mut s,
-            json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
-        );
-    }
-    advance(&mut s, 1_000);
-    // スタッフの照合だけでは会計に進めない
-    let v = reg(&s, 1);
-    assert!(!allowed(&v, Side::Staff, Action::Checkout));
-    assert!(allowed(&v, Side::Customer, Action::ReceiveFf));
-    assert!(run(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"staff"})
-    )
-    .is_err());
-    ok(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"}),
-    );
-    advance(&mut s, 1_000);
-    let v = reg(&s, 1);
-    assert!(!v.staff.ff_unconfirmed);
-    assert!(
-        !allowed(&v, Side::Customer, Action::ReceiveFf),
-        "nothing left to confirm"
-    );
-    // FF を追加すると、照合も確かめもやり直し
-    ok(
-        &mut s,
-        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":1}),
-    );
-    advance(&mut s, 1_000);
-    let v = reg(&s, 1);
-    assert!(v.staff.ff_unconfirmed);
-    assert!(!allowed(&v, Side::Staff, Action::Checkout));
-    for l in v.staff.lines.iter().filter(|l| !ids.contains(&l.line.id)) {
-        ok(
-            &mut s,
-            json!({"type":"check_ff","register":1,"side":"staff","line_id":l.line.id,"handed":l.line.qty}),
-        );
-    }
-    advance(&mut s, 1_000);
-    assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
-    ok(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"}),
-    );
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
-    );
-}
-
-/// お客様の確認も追加分だけ：一度確かめた分は蒸し返さない
-#[test]
-fn customer_reconfirms_only_added_ff() {
+fn staff_alone_is_responsible_for_ff_handover() {
     let mut s = Store::new(1, 1, 1);
     login(&mut s, 1);
     ok(
@@ -3181,34 +3080,24 @@ fn customer_reconfirms_only_added_ff() {
     );
     let id = reg(&s, 1).staff.lines[0].line.id;
     advance(&mut s, 1_000);
+    assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
     ok(
         &mut s,
         json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":2}),
     );
-    ok(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"}),
-    );
     advance(&mut s, 1_000);
+    assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
+    // 個数を増やすと、増えた分（1 個）だけをスタッフが照合する。お客様側の確認はない
     ok(
         &mut s,
         json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
     );
-    let v = reg(&s, 1);
-    assert!(v.staff.ff_unconfirmed);
-    let l = &v.staff.lines[0].line;
-    assert_eq!((l.qty, l.ff_seen, l.ff_base), (3, 2, 2));
     advance(&mut s, 1_000);
+    assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
     ok(
         &mut s,
         json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
     );
-    ok(
-        &mut s,
-        json!({"type":"receive_ff","register":1,"side":"customer"}),
-    );
     advance(&mut s, 1_000);
-    let v = reg(&s, 1);
-    assert!(!v.staff.ff_unconfirmed);
-    assert_eq!(v.staff.lines[0].line.ff_seen, 3);
+    assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
 }

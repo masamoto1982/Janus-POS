@@ -103,11 +103,14 @@ function reset(registers: number, mats: number): void {
 // 骨組み（一度だけ作る）
 // ---------------------------------------------------------------------------
 
+/** 呼び出しの色が淡いレッドに到達するまでの放置時間（core の RING_FULL_MS と同じ） */
+const CALL_FULL_MS = 60_000;
+
 function buildSkeleton(): void {
   const regs = snap.registers
     .map(
       (r) => `<section class="register" data-register="${r.id}" aria-label="レジ${r.id}">
-      <h2>レジ${r.id} <span class="lamp" data-lamp="${r.id}" role="img" aria-label="レジ${r.id}の呼び出しランプ"></span><span data-region="mode-${r.id}"></span>
+      <h2>レジ${r.id} <span data-region="mode-${r.id}"></span>
         <label class="login-sel">スタッフ
           <select data-login="${r.id}" aria-label="レジ${r.id}のスタッフログイン">
             <option value="">未ログイン</option>
@@ -321,13 +324,20 @@ function render(): void {
       const acc = r.staff.state === "absent" ? undefined : snap.accounts.find((a) => a.name === r.staff.name);
       sel.value = acc?.barcode ?? "";
     }
-    // 呼び出しランプ：店員が来るまで点灯し、放置が長いほど速く点滅する
-    const lamp = app.querySelector<HTMLElement>(`[data-lamp="${r.id}"]`);
-    if (lamp) {
-      const on = r.lamp;
-      lamp.classList.toggle("on", on);
-      lamp.style.setProperty("--blink", `${(1.4 - 1.1 * r.ring_volume).toFixed(2)}s`);
-      lamp.title = on ? `呼び出し中（${Math.floor((r.call_waiting_ms ?? 0) / 1000)}秒）` : "呼び出しランプ";
+    // 呼び出し中はレジ画面のヘッダー自体が点滅する。放置時間は点滅の速さではなく色（淡いグリーン→淡いレッド）で表す
+    const waitMs = r.lamp ? (r.call_waiting_ms ?? 0) : 0;
+    const t = Math.min(1, waitMs / CALL_FULL_MS);
+    for (const side of ["staff", "customer"] as const) {
+      const head = app.querySelector<HTMLElement>(`[data-region="head-${r.id}-${side}"]`);
+      if (!head) continue;
+      head.classList.toggle("calling", r.lamp);
+      if (r.lamp) {
+        head.style.setProperty("--call-t", `${Math.round(t * 100)}%`);
+        head.title = `呼び出し中（${Math.floor(waitMs / 1000)}秒）`;
+      } else {
+        head.style.removeProperty("--call-t");
+        head.removeAttribute("title");
+      }
     }
     // もう一方が触れている一瞬（またはお客様側に限られる場面）は、この画面の操作が利かない
     for (const side of ["staff", "customer"] as const) {
@@ -365,7 +375,7 @@ function render(): void {
     const idle = r.idle_revert_in;
     setRegion(
       `mode-${r.id}`,
-      `<span class="mode mode-${r.mode}">${esc(r.mode_label)}</span>${
+      `${
         idle !== null
           ? `<span class="idle" title="5分間操作がないと、登録中の取引も中止してセミセルフに戻ります">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} で${
               r.idle_voids ? (r.mode === "semi_self" ? "取引を中止します" : "取引を中止してセミセルフに戻ります") : "セミセルフに戻ります"

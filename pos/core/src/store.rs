@@ -798,6 +798,8 @@ struct Txn {
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
     inserted: Cash,
+    /// 最後に入金ボックスへ現金を入れた時刻（30 秒入れなければ投入おわりとみなす）
+    inserted_at: u64,
     /// セミセルフで店員が会計に進め、お客様に支払いを任せている（店員が名札を読むと解除）
     customer_turn: bool,
     /// キャッシュレスで先に払った額（電子マネーの残高不足で「不足分を現金で払う」を選んだとき、
@@ -1335,6 +1337,8 @@ fn staff_side() -> Side {
 /// 無操作がこの時間続くと、レジはセミセルフモードに戻って待機する
 /// 決済後の「ありがとうございました」を出す時間。過ぎると新しいお客様の待ち受けに戻る
 pub const THANKS_MS: u64 = 3000;
+/// 最後の投入から、これだけ入れなければ「投入おわり」とみなす
+pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 /// 排出口に釣り銭が残ったまま、お客様画面に「釣り銭が残っています」を出すまで（セミセルフ）
@@ -1429,6 +1433,24 @@ impl Store {
             {
                 r.last_receipt = None;
             }
+        }
+        // 最後の投入から 30 秒入れなければ投入おわり（足りていれば「投入おわり」を押したのと同じ）
+        let done_ids: Vec<u8> = self
+            .registers
+            .iter()
+            .filter(|r| {
+                let t = &r.txn;
+                t.paying
+                    && t.method == Some(PaymentMethod::Cash)
+                    && r.emoney.is_none()
+                    && t.inserted.total() > 0
+                    && t.inserted.total() >= t.due()
+                    && t.inserted_at + INSERT_DONE_MS <= now
+            })
+            .map(|r| r.id)
+            .collect();
+        for id in done_ids {
+            let _ = self.finish_insert_auto(id);
         }
         // MAT はデジタルな呼び鈴：ボタンが押されている間だけ鳴る。鳴らし直しはしない。
         // 年確・代行収納の読み取りのようにボタンを介さない呼び出しは、起きた瞬間に短く鳴る
@@ -3249,9 +3271,11 @@ impl Store {
     /// （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）。
     /// 投入額は積み上がり、「投入おわり」（[`Command::FinishInsert`]）を押すと決済する。入金ボックスの Enter はその近道
     fn pay_cash(&mut self, register: u8, c: Cash) -> Result<Outcome, String> {
+        let now = self.now;
         let r = self.reg_mut(register)?;
         r.txn.method = Some(PaymentMethod::Cash);
         r.txn.inserted.merge(&c);
+        r.txn.inserted_at = now;
         let paid = r.txn.inserted.total();
         let total = r.txn.due();
         if paid < total {
@@ -3264,6 +3288,11 @@ impl Store {
 
     fn finish_insert(&mut self, register: u8) -> Result<Outcome, String> {
         self.check(register, Side::Customer, Action::InsertCash)?;
+        self.finish_insert_auto(register)
+    }
+
+    /// 投入おわりの決済（操作者の確認なし。30 秒の自動判定からも使う）
+    fn finish_insert_auto(&mut self, register: u8) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         let paid = r.txn.inserted.total();
         if paid == 0 {

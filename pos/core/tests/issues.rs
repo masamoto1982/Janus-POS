@@ -3107,3 +3107,33 @@ fn staff_alone_is_responsible_for_ff_handover() {
     advance(&mut s, 1_000);
     assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
 }
+
+/// 最後の投入から 30 秒入れなければ投入おわり。支払方法の選択画面でも、投入すれば現金に移る。
+#[test]
+fn thirty_seconds_without_insert_means_done_inserting() {
+    let mut s = Store::new(1, 2, 1);
+    s.tick(1000);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    assert_eq!(reg(&s, 1).staff.method, None, "method not chosen yet");
+    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    assert_eq!(
+        reg(&s, 1).staff.method,
+        Some(PaymentMethod::Cash),
+        "inserting skips the method choice"
+    );
+    // 足りないうちは、時間が経っても確定しない
+    s.tick(1000 + 31_000);
+    assert!(reg(&s, 1).last_receipt.is_none());
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
+    s.tick(1000 + 31_000 + 29_999);
+    assert!(reg(&s, 1).last_receipt.is_none(), "still within 30 s");
+    s.tick(1000 + 31_000 + 30_000);
+    let v = reg(&s, 1);
+    assert!(v.last_receipt.is_some(), "settled automatically");
+    assert_eq!(v.outlet, 1100 - 160);
+}

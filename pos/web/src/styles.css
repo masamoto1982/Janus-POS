@@ -302,7 +302,9 @@ input, select, button.pad-field {
 }
 /* テンキーで打ち込む入力欄（押すとテンキーが開く）。見た目は入力欄そのもの。テンキーは入力欄とだけ組み合わせる */
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
-button.pad-field .placeholder { color: var(--muted); font-weight: 400; }
+/* 記入例は Janus-POS で規定する一番薄いグレー（--line）。入力欄すべて共通 */
+input::placeholder { color: var(--line); opacity: 1; }
+button.pad-field .placeholder { color: var(--line); font-weight: 400; }
 button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }

@@ -18,7 +18,6 @@
   --safe-line: var(--ac-green);
   /* 積極ボタンの濃い背景（白文字が読める濃さ）：注意＝オレンジ、安全・肯定＝グリーン */
   --caution-solid: color-mix(in srgb, var(--ac-orange) 68%, black);
-  --safe-solid: color-mix(in srgb, var(--ac-green) 72%, black);
   /* ベースカラー：広い面積に用いる */
   --base-pink: #ffcabf;
   --base-cream: #ffff80;
@@ -313,7 +312,7 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 /* 注意のしるし（年確・限定・現金のみ・お渡し前など）＝淡い黄色の背景・オレンジの文字と枠。
    解消したしるし（お渡し済・受付済）＝淡い黄緑の背景・緑の文字と枠。角は丸めない（入力欄とは別の部品）。
    意味のある色なので、画面のグレー置き換え（--warn などの再割り当て・filter）は受けない */
-.tag.age, .tag.warn { background: var(--caution-bg); color: var(--caution-ink); border: 1px solid var(--caution-line); border-radius: 0; }
+.tag.warn { background: var(--caution-bg); color: var(--caution-ink); border: 1px solid var(--caution-line); border-radius: 0; }
 .tag.ok { background: var(--safe-bg); color: var(--safe-ink); border: 1px solid var(--safe-line); border-radius: 0; }
 .screen button.tag, .screen button.tag:disabled, .ff-btn, .screen button.ff-btn:disabled { filter: none !important; }
 .warn { color: var(--warn); }
@@ -375,11 +374,13 @@ details summary h3 { display: inline; }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
 /* お支払い内容の確認は、角の丸い枠に入れず登録エリアいっぱいに広げる（最上段と会計バーは除く。2026-10-28 ユーザー） */
 /* FF の「お渡し前」は押せるアイコン（押すとお渡し照合の画面） */
+/* 年確・限定・現金のみのしるしは文字だけ（オレンジの文字）。お渡し済も文字だけ（緑の文字）。ボタンではないので背景・枠線・押下の動きはない */
+.tag.age { background: none; border: none; padding: 0; color: var(--caution-ink); font-weight: 700; }
+.ff-done { font-size: 11px; font-weight: 700; color: var(--safe-ink); white-space: nowrap; }
 /* 押すと位置がずれて音が鳴る（共通のボタンの動き）。お渡し前＝オレンジ、お渡し済＝グリーンの積極・小ボタン
    （濃い背景・白文字・枠線なし）。意味のある色なので、画面のグレー置き換えは受けない */
 .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; border: none; border-radius: 4px; color: #fff; }
 .ff-btn.ff-waiting { background: var(--caution-solid); }
-.ff-btn.ff-received { background: var(--safe-solid); }
 button.ff-btn.ff-verify { cursor: pointer; }
 button.ff-btn.ff-verify:disabled { cursor: not-allowed; opacity: .35; }
 span.ff-btn { cursor: default; }

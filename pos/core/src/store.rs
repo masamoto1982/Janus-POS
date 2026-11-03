@@ -683,6 +683,8 @@ pub struct Line {
     pub qty: u32,
     /// FF：すでにお渡しの照合が済んでいる個数。追加注文で数量が増えたときは、増えた分だけを照合する
     pub ff_base: u32,
+    /// FF：お客様がお受け取りを確かめた個数。個数が増えたときは、増えた分だけを確かめ直す
+    pub ff_seen: u32,
     /// 登録した時点の税区分と税率（あとで設定を変えても、登録済みの明細は変わらない）
     pub tax: String,
     pub rate_bp: u32,
@@ -802,8 +804,6 @@ struct Txn {
     confiscated: Vec<(&'static str, u32)>,
     /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する。品名と個数）
     ff_collect: Vec<(&'static str, u32)>,
-    /// お客様がお受け取りを確かめた FF（明細番号と個数）。明細が増えたり個数が変わったりすると、確かめ直す
-    ff_confirmed: Vec<(u32, u32)>,
     method: Option<PaymentMethod>,
     /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
@@ -958,7 +958,7 @@ impl Txn {
     /// お客様がまだお受け取りを確かめていない FF がある（有人モードの相互チェック）
     fn ff_unconfirmed(&self) -> bool {
         self.lines.iter().any(|l| {
-            matches!(l.kind, LineKind::Ff { .. }) && !self.ff_confirmed.contains(&(l.id, l.qty))
+            matches!(l.kind, LineKind::Ff { .. }) && l.ff_seen < l.qty
         })
     }
 
@@ -1068,6 +1068,7 @@ impl Txn {
             unit_price: p.price,
             qty,
             ff_base: 0,
+            ff_seen: 0,
             tax: tax.0,
             rate_bp: tax.1,
             category: p.category,
@@ -1678,12 +1679,11 @@ impl Store {
                 self.check(register, side, Action::ReceiveFf)?;
                 // スタッフの照合が済んだ FF を、お客様が受け取ったと確かめる（照合の結果は変えない）
                 let t = &mut self.reg_mut(register)?.txn;
-                t.ff_confirmed = t
-                    .lines
-                    .iter()
-                    .filter(|l| matches!(l.kind, LineKind::Ff { .. }))
-                    .map(|l| (l.id, l.qty))
-                    .collect();
+                for l in t.lines.iter_mut() {
+                    if matches!(l.kind, LineKind::Ff { .. }) {
+                        l.ff_seen = l.qty;
+                    }
+                }
                 done("お客様が FF のお受け取りを確認しました")
             }
             C::CompleteService {

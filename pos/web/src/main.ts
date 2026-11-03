@@ -211,25 +211,42 @@ function buildSkeleton(): void {
 /** 操作できる画面の配色：グレーで描いた画面の濃淡を、そのまま青の濃淡に置き換える。
  *  白と黒はそのまま。4 段階のグレーは明るさをそろえた青（OKLab の明度をそろえ、P型・D型・T型の色覚でも灰色と見分けられる色相）になるので、文字のコントラストは変わらない */
 const RAMP_STEPS: [number, string][] = [
-  [0x00, "#000000"],
-  [0x53, "#03578b"],
-  [0x87, "#188edb"],
-  [0xae, "#5bb6fe"],
-  [0xd4, "#afdaff"],
-  [0xff, "#ffffff"],
+  [0x00, "oklch(0 0 0)"],
+  [0x53, "oklch(0.4415 0.11 245)"],
+  [0x87, "oklch(0.6246 0.15 245)"],
+  [0xae, "oklch(0.7507 0.136 245)"],
+  [0xd4, "oklch(0.8704 0.0685 245)"],
+  [0xff, "oklch(1 0 0)"],
 ];
 
 function rampFilter(): string {
+  // OKLCH の指定を sRGB（0〜255 の実数）に直す。SVG フィルターの表は sRGB で持つため
+  const toRgb = (oklch: string): [number, number, number] => {
+    const [L, C, H] = oklch.match(/oklch\(([^)]*)\)/)![1].split(/\s+/).map(Number);
+    const a = C * Math.cos((H * Math.PI) / 180);
+    const b = C * Math.sin((H * Math.PI) / 180);
+    const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+    const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+    const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+    const lin = [
+      4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+    ];
+    return lin.map((v) => {
+      const c = Math.min(1, Math.max(0, v));
+      return 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+    }) as [number, number, number];
+  };
+  const steps = RAMP_STEPS.map(([g, c]) => [g, toRgb(c)] as const);
   // グレーの値（0〜255）ごとに、隣り合う段のあいだを直線で結んだ表をつくる
   const table = (ch: number) =>
     Array.from({ length: 256 }, (_, v) => {
-      const i = RAMP_STEPS.findIndex(([g]) => g >= v);
-      const [g1, c1] = RAMP_STEPS[i];
-      if (g1 === v || i === 0) return (parseInt(c1.slice(1 + ch * 2, 3 + ch * 2), 16) / 255).toFixed(4);
-      const [g0, c0] = RAMP_STEPS[i - 1];
-      const a = parseInt(c0.slice(1 + ch * 2, 3 + ch * 2), 16);
-      const b = parseInt(c1.slice(1 + ch * 2, 3 + ch * 2), 16);
-      return ((a + ((b - a) * (v - g0)) / (g1 - g0)) / 255).toFixed(4);
+      const i = steps.findIndex(([g]) => g >= v);
+      const [g1, c1] = steps[i];
+      if (g1 === v || i === 0) return (c1[ch] / 255).toFixed(4);
+      const [g0, c0] = steps[i - 1];
+      return ((c0[ch] + ((c1[ch] - c0[ch]) * (v - g0)) / (g1 - g0)) / 255).toFixed(4);
     }).join(" ");
   return `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
       <filter id="ramp" color-interpolation-filters="sRGB">

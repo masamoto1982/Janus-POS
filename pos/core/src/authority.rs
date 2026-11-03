@@ -95,9 +95,6 @@ pub enum Action {
     FfButton,
     /// FF の明細のお渡し確認チェック（入れる・外す）
     CheckFf,
-    /// 有人モードで、お客様が FF を受け取ったことを確かめる（お客様側の「確認しました」）。
-    /// スタッフ側の照合が済んでから押せる（相互チェック）。両方が済むまで会計に進めない
-    ReceiveFf,
     CompleteService,
     /// 荷物の料金が決まった後、次の荷物があるか（「ある」「ない」）を答える
     ParcelNext,
@@ -138,7 +135,6 @@ pub const ACTIONS: &[Action] = &[
     Action::RegisterFf,
     Action::FfButton,
     Action::CheckFf,
-    Action::ReceiveFf,
     Action::CompleteService,
     Action::ParcelNext,
     Action::RemoveLine,
@@ -176,8 +172,6 @@ pub struct Context {
     pub id_pending: bool,
     /// お渡し確認のチェックが入っていない FF がある
     pub ff_waiting: bool,
-    /// お客様がまだお受け取りを確かめていない FF がある（有人モードの「確認しました」）
-    pub ff_unconfirmed: bool,
     /// FF の明細がある
     pub has_ff: bool,
     /// 店員の受付が済んでいないサービス商品がある
@@ -248,7 +242,6 @@ impl Context {
 pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
-const FF_UNRECEIVED: Denial = "お客様の FF のお受け取りの確認が済んでいません";
 const PARCEL_ASK: Denial = "次の荷物があるか選んでください";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
 /// 似て非なる商品をクーポンのつもりで定価で買ってしまう事故を防ぐため、決済を止める
@@ -282,16 +275,6 @@ fn hand_over_bills(c: &Context) -> Result<(), Denial> {
     require(c.bill_handover, "お渡しする払込票はありません")
 }
 
-/// お客様本人の意思表示・申告にあたる操作。お客様側の画面からしか押せず、
-/// どちらの画面が操作側でも押せる（画面の排他の例外）。
-///
-/// 有人モードで FF を受け取ったことの確認（「確認しました」）。同じ性質の操作として、
-/// クレジット・デビットの暗証番号入力（現実には専用端末で行うため扱わない）や
-/// 宅配便の危険物・禁制品がないことの申告（ラベル・ステッカーで行うため扱わない）がある。
-pub fn is_customer_only(action: Action) -> bool {
-    matches!(action, Action::ReceiveFf)
-}
-
 /// 店員本人が判断・確認する操作。店員側の画面からしか押せず、どちらの画面が操作側でも押せる。
 /// 年確の「する／しない」の選択と身分証の生年月日の入力、公共料金の払込票の確認とお渡し。
 pub fn is_staff_only(action: Action) -> bool {
@@ -303,9 +286,7 @@ pub fn is_staff_only(action: Action) -> bool {
 
 /// その操作を押せる画面が決まっているなら、その側（画面の排他の例外）
 pub fn fixed_side(action: Action) -> Option<Side> {
-    if is_customer_only(action) {
-        Some(Side::Customer)
-    } else if is_staff_only(action) {
+    if is_staff_only(action) {
         Some(Side::Staff)
     } else {
         None
@@ -460,12 +441,6 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CashOut => require(!c.has_lines, "取引中は出金操作ができません"),
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
         Action::CheckFf => check_ff(c),
-        Action::ReceiveFf => {
-            // スタッフの照合が済んでから、お客様が確かめる（相互チェック）
-            check_ff(c)?;
-            require(!c.ff_waiting, "スタッフのお渡しの確認が済んでいません")?;
-            require(c.ff_unconfirmed, "お受け取りの確認は済んでいます")
-        }
         Action::CompleteService => require(c.service_pending, "受付待ちのサービス商品はありません"),
         Action::ParcelNext => require(c.parcel_ask, "次の荷物をお尋ねする場面ではありません"),
         Action::RemoveLine => {
@@ -478,7 +453,6 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
             require(!c.ff_waiting, FF_UNCHECKED)?;
-            require(!c.ff_unconfirmed, FF_UNRECEIVED)?;
             require(!c.service_pending, "サービス商品の受付が済んでいません")?;
             require(!c.parcel_ask, PARCEL_ASK)
         }
@@ -513,7 +487,6 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         Action::RegisterFf => Err("FF はスタッフにお申し付けください"),
         Action::CheckFf => check_ff(c),
         // セミセルフでは FF を登録できない（スタッフがログインして有人モードで登録・お渡しする）
-        Action::ReceiveFf => Err("FF のお受け取りの確認は有人モードで行います"),
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")
@@ -573,12 +546,7 @@ mod tests {
             for phase in [Phase::Registering, Phase::Paying] {
                 for has_lines in b {
                     for age_choice_pending in b {
-                        for (ff_waiting, has_ff, ff_unconfirmed) in [
-                            (false, false, false),
-                            (false, true, false),
-                            (false, true, true),
-                            (true, true, true),
-                        ] {
+                        for (ff_waiting, has_ff) in [(false, false), (false, true), (true, true)] {
                             for (service_pending, bill_unchecked) in
                                 [(false, false), (true, false), (false, true)]
                             {
@@ -603,7 +571,6 @@ mod tests {
                                             age_choice_pending: age_choice_pending
                                                 && phase == Phase::Paying,
                                             ff_waiting,
-                                            ff_unconfirmed,
                                             has_ff,
                                             service_pending,
                                             parcel_ask: false,

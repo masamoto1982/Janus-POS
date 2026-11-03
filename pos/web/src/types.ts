@@ -70,8 +70,6 @@ export type StaffLine = LineKind & {
   qty: number;
   /** FF：すでに照合の済んだ個数（追加注文のときは追加分だけを照合する） */
   ff_base: number;
-  /** FF：お客様がお受け取りを確かめた個数 */
-  ff_seen: number;
   category: string;
   cash_only: boolean;
   amount: number;
@@ -123,7 +121,6 @@ export interface StaffView {
   confiscated: { name: string; qty: number }[];
   /** お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する） */
   ff_collect: { name: string; qty: number }[];
-  ff_unconfirmed: boolean;
   /** 会計に進んだが、適用先のないクーポンが残っている（決済できない） */
   coupon_unmatched: boolean;
   /** 取り消して、お客様に返却するクーポン */

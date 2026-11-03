@@ -10,17 +10,17 @@
   /* 余白は一つの値に統一（2026-11-02 ユーザー）。ボタンとボタンの間・並べた部品の間はすべてこの幅 */
   --gap: 6px;
   /* 注意（黄・オレンジ）と解消（黄緑・緑）のしるし（2026-11-02 ユーザー）。赤は危険・警告・否定。入力欄と区別するため角は丸めない */
-  --caution-bg: color-mix(in srgb, var(--ac-yellow) 22%, white);
-  --caution-ink: color-mix(in srgb, var(--ac-orange) 55%, black);
+  --caution-bg: color-mix(in oklch, var(--ac-yellow) 22%, white);
+  --caution-ink: color-mix(in oklch, var(--ac-orange) 55%, black);
   --caution-line: var(--ac-orange);
-  --safe-bg: color-mix(in srgb, var(--base-lime) 45%, white);
-  --safe-ink: color-mix(in srgb, var(--ac-green) 70%, black);
+  --safe-bg: color-mix(in oklch, var(--base-lime) 45%, white);
+  --safe-ink: color-mix(in oklch, var(--ac-green) 70%, black);
   --safe-line: var(--ac-green);
   /* 年確などの札（オレンジ）とお渡し済の札（グリーン）：濃い文字に淡い背景（2026-11-03 ユーザー） */
   --flag-orange-ink: oklch(0.4772 0.113 59); --flag-orange-bg: oklch(0.9348 0.0518 74);
   --flag-green-ink: oklch(0.4583 0.104 154); --flag-green-bg: oklch(0.9352 0.0347 156);
   /* 積極ボタンの濃い背景（白文字が読める濃さ）：注意＝オレンジ、安全・肯定＝グリーン */
-  --caution-solid: color-mix(in srgb, var(--ac-orange) 68%, black);
+  --caution-solid: color-mix(in oklch, var(--ac-orange) 68%, black);
   /* ベースカラー：広い面積に用いる */
   --base-pink: oklch(0.883 0.063 32);
   --base-cream: oklch(0.975 0.149 109);
@@ -54,30 +54,30 @@
   --line: oklch(0.8699 0 0); --border: oklch(0.6234 0 0); --msg-strong: oklch(0.4423 0 0); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.8699 0 0); --off-ink: oklch(0.6234 0 0);
   --accent: var(--ac-blue);
   --accent-ink: oklch(1 0 0);
-  --accent-soft: color-mix(in srgb, var(--ac-blue) 8%, transparent);
+  --accent-soft: color-mix(in oklch, var(--ac-blue) 8%, transparent);
   --reg-top-bg: oklch(0.8699 0 0); /* ボタン（#aeaeae）より一段薄いグレー。黒文字で読む */
   --reg-top-ink: oklch(0 0 0);
   --staff-bg: oklch(0.2781 0.0296 257);
   --staff-ink: oklch(0.967 0.00287 265);
   --staff-line: oklch(0.3729 0.0306 260);
   --cust-bg: oklch(1 0 0);
-  --warn: color-mix(in srgb, var(--ac-orange) 55%, black);
-  --warn-bg: color-mix(in srgb, var(--ac-orange) 22%, white);
-  --danger: color-mix(in srgb, var(--ac-red) 75%, black);
-  --danger-bg: color-mix(in srgb, var(--ac-red) 14%, white);
-  --ok: color-mix(in srgb, var(--ac-green) 70%, black);
-  --call: color-mix(in srgb, var(--ac-blue) 85%, black);
-  --call-bg: color-mix(in srgb, var(--ac-blue) 12%, white);
+  --warn: color-mix(in oklch, var(--ac-orange) 55%, black);
+  --warn-bg: color-mix(in oklch, var(--ac-orange) 22%, white);
+  --danger: color-mix(in oklch, var(--ac-red) 75%, black);
+  --danger-bg: color-mix(in oklch, var(--ac-red) 14%, white);
+  --ok: color-mix(in oklch, var(--ac-green) 70%, black);
+  --call: color-mix(in oklch, var(--ac-blue) 85%, black);
+  --call-bg: color-mix(in oklch, var(--ac-blue) 12%, white);
   --ff: var(--ac-orange);
   --ff-ink: oklch(0 0 0);
   --service: var(--ac-green);
   --service-ink: oklch(0 0 0);
   --tob: var(--ac-blue);
   --tob-ink: oklch(1 0 0);
-  --flash: color-mix(in srgb, var(--ac-yellow) 70%, transparent);
-  --bill-bg: color-mix(in srgb, var(--ac-green) 12%, white);
-  --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, white);
-  --pay-bg: color-mix(in srgb, var(--ac-sky) 18%, white);
+  --flash: color-mix(in oklch, var(--ac-yellow) 70%, transparent);
+  --bill-bg: color-mix(in oklch, var(--ac-green) 12%, white);
+  --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, white);
+  --pay-bg: color-mix(in oklch, var(--ac-sky) 18%, white);
   color-scheme: light;
 }
 
@@ -88,22 +88,22 @@
     --ink: oklch(0.9276 0.00581 265);
     --muted: oklch(0.7137 0.0192 261);
     --line: oklch(0.3041 0.0177 262); --border: oklch(0.6234 0 0); --msg-strong: var(--ink); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.3041 0.0177 262); --off-ink: oklch(0.6234 0 0);
-    --bill-bg: color-mix(in srgb, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
-    --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
-    --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
+    --bill-bg: color-mix(in oklch, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
+    --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
+    --pay-bg: color-mix(in oklch, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
     --accent: var(--ac-sky);
     --accent-ink: oklch(0 0 0);
-    --accent-soft: color-mix(in srgb, var(--ac-sky) 12%, transparent);
+    --accent-soft: color-mix(in oklch, var(--ac-sky) 12%, transparent);
     --staff-bg: oklch(0.2101 0.0318 265);
     --staff-line: oklch(0.3193 0.0296 261);
     --cust-bg: oklch(0.2226 0.0099 89);
     --warn: var(--ac-orange);
-    --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
-    --danger: color-mix(in srgb, var(--ac-red) 70%, white);
-    --danger-bg: color-mix(in srgb, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
+    --warn-bg: color-mix(in oklch, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
+    --danger: color-mix(in oklch, var(--ac-red) 70%, white);
+    --danger-bg: color-mix(in oklch, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
     --ok: var(--ac-green);
     --call: var(--ac-sky);
-    --call-bg: color-mix(in srgb, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
+    --call-bg: color-mix(in oklch, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
     color-scheme: dark;
   }
 }
@@ -113,22 +113,22 @@
   --ink: oklch(0.9276 0.00581 265);
   --muted: oklch(0.7137 0.0192 261);
   --line: oklch(0.3041 0.0177 262); --border: oklch(0.6234 0 0); --msg-strong: var(--ink); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.3041 0.0177 262); --off-ink: oklch(0.6234 0 0);
-  --bill-bg: color-mix(in srgb, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
-  --coin-bg: color-mix(in srgb, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
-  --pay-bg: color-mix(in srgb, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
+  --bill-bg: color-mix(in oklch, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
+  --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
+  --pay-bg: color-mix(in oklch, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
   --accent: var(--ac-sky);
   --accent-ink: oklch(0 0 0);
-  --accent-soft: color-mix(in srgb, var(--ac-sky) 12%, transparent);
+  --accent-soft: color-mix(in oklch, var(--ac-sky) 12%, transparent);
   --staff-bg: oklch(0.2101 0.0318 265);
   --staff-line: oklch(0.3193 0.0296 261);
   --cust-bg: oklch(0.2226 0.0099 89);
   --warn: var(--ac-orange);
-  --warn-bg: color-mix(in srgb, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
-  --danger: color-mix(in srgb, var(--ac-red) 70%, white);
-  --danger-bg: color-mix(in srgb, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
+  --warn-bg: color-mix(in oklch, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
+  --danger: color-mix(in oklch, var(--ac-red) 70%, white);
+  --danger-bg: color-mix(in oklch, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
   --ok: var(--ac-green);
   --call: var(--ac-sky);
-  --call-bg: color-mix(in srgb, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
+  --call-bg: color-mix(in oklch, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
   color-scheme: dark;
 }
 
@@ -749,7 +749,7 @@ body.dragging .drop-hint { display: inline; }
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: 13px; }
 .qty-fixed { min-width: 1.4em; text-align: center; }
 /* 数量のテンキー：レジ画面の上に重ねるポップアップ（レジ画面で覆いかぶさる表示を出す唯一の例外） */
-.qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, oklch(0 0 0) 28%, transparent); }
+.qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, oklch(0 0 0) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 6px; box-shadow: 0 6px 18px oklch(0 0 0 / .25); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; color: var(--msg-strong); }
 .qty-pop-name .muted { font-size: 12px; white-space: nowrap; }
@@ -779,7 +779,7 @@ body.dragging .drop-hint { display: inline; }
 /* 待ち受け画面の背景：画面中央の明るい点から、外へいくほど暗くなる円形グラデーション。
    両モードで同じ（主役はスキャンとご用件の案内。電子マネーの扇形は右下端にあるだけ）（P-31） */
 .scan-welcome, .attended-welcome { position: relative; --spot: 50% 50%; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
-  --glow: color-mix(in srgb, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in srgb, var(--cust-bg) 78%, var(--ink));
+  --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
   background: radial-gradient(circle farthest-corner at var(--spot), var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
 /* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
 .menu-code-value { font-size: 40px; letter-spacing: .25em; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; margin: 4px 0; padding-left: .25em; }

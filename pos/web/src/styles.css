@@ -16,6 +16,9 @@
   --safe-bg: color-mix(in srgb, var(--base-lime) 45%, white);
   --safe-ink: color-mix(in srgb, var(--ac-green) 70%, black);
   --safe-line: var(--ac-green);
+  /* 年確などの札（オレンジ）とお渡し済の札（グリーン）：濃い文字に淡い背景（2026-11-03 ユーザー） */
+  --flag-orange-ink: #8a4a00; --flag-orange-bg: #ffe5c4;
+  --flag-green-ink: #16683c; --flag-green-bg: #d8f1e0;
   /* 積極ボタンの濃い背景（白文字が読める濃さ）：注意＝オレンジ、安全・肯定＝グリーン */
   --caution-solid: color-mix(in srgb, var(--ac-orange) 68%, black);
   /* ベースカラー：広い面積に用いる */
@@ -375,8 +378,10 @@ details summary h3 { display: inline; }
 /* お支払い内容の確認は、角の丸い枠に入れず登録エリアいっぱいに広げる（最上段と会計バーは除く。2026-10-28 ユーザー） */
 /* FF の「お渡し前」は押せるアイコン（押すとお渡し照合の画面） */
 /* 年確・限定・現金のみのしるし＝淡い黄色の背景にオレンジの文字、お渡し済＝淡い黄緑の背景に緑の文字。ボタンではないので枠線・角の丸み・押下の動きはない（ボタンと区別する） */
-.tag.age { background: var(--caution-bg); border: none; border-radius: 0; color: var(--caution-ink); font-weight: 700; }
-.ff-done { display: inline-block; padding: 1px 6px; background: var(--safe-bg); color: var(--safe-ink); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.tag.age { background: var(--flag-orange-bg); border: none; border-radius: 0; color: var(--flag-orange-ink); font-weight: 700; }
+.ff-done { background: var(--flag-green-bg); color: var(--flag-green-ink); font-weight: 700; }
+/* 年確・お渡し前（ボタン）・お渡し済の札は、小ボタン（56×26）と同じ大きさにそろえる */
+.screen-main .lines .tag.age, .tag.age, .ff-done, .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; line-height: 1; white-space: nowrap; }
 /* 押すと位置がずれて音が鳴る（共通のボタンの動き）。お渡し前＝オレンジ、お渡し済＝グリーンの積極・小ボタン
    （濃い背景・白文字・枠線なし）。意味のある色なので、画面のグレー置き換えは受けない */
 .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; border: none; border-radius: 4px; color: #fff; }

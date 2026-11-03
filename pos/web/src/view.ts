@@ -398,7 +398,7 @@ function ffReceiveCard(reg: number, lines: StaffLine[], st: ActionState): string
   // お客様がすでに確かめた分は出さず、追加分だけを確かめてもらう
   const ff = lines.filter((l) => l.kind === "ff" && l.ff_seen < l.qty).sort((a, b) => b.touched - a.touched);
   const rows = ff.map((l) => `<tr><td>${esc(l.ff_seen > 0 ? `${l.name}（追加分）` : l.name)}</td><td class="num">${l.qty - l.ff_seen}</td></tr>`).join("");
-  const staffDone = !ff.some((l) => l.state === "waiting");
+  const staffDone = !lines.some((l) => l.kind === "ff" && l.state === "waiting");
   return `<div class="ffv-screen ff-receive">
       <div class="big">FF のお受け取りの確認</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">個数</th></tr></thead><tbody>${rows}</tbody></table>

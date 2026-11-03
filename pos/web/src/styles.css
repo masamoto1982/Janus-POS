@@ -22,23 +22,23 @@
   /* 積極ボタンの濃い背景（白文字が読める濃さ）：注意＝オレンジ、安全・肯定＝グリーン */
   --caution-solid: color-mix(in srgb, var(--ac-orange) 68%, black);
   /* ベースカラー：広い面積に用いる */
-  --base-pink: #ffcabf;
-  --base-cream: #ffff80;
-  --base-lime: #d8f255;
-  --base-sky: #bfe4ff;
-  --base-beige: #ffca80;
-  --base-green: #77d9a8;
-  --base-purple: #c9ace6;
+  --base-pink: oklch(0.883 0.063 32);
+  --base-cream: oklch(0.975 0.149 109);
+  --base-lime: oklch(0.914 0.180 118);
+  --base-sky: oklch(0.901 0.054 240);
+  --base-beige: oklch(0.870 0.110 75);
+  --base-green: oklch(0.812 0.117 160);
+  --base-purple: oklch(0.789 0.086 307);
   /* アクセントカラー：小さい面積に用いる */
-  --ac-red: #ff4b00;
-  --ac-yellow: #fff100;
-  --ac-green: #03af7a;
-  --ac-blue: #005aff;
-  --ac-sky: #4dc4ff;
-  --ac-pink: #ff8082;
-  --ac-orange: #f6aa00;
-  --ac-purple: #990099;
-  --ac-brown: #804000;
+  --ac-red: oklch(0.666 0.225 37);
+  --ac-yellow: oklch(0.939 0.200 105);
+  --ac-green: oklch(0.667 0.144 163);
+  --ac-blue: oklch(0.542 0.254 262);
+  --ac-sky: oklch(0.778 0.134 234);
+  --ac-pink: oklch(0.745 0.155 21);
+  --ac-orange: oklch(0.791 0.166 77);
+  --ac-purple: oklch(0.479 0.220 328);
+  --ac-brown: oklch(0.444 0.109 55);
   /* ボタンの色（2026-10-24 ユーザー指定）。グレー表示の画面から色を載せ直す第一歩
      標準色 = 押せる部品すべての地色（旧「FF」ボタンの薄いグレー）
      選択色 = 選ばれている・押している部品の地色（旧「たばこ」ボタンのグレー） */
@@ -486,9 +486,6 @@ button.emoney { background: var(--ac-sky); color: #000000; }
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
 .register h2, .mat-area h2, .right h2 { margin: 0 0 8px; font-size: 16px; display: flex; gap: 8px; align-items: center; }
-.register h2 { justify-content: center; }
-/* 店員のログイン用セレクタ：スタッフ側画面の最下段（スタッフ側とお客様側で画面の大きさが変わらないよう、画面の高さは固定のまま） */
-.screen-login { flex: none; display: flex; justify-content: flex-end; padding: 3px 8px; border-top: 1px solid var(--border); }
 .hw { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 10px; }
 .hw-label { font-size: 12px; color: var(--muted); }
 .hw .row { margin: 0; }
@@ -498,12 +495,12 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .mat-area h2 { margin: 0; }
 .mat-area .toast { position: static; margin-top: 8px; display: none; }
 .mat-area .toast.show { display: block; }
-/* ヘッダーの呼び出し色だけは、画面内でグレーに置き換えた変数ではなく本来のパレット色を使う（:root で解決した値を引き継ぐ） */
-:root { --head-green: var(--ac-green); --head-red: var(--ac-red); }
+/* ヘッダーの呼び出し色（OKLCH）：緑→赤を OKLCH 空間で補間する。明度と彩度がそろうので、途中の黄色付近でも濁らない */
+:root { --call-lo: oklch(0.93 0.08 155); --call-hi: oklch(0.90 0.09 25); }
 /* 呼び出し中：レジ画面のヘッダーが点滅する。放置時間は色で表す（--call-t: 0%=淡いグリーン → 100%=淡いレッド） */
 .screen-head.calling { animation: head-call 1s steps(1) infinite; }
-@keyframes head-call { 0% { background: color-mix(in srgb, color-mix(in srgb, var(--head-red) var(--call-t, 0%), var(--head-green)) 30%, white); } 50% { background: transparent; } }
-@media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: color-mix(in srgb, color-mix(in srgb, var(--head-red) var(--call-t, 0%), var(--head-green)) 30%, white); } }
+@keyframes head-call { 0% { background: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo)); } 50% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo)); } }
 
 /* 売り場：スクロールしてもドラッグ元が見えるよう追従させる */
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
@@ -666,7 +663,7 @@ body.dragging .drop-hint { display: inline; }
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }
 .mirror { background: var(--cust-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
 .mirror .muted { color: var(--muted); }
-.login-sel { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
+.login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
 .login-sel select { font-size: 13px; padding: 4px 8px; }
 
 /* 年確ルール設定（売り場タイトルの右端から開く） */

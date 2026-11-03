@@ -864,13 +864,13 @@ body.debug-areas {
   --dbg-rose: oklch(0.635 0.130 11.0); --dbg-wine: oklch(0.432 0.145 354.5); --dbg-purple: oklch(0.553 0.167 334.6);
   --dbg-gray: oklch(0.898 0 89.9);
 }
-body.debug-areas :is(.top, .floor, .bottom)                          { outline: 2px dotted var(--dbg-indigo); outline-offset: -2px; }
-body.debug-areas :is(.left, .right-col)                              { outline: 2px dotted var(--dbg-cyan); outline-offset: -4px; }
-body.debug-areas :is(.mat-area, .register, aside.right)              { outline: 2px dotted var(--dbg-teal); outline-offset: -6px; }
-body.debug-areas :is(.screens, .money-io, .swipe-tabs)               { outline: 2px dotted var(--dbg-green); outline-offset: -8px; }
-body.debug-areas :is(.screen-wrap, .money-io-cust, .items)           { outline: 2px dotted var(--dbg-olive); outline-offset: -10px; }
-body.debug-areas :is(.screen, .screen-cap)                           { outline: 2px dotted var(--dbg-sand); outline-offset: -2px; }
-body.debug-areas :is(.screen-head, .screen-body, .screen-items)      { outline: 2px dotted var(--dbg-rose); outline-offset: -4px; }
-body.debug-areas :is(.screen-main, .fan-slot)                        { outline: 2px dotted var(--dbg-wine); outline-offset: -6px; }
-body.debug-areas :is(.reg-top, .screen-foot, .banner, .confirm, .welcome) { outline: 2px dotted var(--dbg-purple); outline-offset: -8px; }
-body.debug-areas :is(.inlet, .outlet, .mats, h2)                     { outline: 2px dotted var(--dbg-gray); outline-offset: -2px; }
+body.debug-areas :is(.top, .floor, .bottom)                          { outline: 1px solid var(--dbg-indigo); outline-offset: -2px; }
+body.debug-areas :is(.left, .right-col)                              { outline: 1px solid var(--dbg-cyan); outline-offset: -4px; }
+body.debug-areas :is(.mat-area, .register, aside.right)              { outline: 1px solid var(--dbg-teal); outline-offset: -6px; }
+body.debug-areas :is(.screens, .money-io, .swipe-tabs)               { outline: 1px solid var(--dbg-green); outline-offset: -8px; }
+body.debug-areas :is(.screen-wrap, .money-io-cust, .items)           { outline: 1px solid var(--dbg-olive); outline-offset: -10px; }
+body.debug-areas :is(.screen, .screen-cap)                           { outline: 1px solid var(--dbg-sand); outline-offset: -2px; }
+body.debug-areas :is(.screen-head, .screen-body, .screen-items)      { outline: 1px solid var(--dbg-rose); outline-offset: -4px; }
+body.debug-areas :is(.screen-main, .fan-slot)                        { outline: 1px solid var(--dbg-wine); outline-offset: -6px; }
+body.debug-areas :is(.reg-top, .screen-foot, .banner, .confirm, .welcome) { outline: 1px solid var(--dbg-purple); outline-offset: -8px; }
+body.debug-areas :is(.inlet, .outlet, .mats, h2)                     { outline: 1px solid var(--dbg-gray); outline-offset: -2px; }

@@ -486,6 +486,9 @@ button.emoney { background: var(--ac-sky); color: #000000; }
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
 .register h2, .mat-area h2, .right h2 { margin: 0 0 8px; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+.register h2 { justify-content: center; }
+/* 店員のログイン用セレクタ：スタッフ側画面の最下段（スタッフ側とお客様側で画面の大きさが変わらないよう、画面の高さは固定のまま） */
+.screen-login { flex: none; display: flex; justify-content: flex-end; padding: 3px 8px; border-top: 1px solid var(--border); }
 .hw { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 10px; }
 .hw-label { font-size: 12px; color: var(--muted); }
 .hw .row { margin: 0; }
@@ -495,10 +498,12 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .mat-area h2 { margin: 0; }
 .mat-area .toast { position: static; margin-top: 8px; display: none; }
 .mat-area .toast.show { display: block; }
+/* ヘッダーの呼び出し色だけは、画面内でグレーに置き換えた変数ではなく本来のパレット色を使う（:root で解決した値を引き継ぐ） */
+:root { --head-green: var(--ac-green); --head-red: var(--ac-red); }
 /* 呼び出し中：レジ画面のヘッダーが点滅する。放置時間は色で表す（--call-t: 0%=淡いグリーン → 100%=淡いレッド） */
 .screen-head.calling { animation: head-call 1s steps(1) infinite; }
-@keyframes head-call { 0% { background: color-mix(in srgb, color-mix(in srgb, var(--ac-red) var(--call-t, 0%), var(--ac-green)) 30%, white); } 50% { background: transparent; } }
-@media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: color-mix(in srgb, color-mix(in srgb, var(--ac-red) var(--call-t, 0%), var(--ac-green)) 30%, white); } }
+@keyframes head-call { 0% { background: color-mix(in srgb, color-mix(in srgb, var(--head-red) var(--call-t, 0%), var(--head-green)) 30%, white); } 50% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: color-mix(in srgb, color-mix(in srgb, var(--head-red) var(--call-t, 0%), var(--head-green)) 30%, white); } }
 
 /* 売り場：スクロールしてもドラッグ元が見えるよう追従させる */
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
@@ -661,7 +666,7 @@ body.dragging .drop-hint { display: inline; }
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }
 .mirror { background: var(--cust-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
 .mirror .muted { color: var(--muted); }
-.login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
+.login-sel { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
 .login-sel select { font-size: 13px; padding: 4px 8px; }
 
 /* 年確ルール設定（売り場タイトルの右端から開く） */

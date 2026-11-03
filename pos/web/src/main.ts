@@ -110,14 +110,7 @@ function buildSkeleton(): void {
   const regs = snap.registers
     .map(
       (r) => `<section class="register" data-register="${r.id}" aria-label="レジ${r.id}">
-      <h2>レジ${r.id} <span data-region="mode-${r.id}"></span>
-        <label class="login-sel">スタッフ
-          <select data-login="${r.id}" aria-label="レジ${r.id}のスタッフログイン">
-            <option value="">未ログイン</option>
-            ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.name)}${a.role === "owner" ? "（オーナー）" : ""}</option>`).join("")}
-          </select>
-        </label>
-      </h2>
+      <h2>レジ${r.id} <span data-region="mode-${r.id}"></span></h2>
       <div class="swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
         <button type="button" role="tab" class="on" data-swipe-to="${r.id}:staff">スタッフ側</button>
         <button type="button" role="tab" data-swipe-to="${r.id}:customer">お客様側</button>
@@ -129,6 +122,14 @@ function buildSkeleton(): void {
             <div class="screen-head" data-region="head-${r.id}-staff"></div>
             <div class="screen-body"><div class="screen-main" data-region="staff-${r.id}"></div><div class="fan-slot" data-region="fan-${r.id}-staff"></div></div>
             <div class="screen-items" data-region="items-${r.id}-staff"></div>
+            <div class="screen-login">
+              <label class="login-sel">スタッフ
+                <select data-login="${r.id}" aria-label="レジ${r.id}のスタッフログイン">
+            <option value="">未ログイン</option>
+            ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.name)}${a.role === "owner" ? "（オーナー）" : ""}</option>`).join("")}
+                </select>
+              </label>
+            </div>
             <div data-region="pop-${r.id}-staff"></div>
           </section>
         </div>

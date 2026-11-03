@@ -852,3 +852,23 @@ body.dragging .drop-hint { display: inline; }
 .bill-table th:nth-child(3) { width: 40%; }
 .bill-table th:nth-child(4) { width: 16%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
+
+/* ===== エリア構造の確認用の点線枠（一時。2026-11-03 ユーザー依頼）=====
+   Muted パレット（Paul Tol）をネストの深さごとに割り当てる。outline なのでレイアウトは動かない。
+   消すときは main.ts の "debug-areas" の1行とこのブロックを削除する。URL に ?debug=0 で一時的に消せる */
+body.debug-areas {
+  --dbg-indigo: oklch(0.347 0.159 281.8); --dbg-cyan: oklch(0.812 0.084 230.8); --dbg-teal: oklch(0.674 0.098 180.4);
+  --dbg-green: oklch(0.499 0.135 148.6); --dbg-olive: oklch(0.663 0.123 109.3); --dbg-sand: oklch(0.841 0.108 98.3);
+  --dbg-rose: oklch(0.635 0.130 11.0); --dbg-wine: oklch(0.432 0.145 354.5); --dbg-purple: oklch(0.553 0.167 334.6);
+  --dbg-gray: oklch(0.898 0 89.9);
+}
+body.debug-areas :is(.top, .floor, .bottom)                          { outline: 2px dotted var(--dbg-indigo); outline-offset: -2px; }
+body.debug-areas :is(.left, .right-col)                              { outline: 2px dotted var(--dbg-cyan); outline-offset: -4px; }
+body.debug-areas :is(.mat-area, .register, aside.right)              { outline: 2px dotted var(--dbg-teal); outline-offset: -6px; }
+body.debug-areas :is(.screens, .money-io, .swipe-tabs)               { outline: 2px dotted var(--dbg-green); outline-offset: -8px; }
+body.debug-areas :is(.screen-wrap, .money-io-cust, .items)           { outline: 2px dotted var(--dbg-olive); outline-offset: -10px; }
+body.debug-areas :is(.screen, .screen-cap)                           { outline: 2px dotted var(--dbg-sand); outline-offset: -2px; }
+body.debug-areas :is(.screen-head, .screen-body, .screen-items)      { outline: 2px dotted var(--dbg-rose); outline-offset: -4px; }
+body.debug-areas :is(.screen-main, .fan-slot)                        { outline: 2px dotted var(--dbg-wine); outline-offset: -6px; }
+body.debug-areas :is(.reg-top, .screen-foot, .banner, .confirm, .welcome) { outline: 2px dotted var(--dbg-purple); outline-offset: -8px; }
+body.debug-areas :is(.inlet, .outlet, .mats, h2)                     { outline: 2px dotted var(--dbg-gray); outline-offset: -2px; }

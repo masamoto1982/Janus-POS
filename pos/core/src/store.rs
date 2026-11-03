@@ -2681,6 +2681,12 @@ impl Store {
             if !service_pending {
                 self.calls.resolve(register, CallKind::Service, now);
             }
+            // 呼び出しイベントは、店員のログインで解除される（ユーザー指定 2026-11-03）。
+            // 買い物がないままログアウトしても（目当ての銘柄がなく取引がお流れになった等）呼び出しは復活しない。
+            // FF・サービス商品・年確・代行収納の仕事そのものは取引側の状態に残る（呼び出しの記録だけを片付ける）
+            for k in [CallKind::FastFood, CallKind::Service, CallKind::AgeCheck, CallKind::Bill] {
+                self.calls.resolve(register, k, now);
+            }
             return done(match was {
                 _ if resumed => format!("{}さんがレジを再開しました（有人モード）", acc.name),
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),

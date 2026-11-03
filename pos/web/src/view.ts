@@ -463,8 +463,11 @@ function pairNote(head: string, sub = ""): string {
 /** 確認のうち、出すべき最初の一つ（一つの画面で複数の確認をしない） */
 const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
+/** 最後の投入から、この時間（ms）入れなければ投入おわりとみなす（core の INSERT_DONE_MS と同じ） */
+const INSERT_DONE_MS = 30_000;
+
 /** 支払方法を選んだ後の案内 */
-function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false): string {
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   // 現金のみの商品（切手・代行収納）があれば、電子マネーで払う額と現金で払う額をかざす前に見せる
   // （現金と併用できるのは電子マネーだけ。かざし方は入金ボックスの点滅する案内に任せ、ここは金額の内訳だけにする）
@@ -475,8 +478,8 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
   if (inserted && due > 0) return `<p>あと <b>${yen(due)}</b> 入れてください</p>`;
   // 「投入おわり」はお客様だけが押す（入れ終わったかは、お客様にしか分からない）
-  if (inserted && staff) return `<p>お客様が「投入おわり」を押すと、お支払いが確定します</p>`;
-  if (inserted) return `<p>「投入おわり」を押すと、お支払いが確定します（入金ボックスで Enter でも同じです）</p>`;
+  // 最後の投入から無操作が続くと確定する。残り秒数は数え下げる
+  if (inserted) return `<p>${Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000)}秒の無操作で、お支払いを確定します</p>`;
   if (method === "cash" && staff) return `<p>お客様に現金を入れていただき、「投入おわり」を押していただいてください</p>`;
   if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
@@ -970,7 +973,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff") : cashOnlyNote(r)}
+        ${r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r)}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -1483,7 +1486,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
     return screen(`<div class="paybox center">
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due)}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms)}
       </div>`);
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));

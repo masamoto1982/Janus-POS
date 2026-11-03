@@ -136,6 +136,8 @@ export interface StaffView {
   parcel_ask: boolean;
   method: Method | null;
   inserted: number;
+  /** 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ） */
+  settle_in_ms: number | null;
   due: number;
   payment_blocker: string | null;
   calls: Call[];
@@ -168,6 +170,8 @@ export interface CustomerView {
   total: number;
   taxes: TaxTotal[];
   inserted: number;
+  /** 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ） */
+  settle_in_ms: number | null;
   due: number;
   point_card: boolean;
   point_pending: boolean;

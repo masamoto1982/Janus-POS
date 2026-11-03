@@ -3282,7 +3282,8 @@ impl Store {
             return done(format!("{paid}円 投入（あと {}円）", total - paid));
         }
         done(format!(
-            "{paid}円 投入。「投入おわり」を押すとお支払いを確定します"
+            "{paid}円 投入。{}秒の無操作で、お支払いを確定します",
+            INSERT_DONE_MS / 1000
         ))
     }
 
@@ -3698,6 +3699,13 @@ impl Store {
         };
         let total = t.total();
         let inserted = t.inserted.total();
+        // 現金が足りていて、最後の投入からの無操作で確定するまでの残り時間
+        let settle_in_ms = (t.paying
+            && t.method == Some(PaymentMethod::Cash)
+            && r.emoney.is_none()
+            && inserted > 0
+            && inserted >= t.due())
+        .then(|| (t.inserted_at + INSERT_DONE_MS).saturating_sub(self.now));
         let coupons: Vec<CouponView> = t
             .coupon_uses()
             .into_iter()
@@ -3809,6 +3817,7 @@ impl Store {
                 parcel_ask: c.parcel_ask,
                 method: t.method,
                 inserted,
+                settle_in_ms,
                 due: t.due().saturating_sub(inserted),
                 payment_blocker: c.payment_blocker(),
                 calls,
@@ -3826,6 +3835,7 @@ impl Store {
                 total,
                 taxes: taxes.clone(),
                 inserted,
+                settle_in_ms,
                 due: t.due().saturating_sub(inserted),
                 point_card: t.point_card.is_some(),
                 point_pending: c.point_pending,
@@ -3969,6 +3979,8 @@ pub struct StaffView {
     pub parcel_ask: bool,
     pub method: Option<PaymentMethod>,
     pub inserted: u32,
+    /// 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ）
+    pub settle_in_ms: Option<u64>,
     pub due: u32,
     pub payment_blocker: Option<&'static str>,
     pub calls: Vec<Call>,
@@ -3992,6 +4004,8 @@ pub struct CustomerView {
     /// 税率ごとの内税額（有人モードと同じ表示をセミセルフにも出す）
     pub taxes: Vec<TaxTotal>,
     pub inserted: u32,
+    /// 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ）
+    pub settle_in_ms: Option<u64>,
     pub due: u32,
     pub point_card: bool,
     pub point_pending: bool,

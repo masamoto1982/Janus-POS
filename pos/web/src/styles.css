@@ -495,11 +495,10 @@ button.emoney { background: var(--ac-sky); color: #000000; }
 .mat-area h2 { margin: 0; }
 .mat-area .toast { position: static; margin-top: 8px; display: none; }
 .mat-area .toast.show { display: block; }
-/* レジ本体の呼び出しランプ（音ではなく光で知らせる）。放置が長いほど速く点滅（--blink） */
-.lamp { width: 16px; height: 16px; border-radius: 50%; background: var(--line); border: 2px solid var(--border); flex: none; }
-.lamp.on { background: var(--ac-yellow); border-color: var(--border); box-shadow: 0 0 10px 3px color-mix(in srgb, var(--ac-yellow) 70%, transparent); animation: lamp-blink var(--blink, 1s) steps(2, jump-none) infinite; }
-@keyframes lamp-blink { 50% { background: color-mix(in srgb, var(--ac-yellow) 25%, white); box-shadow: none; } }
-@media (prefers-reduced-motion: reduce) { .lamp.on { animation: none; } }
+/* 呼び出し中：レジ画面のヘッダーが点滅する。放置時間は色で表す（--call-t: 0%=淡いグリーン → 100%=淡いレッド） */
+.screen-head.calling { animation: head-call 1s steps(1) infinite; }
+@keyframes head-call { 0% { background: color-mix(in srgb, color-mix(in srgb, var(--ac-red) var(--call-t, 0%), var(--ac-green)) 30%, white); } 50% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: color-mix(in srgb, color-mix(in srgb, var(--ac-red) var(--call-t, 0%), var(--ac-green)) 30%, white); } }
 
 /* 売り場：スクロールしてもドラッグ元が見えるよう追従させる */
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }

@@ -70,6 +70,8 @@ export type StaffLine = LineKind & {
   qty: number;
   /** FF：すでに照合の済んだ個数（追加注文のときは追加分だけを照合する） */
   ff_base: number;
+  /** FF：お客様がお受け取りを確かめた個数 */
+  ff_seen: number;
   category: string;
   cash_only: boolean;
   amount: number;

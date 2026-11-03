@@ -3169,3 +3169,46 @@ fn customer_confirms_ff_receipt_in_attended_mode() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
 }
+
+/// お客様の確認も追加分だけ：一度確かめた分は蒸し返さない
+#[test]
+fn customer_reconfirms_only_added_ff() {
+    let mut s = Store::new(1, 1, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":2}),
+    );
+    let id = reg(&s, 1).staff.lines[0].line.id;
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":2}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"}),
+    );
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.staff.ff_unconfirmed);
+    let l = &v.staff.lines[0].line;
+    assert_eq!((l.qty, l.ff_seen, l.ff_base), (3, 2, 2));
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"receive_ff","register":1,"side":"customer"}),
+    );
+    advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert!(!v.staff.ff_unconfirmed);
+    assert_eq!(v.staff.lines[0].line.ff_seen, 3);
+}

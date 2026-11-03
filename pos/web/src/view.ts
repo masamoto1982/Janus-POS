@@ -73,8 +73,9 @@ const FF_LABEL: Record<FfState, string> = {
 function ffTag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: ActionState, ro: boolean, labels = FF_LABEL): string {
   if (l.kind !== "ff" || !l.state) return "";
   const text = labels[l.state];
-  // お渡し前・お渡し済とも積極の小ボタンの見た目（お渡し前＝オレンジ、お渡し済＝グリーン）。押せるのはお渡し前だけ
-  if (l.state === "received" || ro) return `<span class="ff-btn ff-${l.state}">${text}</span>`;
+  // お渡し済はボタンではなく緑の文字だけ。お渡し前は積極の小ボタン（オレンジ）。見るだけの画面ではボタンの形で押せない
+  if (l.state === "received") return `<span class="ff-done">${text}</span>`;
+  if (ro) return `<span class="ff-btn ff-waiting">${text}</span>`;
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
   return `<button type="button" class="ff-btn ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
 }
@@ -394,8 +395,9 @@ function ffReturnCard(reg: number, v: StaffView): string {
  * 会計には両方の確認が要る
  */
 function ffReceiveCard(reg: number, lines: StaffLine[], st: ActionState): string {
-  const ff = lines.filter((l) => l.kind === "ff").sort((a, b) => b.touched - a.touched);
-  const rows = ff.map((l) => `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td></tr>`).join("");
+  // お客様がすでに確かめた分は出さず、追加分だけを確かめてもらう
+  const ff = lines.filter((l) => l.kind === "ff" && l.ff_seen < l.qty).sort((a, b) => b.touched - a.touched);
+  const rows = ff.map((l) => `<tr><td>${esc(l.ff_seen > 0 ? `${l.name}（追加分）` : l.name)}</td><td class="num">${l.qty - l.ff_seen}</td></tr>`).join("");
   const staffDone = !ff.some((l) => l.state === "waiting");
   return `<div class="ffv-screen ff-receive">
       <div class="big">FF のお受け取りの確認</div>

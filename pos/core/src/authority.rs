@@ -223,6 +223,8 @@ impl Context {
             Some(BILL_UNCHECKED)
         } else if self.mode == Mode::SemiSelf && self.cash_only_goods {
             Some(SEMI_CASH_ONLY_GOODS)
+        } else if self.mode == Mode::SemiSelf && self.method == Some(PaymentMethod::Cash) {
+            Some(SEMI_CASH_CHOSEN)
         } else if self.age_choice_pending {
             Some("スタッフが年齢確認をするか選んでいません")
         } else if self.id_pending {
@@ -258,6 +260,8 @@ const SEMI_CASH_ONLY_GOODS: Denial =
 /// セミセルフには現金を入れる口がない
 const SEMI_NO_CASH: Denial =
     "セミセルフモードでは現金を使えません。キャッシュレスでお支払いください";
+/// 支払方法で現金が選ばれた（カードが通らなかった等）。スタッフを呼んでいる
+const SEMI_CASH_CHOSEN: Denial = "現金はスタッフがお預かりします。スタッフをお呼びしました";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";
 
 /// 電子マネーのチャージ・残高確認（残高不足の対応中は、その選択肢から）

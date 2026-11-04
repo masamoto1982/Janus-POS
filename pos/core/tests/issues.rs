@@ -1909,6 +1909,29 @@ fn points_pay_only_for_point_eligible_goods() {
         .any(|u| u.method == PaymentMethod::Points));
 }
 
+/// セミセルフで支払方法に現金を選ぶとスタッフ呼び出し（カードが通らず現金で払いたい場合）。選び直せば片付く
+#[test]
+fn semi_self_cash_choice_calls_staff() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
+    );
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "現金"));
+    assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    assert!(reg(&s, 1).staff.calls.is_empty());
+}
+
 /// 切手は現金のみ（非課税）。ほかの商品と一緒に買えるが、キャッシュレスで払えるのは切手を除いた分だけ
 #[test]
 fn stamps_are_paid_in_cash_even_with_other_items() {
@@ -1921,7 +1944,7 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     let v = reg(&s, 1);
-    assert!(v.staff.calls.iter().any(|c| c.label == "現金のみ"));
+    assert!(v.staff.calls.iter().any(|c| c.label == "現金"));
     confirm_point(&mut s, 1);
     ok(
         &mut s,

@@ -937,11 +937,11 @@ export const SCENES: Scene[] = [
     staff: { mirror: true },
     customer: {
       buttons: [
-        { label: "現金", tone: "消極", note: "選んだ手段は積極。現金を入れた後は出さない" },
         { label: "電子マネー", tone: "消極" },
         { label: "バーコード決済", tone: "消極" },
         { label: "クレジットカード", tone: "消極" },
         { label: "ポイント利用", tone: "消極" },
+        { label: "現金", tone: "消極", note: "小ボタン。画面の右下。押すとスタッフ呼び出し（カードが通らず現金で払いたい場合など。現金はスタッフが預かる）" },
       ],
       weak: ["〈支払いの案内〉例：キャッシュレスでお支払いください。お支払い方法を選んでください"],
     },

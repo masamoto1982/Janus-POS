@@ -1435,7 +1435,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const lineRows = c.lines.map((l): Row => {
       const tag =
         l.kind === "ff"
-          ? ffTag(reg, side, l, a("check_ff"), false, { waiting: "お受け取り前", received: "お受け取り済" })
+          ? ffTag(reg, side, l, a("check_ff"), true, { waiting: "お受け取り前", received: "お受け取り済" })
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">スタッフが受付します</span>`
             : "";

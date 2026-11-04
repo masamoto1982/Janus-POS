@@ -280,7 +280,11 @@ fn hand_over_bills(c: &Context) -> Result<(), Denial> {
 pub fn is_staff_only(action: Action) -> bool {
     matches!(
         action,
-        Action::ChooseAgeCheck | Action::CheckId | Action::CheckBill | Action::HandOverBills
+        Action::ChooseAgeCheck
+            | Action::CheckId
+            | Action::CheckBill
+            | Action::HandOverBills
+            | Action::CheckFf
     )
 }
 
@@ -360,6 +364,8 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Ok(())
         } else if matches!(action, Action::CheckBill | Action::HandOverBills) {
             Err("払込票の確認・お渡しはスタッフ側の画面で行います")
+        } else if action == Action::CheckFf {
+            Err("FF のお渡し確認はスタッフ側の画面で行います")
         } else if is_staff_only(action) {
             Err("年齢確認はスタッフ側の画面で行います")
         } else {
@@ -485,7 +491,11 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         // 係員は「商品登録に戻る」で登録画面に引き返して FF を追加する
         Action::FfButton => Ok(()),
         Action::RegisterFf => Err("FF はスタッフにお申し付けください"),
-        Action::CheckFf => check_ff(c),
+        // お渡しの確認はスタッフの責任。スタッフがログアウトしたあとは、お客様側では確認できない
+        Action::CheckFf => {
+            check_ff(c)?;
+            Err("FF のお渡し確認はスタッフがログインしてから行います")
+        }
         // セミセルフでは FF を登録できない（スタッフがログインして有人モードで登録・お渡しする）
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;

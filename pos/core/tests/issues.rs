@@ -1373,7 +1373,9 @@ fn attended_screens_lock_only_while_touched() {
     ok(&mut s, check(ids[0], "staff"));
     assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
     advance(&mut s, 1_000);
-    ok(&mut s, check(ids[1], "customer"));
+    // お渡しの確認はスタッフ側の画面だけ（お客様側では確認できない）
+    assert!(run(&mut s, check(ids[1], "customer")).is_err());
+    ok(&mut s, check(ids[1], "staff"));
     advance(&mut s, 1_000);
     advance(&mut s, 1_000);
     ok(
@@ -1596,8 +1598,9 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     let id = reg(&s, 1).customer.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"handed":1}),
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
     );
+    advance(&mut s, 1_000);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -1633,8 +1636,9 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     let id = reg(&s, 1).customer.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"customer","line_id":id,"handed":1}),
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
     );
+    advance(&mut s, 1_000);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -3136,4 +3140,35 @@ fn thirty_seconds_without_insert_means_done_inserting() {
     let v = reg(&s, 1);
     assert!(v.last_receipt.is_some(), "settled automatically");
     assert_eq!(v.outlet, 1100 - 160);
+}
+
+/// FF のお渡し確認はスタッフの責任。スタッフがログアウトしたセミセルフでは、
+/// 顧客側の画面からも（スタッフ側の画面からも）確認できない
+#[test]
+fn ff_handover_cannot_be_confirmed_after_staff_logs_out() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":1}),
+    );
+    let id = reg(&s, 1).staff.lines[0].line.id;
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    advance(&mut s, 2_000);
+    for side in ["customer", "staff"] {
+        assert!(
+            run(
+                &mut s,
+                json!({"type":"check_ff","register":1,"side":side,"line_id":id,"handed":1})
+            )
+            .is_err(),
+            "{side}"
+        );
+    }
+    assert!(matches!(
+        reg(&s, 1).staff.lines[0].line.kind,
+        LineKind::Ff {
+            state: FfState::Waiting
+        }
+    ));
 }

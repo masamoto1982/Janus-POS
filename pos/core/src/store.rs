@@ -2053,11 +2053,17 @@ impl Store {
             }
             C::DismissConfiscated { register } => {
                 let r = self.reg_mut(register)?;
+                if r.staff_state() != StaffState::Ready {
+                    return Err("回収の確認はスタッフが行います".into());
+                }
                 r.txn.confiscated.clear();
                 done("販売できない商品を回収しました")
             }
             C::DismissFfCollect { register } => {
                 let r = self.reg_mut(register)?;
+                if r.staff_state() != StaffState::Ready {
+                    return Err("FF の回収の確認はスタッフが行います".into());
+                }
                 r.txn.ff_collect.clear();
                 done("FF を回収しました")
             }

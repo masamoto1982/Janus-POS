@@ -7,7 +7,7 @@
      小：待ち受け画面の案内（商品・レジ袋など）、明細の数量・−（削除）・＋ */
   --btn-w: 116px; --btn-h: 48px;
   --btn-sm-w: 56px; --btn-sm-h: 26px;
-  --btn-md-w: 64px; --btn-md-h: 32px; /* 中：テンキーの一列の幅に合わせ、バック・スキップに使う */
+  --btn-md-w: 64px; --btn-md-h: 34px; /* 中：テンキーの「←」と同じ大きさ。バック・スキップに使う */
   /* 余白は一つの値に統一（2026-11-02 ユーザー）。ボタンとボタンの間・並べた部品の間はすべてこの幅 */
   --gap: 6px;
   /* 注意（黄・オレンジ）と解消（黄緑・緑）のしるし（2026-11-02 ユーザー）。赤は危険・警告・否定。入力欄と区別するため角は丸めない */
@@ -763,7 +763,7 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-value { border: 1.5px solid var(--msg-strong); border-radius: 0; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
 .qty-pop-value .muted { font-size: 13px; font-weight: 400; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); flex: 1 1 auto; min-height: 0; }
-.qty-pop-keys .pad-key { padding: 4px 0; font-size: 16px; font-weight: 600; min-height: 0; }
+.qty-pop-keys .pad-key { height: var(--btn-md-h); padding: 0; font-size: 16px; font-weight: 600; min-height: 0; }
 .qty-pop-keys .zero { grid-column: span 2; }
 /* 引き返す「やめる」は左、進める「決定」は右 */
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }

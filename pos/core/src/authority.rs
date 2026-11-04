@@ -193,8 +193,8 @@ pub struct Context {
     pub method: Option<PaymentMethod>,
     /// セミセルフで、店員が会計に進めてお客様に支払いを任せている
     pub customer_turn: bool,
-    /// 店舗メニューを開いている側（スタッフ側の画面だけ）
-    pub menu_side: Option<Side>,
+    /// 店舗メニューを開いている（スタッフ側の画面だけに出る）
+    pub menu_open: bool,
     /// いま触れている側（操作した直後の一瞬だけ。その間はもう一方からの操作が利かない）
     pub touching: Option<Side>,
     /// 買い物点数が上限（[`MAX_ITEMS`]）に達している
@@ -336,9 +336,9 @@ fn confirm_point(c: &Context) -> Result<(), Denial> {
 
 /// 今、操作できる側が片方に限られているなら、その側（`None` なら両方の画面が操作できる）。
 pub fn active_side(c: &Context) -> Option<Side> {
-    if let Some(side) = c.menu_side {
-        // 店舗メニューは開いた側の画面に出し、その側で操作する
-        return Some(side);
+    if c.menu_open {
+        // 店舗メニューはスタッフ側の画面に出し、スタッフ側で操作する
+        return Some(Side::Staff);
     }
     if c.staff != StaffState::Ready {
         // 店員がいない（未ログイン）ならお客様側
@@ -581,7 +581,7 @@ mod tests {
                                 {
                                     for customer_turn in b {
                                         v.push(Context {
-                                            menu_side: None,
+                                            menu_open: false,
                                             point_pending: false,
                                             has_coupons: false,
                                             coupon_unmatched: false,

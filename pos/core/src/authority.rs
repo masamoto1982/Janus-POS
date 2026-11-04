@@ -34,8 +34,8 @@ pub enum Mode {
 impl Mode {
     pub fn label(self) -> &'static str {
         match self {
-            Mode::Attended => "有人",
-            Mode::SemiSelf => "セミセルフ",
+            Mode::Attended => "スタッフが対応します",
+            Mode::SemiSelf => "セルフレジ",
         }
     }
 }
@@ -256,10 +256,10 @@ const COUPON_UNMATCHED: Denial =
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
 /// セミセルフはキャッシュレス専用機。現金のみの商品は、スタッフがログインして有人モードで会計する
 const SEMI_CASH_ONLY_GOODS: Denial =
-    "切手・お支払いは現金のみです。スタッフが有人モードでお預かりします";
+    "切手・お支払いは現金のみです。スタッフがお預かりします";
 /// セミセルフには現金を入れる口がない
 const SEMI_NO_CASH: Denial =
-    "セミセルフモードでは現金を使えません。キャッシュレスでお支払いください";
+    "セルフレジでは現金を使えません。キャッシュレスでお支払いください";
 /// 支払方法で現金が選ばれた（カードが通らなかった等）。スタッフを呼んでいる
 const SEMI_CASH_CHOSEN: Denial = "現金はスタッフがお預かりします。スタッフをお呼びしました";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";

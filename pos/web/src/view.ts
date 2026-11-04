@@ -857,7 +857,7 @@ const GUIDES: [GuideKind, string, string][] = [
  * （自由度がなさすぎても、ありすぎても人は迷う）
  */
 /** レジ画面ヘッダー中央に出す動作モード（両画面）。有人：濃い塗り、セミセルフ：枠線 */
-const modeTitle = (attended: boolean): string => `<span class="mode-title ${attended ? "attended" : "semi"}">${attended ? "有人モード" : "セミセルフモード"}</span>`;
+const modeTitle = (attended: boolean): string => `<span class="mode-title ${attended ? "attended" : "semi"}">${attended ? "スタッフが対応します" : "セルフレジ"}</span>`;
 
 export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {
   const reg = r.id;

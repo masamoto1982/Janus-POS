@@ -7,6 +7,7 @@
      小：待ち受け画面の案内（商品・レジ袋など）、明細の数量・−（削除）・＋ */
   --btn-w: 116px; --btn-h: 48px;
   --btn-sm-w: 56px; --btn-sm-h: 26px;
+  --btn-md-w: 64px; --btn-md-h: 32px; /* 中：テンキーの一列の幅に合わせ、バック・スキップに使う */
   /* 余白は一つの値に統一（2026-11-02 ユーザー）。ボタンとボタンの間・並べた部品の間はすべてこの幅 */
   --gap: 6px;
   /* 注意（黄・オレンジ）と解消（黄緑・緑）のしるし（2026-11-02 ユーザー）。赤は危険・警告・否定。入力欄と区別するため角は丸めない */
@@ -417,7 +418,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
 /* 会計中の「バック」は確認画面の左下（中身の中央寄せは崩さない） */
 .confirm { position: relative; }
-.confirm:has(> .back-foot), .confirm:has(> .skip-foot) { padding-bottom: calc(var(--btn-sm-h) + 4px); }
+.confirm:has(> .back-foot), .confirm:has(> .skip-foot) { padding-bottom: calc(var(--btn-md-h) + 4px); }
 /* セミセルフは最下段に呼び出しボタンがあって狭いので、ボタンの分だけ上下の余白を詰める */
 .confirm:has(> .back-foot) > .point-screen { padding-top: 2px; padding-bottom: 2px; gap: 6px; }
 .confirm:has(> .back-foot) > .point-screen .big { margin-bottom: 0; }
@@ -428,11 +429,11 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .back-foot { position: absolute; left: 0; bottom: 0; }
 /* 「スキップ」は「バック」と左右対称に右下へ（小ボタン・消極）。進むボタンは右、引き返すボタンは左 */
 .skip-foot { position: absolute; right: 0; bottom: 0; }
-.confirm button.skip.small, button.skip.small { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
+.confirm button.skip.md, button.skip.md { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
 /* 「バック」はどこでも小ボタン（56×26）で、画面（テンキーはポップアップ）の左下に置く */
 .menu-screen { display: flex; flex-direction: column; min-height: 100%; }
 .qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
-.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
+.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
 /* 狭い画面（セミセルフは最下段に呼び出しボタンがある）でもボタンまで収まるよう、詰めて置く */
 .change { font-size: 18px; margin: 8px 0; }
 

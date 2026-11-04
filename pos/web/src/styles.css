@@ -684,7 +684,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; }
 .money-io-cust > *, .money-io-boxes > * { min-width: 0; }
-.emoney-head { min-height: 0; height: 24px; padding: 0 8px; font-size: 11px; line-height: 1; white-space: nowrap; cursor: pointer; }
+.emoney-head { min-height: 0; height: 28px; padding: 0 8px; display: inline-flex; flex-direction: column; justify-content: center; align-items: flex-start; font-size: 10px; line-height: 1.15; white-space: nowrap; cursor: pointer; }
 .emoney-head.pressing { transform: translate(1px, 2px); }
 .hamburger { min-height: 0; width: 28px; height: 24px; padding: 0; font-size: 16px; line-height: 1; cursor: pointer; }
 /* レジ画面ヘッダー中央に出す動作モード（両画面）。有人：濃い塗り、セミセルフ：枠線 */
@@ -863,6 +863,8 @@ body.debug-areas :is(.inlet, .outlet, .mats, h2)                     { outline: 
 */
 /* ハンバーガーは、もう一方の画面が操作中でも押せる（どの操作も、やりたいときにできる） */
 .screen.inactive [data-region] .hamburger:not(:disabled) { pointer-events: auto; opacity: 1; }
+/* スタッフ側のベル（仲間に応援を頼む）も、お客様側が操作中でも押せる（ログインしていない顧客操作モードでも） */
+.staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }
 .bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .bell-btn.pressing { transform: translate(1px, 2px); }
 .bell-btn:disabled { opacity: .45; }

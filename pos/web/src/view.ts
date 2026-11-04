@@ -879,23 +879,26 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
  * もう一方の画面には押せない形で映す。セミセルフのお買い物の途中は、押すとスタッフを呼ぶ
  * （押している間鳴る。スタッフがログインした有人モードで手続きすれば、お客様は取引を終えずに済む）
  */
+// ヘッダーは狭いので、「電子マネーの」「チャージ・残高確認」の二行にする
+const EMONEY_HEAD_LABEL = `<span>電子マネーの</span><span>チャージ・残高確認</span>`;
+
 function emoneyHead(r: RegisterView, side: Side): string {
   if (r.paused) return "";
   const attended = r.mode === "attended";
   const v = attended ? r.staff : r.customer;
   const own: Side = attended ? "staff" : "customer";
-  const label = `<button type="button" class="emoney-head" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">電子マネー</button>`;
+  const label = `<button type="button" class="emoney-head" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">${EMONEY_HEAD_LABEL}</button>`;
   if (side !== own) return label;
   const shopping = !attended && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
   if (shopping) {
     // セミセルフのお買い物の途中：スタッフを呼ぶ
     const st = find(r.customer.actions, "call_staff");
     const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
-    return `<button type="button" class="emoney-head" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>電子マネー</button>`;
+    return `<button type="button" class="emoney-head" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
   }
   const st = find(v.actions, "emoney");
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
-  return `<button type="button" class="emoney-head" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>電子マネー</button>`;
+  return `<button type="button" class="emoney-head" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
 }
 
 /**
@@ -1244,13 +1247,16 @@ export function clockText(d: Date): string {
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
-  // 有人モードでは、店員側のベルは仲間に SOS を出すのに使う（お客様側は店員がいるので押せない）
+  // スタッフ側のベルは、スタッフが仲間に応援を頼むのに使う（ログインの有無を問わない。Bell を鳴らすだけで通知画面は出さない）。
+  // お客様側のベルはスタッフを呼ぶ。店員操作モードではスタッフが対応しているので、お客様側にはベルを出さない
   const call = find(r.customer.actions, "call_staff");
-  const sos = r.mode === "attended";
-  const on = call.allowed && !(sos && side === "customer");
-  const bellTip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
-  const reason = sos && side === "customer" ? "スタッフが対応中です" : (call.reason ?? "");
-  const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}>🔔</button>`;
+  const sos = side === "staff";
+  const tip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
+  const cmd = sos ? { type: "call_staff", register: r.id, topic: "sos" } : { type: "call_staff", register: r.id };
+  const bell =
+    !sos && r.mode === "attended"
+      ? ""
+      : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
   // 左：店舗メニューのハンバーガーと時刻、中央：稼働モード、右：呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
   return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}${emoneyHead(r, side)}</span><span class="head-c">${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r"><time class="clock">${clockText(now)}</time>${bell}</span>`;
 }

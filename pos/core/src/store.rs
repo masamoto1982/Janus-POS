@@ -196,6 +196,8 @@ pub enum CallTopic {
     Tobacco,
     /// 電子マネーのチャージ・残高確認（セミセルフのお買い物の途中。スタッフが有人モードで手続きする）
     Emoney,
+    /// スタッフ側のベル：スタッフが仲間に応援を頼む。Bell を鳴らすだけで、呼び出しの記録・通知画面は出さない
+    Sos,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -573,6 +575,11 @@ impl Command {
             | C::CloseEmoney { side, .. }
             | C::ResolveEmoneyShort { side, .. }
             | C::Claim { side, .. } => Some(*side),
+            // スタッフ側のベル（応援を呼ぶ）は、お客様側の操作をふさがない（Bell を鳴らすだけ）
+            C::CallStaff {
+                topic: Some(CallTopic::Sos),
+                ..
+            } => None,
             C::FfButton { .. } | C::CallStaff { .. } => {
                 Some(Side::Customer)
             }
@@ -2313,10 +2320,16 @@ impl Store {
             }
             C::CallStaff { register, topic } => {
                 self.check_active(register, Action::CallStaff)?;
+                // 応援を呼ぶ：Bell を鳴らすだけ（呼び出しの記録・通知画面はなし。来た仲間とは口頭で話す）
+                if topic == Some(CallTopic::Sos) {
+                    self.press(register)?;
+                    return done("仲間のスタッフを呼んでいます");
+                }
                 let (kind, detail) = match topic {
                     Some(CallTopic::Service) => (CallKind::Service, "お支払い・荷物"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
                     Some(CallTopic::Emoney) => (CallKind::Emoney, "チャージ・残高確認"),
+                    Some(CallTopic::Sos) => unreachable!(),
                     None => (CallKind::CustomerHelp, "お客様からの呼び出し"),
                 };
                 self.call(register, kind, detail);
@@ -2325,6 +2338,7 @@ impl Store {
                     Some(CallTopic::Service) => "スタッフをお呼びしました（サービス）",
                     Some(CallTopic::Tobacco) => "スタッフをお呼びしました（たばこ）",
                     Some(CallTopic::Emoney) => "スタッフをお呼びしました（電子マネー）",
+                    Some(CallTopic::Sos) => unreachable!(),
                     None => "スタッフをお呼びしました",
                 })
             }

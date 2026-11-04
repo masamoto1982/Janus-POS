@@ -881,45 +881,20 @@ fn cash_out_only_inside_the_store_menu() {
     .is_err());
 }
 
-/// 店舗メニューは、スタッフ側からはパスワードなしで、お客様側からはスタッフ画面にだけ出る
-/// 使い捨ての 4 桁パスワードを入れて開く。開いた側の画面に出る。
+/// 店舗メニューはスタッフ側の画面だけ。ログインしたスタッフがパスワードなしで開く
 #[test]
-fn customer_side_menu_needs_a_one_time_code() {
+fn store_menu_opens_only_on_the_staff_side() {
     let mut s = Store::new(1, 2, 1);
-    let open = |code: &str| json!({"type":"open_menu","register":1,"side":"customer","screen":"top","code":code});
-    assert!(
-        run(&mut s, json!({"type":"request_menu_code","register":1})).is_err(),
-        "ログインしたスタッフだけ"
-    );
+    let open = json!({"type":"open_menu","register":1,"screen":"top"});
+    assert!(run(&mut s, open.clone()).is_err(), "ログインしたスタッフだけ");
     login(&mut s, 1);
-    assert!(run(&mut s, open("AAAA")).is_err(), "パスワードを出す前は開けない");
-    ok(&mut s, json!({"type":"request_menu_code","register":1}));
-    let v = reg(&s, 1);
-    let code = v.menu_code.clone().unwrap();
-    assert_eq!(code.len(), 4);
-    assert_eq!(v.active_side, Some(Side::Customer), "お客様側で入力する");
-    let wrong = if code == "0000" { "1111" } else { "0000" };
-    assert!(run(&mut s, open(wrong)).is_err());
-    ok(&mut s, open(&code.to_lowercase()));
-    let v = reg(&s, 1);
-    assert_eq!(v.menu.unwrap().side, Side::Customer);
-    assert!(v.menu_code.is_none(), "パスワードは一度きり");
-    ok(
-        &mut s,
-        json!({"type":"open_menu","register":1,"side":"customer","screen":null}),
-    );
-    assert!(run(&mut s, open(&code)).is_err(), "閉じたらまた必要");
     advance(&mut s, 1_000);
-    // スタッフ側はパスワードなし。開いたらお客様側のパスワード入力は取りやめになる
-    ok(&mut s, json!({"type":"request_menu_code","register":1}));
-    ok(
-        &mut s,
-        json!({"type":"open_menu","register":1,"side":"staff","screen":"top"}),
-    );
+    ok(&mut s, open);
     let v = reg(&s, 1);
-    assert_eq!(v.menu.unwrap().side, Side::Staff);
-    assert!(v.menu_code.is_none());
+    assert!(v.menu.is_some());
     assert_eq!(v.active_side, Some(Side::Staff));
+    ok(&mut s, json!({"type":"open_menu","register":1,"screen":null}));
+    assert!(reg(&s, 1).menu.is_none());
 }
 
 /// 問題8：呼び出しは発生したレジだけに出て、ほかのレジには出ない。

@@ -390,9 +390,9 @@ function render(): void {
       el?.classList.toggle("no-items", !items);
     }
     // モバイルモード：操作する面（アクティブ面）が変わったら、その面を表にする。
-    // セミセルフはお客様側、有人は店員側、店舗メニューは開いた側（パスワード入力中はお客様側）。
+    // セミセルフはお客様側、有人は店員側、店舗メニューはスタッフ側。
     // 有人モードで触れている一瞬だけ変わる操作側には付いていかない。表にした後もスワイプで切り替えられる
-    const face: Side = r.menu?.side ?? (r.menu_code ? "customer" : r.mode === "attended" ? "staff" : "customer");
+    const face: Side = r.menu ? "staff" : r.mode === "attended" ? "staff" : "customer";
     if (face !== activeShown.get(r.id)) {
       activeShown.set(r.id, face);
       if (isMobile()) swipeTo(r.id, face);
@@ -677,34 +677,18 @@ function form(b: HTMLElement): void {
       });
       clear(`mo-amt-${reg}`);
       break;
-    case "menucode":
-      send({ type: "open_menu", register: reg, side: "customer", screen: "top", code: val(`mc-${reg}`) });
-      clear(`mc-${reg}`);
-      break;
   }
 }
 
 app.addEventListener("input", (e) => {
   const el = e.target as HTMLInputElement;
   // 生年月日：西暦 8 桁。全角の数字は半角に直す
-  // 店舗メニューのパスワード：英大文字と数字の 4 桁（小文字・全角は直す）
-  if (el.dataset.menucode)
-    el.value = el.value
-      .replace(/[０-９Ａ-Ｚａ-ｚ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0))
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "")
-      .slice(0, 4);
   // 払込票の確認：事業者・金額が合っていれば一枚ずつチェックを入れる（外すこともできる）
   if (el.dataset.billCheck) {
     const [reg, side, line] = el.dataset.billCheck.split(":");
     send({ type: "check_bill", register: Number(reg), side, line_id: Number(line), checked: el.checked });
     return;
   }
-});
-app.addEventListener("keydown", (e) => {
-  const el = e.target as HTMLInputElement;
-  if (!el.dataset?.menucode || e.key !== "Enter" || e.isComposing) return;
-  el.closest(".menu-code")?.querySelector<HTMLButtonElement>('[data-form="menucode"]')?.click();
 });
 
 app.addEventListener("change", (e) => {
@@ -859,15 +843,11 @@ app.addEventListener("click", (e) => {
     ffTabs.set(reg, { tab: u.tab, page: Math.max(0, u.page + d) });
     return frame();
   }
-  // ヘッダーのハンバーガー：開いた側の画面で店舗メニューを開く・閉じる。
-  // お客様側は、スタッフ画面に出る使い切りパスワードを入力して開く
+  // ヘッダーのハンバーガー（スタッフ側の画面だけ）：店舗メニューを開く・閉じる
   if (b.dataset.gear) {
-    const [reg, side] = b.dataset.gear.split(":") as [string, Side];
-    const r = snap.registers.find((x) => x.id === Number(reg));
-    const open = r?.menu?.side === side || (side === "customer" && !!r?.menu_code);
-    if (open) send({ type: "open_menu", register: Number(reg), side, screen: null });
-    else if (side === "customer") send({ type: "request_menu_code", register: Number(reg) });
-    else send({ type: "open_menu", register: Number(reg), side, screen: "top" });
+    const reg = Number(b.dataset.gear.split(":")[0]);
+    const r = snap.registers.find((x) => x.id === reg);
+    send({ type: "open_menu", register: reg, screen: r?.menu ? null : "top" });
     return;
   }
   if (b.dataset.outlet) {

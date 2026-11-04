@@ -49,7 +49,7 @@ const BILL_NO_REMOVE: &str =
 const NO_POINTS: &str =
     "ポイントを使える商品がありません（宅配便・代金引換・公共料金・切手・たばこにはポイントを使えません）";
 const EMONEY_NO_CASH: &str =
-    "セミセルフモードでは現金を使えません。ほかの支払方法を選ぶか、スタッフをお呼びください";
+    "セルフレジでは現金を使えません。ほかの支払方法を選ぶか、スタッフをお呼びください";
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
 
@@ -2396,7 +2396,7 @@ impl Store {
                 r.staff = None;
                 r.menu = None;
                 r.menu_code = None;
-                done("ログアウトしました（セミセルフモード）")
+                done("ログアウトしました（セルフレジ）")
             }
             C::CashOut {
                 register,
@@ -2752,9 +2752,9 @@ impl Store {
                 self.calls.resolve(register, k, now);
             }
             return done(match was {
-                _ if resumed => format!("{}さんがレジを再開しました（有人モード）", acc.name),
+                _ if resumed => format!("{}さんがレジを再開しました（スタッフが対応します）", acc.name),
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),
-                _ => format!("{}さんがログインしました（有人モード）", acc.name),
+                _ => format!("{}さんがログインしました（スタッフが対応します）", acc.name),
             });
         }
         self.check(register, side, Action::Scan)?;

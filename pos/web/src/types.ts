@@ -208,7 +208,9 @@ export interface RegisterView {
   change_left: boolean;
   outlet: number;
   outlet_detail: [number, number][];
-  menu: { screen: MenuScreen; exchange_to: number } | null;
+  menu: { side: Side; screen: MenuScreen; exchange_to: number } | null;
+  /** お客様側から店舗メニューを開くための使い捨てパスワード（スタッフ側の画面にだけ出す） */
+  menu_code: string | null;
   /** お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す） */
   /** レジ休止中（スタッフバーコードで再開） */
   paused: boolean;

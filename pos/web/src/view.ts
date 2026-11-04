@@ -855,10 +855,13 @@ const GUIDES: [GuideKind, string, string][] = [
  * 初期画面。慣れた人はそのままスキャンし、不慣れな人はボタンで何を読むか選んで案内を見る
  * （自由度がなさすぎても、ありすぎても人は迷う）
  */
+/** 待ち受け画面の最上部に出す動作モード（両画面）。有人：濃い塗り、セミセルフ：枠線 */
+const modeTitle = (attended: boolean): string => `<div class="mode-title ${attended ? "attended" : "semi"}">${attended ? "有人モード" : "セミセルフモード"}</div>`;
+
 export function welcome(reg: number, side: Side, emoney?: ActionState): string {
   const on = scanGuide.get(`${reg}:${side}`);
   const guide = GUIDES.find(([k]) => k === on);
-  return `<div class="welcome${emoney ? " scan-welcome" : ""}">
+  return `<div class="welcome${emoney ? " scan-welcome" : ""}">${modeTitle(false)}
       <div class="big">バーコードをスキャンしてください</div>
       <p>すべてのバーコードを受け付けます</p>
       <div class="guide-row">${GUIDES.map(
@@ -876,7 +879,7 @@ export function welcome(reg: number, side: Side, emoney?: ActionState): string {
  * 押すのは操作する側（有人は店員側、セミセルフはお客様側）。もう一方の画面には押せない形で映す
  */
 export function emoneyFan(r: RegisterView, side: Side, main: string): string {
-  if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null) return "";
+  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null) return "";
   const attended = r.mode === "attended";
   const v = attended ? r.staff : r.customer;
   const welcomeShown = main.includes('class="welcome');
@@ -951,7 +954,7 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
       `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
-  return `${notice}<div class="welcome attended-welcome"><div class="big">${head}</div><p>${sub}</p>
+  return `${notice}<div class="welcome attended-welcome">${modeTitle(true)}<div class="big">${head}</div><p>${sub}</p>
       <div class="guide-row">${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
@@ -959,8 +962,10 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
-  // 店舗メニューはスタッフ側の画面にだけ出す（お客様側は登録画面のまま）
-  if (r.menu && side === "staff") return notice + storeMenu(r);
+  // 店舗メニューは開いた側の画面にだけ出す。お客様側から開くときは、スタッフ側にパスワード・お客様側に入力欄
+  if (r.menu?.side === side) return notice + storeMenu(r);
+  if (r.menu_code) return notice + menuCode(r, side);
+  if (r.menu && side === "staff") return notice + pairNote("お客様側の画面で店舗メニューを操作しています");
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
@@ -1251,12 +1256,9 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bellTip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
   const reason = sos && side === "customer" ? "スタッフが対応中です" : (call.reason ?? "");
   const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}>🔔</button>`;
-  const label = r.mode === "attended" ? "有人モード" : "セミセルフモード";
-  const cls = `mode-badge ${r.mode === "attended" ? "attended" : "semi"}`;
-  // モードバッジは表示だけ（店舗メニューの入口はスタッフ側の画面に付いている：storeMenuEntry）
-  const badge = `<span class="${cls}">${label}</span>`;
-  // 休止中は画面の「レジ休止中」と重ねて出さない（稼働モードのバッジは出さない）
-  return `<span class="head-l">${r.paused ? "" : badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
+  // 動作モードはヘッダーには出さず、待ち受け画面の最上部に大きく出す（modeTitle）。
+  // 左端は店舗メニューのハンバーガー。休止中は画面の「レジ休止中」と重ねて出さない
+  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1280,7 +1282,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const reg = r.id;
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
-  if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
+  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -1361,13 +1363,37 @@ const MENU_ITEMS: { screen: MenuScreen; cash: boolean }[] = [
 ];
 
 /**
- * スタッフ側の画面に付いた店舗メニューの入口。有人モードでログインしているときだけ押せる。
+ * 店舗メニューの入口：両方の画面のヘッダーにあるハンバーガー。有人モードでログインしているときだけ押せる。
+ * スタッフ側はそのまま開く。お客様側から開くときは、スタッフ側の画面に出る 4 桁の使い切りパスワードが要る。
  * 開いている間は同じボタンで閉じる（開く所と閉じる所を同じにする）
  */
-export function storeMenuEntry(r: RegisterView): string {
+function hamburger(r: RegisterView, side: Side): string {
   const usable = r.mode === "attended" && r.staff.state === "ready";
-  const open = !!r.menu;
-  return `<button type="button" class="store-menu-btn" data-gear="${r.id}:staff" aria-label="レジ${r.id}の店舗メニュー"${open ? ' aria-expanded="true"' : ""}${usable ? "" : " disabled"} title="${usable ? (open ? "店舗メニューを閉じる" : "店舗メニュー（返品返金・両替・ジャーナル確認など）") : "スタッフがログインすると使えます"}">店舗メニュー</button>`;
+  const open = r.menu?.side === side || (side === "customer" && !!r.menu_code);
+  const what = side === "staff" ? "店舗メニュー（返品返金・両替・ジャーナル確認など）" : "店舗メニュー（スタッフ側の画面に出るパスワードで開く）";
+  return `<button type="button" class="hamburger" data-gear="${r.id}:${side}" aria-label="レジ${r.id}の店舗メニュー"${open ? ' aria-expanded="true"' : ""}${usable ? "" : " disabled"} title="${usable ? (open ? "店舗メニューを閉じる" : what) : "スタッフがログインすると使えます"}">☰</button>`;
+}
+
+/**
+ * お客様側から店舗メニューを開くときの使い捨てパスワード。店員画面にだけパスワードを出し、
+ * お客様側の画面で入力する（パスワードを見た人でなければ開けない）
+ */
+function menuCode(r: RegisterView, side: Side): string {
+  const reg = r.id;
+  if (side === "staff")
+    return confirm(`<div class="point-screen menu-code-show">
+      <p>お客様側の画面から店舗メニューを開こうとしています</p>
+      <div class="big menu-code-value" aria-label="パスワード">${esc(r.menu_code ?? "")}</div>
+      <p class="muted">このパスワードをお客様側の画面で入力してください。一度きり有効です</p>
+    </div>`);
+  return confirm(`<div class="point-screen menu-code">
+      <div class="big">店舗メニューのパスワード</div>
+      <p>スタッフ側の画面に出ている 4 桁を入力してください</p>
+      <div class="row menu-code-form">
+        <input type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例 U8X3" data-menucode="1" data-key="mc-${reg}" aria-label="パスワード" />
+        <button class="primary" data-form="menucode" data-reg="${reg}">開く</button>
+      </div>
+    </div>${backCorner({ type: "open_menu", register: reg, side: "customer", screen: null })}`);
 }
 
 /** 一度に一つの画面だけを出す：一覧 → 各項目の画面 */
@@ -1375,7 +1401,7 @@ export function storeMenu(r: RegisterView): string {
   const v = r.staff;
   const reg = r.id;
   const m = r.menu!;
-  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side: "staff", screen, ...extra });
+  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side: m.side, screen, ...extra });
   const head = (title: string) => `<div class="menu-head"><b>${esc(title)}</b></div>`;
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   // 各項目の画面は、左下の「バック」で一覧に戻る

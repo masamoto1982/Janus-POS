@@ -797,6 +797,7 @@ body.dragging .drop-hint { display: inline; }
 .picker-dlg { width: min(720px, calc(100vw - 16px)); max-height: calc(100dvh - 32px); overflow: auto; }
 .picker-dlg .item { cursor: pointer; touch-action: manipulation; }
 .picker-dlg .tip { display: none; }
+.picker-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
 @media (max-width: 760px) {
   .top { padding-block: 6px; }
   .top .logo { width: 36px; height: 36px; }

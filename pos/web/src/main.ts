@@ -31,7 +31,6 @@ import {
   padValueKey,
   type PadTarget,
   screenHead,
-  storeMenuEntry,
   isoDate,
   scanGuide,
   voidAsk,
@@ -147,7 +146,6 @@ function buildSkeleton(): void {
       </div>
       <div class="money-io face-staff">
         <div class="money-io-staff" aria-label="レジ${r.id}の自動釣銭機（スタッフ側の画面に付いています）">
-          <div class="store-menu-slot" data-region="menu-entry-${r.id}"></div>
           <div class="money-io-boxes" data-cash-drop="${r.id}">
             <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:staff:inlet:" aria-label="レジ${r.id}の入金ボックス（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
             <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の出金ボックス（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
@@ -393,7 +391,7 @@ function render(): void {
     // モバイルモード：操作する面（アクティブ面）が変わったら、その面を表にする。
     // セミセルフはお客様側、有人は店員側、店舗メニューは開いた側（パスワード入力中はお客様側）。
     // 有人モードで触れている一瞬だけ変わる操作側には付いていかない。表にした後もスワイプで切り替えられる
-    const face: Side = r.menu ? "staff" : r.mode === "attended" ? "staff" : "customer";
+    const face: Side = r.menu?.side ?? (r.menu_code ? "customer" : r.mode === "attended" ? "staff" : "customer");
     if (face !== activeShown.get(r.id)) {
       activeShown.set(r.id, face);
       if (isMobile()) swipeTo(r.id, face);
@@ -423,8 +421,6 @@ function render(): void {
     );
     // おつりなど、出金ボックスにお金があれば枠と文字を点滅させる
     app.querySelector(`[data-outlet="${r.id}"]`)?.classList.toggle("blink", r.outlet > 0);
-    // 店舗メニューの入口（スタッフ側の画面に付いている）
-    setRegion(`menu-entry-${r.id}`, storeMenuEntry(r));
     // 入金ボックス（現金。スタッフ側）と決済端末（キャッシュレス。お客様側）：支払方法が決まったら枠を点滅させる。
     // 現金は投入額を積み上げて見せる
     const inlet = app.querySelector<HTMLElement>(`[data-inlet="${r.id}"]`);
@@ -865,11 +861,15 @@ app.addEventListener("click", (e) => {
     ffTabs.set(reg, { tab: u.tab, page: Math.max(0, u.page + d) });
     return frame();
   }
-  // 店舗メニューの入口（スタッフ側の画面に付いている）：開く・閉じる
+  // ヘッダーのハンバーガー：開いた側の画面で店舗メニューを開く・閉じる。
+  // お客様側は、スタッフ画面に出る使い切りパスワードを入力して開く
   if (b.dataset.gear) {
-    const [reg] = b.dataset.gear.split(":");
+    const [reg, side] = b.dataset.gear.split(":") as [string, Side];
     const r = snap.registers.find((x) => x.id === Number(reg));
-    send({ type: "open_menu", register: Number(reg), side: "staff", screen: r?.menu ? null : "top" });
+    const open = r?.menu?.side === side || (side === "customer" && !!r?.menu_code);
+    if (open) send({ type: "open_menu", register: Number(reg), side, screen: null });
+    else if (side === "customer") send({ type: "request_menu_code", register: Number(reg) });
+    else send({ type: "open_menu", register: Number(reg), side, screen: "top" });
     return;
   }
   if (b.dataset.outlet) {

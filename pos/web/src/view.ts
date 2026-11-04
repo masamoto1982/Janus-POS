@@ -49,13 +49,13 @@ export function btn(label: string, cmd: Command, a?: ActionState, cls = ""): str
 
 /** 手続きを引き返す「バック」。どこでも小ボタンにし、画面の左下に置く（`.screen-foot` などの左端） */
 export function backBtn(cmd: Command, a?: ActionState): string {
-  return btn("バック", cmd, a, "small ghost back-btn");
+  return btn("バック", cmd, a, "md ghost back-btn");
 }
 const backFootRow = (cmd: Command, a?: ActionState): string => `<div class="screen-foot">${backBtn(cmd, a)}</div>`;
 /** 確認画面（`.confirm`）の左下に置く「バック」。確認画面の中身の直後に並べる */
 const backCorner = (cmd: Command, a?: ActionState): string => `<div class="back-foot">${backBtn(cmd, a)}</div>`;
 /** 先へ進むのを省く「スキップ」。「バック」と左右対称に、確認画面の右下へ小さな消極ボタンで置く */
-const skipCorner = (cmd: Command, a?: ActionState): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "small skip")}</div>`;
+const skipCorner = (cmd: Command, a?: ActionState): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "md skip")}</div>`;
 
 const FF_LABEL: Record<FfState, string> = {
   waiting: "お渡し前",
@@ -134,7 +134,7 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
   return `<div class="ffv-screen">
       <div class="big">お渡しの確認</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="ffv-foot"><button type="button" class="small ghost back-btn" data-ffverify-close="${reg}:${side}" >バック</button></div>
+      <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-ffverify-close="${reg}:${side}" >バック</button></div>
     </div>`;
 }
 
@@ -609,7 +609,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(l.name)}<span class="muted">いまの数量 ${l.qty}</span></div>
         <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("0", "0", "pad-key zero")}${k("back", "←", "pad-key neg")}</div>
-        <div class="qty-pop-foot">${k("cancel", "バック", "small ghost back-btn")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-foot">${k("cancel", "バック", "md ghost back-btn")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -670,7 +670,7 @@ export function padPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(title)}${now}</div>
         <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}${k("back", "←", "pad-key neg")}</div>
-        <div class="qty-pop-foot">${k("cancel", "バック", "small ghost back-btn")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-foot">${k("cancel", "バック", "md ghost back-btn")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -909,7 +909,7 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
         ${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}
       </div>
     </div>
-    <div class="back-foot"><button type="button" class="small ghost back-btn" data-void-cancel="${reg}">バック</button></div>`;
+    <div class="back-foot"><button type="button" class="md ghost back-btn" data-void-cancel="${reg}">バック</button></div>`;
 }
 
 /** 有人モードの初期画面の案内ボタン（店員側で押す。お客様側には同じボタンを押せない形で映す） */

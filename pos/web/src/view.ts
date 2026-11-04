@@ -868,23 +868,34 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
       <p>すべてのバーコードを受け付けます</p>
       <div class="guide-row">${GUIDES.map(
         ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
-      ).join("")}${emoneyBtn(r, side)}</div>
+      ).join("")}</div>
       ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
 
 /**
- * 電子マネーのチャージ・残高確認の入口：待ち受けのご用件ボタンの並びに置く（扇形は一旦廃止。置き場所は確認中）。
- * 押すのは操作する側（有人は店員側、セミセルフはお客様側）。もう一方の画面には押せない形で映す。
- * セミセルフでチャージを選ぶとスタッフ呼び出しになる（核側の仕様）
+ * 電子マネーのチャージ・残高確認の入口：レジ画面ヘッダーの、ハンバーガーと稼働モードの間に置くボタン。
+ * ヘッダーなので常に見え、商品登録画面をふさがない。押すのは操作する側（有人は店員側、セミセルフはお客様側）で、
+ * もう一方の画面には押せない形で映す。セミセルフのお買い物の途中は、押すとスタッフを呼ぶ
+ * （押している間鳴る。スタッフがログインした有人モードで手続きすれば、お客様は取引を終えずに済む）
  */
-function emoneyBtn(r: RegisterView, side: Side): string {
+function emoneyHead(r: RegisterView, side: Side): string {
+  if (r.paused) return "";
   const attended = r.mode === "attended";
   const v = attended ? r.staff : r.customer;
   const own: Side = attended ? "staff" : "customer";
-  const label = "電子マネー";
-  if (side !== own) return `<button type="button" class="guide-btn emoney-entry mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;
-  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, find(v.actions, "emoney"), "guide-btn emoney-entry").replace("></button>", `>${label}</button>`);
+  const label = `<button type="button" class="emoney-head" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">電子マネー</button>`;
+  if (side !== own) return label;
+  const shopping = !attended && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
+  if (shopping) {
+    // セミセルフのお買い物の途中：スタッフを呼ぶ
+    const st = find(r.customer.actions, "call_staff");
+    const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
+    return `<button type="button" class="emoney-head" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>電子マネー</button>`;
+  }
+  const st = find(v.actions, "emoney");
+  const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
+  return `<button type="button" class="emoney-head" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>電子マネー</button>`;
 }
 
 /**
@@ -942,7 +953,7 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
   return `${notice}<div class="welcome attended-welcome"><div class="big">${head}</div><p>${sub}</p>
-      <div class="guide-row">${guides}${emoneyBtn(r, side)}</div>
+      <div class="guide-row">${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
@@ -1243,7 +1254,7 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const reason = sos && side === "customer" ? "スタッフが対応中です" : (call.reason ?? "");
   const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}>🔔</button>`;
   // 左：店舗メニューのハンバーガーと時刻、中央：稼働モード、右：呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
-  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}<time class="clock">${clockText(now)}</time></span><span class="head-c">${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r">${bell}</span>`;
+  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}${emoneyHead(r, side)}</span><span class="head-c">${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r"><time class="clock">${clockText(now)}</time>${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------

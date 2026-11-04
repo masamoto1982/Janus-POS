@@ -54,6 +54,13 @@ export function backBtn(cmd: Command, a?: ActionState): string {
 const backFootRow = (cmd: Command, a?: ActionState): string => `<div class="screen-foot">${backBtn(cmd, a)}</div>`;
 /** 確認画面（`.confirm`）の左下に置く「バック」。確認画面の中身の直後に並べる */
 const backCorner = (cmd: Command, a?: ActionState): string => `<div class="back-foot">${backBtn(cmd, a)}</div>`;
+/**
+ * セミセルフの支払方法の選択画面の右下に置く「現金」。消極の小ボタン（セミセルフはキャッシュレス専用なので控えめに）。
+ * 押すとスタッフ呼び出しが発動する（カードが通らず現金で払いたい場合など）
+ */
+const cashCorner = (reg: number, side: Side, method: string | null, st: ActionState): string =>
+  `<div class="skip-foot">${btn("現金", { type: "select_payment", register: reg, side, method: "cash" }, st, `md skip${method === "cash" ? " on" : ""}`)}</div>`;
+
 /** 先へ進むのを省く「スキップ」。「バック」と左右対称に、確認画面の右下へ小さな消極ボタンで置く */
 const skipCorner = (cmd: Command, a?: ActionState): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "md skip")}</div>`;
 
@@ -491,14 +498,14 @@ function payHint(method: string | null, blocker: string | null, inserted: number
  * 支払方法の選択肢。現金は入れただけで支払方法が現金に決まるので、入れた後は出さない
  * （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）
  */
-function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = "", unavailable: Unavailable[] = []): string {
+function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = "", unavailable: Unavailable[] = [], noCash = false): string {
   if (method === "cash" && inserted) return "";
   // 決済の組み合わせの原則で使えない支払方法は押せなくする（理由は core が返す）
   const off = (m: string): ActionState => {
     const u = unavailable.find((x) => x.method === m);
     return u ? { action: st.action, allowed: false, reason: u.reason } : st;
   };
-  return `<div class="row method-row ${cls}">${METHODS
+  return `<div class="row method-row ${cls}">${METHODS.filter((m) => !(noCash && m === "cash"))
     .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, off(m), `seg ${method === m ? "on" : ""}`))
     .join("")}</div>`;
 }
@@ -1482,8 +1489,8 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
     return screen(`<div class="paybox center">
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true)}
-      </div>`);
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true)}
+      </div>${cashCorner(reg, side, c.method, a("select_payment"))}`);
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));
   closeFfVerify(reg, side);

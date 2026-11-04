@@ -1957,7 +1957,23 @@ impl Store {
                     return Err(why.into());
                 }
                 r.txn.method = Some(method);
+                let semi = r.mode == Mode::SemiSelf;
+                let no_cash_goods = r.txn.cash_only() == 0;
+                // セミセルフは現金を扱わない：現金を選んだらスタッフ呼び出しを発動する
+                // （カードが通らず現金で払いたい、などの場合。スタッフが有人モードで預かる）。
+                // 別の支払方法に選び直したら、その呼び出しは片付ける（現金のみの商品があるときは残す）
+                if semi {
+                    if method == PaymentMethod::Cash {
+                        self.calls
+                            .raise(register, CallKind::CashOnly, self.now, "現金でのお支払い");
+                        return done("スタッフをお呼びしました。現金はスタッフがお預かりします");
+                    }
+                    if no_cash_goods {
+                        self.calls.resolve(register, CallKind::CashOnly, self.now);
+                    }
+                }
                 // ポイント利用なのにポイントカードが読まれていなければ、ポイントカードの確認に差し戻す
+                let r = self.reg_mut(register)?;
                 if method == PaymentMethod::Points && r.txn.point_card.is_none() {
                     r.txn.point_checked = false;
                     return done(

@@ -190,7 +190,11 @@ button { touch-action: manipulation; }
 .bell-fan > span { padding: 0 6px 6px 0; font-size: 20px; line-height: 1; }
 .bell-fan.pressing { transform: translate(1px, 2px); }
 .bell-fan:disabled { opacity: .45; }
+.screen-body:has(.screen-main > .welcome) .bell-fan { width: 72px; height: 72px; border-radius: 72px 0 0 0; }
+.screen-body:has(.screen-main > .welcome) .bell-fan > span { font-size: 24px; }
 .screen-body:has(.bell-fan, .emoney-fan) .screen-main { padding-bottom: 60px; }
+/* 待ち受けの背景は登録エリアの下端まで塗る（下に余白を残すと色が途中で途切れる）。扇形は背景の上に重ねる */
+.screen-body:has(.bell-fan, .emoney-fan) .screen-main:has(> .welcome) { padding-bottom: 8px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
 /* 文字の強弱：強いメッセージ #535353、補足の弱いメッセージは枠線と同じ #878787。強いほうが必ず大きい */

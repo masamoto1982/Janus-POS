@@ -82,7 +82,8 @@ function ffTag(reg: number, side: Side, l: { kind: string; state?: FfState }, a:
   const text = labels[l.state];
   // お渡し済はボタンではなく緑の文字だけ。お渡し前は積極の小ボタン（オレンジ）。見るだけの画面ではボタンの形で押せない
   if (l.state === "received") return `<span class="ff-done">${text}</span>`;
-  if (ro) return `<span class="ff-btn ff-waiting">${text}</span>`;
+  // お渡し確認はスタッフ側の画面だけ。顧客側（見るだけの画面）にはお渡し前を出さない
+  if (ro) return "";
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
   return `<button type="button" class="ff-btn ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
 }

@@ -26,6 +26,7 @@ import {
   padEntry,
   padPopup,
   emoneyFan,
+  bellFan,
   PAD,
   padValue,
   padValueKey,
@@ -410,13 +411,13 @@ function render(): void {
       }`,
     );
     // 両方の画面に同じ内容を出す（呼び出しの表示だけは側ごとに出し分ける）
-    // 電子マネーの入口（右下端の扇形）は、待ち受け・商品登録の画面にだけ重ねる
+    // 電子マネーの入口（左下端の扇形）は待ち受け・商品登録の画面にだけ、呼び鈴（右下端の扇形）は常に重ねる
     const staffMain = sharedScreen(r, snap, "staff");
     const custMain = sharedScreen(r, snap, "customer");
     setRegion(`staff-${r.id}`, staffMain);
     setRegion(`cust-${r.id}`, custMain);
-    setRegion(`fan-${r.id}-staff`, emoneyFan(r, "staff", staffMain));
-    setRegion(`fan-${r.id}-customer`, emoneyFan(r, "customer", custMain));
+    setRegion(`fan-${r.id}-staff`, emoneyFan(r, "staff", staffMain) + bellFan(r, "staff"));
+    setRegion(`fan-${r.id}-customer`, emoneyFan(r, "customer", custMain) + bellFan(r, "customer"));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -1141,7 +1142,7 @@ function wireSwipe(): void {
     const t = e.target as Element;
     const inlet = t.closest<HTMLElement>("[data-inlet], [data-reader]");
     // 最上部（呼び鈴など）と最下段（FF・サービス・たばこ）は長押しで操作するボタンがあるので対象外
-    const screen = t.closest(".screen-head, .screen-items, .emoney-fan") ? null : t.closest<HTMLElement>("[data-drop]");
+    const screen = t.closest(".screen-head, .screen-items, .emoney-fan, .bell-fan") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;
     cancelLongPress();
     const timer = window.setTimeout(() => {

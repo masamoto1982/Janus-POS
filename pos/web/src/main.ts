@@ -81,8 +81,9 @@ function reset(registers: number, mats: number): void {
   t0 = performance.now();
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   buildSkeleton();
+  // 【今は無効。使うときは下の2行のコメントを外す】
   // エリア構造の確認用の点線枠（styles.css 末尾）。不要になったらこの1行と CSS の末尾ブロックを消す。URL に ?debug=0 で消せる
-  document.body.classList.toggle("debug-areas", new URLSearchParams(location.search).get("debug") !== "0");
+  // document.body.classList.toggle("debug-areas", new URLSearchParams(location.search).get("debug") !== "0");
   wireSwipe();
   // 閉じたら（Esc でも）認証を解除し、パスワードを消す
   rulesDlg().addEventListener("close", lockRules);

@@ -767,7 +767,7 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-keys .zero { grid-column: span 2; }
 /* 引き返す「やめる」は左、進める「決定」は右 */
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
-.qty-pop-foot button { flex: 1; }
+.qty-pop-foot button { flex: 1; height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
 
 .emoney-choices { display: flex; flex-direction: column; gap: var(--gap); align-items: stretch; width: min(100%, 280px); margin: 0 auto; }
 /* チャージと残高確認は横に並べ、やめるは次の行に置く */

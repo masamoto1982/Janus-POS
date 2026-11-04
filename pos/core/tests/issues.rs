@@ -2654,9 +2654,30 @@ fn emoney_inquiry_shows_the_balance() {
 #[test]
 fn emoney_charge_takes_bills_up_to_the_limit() {
     let mut s = Store::new(1, 2, 1);
+    // セミセルフでチャージを選ぶとスタッフ呼び出し（残高照会は呼ばない）
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),
+    );
+    assert!(reg(&s, 1).staff.calls.is_empty(), "残高照会は呼ばない");
+    ok(
+        &mut s,
+        json!({"type":"close_emoney","register":1,"side":"customer"}),
+    );
     ok(
         &mut s,
         json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.emoney.is_none());
+    assert!(v.staff.calls.iter().any(|c| c.label == "電子マネー"));
+    // チャージの現金はスタッフが有人モードで預かる
+    login(&mut s, 1);
+    assert!(reg(&s, 1).staff.calls.is_empty());
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"staff","kind":"charge"}),
     );
     assert!(
         run(&mut s, json!({"type":"insert","register":1,"amount":500})).is_err(),
@@ -2686,12 +2707,12 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
 
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
+        json!({"type":"start_emoney","register":1,"side":"staff","kind":"charge"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":2000}));
     ok(
         &mut s,
-        json!({"type":"close_emoney","register":1,"side":"customer"}),
+        json!({"type":"close_emoney","register":1,"side":"staff"}),
     );
     assert_eq!(reg(&s, 1).outlet, 2000);
     assert_eq!(emoney_balance(&s), 16_000);

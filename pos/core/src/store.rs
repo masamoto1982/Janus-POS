@@ -2196,6 +2196,13 @@ impl Store {
                 if r.mode == Mode::SemiSelf && shopping {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
+                // セミセルフでチャージが選ばれたら、スタッフ呼び出しイベントを発動する
+                // （チャージの現金はスタッフが有人モードで預かる。残高照会は呼び出さない）
+                if r.mode == Mode::SemiSelf && kind == EmoneyKind::Charge {
+                    r.emoney = None;
+                    self.call(register, CallKind::Emoney, "チャージ");
+                    return done("チャージはスタッフがお手伝いします。スタッフをお呼びしました");
+                }
                 // 選ぶ画面からは、チャージ・残高確認に進める
                 if r.emoney
                     .as_ref()

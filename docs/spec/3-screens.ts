@@ -648,8 +648,8 @@ export const SCENES: Scene[] = [
       strong: ["電子マネー"],
       weak: ["選択してください"],
       buttons: [
-        { label: "チャージ", tone: "積極" },
-        { label: "残高確認", tone: "積極" },
+        { label: "チャージ", tone: "積極", note: "セミセルフで押すとスタッフ呼び出し（現金はスタッフが有人モードで預かる）" },
+        { label: "残高確認", tone: "積極", note: "セミセルフでも呼び出さない" },
         { label: "バック", tone: "消極", note: "小ボタン。左下" },
       ],
     },

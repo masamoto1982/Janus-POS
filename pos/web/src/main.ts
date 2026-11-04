@@ -40,7 +40,7 @@ import {
   bellSettings,
   ownerPanel,
   shelfPanel,
-  readableCardsPanel,
+  readableCardsShelves,
   walletPanel,
   sideOf,
   sharedScreen,
@@ -1083,11 +1083,8 @@ function openPicker(register: number, side: Side, kind: "item" | "wallet"): void
   const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の${side === "staff" ? "入金ボックス（現金）" : "決済端末（かざす）"}`;
   document.getElementById("picker-title")!.textContent = title;
   const body = document.getElementById("picker-body")!;
-  if (kind === "wallet") body.innerHTML = walletPanel(snap.emoney_balance);
-  else {
-    // レジ画面の長押し：商品と、ポイント・クーポン（Wallet のカード類）をタブで切り替える
-    body.innerHTML = `<div class="picker-tabs" role="tablist"><button type="button" class="seg on" role="tab" aria-selected="true" data-picker-tab="item">商品</button><button type="button" class="seg" role="tab" aria-selected="false" data-picker-tab="cards">ポイント・クーポン</button></div><div id="picker-pane">${shelfPanel(snap)}</div>`;
-  }
+  // レジ画面の長押しは、商品の棚のオプションの下にポイント・クーポンの棚も並べる（モバイル専用の見せ方）
+  body.innerHTML = kind === "item" ? shelfPanel(snap, readableCardsShelves()) : walletPanel(snap.emoney_balance);
   pickerDlg().showModal();
 }
 
@@ -1185,16 +1182,6 @@ function wireSwipe(): void {
     if (t.closest("[data-close-picker]") || t === dlg) {
       dlg.close();
       pickFor = null;
-      return;
-    }
-    const tab = t.closest<HTMLElement>("[data-picker-tab]");
-    if (tab) {
-      dlg.querySelectorAll<HTMLElement>("[data-picker-tab]").forEach((x) => {
-        const on = x === tab;
-        x.classList.toggle("on", on);
-        x.setAttribute("aria-selected", String(on));
-      });
-      document.getElementById("picker-pane")!.innerHTML = tab.dataset.pickerTab === "cards" ? readableCardsPanel() : shelfPanel(snap);
       return;
     }
     const b = t.closest<HTMLElement>("[data-code], [data-wallet]");

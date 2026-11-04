@@ -1720,7 +1720,8 @@ function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCA
 }
 
 /** Item：4 大分類ごとに小さな見出しを付けて並べる */
-export function shelfPanel(s: Snapshot): string {
+/** extra：オプションの棚の下（伝票の棚の上）に足す棚。モバイルの長押しで使う */
+export function shelfPanel(s: Snapshot, extra = ""): string {
   // たばこはカウンターの内側の商品。有人モードのレジがあるときだけ並べ、
   // たばこボタンで呼ばれて有人モードになったら（まだ登録していなければ）枠と文字を点滅させる
   const attended = s.registers.some((r) => r.mode === "attended");
@@ -1745,7 +1746,7 @@ export function shelfPanel(s: Snapshot): string {
             ),
       )
       .join("")}</div></div>`;
-  }).join("") + slipShelf(s);
+  }).join("") + extra + slipShelf(s);
 }
 
 /**
@@ -1771,15 +1772,13 @@ function walletItem(key: string, name: string, sub: string, cls: string, hint: s
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
-/** レジが読むカード類（ポイントカード・アプリ、引換券・割引券）。モバイルのレジ画面の長押しで商品と並べて出す */
-export function readableCardsPanel(): string {
-  const cards = [
-    item("PC12345678", "ポイントカード", "", "card"),
-    item("PC87654321", "ポイントアプリ", "", "card"),
-    item("CP0001", "引換券", "ソフトドリンク", "coupon"),
-    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
-  ];
-  return `<div class="shelf"><div class="items wallet-cards">${cards.join("")}</div></div>`;
+/** レジが読むカード類（ポイント・クーポン）。モバイルのレジ画面の長押しで、商品の棚のオプションの下に並べる */
+export function readableCardsShelves(): string {
+  const shelf = (label: string, items: string[]) => `<div class="shelf"><h3>${label}</h3><div class="items uniform">${items.join("")}</div></div>`;
+  return (
+    shelf("ポイント", [item("PC12345678", "ポイントカード", "", "card"), item("PC87654321", "ポイントアプリ", "", "card")]) +
+    shelf("クーポン", [item("CP0001", "引換券", "ソフトドリンク", "coupon"), item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon")])
+  );
 }
 
 export function walletPanel(emoneyBalance: number): string {

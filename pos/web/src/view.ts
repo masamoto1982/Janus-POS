@@ -1771,6 +1771,17 @@ function walletItem(key: string, name: string, sub: string, cls: string, hint: s
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
+/** レジが読むカード類（ポイントカード・アプリ、引換券・割引券）。モバイルのレジ画面の長押しで商品と並べて出す */
+export function readableCardsPanel(): string {
+  const cards = [
+    item("PC12345678", "ポイントカード", "", "card"),
+    item("PC87654321", "ポイントアプリ", "", "card"),
+    item("CP0001", "引換券", "ソフトドリンク", "coupon"),
+    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
+  ];
+  return `<div class="shelf"><div class="items wallet-cards">${cards.join("")}</div></div>`;
+}
+
 export function walletPanel(emoneyBalance: number): string {
   const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill", HINT_CASH));
   const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin", HINT_CASH));

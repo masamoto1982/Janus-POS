@@ -193,7 +193,7 @@ pub struct Context {
     pub method: Option<PaymentMethod>,
     /// セミセルフで、店員が会計に進めてお客様に支払いを任せている
     pub customer_turn: bool,
-    /// 店舗メニューを開いている側（お客様側のパスワード入力中もお客様側）
+    /// 店舗メニューを開いている側（スタッフ側の画面だけ）
     pub menu_side: Option<Side>,
     /// いま触れている側（操作した直後の一瞬だけ。その間はもう一方からの操作が利かない）
     pub touching: Option<Side>,
@@ -201,6 +201,8 @@ pub struct Context {
     pub items_full: bool,
     /// 電子マネーで払おうとしたが残高が足りず、どうするか選んでいない
     pub emoney_short: bool,
+    /// 現金のみの商品（切手・代行収納）がある
+    pub cash_only_goods: bool,
 }
 
 /// 一回のお買い物で登録できる点数（数量の合計）の上限。
@@ -219,6 +221,8 @@ impl Context {
             Some(EMONEY_SHORT)
         } else if self.bill_unchecked {
             Some(BILL_UNCHECKED)
+        } else if self.mode == Mode::SemiSelf && self.cash_only_goods {
+            Some(SEMI_CASH_ONLY_GOODS)
         } else if self.age_choice_pending {
             Some("スタッフが年齢確認をするか選んでいません")
         } else if self.id_pending {
@@ -248,6 +252,12 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります。対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
+/// セミセルフはキャッシュレス専用機。現金のみの商品は、スタッフがログインして有人モードで会計する
+const SEMI_CASH_ONLY_GOODS: Denial =
+    "切手・お支払いは現金のみです。スタッフが有人モードでお預かりします";
+/// セミセルフには現金を入れる口がない
+const SEMI_NO_CASH: Denial =
+    "セミセルフモードでは現金を使えません。キャッシュレスでお支払いください";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません。どうするか選んでください";
 
 /// 電子マネーのチャージ・残高確認（残高不足の対応中は、その選択肢から）
@@ -530,7 +540,9 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
         }
         // 決済の後に係員がログアウトしていても、お渡しは済ませられる
         Action::HandOverBills => hand_over_bills(c),
-        Action::InsertCash | Action::TapEmoney => pay_action(action, c),
+        // 自動釣銭機の入金ボックスはスタッフ側の画面に付いている。セミセルフは現金を扱わない
+        Action::InsertCash => Err(SEMI_NO_CASH),
+        Action::TapEmoney => pay_action(action, c),
         Action::CallStaff => Ok(()),
         Action::Emoney => emoney(c),
         Action::ResolveEmoneyShort => resolve_emoney_short(c),
@@ -572,6 +584,7 @@ mod tests {
                                             touching: None,
                                             items_full: false,
                                             emoney_short: false,
+                                            cash_only_goods: false,
                                             customer_turn,
                                             mode,
                                             phase,

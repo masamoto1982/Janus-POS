@@ -859,7 +859,8 @@ const GUIDES: [GuideKind, string, string][] = [
 /** レジ画面ヘッダー中央に出す動作モード（両画面）。有人：濃い塗り、セミセルフ：枠線 */
 const modeTitle = (attended: boolean): string => `<span class="mode-title ${attended ? "attended" : "semi"}">${attended ? "有人モード" : "セミセルフモード"}</span>`;
 
-export function welcome(reg: number, side: Side, emoney?: ActionState): string {
+export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {
+  const reg = r.id;
   const on = scanGuide.get(`${reg}:${side}`);
   const guide = GUIDES.find(([k]) => k === on);
   return `<div class="welcome${emoney ? " scan-welcome" : ""}">
@@ -867,38 +868,23 @@ export function welcome(reg: number, side: Side, emoney?: ActionState): string {
       <p>すべてのバーコードを受け付けます</p>
       <div class="guide-row">${GUIDES.map(
         ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
-      ).join("")}</div>
+      ).join("")}${emoneyBtn(r, side)}</div>
       ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
 
 /**
- * 電子マネーのチャージ・残高確認の入口：画面（登録エリア）の左下端の、円を四分の一にした扇形。
- * 入口はモードによらずここだけで、両モードの待ち受け画面と商品登録画面に出す。確認画面・手続きの最中は出さない。
- * セミセルフのお買い物の途中は、押すとスタッフを呼ぶ（ほかの呼び出しボタンと同じく押している間鳴る）。
- * スタッフがログインした有人モードで手続きすれば安全で、お客様は取引を終えずに済む。
- * 押すのは操作する側（有人は店員側、セミセルフはお客様側）。もう一方の画面には押せない形で映す
+ * 電子マネーのチャージ・残高確認の入口：待ち受けのご用件ボタンの並びに置く（扇形は一旦廃止。置き場所は確認中）。
+ * 押すのは操作する側（有人は店員側、セミセルフはお客様側）。もう一方の画面には押せない形で映す。
+ * セミセルフでチャージを選ぶとスタッフ呼び出しになる（核側の仕様）
  */
-export function emoneyFan(r: RegisterView, side: Side, main: string): string {
-  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null) return "";
+function emoneyBtn(r: RegisterView, side: Side): string {
   const attended = r.mode === "attended";
   const v = attended ? r.staff : r.customer;
-  const welcomeShown = main.includes('class="welcome');
-  const registering = v.phase === "registering" && main.includes('class="reg-top"') && !main.includes('class="confirm"');
-  if (!welcomeShown && !registering) return "";
-  // 商品登録画面では登録の妨げにならないよう控えめな大きさにし、「電子マネー」だけを出す
-  const compact = !welcomeShown;
-  const label = compact ? `<span><b>電子<br>マネー</b></span>` : `<span><b>電子マネー</b><small>チャージ<br>残高確認</small></span>`;
-  const cls = `emoney-fan${compact ? " compact" : ""}`;
   const own: Side = attended ? "staff" : "customer";
-  if (side !== own) return `<button type="button" class="${cls} mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;
-  if (!attended && registering) {
-    // セミセルフのお買い物の途中：スタッフを呼ぶ
-    const st = find(r.customer.actions, "call_staff");
-    const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
-    return `<button type="button" class="${cls}" data-hold="${esc(JSON.stringify(cmd))}" title="スタッフを呼んで手続きします（押している間鳴ります）"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}>${label}</button>`;
-  }
-  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, find(v.actions, "emoney"), cls).replace("></button>", `>${label}</button>`);
+  const label = "電子マネー";
+  if (side !== own) return `<button type="button" class="guide-btn emoney-entry mirror-only" tabindex="-1" aria-disabled="true">${label}</button>`;
+  return btn("", { type: "start_emoney", register: r.id, side, kind: "menu" }, find(v.actions, "emoney"), "guide-btn emoney-entry").replace("></button>", `>${label}</button>`);
 }
 
 /**
@@ -942,7 +928,7 @@ const ATTENDED_GUIDES: [GuideKind, string, string][] = [
 
 /**
  * 有人モードの初期画面。あいさつと声かけの二行に、ご用件の案内ボタンを添える。
- * 一段目は お買い物・宅配便・お支払い（押すと読むバーコードを案内）。電子マネーは左下の扇形から（emoneyFan）。
+ * 一段目は お買い物・宅配便・お支払い（押すと読むバーコードを案内）。電子マネーも同じ並びに置く（emoneyBtn）。
  * 両方の画面に出し、操作できるのは店員側だけ（お客様側はどの用件を受け付けているかを見せる）
  */
 function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
@@ -956,7 +942,7 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
   return `${notice}<div class="welcome attended-welcome"><div class="big">${head}</div><p>${sub}</p>
-      <div class="guide-row">${guides}</div>
+      <div class="guide-row">${guides}${emoneyBtn(r, side)}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
@@ -1238,32 +1224,26 @@ function cashOnlyNote(r: RegisterView): string {
 }
 
 // ---------------------------------------------------------------------------
-// レジ画面のヘッダー：左に店舗メニューのハンバーガー、中央に稼働モード、右に日付と時刻。
-// 呼び出しベルは右下の扇形（bellFan）。どちらが店員側・お客様側かは設置で自明なので画面には出さない
+// レジ画面のヘッダー：左に店舗メニューのハンバーガーと時刻、中央に稼働モード、右に呼び出しベル。
+//どちらが店員側・お客様側かは設置で自明なので画面には出さない
 // ---------------------------------------------------------------------------
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
 export function clockText(d: Date): string {
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
-  // 左端は店舗メニューのハンバーガー、中央は稼働モード。休止中は画面の「レジ休止中」と重ねて出さない
-  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}</span><span class="head-c">${r.paused ? "" : modeTitle(r.mode === "attended")}</span><time class="clock">${clockText(now)}</time>`;
-}
-
-/**
- * 呼び出しベル：画面（登録エリア）の右下端の、円を四分の一にした扇形。押している間鳴る。
- * 有人モードでは店員側のベルは仲間に SOS を出すのに使う（お客様側は店員がいるので押せない）
- */
-export function bellFan(r: RegisterView, side: Side): string {
+  // 有人モードでは、店員側のベルは仲間に SOS を出すのに使う（お客様側は店員がいるので押せない）
   const call = find(r.customer.actions, "call_staff");
   const sos = r.mode === "attended";
   const on = call.allowed && !(sos && side === "customer");
   const bellTip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
   const reason = sos && side === "customer" ? "スタッフが対応中です" : (call.reason ?? "");
-  return `<button type="button" class="bell-fan" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}><span>🔔</span></button>`;
+  const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}>🔔</button>`;
+  // 左：店舗メニューのハンバーガーと時刻、中央：稼働モード、右：呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
+  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}<time class="clock">${clockText(now)}</time></span><span class="head-c">${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r">${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1497,7 +1477,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   );
 
   if (!c.lines.length && !c.coupons.length) voidAsk.delete(reg);
-  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(reg, side, a("emoney"))}`;
+  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(r, side, a("emoney"))}`;
   // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）。
   // お会計中は、手続きを引き返す「バック」を確認画面の左下に置く
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";

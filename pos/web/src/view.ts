@@ -423,10 +423,10 @@ export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: 
 }
 
 /** 店員の確認が済んだ公共料金の支払い（お客様側）。公共料金は現金のみ */
-export function billPayCard(count: number): string {
+export function billPayCard(count: number, semi = false): string {
   return `<div class="point-screen bill-pay">
       <div class="big">公共料金${billN(count)}を受け付けます。</div>
-      <p>現金でお支払いください。</p>
+      <p>${semi ? "現金はスタッフがお預かりします。スタッフをお呼びください。" : "現金でお支払いください。"}</p>
     </div>`;
 }
 
@@ -467,22 +467,24 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 const INSERT_DONE_MS = 30_000;
 
 /** 支払方法を選んだ後の案内 */
-function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null): string {
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, semi = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   // 現金のみの商品（切手・代行収納）があれば、電子マネーで払う額と現金で払う額をかざす前に見せる
-  // （現金と併用できるのは電子マネーだけ。かざし方は入金ボックスの点滅する案内に任せ、ここは金額の内訳だけにする）
+  // （現金と併用できるのは電子マネーだけ。かざし方は決済端末の点滅する案内に任せ、ここは金額の内訳だけにする）
   if (method && method !== "cash" && cashlessDue < due)
     return `<p>${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
-  if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、入金ボックスにかざしてください</p>`;
-  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、入金ボックスにかざしてください</p>`;
+  if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
+  if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
+  // セミセルフはキャッシュレス専用機（現金の入金ボックスはスタッフ側の画面に付いている）
+  if (semi) return `<p>キャッシュレスでお支払いください。お支払い方法を選んでください</p>`;
   // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
-  if (inserted && due > 0) return `<p>あと <b>${yen(due)}</b> 入れてください</p>`;
-  // 「投入おわり」はお客様だけが押す（入れ終わったかは、お客様にしか分からない）
+  if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> お預かりしてください</p>` : `<p>あと <b>${yen(due)}</b> お預かりします</p>`;
+  // 現金はスタッフが預かり、スタッフ側の入金ボックスに入れる。「投入おわり」もスタッフが押す
   // 最後の投入から無操作が続くと確定する。残り秒数は数え下げる
   if (inserted) return `<p>${Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000)}秒の無操作で、お支払いを確定します</p>`;
-  if (method === "cash" && staff) return `<p>お客様に現金を入れていただき、「投入おわり」を押していただいてください</p>`;
-  if (method === "cash") return `<p>現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
-  return `<p>現金を入金ボックスに入れるか、支払方法を選んでください</p>`;
+  if (method === "cash" && staff) return `<p>お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
+  if (method === "cash") return `<p>スタッフが現金をお預かりします</p>`;
+  return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
 }
 
 /**
@@ -740,6 +742,14 @@ export function callScreen(r: RegisterView, now: number): string {
     </div>`;
 }
 
+/** セミセルフで、現金のみの商品（切手）の係員を待つ間のお客様側の案内（会計ボタンで自動的に呼ぶ） */
+function cashOnlyWait(): string {
+  return `<div class="point-screen">
+      <div class="big">切手は現金のみのお取り扱いです。</div>
+      <p>スタッフをお呼びしました。そのままお待ちください。</p>
+    </div>`;
+}
+
 /** セミセルフで年確の係員を待つ間のお客様側の案内（登録画面・支払画面の代わりに出す） */
 function ageWait(age: number): string {
   return `<div class="point-screen">
@@ -859,7 +869,7 @@ export function welcome(reg: number, side: Side, emoney?: ActionState): string {
  * 押すのは操作する側（有人は店員側、セミセルフはお客様側）。もう一方の画面には押せない形で映す
  */
 export function emoneyFan(r: RegisterView, side: Side, main: string): string {
-  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null) return "";
+  if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null) return "";
   const attended = r.mode === "attended";
   const v = attended ? r.staff : r.customer;
   const welcomeShown = main.includes('class="welcome');
@@ -942,10 +952,8 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
 
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
-  // 店舗メニューは開いた側の画面にだけ出す。お客様側から開くときは、店員画面にパスワード・お客様画面に入力欄
-  if (r.menu?.side === side) return notice + storeMenu(r);
-  if (r.menu_code) return notice + menuCode(r, side);
-  if (r.menu && side === "staff") return notice + pairNote("お客様側の画面で店舗メニューを操作しています");
+  // 店舗メニューはスタッフ側の画面にだけ出す（お客様側は登録画面のまま）
+  if (r.menu && side === "staff") return notice + storeMenu(r);
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
@@ -983,9 +991,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const top = regTop(
     v.total,
     itemCount(v.lines),
-    // 「投入おわり」は例外なくお客様側だけに出す（入れ終わったかは、お客様にしか分からない）。
+    // 「投入おわり」はスタッフ側だけに出す（現金はスタッフが預かって入金ボックスに入れる）。
     // 会計ボタンは会計中に別のボタンに置き換えない（引き返す「バック」は確認画面の左下）
-    (paying && v.method === "cash" && ro
+    (paying && v.method === "cash" && !ro
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro || paying
         ? ""
@@ -1087,7 +1095,8 @@ function customerPointAsk(): string {
  * 商品登録が一つもないときは出さない（案内を広く見せる）。
  */
 /**
- * 現金払いのときだけ、お客様側の会計ボタンの位置が「投入おわり」に切り替わる（店員側には出さない）。
+ * 現金払いのときだけ、スタッフ側の会計ボタンの位置が「投入おわり」に切り替わる（お客様側には出さない。
+ * 入金ボックスはスタッフ側の画面に付いていて、現金はスタッフが預かって入れる）。
  * 入金ボックスで Enter を押すのは、このボタンを押す近道
  */
 function finishInsert(reg: number, inserted: number, due: number, st: ActionState): string {
@@ -1098,8 +1107,8 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
       : due > 0
         ? { ...st, allowed: false, reason: `あと ${yen(due)} 入れてください` }
         : st;
-  // お客様本人が押すボタン（有人モードでも、お客様側の画面で押せる）
-  return `<span class="customer-only">${btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary")}</span>`;
+  // 現金を入れたスタッフ本人が押すボタン（スタッフ側の画面でだけ押せる）
+  return `<span class="staff-only">${btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary")}</span>`;
 }
 
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean, voidHtml = "", infoHtml = ""): string {
@@ -1167,7 +1176,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
           ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}${go("確認しました", "cash_confirmed", "primary")}</div>`}
         </div>`;
     return `<div class="point-screen emoney-screen">
-        <div class="big">電子マネーを入金ボックスにかざしてください</div>${note}
+        <div class="big">電子マネーを決済端末にかざしてください</div>${note}
         ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}</div>`}
       </div>`;
   }
@@ -1177,7 +1186,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     return `<div class="point-screen emoney-screen">
         <div class="big">電子マネーの残高が足りません</div>
         <p>残高 <b>${yen(r.emoney_short)}</b>・お支払い <b>${yen(r.staff.due)}</b></p>
-        ${ro ? "" : `<div class="emoney-choices">${choice("他の決済を使う", "cancel", "skip")}${choice("不足分を現金で払う", "cash", r.mode === "attended" ? "" : "primary")}${r.mode === "attended" ? choice("電子マネーをチャージする", "charge", "primary") : ""}</div>`}
+        ${ro ? "" : `<div class="emoney-choices">${r.mode === "attended" ? `${choice("他の決済を使う", "cancel", "skip")}${choice("不足分を現金で払う", "cash")}${choice("電子マネーをチャージする", "charge", "primary")}` : choice("他の決済を使う", "cancel", "primary")}</div>`}
       </div>`;
   }
   const e = r.emoney!;
@@ -1191,11 +1200,11 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   }
   if (e.kind === "inquiry")
     return e.balance === null
-      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを入金ボックスにかざしてください</div></div>${close("バック")}`
+      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを決済端末にかざしてください</div></div>${close("バック")}`
       : `<div class="point-screen emoney-screen"><p>電子マネーの残高</p><div class="big emoney-balance">${yen(e.balance)}</div>${close("閉じる")}</div>`;
   return `<div class="point-screen emoney-screen">
       <div class="big">チャージする紙幣を入れてください</div>
-      <p>${e.inserted ? "入れおわったら、電子マネーを入金ボックスにかざしてください" : "入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）"}</p>
+      <p>${e.inserted ? "入れおわったら、電子マネーを決済端末にかざしてください" : "入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）"}</p>
     </div>${close("バック")}`;
 }
 
@@ -1237,13 +1246,8 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bell = `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: r.id }))}" aria-label="${bellTip}" title="${esc(on ? bellTip : reason)}"${on ? "" : " disabled"}>🔔</button>`;
   const label = r.mode === "attended" ? "有人モード" : "セミセルフモード";
   const cls = `mode-badge ${r.mode === "attended" ? "attended" : "semi"}`;
-  // 店舗メニューは両方の画面のバッジから開ける。開いた側の画面にだけ、その側の項目を出す
-  const open = r.menu?.side === side || (side === "customer" && !!r.menu_code);
-  const what = side === "staff" ? "ジャーナル確認・廃棄登録・FF鮮度管理など" : "自動釣銭機へのお金の出し入れ。スタッフ側の画面に出るパスワードで開く";
-  const badge =
-    r.mode === "attended" && r.staff.state === "ready"
-      ? `<button type="button" class="${cls}" data-gear="${r.id}:${side}" aria-label="レジ${r.id}の店舗メニュー" title="${open ? "店舗メニューを閉じる" : `店舗メニュー（${what}）`}"${open ? ' aria-expanded="true"' : ""}>${label}<span class="caret">▾</span></button>`
-      : `<span class="${cls}">${label}</span>`;
+  // モードバッジは表示だけ（店舗メニューの入口はスタッフ側の画面に付いている：storeMenuEntry）
+  const badge = `<span class="${cls}">${label}</span>`;
   // 休止中は画面の「レジ休止中」と重ねて出さない（稼働モードのバッジは出さない）
   return `<span class="head-l">${r.paused ? "" : badge}</span><time class="clock">${clockText(now)}</time><span class="head-r">${bell}</span>`;
 }
@@ -1269,7 +1273,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const reg = r.id;
   // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
   // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
-  if (r.paused || r.menu || r.menu_code || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
+  if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
@@ -1321,8 +1325,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
 }
 
 // ---------------------------------------------------------------------------
-// 店舗メニュー（お客様画面の右上の歯車から。有人モードの店員だけが使う）
-// 自動釣銭機の取り出し口は売り場側にあるので、入出金の操作もお客様画面側で行う
+// 店舗メニュー（スタッフ側の画面に付いた入口から。有人モードの店員だけが使う）
+// 自動釣銭機の入金・出金ボックスもスタッフ側の画面に付いているので、入出金の操作もスタッフ側で行う
 // ---------------------------------------------------------------------------
 
 const MENU_LABEL: Record<MenuScreen, string> = {
@@ -1337,32 +1341,26 @@ const MENU_LABEL: Record<MenuScreen, string> = {
   ff_fresh: "FF鮮度管理",
 };
 
-/** 店舗メニューの項目：お客様側は自動釣銭機へのお金の出し入れ、店員側はそれ以外 */
-const MENU_ITEMS: Record<Side, MenuScreen[]> = {
-  customer: ["refund", "emergency", "deposit", "expense", "changer"],
-  staff: ["journal", "waste", "ff_fresh"],
-};
+/** 店舗メニューの項目（お金の出し入れを伴うものは、取引中は開けない） */
+const MENU_ITEMS: { screen: MenuScreen; cash: boolean }[] = [
+  { screen: "refund", cash: true },
+  { screen: "emergency", cash: true },
+  { screen: "deposit", cash: true },
+  { screen: "expense", cash: true },
+  { screen: "changer", cash: true },
+  { screen: "journal", cash: false },
+  { screen: "waste", cash: false },
+  { screen: "ff_fresh", cash: false },
+];
 
 /**
- * お客様側から店舗メニューを開くときの使い捨てパスワード。店員画面にだけパスワードを出し、
- * お客様側の画面で入力する（パスワードを見た人でなければ開けない）
+ * スタッフ側の画面に付いた店舗メニューの入口。有人モードでログインしているときだけ押せる。
+ * 開いている間は同じボタンで閉じる（開く所と閉じる所を同じにする）
  */
-function menuCode(r: RegisterView, side: Side): string {
-  const reg = r.id;
-  if (side === "staff")
-    return confirm(`<div class="point-screen menu-code-show">
-      <p>お客様側の画面から店舗メニューを開こうとしています</p>
-      <div class="big menu-code-value" aria-label="パスワード">${esc(r.menu_code ?? "")}</div>
-      <p class="muted">このパスワードをお客様側の画面で入力してください。一度きり有効です</p>
-    </div>`);
-  return confirm(`<div class="point-screen menu-code">
-      <div class="big">店舗メニューのパスワード</div>
-      <p>スタッフ側の画面に出ている 4 桁を入力してください</p>
-      <div class="row menu-code-form">
-        <input type="text" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="例 U8X3" data-menucode="1" data-key="mc-${reg}" aria-label="パスワード" />
-        <button class="primary" data-form="menucode" data-reg="${reg}">開く</button>
-      </div>
-    </div>${backCorner({ type: "open_menu", register: reg, side: "customer", screen: null })}`);
+export function storeMenuEntry(r: RegisterView): string {
+  const usable = r.mode === "attended" && r.staff.state === "ready";
+  const open = !!r.menu;
+  return `<button type="button" class="store-menu-btn" data-gear="${r.id}:staff" aria-label="レジ${r.id}の店舗メニュー"${open ? ' aria-expanded="true"' : ""}${usable ? "" : " disabled"} title="${usable ? (open ? "店舗メニューを閉じる" : "店舗メニュー（返品返金・両替・ジャーナル確認など）") : "スタッフがログインすると使えます"}">店舗メニュー</button>`;
 }
 
 /** 一度に一つの画面だけを出す：一覧 → 各項目の画面 */
@@ -1370,8 +1368,7 @@ export function storeMenu(r: RegisterView): string {
   const v = r.staff;
   const reg = r.id;
   const m = r.menu!;
-  const side = m.side;
-  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side, screen, ...extra });
+  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, side: "staff", screen, ...extra });
   const head = (title: string) => `<div class="menu-head"><b>${esc(title)}</b></div>`;
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   // 各項目の画面は、左下の「バック」で一覧に戻る
@@ -1379,8 +1376,8 @@ export function storeMenu(r: RegisterView): string {
   switch (m.screen) {
     case "top":
       return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
-        <div class="menu-list">${MENU_ITEMS[side]
-          .map((k) => btn(MENU_LABEL[k], go(k), side === "customer" ? busy : undefined, "menu-item"))
+        <div class="menu-list">${MENU_ITEMS
+          .map((k) => btn(MENU_LABEL[k.screen], go(k.screen), k.cash ? busy : undefined, "menu-item"))
           .join("")}</div>
         <div class="menu-list">
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
@@ -1424,7 +1421,6 @@ export function storeMenu(r: RegisterView): string {
 // ---------------------------------------------------------------------------
 
 export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
-  if (r.menu?.side === side) return notice + storeMenu(r);
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
@@ -1456,9 +1452,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     // セミセルフではお買い物の途中に電子マネーのチャージ・残高確認はできない（ボタンを出さない）
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
-      : c.method === "cash" && side === "customer"
-        ? finishInsert(reg, c.inserted, c.due, a("insert_cash"))
-        : ""),
+      : ""),
     r.max_items,
     !!c.point_card,
     voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
@@ -1473,8 +1467,10 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
   // 公共料金：係員を待つ間は案内だけ。係員の確認が済んでいれば（その後にログアウトしても）現金で支払う
   const slips = c.bills.length;
-  if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : billPayCard(slips));
+  if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : billPayCard(slips, true));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
+  // 切手などの現金のみの商品：セミセルフは現金を扱わないので、スタッフが有人モードで会計する
+  if (c.phase === "paying" && r.cash_only) return screen(cashOnlyWait());
   // 荷物を送る：伝票を読んで係員を待つ間は、登録画面ではなく案内だけを出す
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   const card = firstOf([
@@ -1486,7 +1482,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
     return screen(`<div class="paybox center">
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms)}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true)}
       </div>`);
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));
@@ -1681,8 +1677,8 @@ const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
 /** 使い方の説明（ボタンにカーソルを重ねると出る） */
 const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
 const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
-const HINT_PAY = "支払方法を選んでから、入金ボックスにドラッグ＆ドロップ";
-const HINT_EMONEY = "入金ボックスにドラッグ＆ドロップ";
+const HINT_PAY = "支払方法を選んでから、決済端末にドラッグ＆ドロップ";
+const HINT_EMONEY = "決済端末にドラッグ＆ドロップ";
 
 function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCAN): string {
   return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">

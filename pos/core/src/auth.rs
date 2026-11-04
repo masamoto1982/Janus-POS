@@ -90,7 +90,6 @@ impl Guard {
 
 #[derive(Clone, Debug, Default)]
 pub struct Authenticator {
-    menu_code: Guard,
     owner: Guard,
 }
 
@@ -100,17 +99,6 @@ fn constant_time_eq(a: &str, b: &str) -> bool {
 }
 
 impl Authenticator {
-    /// お客様側から店舗メニューを開くときの使い捨てパスワード。続けて間違えると一時ロックする
-    pub fn verify_menu_code(
-        &mut self,
-        given: &str,
-        expected: &str,
-        now: u64,
-    ) -> Result<(), String> {
-        let ok = constant_time_eq(given, expected);
-        self.menu_code.check(ok, now)
-    }
-
     pub fn verify_owner(&mut self, staff_id: &str, password: &str, now: u64) -> Result<(), String> {
         let acc = account(staff_id).ok_or("従業員が見つかりません")?;
         if acc.role != Role::Owner {
@@ -124,19 +112,6 @@ impl Authenticator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn menu_code_locks_after_repeated_failures() {
-        let mut a = Authenticator::default();
-        assert!(a.verify_menu_code("0000", "U8X3", 0).is_err());
-        assert!(a.verify_menu_code("0000", "U8X3", 1).is_err());
-        assert!(a.verify_menu_code("0000", "U8X3", 2).is_err());
-        assert!(
-            a.verify_menu_code("U8X3", "U8X3", 3).is_err(),
-            "locked even with the right code"
-        );
-        assert!(a.verify_menu_code("U8X3", "U8X3", 2 + LOCKOUT_MS).is_ok());
-    }
 
     #[test]
     fn crew_cannot_reauthenticate_as_owner() {

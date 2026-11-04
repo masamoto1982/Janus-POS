@@ -24,6 +24,8 @@ pub enum CallKind {
     Bill,
     /// セミセルフのお買い物の途中に、電子マネーの扇形が押された（スタッフがログインして有人モードで手続きする）
     Emoney,
+    /// セミセルフで、現金のみの商品（切手）の会計ボタンが押された（スタッフがログインして有人モードで現金をお預かりする）
+    CashOnly,
 }
 
 impl CallKind {
@@ -37,6 +39,7 @@ impl CallKind {
             CallKind::ChangeLeft => "釣銭忘れ",
             CallKind::Bill => "公共料金",
             CallKind::Emoney => "電子マネー",
+            CallKind::CashOnly => "現金のみ",
         }
     }
 }

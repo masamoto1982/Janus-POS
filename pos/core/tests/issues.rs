@@ -66,13 +66,11 @@ fn login(s: &mut Store, r: u8) {
     login_as(s, r, "ST001");
 }
 
-/// お客様側の画面から店舗メニューを開く：店員画面に出た使い捨てパスワードを入力する
-fn open_customer_menu(s: &mut Store, r: u8) {
-    ok(s, json!({"type":"request_menu_code","register":r}));
-    let code = reg(s, r).menu_code.expect("店員画面にパスワードが出る");
+/// スタッフ側の画面から店舗メニューを開く（自動釣銭機の入金・出金ボックスもスタッフ側）
+fn open_staff_menu(s: &mut Store, r: u8) {
     ok(
         s,
-        json!({"type":"open_menu","register":r,"side":"customer","screen":"top","code":code}),
+        json!({"type":"open_menu","register":r,"side":"staff","screen":"top"}),
     );
 }
 
@@ -859,9 +857,9 @@ fn parcel_cannot_be_mixed_with_other_goods() {
     .is_err());
 }
 
-/// 問題6：出金はお客様側の店舗メニューに入ったときだけでき（入るには使い捨てパスワード）、記録が残る。
+/// 問題6：出金はスタッフ側の店舗メニューに入ったときだけでき、記録が残る。
 #[test]
-fn cash_out_only_inside_the_customer_side_menu() {
+fn cash_out_only_inside_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     let co = json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000});
@@ -869,22 +867,7 @@ fn cash_out_only_inside_the_customer_side_menu() {
         run(&mut s, co.clone()).is_err(),
         "店舗メニューの外では出金できない"
     );
-    // 店員側の店舗メニューにはお金の出し入れがない
-    ok(
-        &mut s,
-        json!({"type":"open_menu","register":1,"screen":"top"}),
-    );
-    assert!(run(&mut s, co.clone()).is_err());
-    assert!(run(
-        &mut s,
-        json!({"type":"open_menu","register":1,"screen":"emergency"})
-    )
-    .is_err());
-    ok(
-        &mut s,
-        json!({"type":"open_menu","register":1,"screen":null}),
-    );
-    open_customer_menu(&mut s, 1);
+    open_staff_menu(&mut s, 1);
     ok(&mut s, co.clone());
     ok(&mut s, co);
     let a = s.snapshot().audit;
@@ -898,86 +881,37 @@ fn cash_out_only_inside_the_customer_side_menu() {
     .is_err());
 }
 
-/// お客様側から店舗メニューを開くには、店員画面にだけ出る使い捨てのパスワード（英大文字と数字の 4 桁）が要る。
-/// 店員側からはパスワードなしで開ける。開いた側の画面にだけ、その側の項目を出す。
+/// 店舗メニューはスタッフ側の画面だけで開く（パスワードなし）。お客様側からは開けない
 #[test]
-fn customer_side_menu_needs_a_one_time_code() {
+fn store_menu_opens_only_on_the_staff_side() {
     let mut s = Store::new(1, 2, 1);
-    login(&mut s, 1);
-    let open = |code: &str| json!({"type":"open_menu","register":1,"side":"customer","screen":"top","code":code});
     assert!(
-        run(&mut s, open("AAAA")).is_err(),
-        "パスワードを出す前は開けない"
+        run(
+            &mut s,
+            json!({"type":"open_menu","register":1,"side":"staff","screen":"top"})
+        )
+        .is_err(),
+        "ログインしたスタッフだけ"
     );
-    ok(&mut s, json!({"type":"request_menu_code","register":1}));
-    let v = reg(&s, 1);
-    let code = v.menu_code.clone().unwrap();
-    assert_eq!(code.len(), 4);
-    assert!(code
-        .chars()
-        .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
-    assert_eq!(v.active_side, Some(Side::Customer), "お客様側で入力する");
-    let wrong = if code == "0000" { "1111" } else { "0000" };
-    assert!(run(&mut s, open(wrong)).is_err());
-    ok(&mut s, open(&code.to_lowercase()));
-    let v = reg(&s, 1);
-    assert_eq!(v.menu.unwrap().side, Side::Customer);
-    assert!(v.menu_code.is_none(), "パスワードは一度きり");
-    assert_eq!(v.active_side, Some(Side::Customer));
-    // お客様側には店員側の項目を出さない
+    login(&mut s, 1);
     assert!(run(
         &mut s,
-        json!({"type":"open_menu","register":1,"side":"customer","screen":"journal"})
+        json!({"type":"open_menu","register":1,"side":"customer","screen":"top"})
     )
     .is_err());
-    ok(
-        &mut s,
-        json!({"type":"open_menu","register":1,"side":"customer","screen":null}),
-    );
-    // 閉じたら、もう一度パスワードを出さないと開けない
-    assert!(run(&mut s, open(&code)).is_err());
-    // 続けて間違えるとロックし、パスワードを作り直す
-    ok(&mut s, json!({"type":"request_menu_code","register":1}));
-    let first = reg(&s, 1).menu_code.unwrap();
-    let bad = if first == "ZZZZ" { "YYYY" } else { "ZZZZ" };
-    for _ in 0..3 {
-        assert!(run(&mut s, open(bad)).is_err());
-    }
-    let again = reg(&s, 1).menu_code.unwrap();
-    assert!(run(&mut s, open(&again)).is_err(), "しばらくロック");
-    advance(&mut s, 31_000);
-    ok(&mut s, open(&again));
-    ok(
-        &mut s,
-        json!({"type":"open_menu","register":1,"side":"customer","screen":null}),
-    );
-    advance(&mut s, 1_000);
-    // 店員側はパスワードなし。店員側の項目（仮設）を開ける
-    ok(
-        &mut s,
-        json!({"type":"open_menu","register":1,"screen":"top"}),
-    );
+    open_staff_menu(&mut s, 1);
     let v = reg(&s, 1);
-    assert_eq!(v.menu.unwrap().side, Side::Staff);
+    assert!(v.menu.is_some());
     assert_eq!(v.active_side, Some(Side::Staff));
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"screen":"journal"}),
+        json!({"type":"open_menu","register":1,"side":"staff","screen":"journal"}),
     );
-    // 有人モードのお客様側のバッジはいつでも押せる：店員側のメニューは閉じ、パスワードを出す
-    ok(&mut s, json!({"type":"request_menu_code","register":1}));
-    let v = reg(&s, 1);
-    assert!(v.menu.is_none());
-    assert!(v.menu_code.is_some());
-    assert_eq!(v.active_side, Some(Side::Customer));
-    // 店員側のバッジもいつでも押せる：お客様側のパスワード入力は取りやめになる
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"screen":"top"}),
+        json!({"type":"open_menu","register":1,"side":"staff","screen":null}),
     );
-    let v = reg(&s, 1);
-    assert_eq!(v.menu.unwrap().side, Side::Staff);
-    assert!(v.menu_code.is_none());
+    assert!(reg(&s, 1).menu.is_none());
 }
 
 /// 問題8：呼び出しは発生したレジだけに出て、ほかのレジには出ない。
@@ -1203,7 +1137,7 @@ fn cash_in_and_out_from_the_customer_side_menu() {
         run(&mut s, cin.clone()).is_err(),
         "店舗メニューの外では入金できない"
     );
-    open_customer_menu(&mut s, 1);
+    open_staff_menu(&mut s, 1);
     let before = reg(&s, 1).staff.drawer_total;
     ok(&mut s, cin);
     ok(
@@ -1231,12 +1165,15 @@ fn cash_in_and_out_from_the_customer_side_menu() {
 #[test]
 fn inlet_pays_and_change_waits_in_outlet() {
     let mut s = Store::new(1, 2, 1);
+    // セミセルフは現金を使えない（入金ボックスはスタッフ側の画面）
     scan(&mut s, 1, "customer", BREAD);
+    assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
+    login(&mut s, 1);
     // お会計前は受け付けない
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
     // 入れたお金は積み上がり、Enter で投入を終えると決済する
@@ -1270,21 +1207,21 @@ fn inlet_pays_and_change_waits_in_outlet() {
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
 }
 
-/// お客様側の店舗メニューは一画面ずつ出す。開いている間はお客様画面側で操作し、
-/// 入金・両替は投入口、出金と両替のお金は排出口を使う。
+/// 店舗メニューはスタッフ側の画面に一画面ずつ出す。
+/// 入金・両替はスタッフ側の入金ボックス、出金と両替のお金は出金ボックスを使う。
 #[test]
 fn store_menu_uses_inlet_and_outlet() {
     let mut s = Store::new(1, 2, 1);
     let open =
-        |screen: &str| json!({"type":"open_menu","register":1,"side":"customer","screen":screen});
+        |screen: &str| json!({"type":"open_menu","register":1,"side":"staff","screen":screen});
     assert!(
-        run(&mut s, json!({"type":"request_menu_code","register":1})).is_err(),
+        run(&mut s, open("top")).is_err(),
         "only for logged-in staff"
     );
     login(&mut s, 1);
-    open_customer_menu(&mut s, 1);
+    open_staff_menu(&mut s, 1);
     let v = reg(&s, 1);
-    assert_eq!(v.active_side, Some(Side::Customer));
+    assert_eq!(v.active_side, Some(Side::Staff));
     // 取引外入金：投入口に入れた金額が入金になる
     ok(&mut s, open("deposit"));
     let before = reg(&s, 1).staff.drawer_total;
@@ -1293,7 +1230,7 @@ fn store_menu_uses_inlet_and_outlet() {
     // 自動釣銭機：一万円を千円札に両替して排出口へ
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"side":"customer","screen":"changer","exchange_to":1000}),
+        json!({"type":"open_menu","register":1,"side":"staff","screen":"changer","exchange_to":1000}),
     );
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1500})).is_err());
     ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));
@@ -1311,7 +1248,7 @@ fn store_menu_uses_inlet_and_outlet() {
     // 閉じると両方の画面に戻る（触れている一瞬が過ぎれば）。ログアウトでもメニューは閉じる
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"side":"customer","screen":null}),
+        json!({"type":"open_menu","register":1,"side":"staff","screen":null}),
     );
     advance(&mut s, 1_000);
     assert_eq!(reg(&s, 1).active_side, None);
@@ -1975,6 +1912,31 @@ fn points_pay_only_for_point_eligible_goods() {
 /// 切手は現金のみ（非課税）。ほかの商品と一緒に買えるが、キャッシュレスで払えるのは切手を除いた分だけ
 #[test]
 fn stamps_are_paid_in_cash_even_with_other_items() {
+    // セミセルフ（キャッシュレス専用）：切手は会計ボタンでスタッフを呼び、現金はスタッフが有人モードで預かる
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", STAMP);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.staff.calls.iter().any(|c| c.label == "現金のみ"));
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+    );
+    assert!(run(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"})
+    )
+    .is_err());
+    assert!(run(&mut s, json!({"type":"insert","register":1,"amount":500})).is_err());
+    // スタッフがログインすると呼び出しは片付き、有人モードで現金を預かる
+    login(&mut s, 1);
+    assert!(reg(&s, 1).staff.calls.is_empty());
+
     // 切手だけならキャッシュレスは選べない
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", STAMP);
@@ -2001,16 +1963,17 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
 
     // パンと切手：電子マネーで払うのはパンの分だけ、切手は現金で
     let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", STAMP);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
     );
     assert_eq!(reg(&s, 1).cashless_due, 160);
     ok(
@@ -2028,16 +1991,17 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
 
     // 取引中止なら電子マネーで払った分は残高に戻る
     let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", STAMP);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
     );
     ok(
         &mut s,
@@ -2477,29 +2441,6 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
         reg(&s, 1).idle_revert_in.unwrap() < frozen,
         "countdown resumes"
     );
-
-    // セミセルフ：1 分で案内、2 分で呼び出し
-    let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
-    );
-    confirm_point(&mut s, 1);
-    ok(
-        &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
-    );
-    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
-    ok(&mut s, json!({"type":"finish_insert","register":1}));
-    advance(&mut s, 40_000);
-    assert!(!reg(&s, 1).change_left);
-    advance(&mut s, 21_000);
-    assert!(reg(&s, 1).change_left);
-    assert!(reg(&s, 1).staff.calls.is_empty());
-    advance(&mut s, 60_000);
-    assert_eq!(reg(&s, 1).staff.calls[0].label, "釣銭忘れ");
-    assert!(reg(&s, 1).last_receipt.is_some());
 }
 
 /// 販売個数の上限：オーナーが商品ごとに「1 回のお会計で何点まで」を決める。
@@ -2800,12 +2741,22 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.customer.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
-    // 不足分を現金で：案内を確認してから電子マネーをかざして残高を引き出し、残り 120 円を現金で
+    // セミセルフは現金を使えないので、残りを現金で払う道はない（有人モードだけ）
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
+    assert!(run(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"})
+    )
+    .is_err());
+
+    // 不足分を現金で：案内を確認してから電子マネーをかざして残高を引き出し、残り 120 円を現金で
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    short_checkout_on(&mut s, "staff");
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash"}),
     );
     assert_eq!(reg(&s, 1).emoney_partial, Some(1_000));
     assert!(
@@ -2819,7 +2770,7 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(emoney_balance(&s), 1_000);
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash_confirmed"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash_confirmed"}),
     );
     assert!(
         run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err(),
@@ -2837,7 +2788,7 @@ fn emoney_short_offers_three_choices() {
     assert!(
         run(
             &mut s,
-            json!({"type":"back_to_registering","register":1,"side":"customer"})
+            json!({"type":"back_to_registering","register":1,"side":"staff"})
         )
         .is_err(),
         "電子マネーで払った後は登録に戻れない"
@@ -2850,14 +2801,15 @@ fn emoney_short_offers_three_choices() {
 
     // 案内を見て、やめることもできる（何も引き落とされない）
     let mut s = Store::new(1, 2, 1);
-    short_checkout(&mut s);
+    login(&mut s, 1);
+    short_checkout_on(&mut s, "staff");
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash"}),
     );
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cancel"}),
     );
     let v = reg(&s, 1);
     assert_eq!(v.emoney_partial, None);
@@ -2913,12 +2865,12 @@ fn customer_voids_and_money_comes_back() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     confirm_point(&mut s, 1);
-    ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
+    // セミセルフは現金を入れられない（電子マネーなどキャッシュレス専用）
+    assert!(run(&mut s, json!({"type":"insert","register":1,"amount":100})).is_err());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     let v = reg(&s, 1);
     assert!(v.customer.lines.is_empty());
-    assert_eq!(v.outlet, 100);
-    assert_eq!(v.customer.inserted, 0);
+    assert_eq!(v.outlet, 0);
 }
 
 /// 店員側・お客様側どちらの店舗メニューにも「ログアウト」と「レジ休止中」がある（お客様側はパスワードで入った後）。
@@ -2927,7 +2879,7 @@ fn customer_voids_and_money_comes_back() {
 fn logout_and_pause_from_either_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    open_customer_menu(&mut s, 1);
+    open_staff_menu(&mut s, 1);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
@@ -2937,7 +2889,7 @@ fn logout_and_pause_from_either_store_menu() {
     scan(&mut s, 1, "staff", BREAD);
     assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
-    open_customer_menu(&mut s, 1);
+    open_staff_menu(&mut s, 1);
     ok(&mut s, json!({"type":"pause","register":1}));
     let v = reg(&s, 1);
     assert!(v.paused);
@@ -3117,10 +3069,11 @@ fn staff_alone_is_responsible_for_ff_handover() {
 fn thirty_seconds_without_insert_means_done_inserting() {
     let mut s = Store::new(1, 2, 1);
     s.tick(1000);
+    login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
     assert_eq!(reg(&s, 1).staff.method, None, "method not chosen yet");

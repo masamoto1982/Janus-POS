@@ -31,6 +31,7 @@ import {
   padValueKey,
   type PadTarget,
   screenHead,
+  storeMenuEntry,
   isoDate,
   scanGuide,
   voidAsk,
@@ -144,10 +145,16 @@ function buildSkeleton(): void {
           </section>
         </div>
       </div>
-      <div class="money-io staff-shown" aria-label="レジ${r.id}の投入口と排出口（お客様側だけにあります）">
-        <div class="money-io-cust" data-cash-drop="${r.id}">
-        <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:customer:inlet:" aria-label="レジ${r.id}の投入口（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
-        <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の排出口（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
+      <div class="money-io face-staff">
+        <div class="money-io-staff" aria-label="レジ${r.id}の自動釣銭機（スタッフ側の画面に付いています）">
+          <div class="store-menu-slot" data-region="menu-entry-${r.id}"></div>
+          <div class="money-io-boxes" data-cash-drop="${r.id}">
+            <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:staff:inlet:" aria-label="レジ${r.id}の入金ボックス（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
+            <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の出金ボックス（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
+          </div>
+        </div>
+        <div class="money-io-cust" aria-label="レジ${r.id}の決済端末（お客様側の画面に付いています）">
+          <div class="reader-slot" data-pay-drop="${r.id}"><button type="button" class="reader" data-reader="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・カード・バーコードをかざす）"><span data-region="reader-${r.id}"></span></button></div>
         </div>
       </div>
     </section>`,
@@ -386,7 +393,7 @@ function render(): void {
     // モバイルモード：操作する面（アクティブ面）が変わったら、その面を表にする。
     // セミセルフはお客様側、有人は店員側、店舗メニューは開いた側（パスワード入力中はお客様側）。
     // 有人モードで触れている一瞬だけ変わる操作側には付いていかない。表にした後もスワイプで切り替えられる
-    const face: Side = r.menu?.side ?? (r.menu_code ? "customer" : r.mode === "attended" ? "staff" : "customer");
+    const face: Side = r.menu ? "staff" : r.mode === "attended" ? "staff" : "customer";
     if (face !== activeShown.get(r.id)) {
       activeShown.set(r.id, face);
       if (isMobile()) swipeTo(r.id, face);
@@ -416,29 +423,31 @@ function render(): void {
     );
     // おつりなど、出金ボックスにお金があれば枠と文字を点滅させる
     app.querySelector(`[data-outlet="${r.id}"]`)?.classList.toggle("blink", r.outlet > 0);
-    // 入金ボックス：支払方法が決まったら中の文字を点滅させる。現金は投入額を積み上げて見せる
+    // 店舗メニューの入口（スタッフ側の画面に付いている）
+    setRegion(`menu-entry-${r.id}`, storeMenuEntry(r));
+    // 入金ボックス（現金。スタッフ側）と決済端末（キャッシュレス。お客様側）：支払方法が決まったら枠を点滅させる。
+    // 現金は投入額を積み上げて見せる
     const inlet = app.querySelector<HTMLElement>(`[data-inlet="${r.id}"]`);
+    const reader = app.querySelector<HTMLElement>(`[data-reader="${r.id}"]`);
+    const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null && r.emoney_partial === null;
+    // 電子マネーのチャージ・残高確認の間は、その手続きの案内を出す
+    const emoney = r.menu ? null : r.emoney;
+    // 「不足分を現金で払う」では、案内を確認したあとで電子マネーをかざしてもらう
+    const partial = !r.menu && r.emoney_partial !== null && r.emoney_partial_ok;
+    const cashPay = paying && r.staff.method === "cash";
+    const cashlessPay = (paying && r.staff.method !== "cash") || partial;
+    const charging = !!emoney && emoney.kind === "charge";
+    const tapping = !!emoney && emoney.kind !== "menu" && !(charging && !emoney.inserted);
     if (inlet) {
-      const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null && r.emoney_partial === null;
-      // 電子マネーのチャージ・残高確認の間は、その手続きの案内を出す
-      const emoney = r.menu ? null : r.emoney;
-      // 「不足分を現金で払う」では、案内を確認したあとで電子マネーをかざしてもらう
-      const partial = !r.menu && r.emoney_partial !== null && r.emoney_partial_ok;
-      inlet.classList.toggle("blink", paying || partial || (!!emoney && emoney.kind !== "menu"));
-      // 中の文字は、選んだ支払方法に合わせて何をすればよいかを示す
-      const hint = emoney && emoney.kind !== "menu"
-        ? emoney.kind === "charge"
-          ? emoney.inserted
-            ? "電子マネーをかざす"
-            : "紙幣を入れる"
-          : "電子マネーをかざす"
-        : partial
-          ? "電子マネーをかざす"
-          : paying
-          ? (INLET_HINT[r.staff.method!] ?? "入金")
-          : "入金";
+      inlet.classList.toggle("blink", cashPay || (charging && !emoney!.inserted));
+      const hint = cashPay || (charging && !emoney!.inserted) ? (charging ? "紙幣を入れる" : "現金を入れる") : "入金";
       const shown = emoney ? emoney.inserted : !r.menu ? r.staff.inserted : 0;
       setRegion(`inlet-${r.id}`, shown ? `<b>${shown.toLocaleString()}円</b>` : `<span class="placeholder">${esc(hint)}</span>`);
+    }
+    if (reader) {
+      reader.classList.toggle("blink", cashlessPay || tapping);
+      const hint = cashlessPay || tapping ? (cashlessPay && !partial ? (READER_HINT[r.staff.method!] ?? "決済端末") : "電子マネーをかざす") : "決済端末";
+      setRegion(`reader-${r.id}`, `<span class="placeholder">${esc(hint)}</span>`);
     }
   }
   setRegion("mats", matPanel(snap));
@@ -856,15 +865,11 @@ app.addEventListener("click", (e) => {
     ffTabs.set(reg, { tab: u.tab, page: Math.max(0, u.page + d) });
     return frame();
   }
-  // 稼働モードのバッジ：開いた側の画面で店舗メニューを開く・閉じる。
-  // お客様側は、店員画面に出る使い捨てパスワードを入力して開く
+  // 店舗メニューの入口（スタッフ側の画面に付いている）：開く・閉じる
   if (b.dataset.gear) {
-    const [reg, side] = b.dataset.gear.split(":") as [string, Side];
+    const [reg] = b.dataset.gear.split(":");
     const r = snap.registers.find((x) => x.id === Number(reg));
-    const open = r?.menu?.side === side || (side === "customer" && !!r?.menu_code);
-    if (open) send({ type: "open_menu", register: Number(reg), side, screen: null });
-    else if (side === "customer") send({ type: "request_menu_code", register: Number(reg) });
-    else send({ type: "open_menu", register: Number(reg), side, screen: "top" });
+    send({ type: "open_menu", register: Number(reg), side: "staff", screen: r?.menu ? null : "top" });
     return;
   }
   if (b.dataset.outlet) {
@@ -919,9 +924,7 @@ app.addEventListener("click", (e) => {
   // 連続値のテンキーを開く（荷物の長さ・重さ、入金ボックス）。もう一度押すとやめる
   if (b.dataset.padopen) {
     const [reg, s0, target, line] = b.dataset.padopen.split(":");
-    const r = snap.registers.find((x) => x.id === Number(reg));
-    // 入金ボックスのテンキーは、店舗メニューの入金・両替なら開いた側の画面に出す
-    const side = target === "inlet" ? (r?.menu?.side ?? s0) : s0;
+    const side = s0;
     const key = `${reg}:${side}`;
     if (padEntry.get(key)?.target === target) padEntry.delete(key);
     else {
@@ -949,9 +952,8 @@ app.addEventListener("click", (e) => {
 // ドラッグ＆ドロップ（ポインターイベントで実装。マウスでもタッチでも同じに動く）
 // ---------------------------------------------------------------------------
 
-// 入金ボックスの中の文字（支払方法ごと）
-const INLET_HINT: Record<string, string> = {
-  cash: "現金を入れる",
+// 決済端末の中の文字（支払方法ごと）
+const READER_HINT: Record<string, string> = {
   emoney: "電子マネーをかざす",
   qr: "バーコードをかざす",
   credit: "カードをかざす",
@@ -963,7 +965,7 @@ function setupDrag(): void {
   // code：レジで読むもの（商品・ポイントカード）、wallet：お金（cash:金額）とかざす決済（pay:方法）
   let drag: { code?: string; wallet?: string; label: string; x: number; y: number; moved: boolean; id: number } | null = null;
 
-  const target = (x: number, y: number): Element | null => document.elementFromPoint(x, y)?.closest("[data-drop], [data-cash-drop]") ?? null;
+  const target = (x: number, y: number): Element | null => document.elementFromPoint(x, y)?.closest("[data-drop], [data-cash-drop], [data-pay-drop]") ?? null;
   const end = () => {
     drag = null;
     ghost.hidden = true;
@@ -997,22 +999,27 @@ function setupDrag(): void {
     const t = target(e.clientX, e.clientY);
     end();
     if (!d.moved) {
-      toast("toast-store", "ドラッグして、レジのスタッフ側の画面・お客様画面（お金は入金ボックスにも）に落としてください", false);
+      toast("toast-store", "ドラッグして、レジのスタッフ側の画面・お客様画面（現金は入金ボックス、キャッシュレスは決済端末にも）に落としてください", false);
       return;
     }
     if (!t) return;
     const el = t as HTMLElement;
-    // 入金ボックスの周り（お客様側）に落としたときは、お客様側として扱う
-    const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop!, "customer"];
+    // 入金ボックスの周りはスタッフ側、決済端末の周りはお客様側として扱う
+    const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "staff" : "customer"];
     const register = Number(reg);
-    // ポイント利用を選んだあとは、ポイントカード・アプリを入金ボックスにかざすと決済になる
+    // ポイント利用を選んだあとは、ポイントカード・アプリを決済端末にかざすと決済になる
     const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
-    if (d.code?.startsWith("PC") && el.dataset.cashDrop && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
+    if (d.code?.startsWith("PC") && el.dataset.payDrop && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
     if (d.code) return void send({ type: "scan", register, side, code: d.code });
     const [kind, value] = d.wallet!.split(":");
-    // お金は投入口（お客様側にしかない）へ、決済はお客様側の端末にかざす
-    if (kind === "cash") send({ type: "insert", register, amount: Number(value) });
-    else send({ type: "tap_emoney", register, method: value });
+    // 現金はスタッフが預かって入金ボックスへ。キャッシュレスはお客様がお客様側の決済端末にかざす
+    if (kind === "cash") {
+      if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
+      send({ type: "insert", register, amount: Number(value) });
+    } else {
+      if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末にかざしてください", false);
+      send({ type: "tap_emoney", register, method: value });
+    }
   });
 
   window.addEventListener("pointercancel", end);
@@ -1071,7 +1078,7 @@ const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg")
 
 function openPicker(register: number, side: Side, kind: "item" | "wallet"): void {
   pickFor = { register, side, kind };
-  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の入金ボックスに入れる・かざす`;
+  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の${side === "staff" ? "入金ボックス（現金）" : "決済端末（かざす）"}`;
   document.getElementById("picker-title")!.textContent = title;
   const body = document.getElementById("picker-body")!;
   body.innerHTML = kind === "item" ? shelfPanel(snap) : walletPanel(snap.emoney_balance);
@@ -1104,8 +1111,10 @@ function syncSwipeTabs(reg: number): void {
     b.classList.toggle("on", on);
     b.setAttribute("aria-selected", String(on));
   });
-  // 入金・出金ボックスはお客様側向きの機器なので、モバイルでスタッフ側の画面を見ている間は隠す（CSS）
-  app.querySelector(`[data-swipe="${reg}"]`)?.parentElement?.querySelector(".money-io")?.classList.toggle("staff-shown", side === "staff");
+  // 入金・出金ボックスはスタッフ側、決済端末はお客様側の機器なので、モバイルでは見ている面のものだけ出す（CSS）
+  const io = app.querySelector(`[data-swipe="${reg}"]`)?.parentElement?.querySelector(".money-io");
+  io?.classList.toggle("face-staff", side === "staff");
+  io?.classList.toggle("face-customer", side === "customer");
 }
 
 function cancelLongPress(): void {
@@ -1127,7 +1136,7 @@ function wireSwipe(): void {
   app.addEventListener("pointerdown", (e) => {
     if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
     const t = e.target as Element;
-    const inlet = t.closest<HTMLElement>("[data-inlet]");
+    const inlet = t.closest<HTMLElement>("[data-inlet], [data-reader]");
     // 最上部（呼び鈴など）と最下段（FF・サービス・たばこ）は長押しで操作するボタンがあるので対象外
     const screen = t.closest(".screen-head, .screen-items, .emoney-fan") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;
@@ -1136,7 +1145,7 @@ function wireSwipe(): void {
       longPress = null;
       swallowClick = true;
       if (inlet) {
-        openPicker(Number(inlet.dataset.inlet), "customer", "wallet");
+        openPicker(Number(inlet.dataset.inlet ?? inlet.dataset.reader), inlet.dataset.inlet ? "staff" : "customer", "wallet");
       } else {
         const [reg, side] = screen!.dataset.drop!.split(":");
         openPicker(Number(reg), side as Side, "item");
@@ -1161,7 +1170,7 @@ function wireSwipe(): void {
   // 長押しを離したときの click が出ない端末もあるので、次に触れた時点で打ち消しをやめる
   window.addEventListener("pointerdown", () => (swallowClick = false), true);
   app.addEventListener("contextmenu", (e) => {
-    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet]")) e.preventDefault();
+    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-reader]")) e.preventDefault();
   });
   // 選択画面：タップで選ぶ（指で縦にスクロールできるよう、ドラッグはしない）
   const dlg = pickerDlg();

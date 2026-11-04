@@ -1439,6 +1439,19 @@ fn shortcut_buttons_call_staff() {
     assert!(kinds(&s, 1).is_empty());
 }
 
+/// スタッフがログインしていないとき（顧客操作モード）も、スタッフ側のベルで仲間に応援を頼める。
+/// Bell は鳴るが、呼び出しの記録は作らない（スタッフ側に通知画面を出さない）
+#[test]
+fn staff_bell_calls_colleagues_without_call_screen() {
+    let mut s = Store::new(1, 2, 1);
+    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+    ok(&mut s, json!({"type":"call_staff","register":1,"topic":"sos"}));
+    advance(&mut s, 1_000);
+    assert!(s.snapshot().mats[0].buzzing, "SOS rings the bell");
+    assert!(reg(&s, 1).staff.calls.is_empty(), "no call record, so no call screen");
+    ok(&mut s, json!({"type":"release_call","register":1}));
+}
+
 /// 呼び出しボタンは触れている間だけ MAT を鳴らす。短く押して「押した」電文が失われても、
 /// 押した回数が届いた時点で必ず鳴る（押したのに鳴らない、をなくす）。
 #[test]

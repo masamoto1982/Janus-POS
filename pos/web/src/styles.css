@@ -759,10 +759,13 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
 .qty-pop-foot button { flex: 1; height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
 
-.emoney-choices { display: flex; flex-direction: column; gap: var(--gap); align-items: stretch; width: min(100%, 280px); margin: 0 auto; }
+.emoney-choices { display: flex; flex-direction: column; gap: var(--gap); align-items: center; width: min(100%, 280px); margin: 0 auto; }
 /* チャージと残高確認は横に並べ、やめるは次の行に置く */
 .emoney-choices.row { display: grid; grid-template-columns: 1fr 1fr; width: 280px; max-width: 100%; margin-bottom: 8px; }
 .emoney-choices.row > * { white-space: nowrap; }
+/* 残高不足：「不足額を現金で払う」「電子マネーをチャージする」を大ボタンのまま横に並べ、文言は二行に折る */
+.emoney-choices.row.pair { display: flex; flex-direction: row; justify-content: center; width: auto; margin-bottom: 0; }
+.emoney-choices.row.pair > button { white-space: pre-line; line-height: 1.25; font-size: 14px; }
 /* 「電子マネー」（積極テキスト）のすぐ下に「選択してください」（消極テキスト） */
 .emoney-screen .big + .muted { margin-top: -14px; }
 .emoney-screen .emoney-balance { font-size: 28px; font-variant-numeric: tabular-nums; }

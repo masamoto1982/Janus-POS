@@ -433,7 +433,7 @@ function render(): void {
     const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null && r.emoney_partial === null;
     // 電子マネーのチャージ・残高確認の間は、その手続きの案内を出す
     const emoney = r.menu ? null : r.emoney;
-    // 「不足分を現金で払う」では、案内を確認したあとで電子マネーをかざしてもらう
+    // 「不足額を現金で払う」では、案内を確認したあとで電子マネーをかざしてもらう
     const partial = !r.menu && r.emoney_partial !== null && r.emoney_partial_ok;
     const cashPay = paying && r.staff.method === "cash";
     const cashlessPay = (paying && r.staff.method !== "cash") || partial;

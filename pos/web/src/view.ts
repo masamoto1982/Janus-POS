@@ -1193,7 +1193,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   const close = (label: string) =>
     ro ? "" : label === "バック" ? backCorner({ type: "close_emoney", register: reg, side }, find(actions, "emoney")) : `<div class="screen-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip")}</div>`;
   if (r.emoney_partial !== null) {
-    // 「不足分を現金で払う」：残高を引き出し残りを現金で払うことを確かめてから、電子マネーを受け付ける
+    // 「不足額を現金で払う」：残高を引き出し残りを現金で払うことを確かめてから、電子マネーを受け付ける
     // （かざしたままの電子マネーで、案内を見ないうちに決済が走らないように）
     const rest = Math.max(0, r.staff.due - r.emoney_partial);
     const st = find(actions, "resolve_emoney_short");
@@ -1210,12 +1210,19 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       </div>`;
   }
   if (r.emoney_short !== null) {
+    // 残高とお支払いの額は出さず、不足額だけを出す。現金で払う・チャージは横に並べ、他の決済を使うは最下段の左
     const st = find(actions, "resolve_emoney_short");
     const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
+    const short = Math.max(0, r.staff.due - r.emoney_short);
+    const buttons =
+      r.mode === "attended"
+        ? `<div class="emoney-choices row pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>
+           <div class="emoney-foot">${choice("他の決済を使う", "cancel", "skip")}</div>`
+        : `<div class="emoney-choices">${choice("他の決済を使う", "cancel", "primary")}</div>`;
     return `<div class="point-screen emoney-screen">
         <div class="big">電子マネーの残高が足りません</div>
-        <p>残高 <b>${yen(r.emoney_short)}</b>・お支払い <b>${yen(r.staff.due)}</b></p>
-        ${ro ? "" : `<div class="emoney-choices">${r.mode === "attended" ? `${choice("他の決済を使う", "cancel", "skip")}${choice("不足分を現金で払う", "cash")}${choice("電子マネーをチャージする", "charge", "primary")}` : choice("他の決済を使う", "cancel", "primary")}</div>`}
+        <p>不足額 <b>${yen(short)}</b></p>
+        ${ro ? "" : buttons}
       </div>`;
   }
   const e = r.emoney!;

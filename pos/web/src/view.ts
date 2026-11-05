@@ -975,7 +975,7 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
   // 店舗メニューはスタッフ側の画面だけ。お客様側には対になる知らせを出す
-  if (r.menu) return notice + (side === "staff" ? storeMenu(r) : pairNote("スタッフが店舗メニューを操作しています"));
+  if (r.menu) return notice + (side === "staff" ? storeMenu(r) : pairNote("休止中", "空いているレジをお使い下さい"));
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
@@ -1273,7 +1273,9 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
       ? ""
       : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
   // 左：日時と稼働モード（日時が上）、右：電子マネーと呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
-  return `<span class="head-l"><time class="clock">${clockText(now)}</time>${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
+  // 店舗メニューを開いている間は、両側とも稼働モードの代わりに「メンテナンス」
+  const mode = r.paused ? "" : r.menu ? `<span class="mode-title semi">メンテナンス</span>` : modeTitle(r.mode === "attended");
+  return `<span class="head-l"><time class="clock">${clockText(now)}</time>${mode}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------

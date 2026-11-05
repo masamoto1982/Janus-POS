@@ -639,7 +639,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
  * テンキーで打ち込む連続値（数量のほかに、荷物の三辺の合計・重さ、入金ボックスの金額）。
  * 離散値は選択肢から選ぶので、テンキーを使うのは連続値だけ。キーは「レジ番号:画面」
  */
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "inlet";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "inlet" | "mamt" | "mpw";
 export type PadEntry = { target: PadTarget; line?: number; digits: string };
 /** いまテンキーを開いている入力欄（キーは「レジ:側」） */
 export const padEntry = new Map<string, PadEntry>();
@@ -654,9 +654,13 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   birth: { title: "身分証の生年月日（西暦8桁）", unit: "", max: 8, code: true },
   ffv: { title: "お渡し数", unit: "", max: 3, code: true },
   inlet: { title: "入金", unit: "円", max: 6 },
+  mamt: { title: "出金する金額", unit: "円", max: 6 },
+  mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
 };
 /** 郵便番号は 3 桁目のあとにハイフンを入れて見せる */
-export const padShow = (target: PadTarget, digits: string): string => (target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits);
+/** 店舗パスワードは打った桁数だけ ● で見せる */
+export const padShow = (target: PadTarget, digits: string): string =>
+  target === "mpw" ? "●".repeat(digits.length) : target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits;
 
 /**
  * テンキーで打ち込む入力欄（角を丸めない箱。濃い枠線・濃い文字・背景なし）。押すと、その画面の上にテンキーが開く。
@@ -1413,11 +1417,15 @@ export function storeMenu(r: RegisterView): string {
     case "emergency":
     case "expense": {
       const cout = find(v.actions, "cash_out");
+      const amt = padValue.get(padValueKey(reg, "mamt")) ?? "";
+      const pw = padValue.get(padValueKey(reg, "mpw")) ?? "";
+      const ready = cout.allowed && Number(amt) > 0 && pw !== "";
       return screen(`${head(MENU_LABEL[m.screen])}
-        <p class="muted">お金を抜く操作です。お金は下の「出金」ボックスに出ます。記録は担当者名つきで残ります。</p>
+        <p class="muted">お金を抜く操作です。操作のたびに店舗パスワードが要ります。お金は下の「出金」ボックスに出ます。記録は担当者名つきで残ります。</p>
         <div class="menu-form">
-          <input type="number" inputmode="numeric" min="1" placeholder="金額" data-key="mo-amt-${reg}" />
-          <button class="primary" data-form="cashout" data-reg="${reg}" data-kind="${m.screen}" ${cout.allowed ? "" : `disabled title="${esc(cout.reason ?? "")}"`}>出金</button>
+          ${padField(reg, "staff", "mamt", amt, "金額（円）", "出金する金額")}
+          ${padField(reg, "staff", "mpw", pw, "店舗パスワード", "店舗パスワード")}
+          <button class="primary" data-form="cashout" data-reg="${reg}" data-kind="${m.screen}" ${ready ? "" : `disabled title="${esc(cout.allowed ? "金額と店舗パスワードを入れてください" : (cout.reason ?? ""))}"`}>出金</button>
         </div>`);
     }
     case "deposit":

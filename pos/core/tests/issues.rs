@@ -862,12 +862,23 @@ fn parcel_cannot_be_mixed_with_other_goods() {
 fn cash_out_only_inside_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    let co = json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000});
+    let co = json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"});
     assert!(
         run(&mut s, co.clone()).is_err(),
         "店舗メニューの外では出金できない"
     );
     open_staff_menu(&mut s, 1);
+    // お金を抜く操作は、メニューの中でも操作のたびに店舗パスワードが要る
+    assert!(run(
+        &mut s,
+        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000})
+    )
+    .is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"1234"})
+    )
+    .is_err());
     ok(&mut s, co.clone());
     ok(&mut s, co);
     let a = s.snapshot().audit;
@@ -876,7 +887,7 @@ fn cash_out_only_inside_the_store_menu() {
     // 未ログインのレジでは出金できない
     assert!(run(
         &mut s,
-        json!({"type":"cash_out","register":2,"kind":"refund","amount":100})
+        json!({"type":"cash_out","register":2,"kind":"refund","amount":100,"password":"7777"})
     )
     .is_err());
 }
@@ -1130,7 +1141,7 @@ fn cash_in_and_out_from_the_customer_side_menu() {
     assert_eq!(reg(&s, 1).staff.drawer_total, before + 4500);
     ok(
         &mut s,
-        json!({"type":"cash_out","register":1,"kind":"changer_collect","amount":4500}),
+        json!({"type":"cash_out","register":1,"kind":"changer_collect","amount":4500,"password":"7777"}),
     );
     assert_eq!(reg(&s, 1).staff.drawer_total, before);
     let ops: Vec<_> = s.snapshot().audit.iter().map(|a| a.operation).collect();
@@ -1228,7 +1239,7 @@ fn store_menu_uses_inlet_and_outlet() {
     ok(&mut s, open("emergency"));
     ok(
         &mut s,
-        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000}),
+        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"}),
     );
     assert_eq!(reg(&s, 1).outlet, 5000);
     // 閉じると両方の画面に戻る（触れている一瞬が過ぎれば）。ログアウトでもメニューは閉じる

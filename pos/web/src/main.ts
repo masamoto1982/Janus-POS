@@ -388,6 +388,11 @@ function render(): void {
       // 打ち込んでいる入力欄が画面から消えたら（手続きが進んだ・戻ったなど）、テンキーを閉じる
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
+      // 出金の画面を離れたら、入れかけの金額と店舗パスワードを消す（パスワードを残さない）
+      if (side === "staff" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {
+        padValue.delete(padValueKey(r.id, "mamt"));
+        padValue.delete(padValueKey(r.id, "mpw"));
+      }
       setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side));
       el?.classList.toggle("no-items", !items);
     }
@@ -640,10 +645,6 @@ window.addEventListener("scroll", hideHint, true);
 // 両方の画面に同じ入力欄があるので、押したボタンのある画面（操作している側）の欄を読む
 let scope: ParentNode = app;
 const val = (key: string): string => scope.querySelector<HTMLInputElement>(`[data-key="${key}"]`)?.value.trim() ?? "";
-const clear = (key: string): void => {
-  const el = scope.querySelector<HTMLInputElement>(`[data-key="${key}"]`);
-  if (el) el.value = "";
-};
 
 function form(b: HTMLElement): void {
   const reg = Number(b.dataset.reg);
@@ -671,13 +672,19 @@ function form(b: HTMLElement): void {
       if (send({ type: "check_id", register: reg, side: "staff", birth: padValue.get(padValueKey(reg, "birth")) ?? "", today: isoDate(new Date()) })) padValue.delete(padValueKey(reg, "birth"));
       break;
     case "cashout":
-      send({
-        type: "cash_out",
-        register: reg,
-        kind: b.dataset.kind,
-        amount: Number(val(`mo-amt-${reg}`) || 0),
-      });
-      clear(`mo-amt-${reg}`);
+      // パスワードは成否にかかわらず送ったら消す（次の出金でもまた入れる）。金額は出金できたときだけ消す
+      if (
+        send({
+          type: "cash_out",
+          register: reg,
+          kind: b.dataset.kind,
+          amount: Number(padValue.get(padValueKey(reg, "mamt")) ?? 0),
+          password: padValue.get(padValueKey(reg, "mpw")) ?? "",
+        })
+      )
+        padValue.delete(padValueKey(reg, "mamt"));
+      padValue.delete(padValueKey(reg, "mpw"));
+      frame();
       break;
   }
 }

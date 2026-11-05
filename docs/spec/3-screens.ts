@@ -751,7 +751,7 @@ export const SCENES: Scene[] = [
         { label: "ログアウト／レジ休止中", tone: "積極" },
       ],
     },
-    customer: { strong: ["空いているレジをお使い下さい"] },
+    customer: { strong: ["休止中"], weak: ["空いているレジをお使い下さい"] },
     rules: ["P-01"],
     source: "storeMenu",
   },

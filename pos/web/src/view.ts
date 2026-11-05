@@ -975,7 +975,7 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
 /** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
   // 店舗メニューはスタッフ側の画面だけ。お客様側には対になる知らせを出す
-  if (r.menu) return notice + (side === "staff" ? storeMenu(r) : pairNote("空いているレジをお使い下さい"));
+  if (r.menu) return notice + (side === "staff" ? storeMenu(r) : pairNote("休止中", "空いているレジをお使い下さい"));
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);

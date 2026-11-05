@@ -988,7 +988,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.pickup_handover && !v.lines.length) return notice + confirm(pickupHandover(reg, side, r.pickup_handover));
-  if (r.last_receipt && !v.lines.length) return notice + (r.outlet ? changeDue(side, r.outlet) : thanks());
+  if (r.last_receipt && !v.lines.length) return notice + confirm(r.outlet ? changeDue(side, r.outlet) : thanks());
   // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return attendedWelcome(r, notice, side);
@@ -1464,7 +1464,7 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.last_receipt && !c.lines.length) return notice + thanks();
+  if (r.last_receipt && !c.lines.length) return notice + confirm(thanks());
 
   // 新しい動きのあった行ほど上に出す
   const lineRows = c.lines.map((l): Row => {

@@ -165,7 +165,7 @@ button { touch-action: manipulation; }
 /* レジ画面：ヘッダー ＋ 上 4/5 が登録画面 ＋ 下 1/5 がバーコードなしアイテム欄（複数のレジと MAT を一画面に収める） */
 /* レジ画面は角を丸めない（2026-10-25 ユーザー） */
 .screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
-.screen-head { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; height: 34px; padding: 0 4px; border-bottom: 1px solid var(--border); }
+.screen-head { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; height: 51px; /* 窮屈なので 34px の 1.5 倍 */ padding: 0 4px; border-bottom: 1px solid var(--border); }
 .screen-head .head-l { display: flex; align-items: center; gap: 8px; }
 .screen-head .head-c { justify-self: center; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }

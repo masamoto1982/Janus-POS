@@ -165,11 +165,12 @@ button { touch-action: manipulation; }
 /* レジ画面：ヘッダー ＋ 上 4/5 が登録画面 ＋ 下 1/5 がバーコードなしアイテム欄（複数のレジと MAT を一画面に収める） */
 /* レジ画面は角を丸めない（2026-10-25 ユーザー） */
 .screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
-.screen-head { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; height: 51px; /* 窮屈なので 34px の 1.5 倍 */
+.screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; height: 51px; /* 窮屈なので 34px の 1.5 倍 */
   /* 左右の余白は、顧客操作モードの呼び出しボタン（FF・サービス・たばこ）の行の左右の余白と揃える（.screen-items の左右 6px ＋ .call-row の space-evenly の余り） */
   padding: 0 calc(6px + max(0px, (100% - 12px - 3 * var(--btn-w) - 2 * var(--gap)) / 4)); border-bottom: 1px solid var(--border); }
-.screen-head .head-l { display: flex; align-items: center; gap: 8px; }
-.screen-head .head-c { justify-self: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+/* スタッフ側のヘッダーは右にスワイプして店舗メニューを開き、左にスワイプして閉じる（横の指の動きはスクロールにしない） */
+.staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }
 /* 稼働モードのバッジ：有人は濃いグレーの塗りに白文字、セミセルフは白地に濃いグレーの枠と文字。塗りの有無で一目で区別する */
 .screen-head .clock { font-size: 11px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
@@ -602,7 +603,7 @@ body.dragging .drop-hint { display: inline; }
    押せないボタン（売り切れなど）は下の :disabled でグレーに戻す */
 .screen.operable [data-region] :is(button, input, select, summary),
 .staff-screen [data-region] .staff-only button,
-.screen-head :is(.hamburger, .emoney-head):not(:disabled) { filter: url(#ramp); }
+.screen-head .emoney-head:not(:disabled) { filter: url(#ramp); }
 .screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
 /* 絵文字のアイコン（呼び出し理由・ポイントサービス）は文字なので、操作できない箇所としてグレー */
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
@@ -688,7 +689,6 @@ body.dragging .drop-hint { display: inline; }
 .money-io-cust > *, .money-io-boxes > * { min-width: 0; }
 .emoney-head { min-height: 0; height: 28px; padding: 0 8px; display: inline-flex; flex-direction: column; justify-content: center; align-items: flex-start; font-size: 10px; line-height: 1.15; white-space: nowrap; cursor: pointer; }
 .emoney-head.pressing { transform: translate(1px, 2px); }
-.hamburger { min-height: 0; width: 28px; height: 24px; padding: 0; font-size: 16px; line-height: 1; cursor: pointer; }
 /* レジ画面ヘッダー中央に出す動作モード（両画面）。有人：濃い塗り、セミセルフ：枠線 */
 .mode-title { display: inline-block; padding: 1px 12px; font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
 .mode-title.attended { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
@@ -863,8 +863,6 @@ body.debug-areas :is(.screen-main)                                 { outline: 1p
 body.debug-areas :is(.reg-top, .screen-foot, .banner, .confirm, .welcome) { outline: 1px solid var(--dbg-purple); outline-offset: -8px; }
 body.debug-areas :is(.inlet, .outlet, .mats, h2)                     { outline: 1px solid var(--dbg-gray); outline-offset: -2px; }
 */
-/* ハンバーガーは、もう一方の画面が操作中でも押せる（どの操作も、やりたいときにできる） */
-.screen.inactive [data-region] .hamburger:not(:disabled) { pointer-events: auto; opacity: 1; }
 /* スタッフ側のベル（仲間に応援を頼む）も、お客様側が操作中でも押せる（ログインしていない顧客操作モードでも） */
 .staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }
 .bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }

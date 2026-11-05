@@ -30,6 +30,7 @@ import {
   padValueKey,
   type PadTarget,
   screenHead,
+  storeMenuUsable,
   isoDate,
   scanGuide,
   voidAsk,
@@ -85,6 +86,7 @@ function reset(registers: number, mats: number): void {
   // エリア構造の確認用の点線枠（styles.css 末尾）。不要になったらこの1行と CSS の末尾ブロックを消す。URL に ?debug=0 で消せる
   // document.body.classList.toggle("debug-areas", new URLSearchParams(location.search).get("debug") !== "0");
   wireSwipe();
+  wireMenuSwipe();
   // 閉じたら（Esc でも）認証を解除し、パスワードを消す
   rulesDlg().addEventListener("close", lockRules);
   rulesDlg()
@@ -843,13 +845,6 @@ app.addEventListener("click", (e) => {
     ffTabs.set(reg, { tab: u.tab, page: Math.max(0, u.page + d) });
     return frame();
   }
-  // ヘッダーのハンバーガー（スタッフ側の画面だけ）：店舗メニューを開く・閉じる
-  if (b.dataset.gear) {
-    const reg = Number(b.dataset.gear.split(":")[0]);
-    const r = snap.registers.find((x) => x.id === reg);
-    send({ type: "open_menu", register: reg, screen: r?.menu ? null : "top" });
-    return;
-  }
   if (b.dataset.outlet) {
     send({ type: "take_outlet", register: Number(b.dataset.outlet) });
     return;
@@ -1099,6 +1094,38 @@ function syncSwipeTabs(reg: number): void {
 function cancelLongPress(): void {
   if (longPress) clearTimeout(longPress.timer);
   longPress = null;
+}
+
+/**
+ * 店舗メニュー：スタッフ側の画面のヘッダーを右にスワイプすると開き、左にスワイプすると閉じる。
+ * ヘッダーの上の横の指の動きは画面の切り替え（モバイル）にしない（CSS の touch-action: pan-y）。
+ * マウスでも、ヘッダーを左右へドラッグすれば同じ
+ */
+const MENU_SWIPE_PX = 40;
+function wireMenuSwipe(): void {
+  let start: { reg: number; x: number; y: number; id: number } | null = null;
+  app.addEventListener("pointerdown", (e) => {
+    const head = (e.target as Element).closest<HTMLElement>(".staff-screen .screen-head");
+    // 呼び鈴（押している間鳴る）から始めた指の動きは、呼び鈴の操作として扱う
+    if (!head || e.button !== 0 || (e.target as Element).closest("[data-hold]")) return;
+    const reg = Number(head.dataset.region!.split("-")[1]);
+    start = { reg, x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  const end = (e: PointerEvent) => {
+    if (!start || e.pointerId !== start.id) return;
+    const { reg, x, y } = start;
+    start = null;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    if (Math.abs(dx) < MENU_SWIPE_PX || Math.abs(dy) > Math.abs(dx) / 2) return;
+    const r = snap.registers.find((v) => v.id === reg);
+    if (!r || !storeMenuUsable(r)) return;
+    // 右：開く、左：閉じる
+    if (dx > 0 && !r.menu) send({ type: "open_menu", register: reg, screen: "top" });
+    if (dx < 0 && r.menu) send({ type: "open_menu", register: reg, screen: null });
+  };
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", () => (start = null));
 }
 
 function wireSwipe(): void {

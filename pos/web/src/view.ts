@@ -902,18 +902,18 @@ function emoneyHead(r: RegisterView, side: Side): string {
   const attended = r.mode === "attended";
   const v = attended ? r.staff : r.customer;
   const own: Side = attended ? "staff" : "customer";
-  const label = `<button type="button" class="emoney-head" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">${EMONEY_HEAD_LABEL}</button>`;
+  const label = `<button type="button" class="emoney-head neg" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">${EMONEY_HEAD_LABEL}</button>`;
   if (side !== own) return label;
   const shopping = !attended && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
   if (shopping) {
     // セミセルフのお買い物の途中：スタッフを呼ぶ
     const st = find(r.customer.actions, "call_staff");
     const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
-    return `<button type="button" class="emoney-head" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
+    return `<button type="button" class="emoney-head neg" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
   }
   const st = find(v.actions, "emoney");
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
-  return `<button type="button" class="emoney-head" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
+  return `<button type="button" class="emoney-head neg" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
 }
 
 /**

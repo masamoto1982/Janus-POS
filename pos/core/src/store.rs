@@ -11,7 +11,7 @@ use crate::cash::{is_valid_denomination, Cash, Drawer};
 use crate::catalog::{
     self, Category, Coupon, FfTab, Product, Scanned, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
-use crate::mat::{Bell, Mat};
+use crate::bell::{BellSignal, Bell};
 use crate::parcel::{self, Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
@@ -19,7 +19,7 @@ use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 mod persist;
 
 pub const MAX_REGISTERS: u8 = 10;
-pub const MAX_MATS: u8 = 5;
+pub const MAX_BELLS: u8 = 5;
 
 const FF_RECEIVED_SELF: &str =
     "お渡し済みの FF の数量はスタッフが変更します\nスタッフをお呼びください";
@@ -404,15 +404,15 @@ pub enum Command {
         invoice_no: String,
         rounding: Rounding,
     },
-    SetMatLoss {
+    SetBellLoss {
         percent: u8,
     },
-    SetMatOffline {
-        mat: usize,
+    SetBellOffline {
+        bell: usize,
         offline: bool,
     },
     SetBellOn {
-        mat: usize,
+        bell: usize,
         on: bool,
     },
 }
@@ -933,15 +933,15 @@ impl Register {
             self.menu = None;
         }
         self.mode = if self.staff.is_some() {
-            Mode::Attended
+            Mode::StaffOperated
         } else {
-            Mode::SemiSelf
+            Mode::SelfOperated
         };
     }
 
     fn change_timers(&self) -> (u64, u64) {
-        if self.mode == Mode::Attended {
-            (ATTENDED_CHANGE_REMIND_MS, ATTENDED_CHANGE_CALL_MS)
+        if self.mode == Mode::StaffOperated {
+            (STAFF_OP_CHANGE_REMIND_MS, STAFF_OP_CHANGE_CALL_MS)
         } else {
             (CHANGE_REMIND_MS, CHANGE_CALL_MS)
         }
@@ -1025,15 +1025,15 @@ pub struct Store {
     now: u64,
     rng: Rng,
     registers: Vec<Register>,
-    mats: Vec<Mat>,
+    bells: Vec<Bell>,
     calls: Calls,
     age_rules: AgeRules,
     tax: TaxSettings,
     auth: Authenticator,
     ff_stock: Vec<(&'static str, u32)>,
     audit: Vec<AuditEntry>,
-    mat_loss: u8,
-    bell: Bell,
+    bell_loss: u8,
+    signal: BellSignal,
     seen_raised: u64,
     presses: u64,
     receipts: u32,
@@ -1113,8 +1113,8 @@ pub const INSERT_DONE_MS: u64 = 30 * 1000;
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
-pub const ATTENDED_CHANGE_REMIND_MS: u64 = 30 * 1000;
-pub const ATTENDED_CHANGE_CALL_MS: u64 = 60 * 1000;
+pub const STAFF_OP_CHANGE_REMIND_MS: u64 = 30 * 1000;
+pub const STAFF_OP_CHANGE_CALL_MS: u64 = 60 * 1000;
 pub const RING_MIN: f32 = 0.25;
 pub const RING_FULL_MS: u64 = 60 * 1000;
 
@@ -1124,14 +1124,14 @@ pub fn ring_volume(waiting_ms: u64) -> f32 {
 }
 
 impl Store {
-    pub fn new(seed: u64, registers: u8, mats: u8) -> Store {
+    pub fn new(seed: u64, registers: u8, bells: u8) -> Store {
         let registers = registers.clamp(1, MAX_REGISTERS);
-        let mats = mats.clamp(1, MAX_MATS);
+        let bells = bells.clamp(1, MAX_BELLS);
         let regs = (1..=registers)
             .map(|id| {
                 Register {
                     id,
-                    mode: Mode::SemiSelf,
+                    mode: Mode::SelfOperated,
                     staff: None,
                     txn: Txn::default(),
                     drawer: Drawer::default(),
@@ -1153,15 +1153,15 @@ impl Store {
             now: 0,
             rng: Rng::new(seed),
             registers: regs,
-            mats: (0..mats).map(|i| Mat::new(&bell_name(i))).collect(),
+            bells: (0..bells).map(|i| Bell::new(&bell_name(i))).collect(),
             calls: Calls::default(),
             age_rules: AgeRules::default(),
             tax: TaxSettings::default(),
             auth: Authenticator::default(),
             ff_stock: INITIAL_FF_STOCK.to_vec(),
             audit: vec![],
-            mat_loss: 0,
-            bell: Bell::default(),
+            bell_loss: 0,
+            signal: BellSignal::default(),
             seen_raised: 0,
             presses: 0,
             receipts: 0,
@@ -1211,18 +1211,18 @@ impl Store {
             self.seen_raised = self.calls.raised;
             self.presses += 1;
         }
-        let mut bell = self.bell;
-        bell.held = self.registers.iter().filter(|r| r.pressing).count();
-        bell.presses = self.presses;
-        if bell != self.bell {
-            bell.seq += 1;
-            self.bell = bell;
-            for m in &mut self.mats {
+        let mut signal = self.signal;
+        signal.held = self.registers.iter().filter(|r| r.pressing).count();
+        signal.presses = self.presses;
+        if signal != self.signal {
+            signal.seq += 1;
+            self.signal = signal;
+            for m in &mut self.bells {
                 m.kick();
             }
         }
-        for m in self.mats.iter_mut().filter(|m| m.bell_on) {
-            m.tick(now, self.bell, self.mat_loss, &mut self.rng);
+        for m in self.bells.iter_mut().filter(|m| m.bell_on) {
+            m.tick(now, self.signal, self.bell_loss, &mut self.rng);
         }
         for r in &mut self.registers {
             if r.outlet.total() > 0 {
@@ -1244,7 +1244,7 @@ impl Store {
             .registers
             .iter()
             .filter(|r| {
-                (r.mode != Mode::SemiSelf || !r.idle())
+                (r.mode != Mode::SelfOperated || !r.idle())
                     && r.outlet_since.is_none()
                     && !self.calls.open.iter().any(|c| c.register == r.id)
                     && now.saturating_sub(r.last_op) >= IDLE_REVERT_MS
@@ -1256,9 +1256,9 @@ impl Store {
                 self.void_txn(id, now);
             }
             if let Ok(r) = self.reg_mut(id) {
-                if r.mode != Mode::SemiSelf {
+                if r.mode != Mode::SelfOperated {
                     r.staff = None;
-                    r.mode = Mode::SemiSelf;
+                    r.mode = Mode::SelfOperated;
                 }
                 r.menu = None;
                 r.bill_handover = None;
@@ -1704,9 +1704,9 @@ impl Store {
                     return Err(why.into());
                 }
                 r.txn.method = Some(method);
-                let semi = r.mode == Mode::SemiSelf;
+                let self_op = r.mode == Mode::SelfOperated;
                 let no_cash_goods = r.txn.cash_only() == 0;
-                if semi {
+                if self_op {
                     if method == PaymentMethod::Cash {
                         self.calls
                             .raise(register, CallKind::CashOnly, self.now, "現金でのお支払い");
@@ -1943,10 +1943,10 @@ impl Store {
                 self.check(register, side, Action::Emoney)?;
                 let r = self.reg_mut(register)?;
                 let shopping = !r.txn.lines.is_empty() || !r.txn.coupons.is_empty();
-                if r.mode == Mode::SemiSelf && shopping {
+                if r.mode == Mode::SelfOperated && shopping {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
-                if r.mode == Mode::SemiSelf && kind == EmoneyKind::Charge {
+                if r.mode == Mode::SelfOperated && kind == EmoneyKind::Charge {
                     r.emoney = None;
                     self.call(register, CallKind::Emoney, "チャージ");
                     return done("チャージはスタッフがお手伝いします\nスタッフをお呼びしました");
@@ -1998,10 +1998,10 @@ impl Store {
                 self.check(register, side, Action::ResolveEmoneyShort)?;
                 let balance = self.emoney_balance;
                 let r = self.reg_mut(register)?;
-                if r.mode == Mode::SemiSelf && choice == ShortChoice::Charge {
+                if r.mode == Mode::SelfOperated && choice == ShortChoice::Charge {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
-                if r.mode == Mode::SemiSelf
+                if r.mode == Mode::SelfOperated
                     && matches!(choice, ShortChoice::Cash | ShortChoice::CashConfirmed)
                 {
                     return Err(EMONEY_NO_CASH.into());
@@ -2225,18 +2225,18 @@ impl Store {
                 self.age_rules.record(by, change, self.now);
                 done("インボイスの設定を変更しました")
             }
-            C::SetMatLoss { percent } => {
-                self.mat_loss = percent.min(100);
-                done(format!("MAT の通信ロスを {}% にしました", self.mat_loss))
+            C::SetBellLoss { percent } => {
+                self.bell_loss = percent.min(100);
+                done(format!("Bell の通信ロスを {}% にしました", self.bell_loss))
             }
-            C::SetBellOn { mat, on } => {
-                let bell = self.bell;
-                let m = self.mats.get_mut(mat).ok_or("MAT が見つかりません")?;
-                if bell_kind(mat as u8) == BellKind::Fixed {
+            C::SetBellOn { bell, on } => {
+                let signal = self.signal;
+                let m = self.bells.get_mut(bell).ok_or("Bell が見つかりません")?;
+                if bell_kind(bell as u8) == BellKind::Fixed {
                     return Err("据え付け端末は OFF にできません".into());
                 }
                 if on && !m.bell_on {
-                    m.received.presses = bell.presses;
+                    m.received.presses = signal.presses;
                     m.buzz_until = 0;
                 }
                 m.bell_on = on;
@@ -2246,8 +2246,8 @@ impl Store {
                     if on { "ON" } else { "OFF" }
                 ))
             }
-            C::SetMatOffline { mat, offline } => {
-                let m = self.mats.get_mut(mat).ok_or("MAT が見つかりません")?;
+            C::SetBellOffline { bell, offline } => {
+                let m = self.bells.get_mut(bell).ok_or("Bell が見つかりません")?;
                 m.offline = offline;
                 done(format!(
                     "{}を{}にしました",
@@ -2775,7 +2775,7 @@ impl Store {
         r.txn.point_checked = r.txn.point_card.is_some()
             || r.txn.bill_slips() > 0
             || !r.txn.lines.iter().any(Line::earns_points);
-        r.txn.customer_turn = r.mode == Mode::SemiSelf;
+        r.txn.customer_turn = r.mode == Mode::SelfOperated;
         let ready = r.staff_state() == StaffState::Ready;
         let pending = r.txn.age_choice_pending();
         let mode = r.mode;
@@ -2785,7 +2785,7 @@ impl Store {
             if !r.txn.bill_unchecked() {
                 return done(format!("公共料金 {slips}枚：現金でお支払いください"));
             }
-            if mode != Mode::Attended && !ready {
+            if mode != Mode::StaffOperated && !ready {
                 self.calls
                     .raise(register, CallKind::Bill, self.now, format!("{slips}枚"));
                 return done("公共料金のお支払いのためスタッフをお呼びしました");
@@ -2794,14 +2794,14 @@ impl Store {
                 "公共料金 {slips}枚：スタッフ側の画面で払込票の内容を確認してください"
             ));
         }
-        if mode != Mode::Attended && !ready && r.txn.cash_only() > 0 {
+        if mode != Mode::StaffOperated && !ready && r.txn.cash_only() > 0 {
             self.calls
                 .raise(register, CallKind::CashOnly, self.now, "切手");
             if !pending {
                 return done("切手は現金のみのためスタッフをお呼びしました");
             }
         }
-        if pending && mode != Mode::Attended && !ready {
+        if pending && mode != Mode::StaffOperated && !ready {
             self.calls.raise(
                 register,
                 CallKind::AgeCheck,
@@ -3197,11 +3197,11 @@ impl Store {
                 .iter()
                 .map(|r| self.register_view(r))
                 .collect(),
-            mats: self
-                .mats
+            bells: self
+                .bells
                 .iter()
                 .enumerate()
-                .map(|(i, m)| MatView {
+                .map(|(i, m)| BellView {
                     id: m.id.clone(),
                     kind: bell_kind(i as u8),
                     buzzing: m.buzzing(now),
@@ -3211,10 +3211,10 @@ impl Store {
                     bell_on: m.bell_on,
                 })
                 .collect(),
-            mat_links: self
-                .mats
+            bell_links: self
+                .bells
                 .iter()
-                .map(|m| MatLink {
+                .map(|m| BellLink {
                     id: m.id.clone(),
                     link_ok: m.link_ok(now),
                     acked_seq: m.acked_seq,
@@ -3222,7 +3222,7 @@ impl Store {
                     retries: m.retries,
                 })
                 .collect(),
-            bell: self.bell,
+            signal: self.signal,
             calls: self.calls.open.clone(),
             call_history: self.calls.history.clone(),
             age_rules: AgeRulesView {
@@ -3231,7 +3231,7 @@ impl Store {
             },
             audit: self.audit.clone(),
             ff_stock: self.ff_menu(),
-            mat_loss: self.mat_loss,
+            bell_loss: self.bell_loss,
             accounts: ACCOUNTS
                 .iter()
                 .map(|a| AccountView {
@@ -3345,8 +3345,8 @@ impl Store {
             .flatten()
             .map(|t0| self.now.saturating_sub(t0));
         let staff = r.staff.map(|s| s.account);
-        let mat_down = self
-            .mats
+        let bell_down = self
+            .bells
             .iter()
             .filter(|m| m.bell_on && !m.link_ok(self.now))
             .map(|m| m.id.clone())
@@ -3389,7 +3389,7 @@ impl Store {
             lamp: waiting.is_some(),
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
-            tobacco_asked: r.mode == Mode::Attended && t.tobacco_asked,
+            tobacco_asked: r.mode == Mode::StaffOperated && t.tobacco_asked,
             mode: r.mode,
             mode_label: r.mode.label(),
             outlet: r.outlet.total(),
@@ -3397,7 +3397,7 @@ impl Store {
             menu: r.menu,
             paused: r.paused,
             idle_voids: !r.idle(),
-            idle_revert_in: (r.mode != Mode::SemiSelf || !r.idle())
+            idle_revert_in: (r.mode != Mode::SelfOperated || !r.idle())
                 .then(|| r.idle_revert_in(self.now)),
             change_left: r
                 .outlet_since
@@ -3440,7 +3440,7 @@ impl Store {
                 actions: actions(c_side, ACTIONS),
                 drawer_total: r.drawer.cash.total(),
                 drawer: r.drawer.cash.0.clone(),
-                mat_down,
+                bell_down,
             },
             customer: CustomerView {
                 phase: c.phase,
@@ -3461,7 +3461,7 @@ impl Store {
                 staff_called,
                 age_wait: t
                     .required_age
-                    .filter(|_| c.age_choice_pending && r.mode != Mode::Attended),
+                    .filter(|_| c.age_choice_pending && r.mode != Mode::StaffOperated),
                 staff_present: c.staff == StaffState::Ready,
                 method: t.method,
                 payment_blocker: c.payment_blocker(),
@@ -3579,7 +3579,7 @@ pub struct StaffView {
     pub actions: Vec<ActionState>,
     pub drawer_total: u32,
     pub drawer: Vec<(u32, u32)>,
-    pub mat_down: Vec<String>,
+    pub bell_down: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -3680,7 +3680,7 @@ fn bell_name(i: u8) -> String {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct MatView {
+pub struct BellView {
     pub id: String,
     pub kind: BellKind,
     pub buzzing: bool,
@@ -3691,7 +3691,7 @@ pub struct MatView {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct MatLink {
+pub struct BellLink {
     pub id: String,
     pub link_ok: bool,
     pub acked_seq: u64,
@@ -3766,15 +3766,15 @@ pub struct TaxView {
 pub struct Snapshot {
     pub now: u64,
     pub registers: Vec<RegisterView>,
-    pub mats: Vec<MatView>,
-    pub mat_links: Vec<MatLink>,
-    pub bell: Bell,
+    pub bells: Vec<BellView>,
+    pub bell_links: Vec<BellLink>,
+    pub signal: BellSignal,
     pub calls: Vec<Call>,
     pub call_history: Vec<ResolvedCall>,
     pub age_rules: AgeRulesView,
     pub audit: Vec<AuditEntry>,
     pub ff_stock: Vec<FfMenuItem>,
-    pub mat_loss: u8,
+    pub bell_loss: u8,
     pub accounts: Vec<AccountView>,
     pub catalog: Vec<CatalogItem>,
     pub tax: TaxView,

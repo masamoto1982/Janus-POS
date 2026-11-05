@@ -51,7 +51,7 @@ function ringPattern(bus: GainNode): void {
   tone(990, 0.2, 0.25, "triangle", 0.28, bus);
 }
 
-export function setMatRinging(on: boolean, volume: number): void {
+export function setBellRinging(on: boolean, volume: number): void {
   if (!on || !ready() || !ctx) {
     if (ring) {
       window.clearInterval(ring.timer);

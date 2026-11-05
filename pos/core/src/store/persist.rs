@@ -12,12 +12,12 @@ use crate::authority::{Mode, PaymentMethod, Side};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{Cash, Drawer};
 use crate::catalog::{self, COUPONS};
-use crate::mat::{Bell, Mat, Packet};
+use crate::bell::{BellSignal, Bell, Packet};
 use crate::parcel::{Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
 
-pub const SCHEMA: u32 = 1;
+pub const SCHEMA: u32 = 2;
 
 fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
@@ -33,9 +33,9 @@ struct Saved {
     now: u64,
     rng: u64,
     registers: Vec<SavedRegister>,
-    mats: Vec<SavedMat>,
-    mat_loss: u8,
-    bell: Bell,
+    bells: Vec<SavedBell>,
+    bell_loss: u8,
+    signal: BellSignal,
     seen_raised: u64,
     presses: u64,
     calls: SavedCalls,
@@ -49,8 +49,8 @@ struct Saved {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SavedMat {
-    received: Bell,
+struct SavedBell {
+    received: BellSignal,
     acked_seq: u64,
     last_rx_at: u64,
     last_ack_at: u64,
@@ -386,7 +386,7 @@ impl SavedRegister {
         };
         let mut r = Register {
             id: self.id,
-            mode: Mode::SemiSelf,
+            mode: Mode::SelfOperated,
             staff,
             txn: self.txn.restore()?,
             drawer: Drawer { cash: self.drawer },
@@ -425,10 +425,10 @@ impl Store {
             now: self.now,
             rng: self.rng.0,
             registers: self.registers.iter().map(SavedRegister::from).collect(),
-            mats: self
-                .mats
+            bells: self
+                .bells
                 .iter()
-                .map(|m| SavedMat {
+                .map(|m| SavedBell {
                     received: m.received,
                     acked_seq: m.acked_seq,
                     last_rx_at: m.last_rx_at,
@@ -444,8 +444,8 @@ impl Store {
                     bell_on: m.bell_on,
                 })
                 .collect(),
-            mat_loss: self.mat_loss,
-            bell: self.bell,
+            bell_loss: self.bell_loss,
+            signal: self.signal,
             seen_raised: self.seen_raised,
             presses: self.presses,
             calls: SavedCalls {
@@ -520,43 +520,43 @@ impl Store {
             .into_iter()
             .map(SavedRegister::restore)
             .collect::<Result<Vec<_>, _>>()?;
-        if registers.is_empty() || s.mats.is_empty() {
-            return Err("レジか Bell がありません".into());
+        if registers.is_empty() || s.bells.is_empty() {
+            return Err("レジか BellSignal がありません".into());
         }
         let ff_stock = s
             .ff_stock
             .into_iter()
             .map(|(code, n)| product(&code).map(|p| (p.code, n)))
             .collect::<Result<Vec<_>, _>>()?;
-        let mats = s
-            .mats
+        let bells = s
+            .bells
             .iter()
             .enumerate()
             .map(|(i, m)| {
-                let mut mat = Mat::new(&bell_name(i as u8));
-                mat.received = m.received;
-                mat.acked_seq = m.acked_seq;
-                mat.last_rx_at = m.last_rx_at;
-                mat.last_ack_at = m.last_ack_at;
-                mat.last_sent_at = m.last_sent_at;
-                mat.last_sent_seq = m.last_sent_seq;
-                mat.in_flight = m.in_flight.clone();
-                mat.sent = m.sent;
-                mat.retries = m.retries;
-                mat.offline = m.offline;
-                mat.buzz_until = m.buzz_until;
-                mat.rings = m.rings;
-                mat.bell_on = m.bell_on;
-                mat
+                let mut bell = Bell::new(&bell_name(i as u8));
+                bell.received = m.received;
+                bell.acked_seq = m.acked_seq;
+                bell.last_rx_at = m.last_rx_at;
+                bell.last_ack_at = m.last_ack_at;
+                bell.last_sent_at = m.last_sent_at;
+                bell.last_sent_seq = m.last_sent_seq;
+                bell.in_flight = m.in_flight.clone();
+                bell.sent = m.sent;
+                bell.retries = m.retries;
+                bell.offline = m.offline;
+                bell.buzz_until = m.buzz_until;
+                bell.rings = m.rings;
+                bell.bell_on = m.bell_on;
+                bell
             })
             .collect();
-        let mut bell = s.bell;
-        bell.held = 0;
+        let mut signal = s.signal;
+        signal.held = 0;
         Ok(Store {
             now: s.now,
             rng: Rng(s.rng.max(1)),
             registers,
-            mats,
+            bells,
             calls: Calls {
                 next_id: s.calls.next_id,
                 open: s
@@ -616,8 +616,8 @@ impl Store {
                     result: a.result,
                 })
                 .collect(),
-            mat_loss: s.mat_loss,
-            bell,
+            bell_loss: s.bell_loss,
+            signal,
             seen_raised: s.seen_raised,
             presses: s.presses,
             receipts: s.receipts,

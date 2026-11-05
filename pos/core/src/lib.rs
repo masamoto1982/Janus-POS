@@ -4,7 +4,7 @@ pub mod authority;
 pub mod calls;
 pub mod cash;
 pub mod catalog;
-pub mod mat;
+pub mod bell;
 pub mod parcel;
 pub mod rng;
 pub mod store;

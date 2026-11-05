@@ -185,7 +185,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
 }
 
 #[test]
-fn semi_self_age_check_calls_staff() {
+fn self_operated_age_check_calls_staff() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", BEER);
     ok(
@@ -206,7 +206,7 @@ fn semi_self_age_check_calls_staff() {
     scan(&mut s, 2, "staff", "ST002");
     assert_eq!(reg(&s, 2).customer.age_wait, None);
     no_id_check(&mut s, 2);
-    assert_eq!(reg(&s, 2).mode, Mode::Attended);
+    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
     assert_eq!(reg(&s, 2).staff.state, StaffState::Ready);
     assert!(s.snapshot().calls.is_empty());
 }
@@ -258,7 +258,7 @@ fn only_owner_changes_age_rules() {
 }
 
 #[test]
-fn customer_cannot_take_over_attended_register() {
+fn customer_cannot_take_over_staff_operated_register() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
@@ -285,7 +285,7 @@ fn customer_cannot_take_over_attended_register() {
 }
 
 #[test]
-fn fast_food_flow_in_semi_self_mode() {
+fn fast_food_flow_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", BREAD);
     assert!(run(
@@ -352,8 +352,8 @@ fn fast_food_flow_in_semi_self_mode() {
     .is_err());
     assert_eq!(
         reg(&s, 2).mode,
-        Mode::Attended,
-        "badge keeps the register attended"
+        Mode::StaffOperated,
+        "badge keeps the register staff_operated"
     );
     assert!(run(
         &mut s,
@@ -385,7 +385,7 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
         .is_err());
     }
     login_as(&mut s, 2, "ST001");
-    assert_eq!(reg(&s, 2).mode, Mode::Attended);
+    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
     let no = reg(&s, 2).staff.lines[0]
         .line
         .pickup
@@ -852,35 +852,35 @@ fn calls_stay_on_originating_register() {
 }
 
 #[test]
-fn mat_rings_despite_loss_and_reports_link_down() {
+fn bell_rings_despite_loss_and_reports_link_down() {
     let mut s = Store::new(7, 2, 1);
-    ok(&mut s, json!({"type":"set_mat_loss","percent":60}));
+    ok(&mut s, json!({"type":"set_bell_loss","percent":60}));
     advance(&mut s, 3_000);
     ok(&mut s, json!({"type":"call_staff","register":2}));
     advance(&mut s, 8_000);
     let snap = s.snapshot();
-    assert!(snap.mats[0].rings >= 1);
-    assert!(snap.mats[0].buzzing, "rings while the button is held");
-    assert!(snap.mat_links[0].retries > 0 || snap.mat_links[0].acked_seq == snap.bell.seq);
+    assert!(snap.bells[0].rings >= 1);
+    assert!(snap.bells[0].buzzing, "rings while the button is held");
+    assert!(snap.bell_links[0].retries > 0 || snap.bell_links[0].acked_seq == snap.signal.seq);
     ok(&mut s, json!({"type":"release_call","register":2}));
     advance(&mut s, 8_000);
     let snap = s.snapshot();
-    assert!(!snap.mats[0].buzzing, "stops once released");
-    let before = snap.mats[0].rings;
+    assert!(!snap.bells[0].buzzing, "stops once released");
+    let before = snap.bells[0].rings;
     advance(&mut s, 60_000);
-    assert_eq!(s.snapshot().mats[0].rings, before);
-    assert!(!s.snapshot().mats[0].buzzing);
+    assert_eq!(s.snapshot().bells[0].rings, before);
+    assert!(!s.snapshot().bells[0].buzzing);
     assert!(reg(&s, 2).lamp, "the lamp stays on until staff arrives");
 
     ok(
         &mut s,
-        json!({"type":"set_mat_offline","mat":0,"offline":true}),
+        json!({"type":"set_bell_offline","bell":0,"offline":true}),
     );
     advance(&mut s, 8_000);
     let snap = s.snapshot();
-    assert!(!snap.mats[0].link_ok);
+    assert!(!snap.bells[0].link_ok);
     assert_eq!(
-        snap.registers[0].staff.mat_down,
+        snap.registers[0].staff.bell_down,
         vec!["据え付け端末".to_string()]
     );
 }
@@ -895,7 +895,7 @@ fn customer_view_hides_staff_only_information() {
     let c = v["customer"].to_string();
     assert!(!c.contains("alcohol") && !c.contains(BEER) && !c.contains("12345678"));
     assert_eq!(v["staff"]["lines"][0]["age"], 20);
-    assert_eq!(reg(&s, 1).mode, Mode::Attended);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
 }
 
 #[test]
@@ -903,7 +903,7 @@ fn staff_and_customer_screens_are_exclusive() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SemiSelf);
+    assert_eq!(v.mode, Mode::SelfOperated);
     assert_eq!(v.active_side, Some(Side::Customer));
     assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
     ok(
@@ -917,7 +917,7 @@ fn staff_and_customer_screens_are_exclusive() {
     );
     scan(&mut s, 1, "staff", "ST002");
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::Attended);
+    assert_eq!(v.mode, Mode::StaffOperated);
     assert_eq!(v.active_side, None);
     ok(
         &mut s,
@@ -931,7 +931,7 @@ fn staff_and_customer_screens_are_exclusive() {
     .is_err());
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SemiSelf);
+    assert_eq!(v.mode, Mode::SelfOperated);
     assert_eq!(v.active_side, Some(Side::Customer));
     ok(
         &mut s,
@@ -965,15 +965,15 @@ fn mode_follows_staff_badge() {
         .snapshot()
         .registers
         .iter()
-        .all(|r| r.mode == Mode::SemiSelf && r.staff.state == StaffState::Absent));
+        .all(|r| r.mode == Mode::SelfOperated && r.staff.state == StaffState::Absent));
     login(&mut s, 1);
-    assert_eq!(reg(&s, 1).mode, Mode::Attended);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
-    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
 #[test]
-fn customer_cannot_register_ff_in_semi_self() {
+fn customer_cannot_register_ff_in_self_operated() {
     let mut s = Store::new(1, 2, 1);
     assert!(run(
         &mut s,
@@ -984,17 +984,17 @@ fn customer_cannot_register_ff_in_semi_self() {
 }
 
 #[test]
-fn idle_register_returns_to_semi_self() {
+fn idle_register_returns_to_self_operated() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 2);
     advance(&mut s, 4 * 60_000);
     scan(&mut s, 2, "staff", BREAD);
     ok(&mut s, json!({"type":"void_transaction","register":2}));
     advance(&mut s, 4 * 60_000);
-    assert_eq!(reg(&s, 2).mode, Mode::Attended);
+    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
     advance(&mut s, 61_000);
     let v = reg(&s, 2);
-    assert_eq!(v.mode, Mode::SemiSelf);
+    assert_eq!(v.mode, Mode::SelfOperated);
     assert_eq!(v.staff.state, StaffState::Absent);
     assert!(v.idle_revert_in.is_none());
     login(&mut s, 1);
@@ -1011,12 +1011,12 @@ fn idle_register_returns_to_semi_self() {
     advance(&mut s, 4 * 60_000);
     assert_eq!(
         reg(&s, 1).mode,
-        Mode::Attended,
+        Mode::StaffOperated,
         "財布を取りに行くくらいは待つ"
     );
     advance(&mut s, 61_000);
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SemiSelf);
+    assert_eq!(v.mode, Mode::SelfOperated);
     assert!(v.customer.lines.is_empty());
     assert_eq!(v.customer.inserted, 0);
     assert_eq!(v.outlet, 100);
@@ -1155,11 +1155,11 @@ fn store_menu_uses_inlet_and_outlet() {
 }
 
 #[test]
-fn attended_screens_lock_only_while_touched() {
+fn staff_operated_screens_lock_only_while_touched() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "staff", "ST001");
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::Attended);
+    assert_eq!(v.mode, Mode::StaffOperated);
     assert_eq!(v.active_side, None);
     assert!(allowed(&v, Side::Customer, Action::RegisterFf));
     assert!(allowed(&v, Side::Staff, Action::RegisterFf));
@@ -1322,17 +1322,17 @@ fn shortcut_buttons_call_staff() {
     login(&mut s, 1);
     ok(&mut s, json!({"type":"call_staff","register":1}));
     advance(&mut s, 1_000);
-    assert!(s.snapshot().mats[0].buzzing, "SOS rings the bell");
+    assert!(s.snapshot().bells[0].buzzing, "SOS rings the bell");
     assert!(kinds(&s, 1).is_empty());
 }
 
 #[test]
 fn staff_bell_calls_colleagues_without_call_screen() {
     let mut s = Store::new(1, 2, 1);
-    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
     ok(&mut s, json!({"type":"call_staff","register":1,"topic":"sos"}));
     advance(&mut s, 1_000);
-    assert!(s.snapshot().mats[0].buzzing, "SOS rings the bell");
+    assert!(s.snapshot().bells[0].buzzing, "SOS rings the bell");
     assert!(reg(&s, 1).staff.calls.is_empty(), "no call record, so no call screen");
     ok(&mut s, json!({"type":"release_call","register":1}));
 }
@@ -1341,13 +1341,13 @@ fn staff_bell_calls_colleagues_without_call_screen() {
 fn call_button_rings_only_while_held_and_every_press_rings() {
     for seed in 1..20u64 {
         let mut s = Store::new(seed, 2, 1);
-        ok(&mut s, json!({"type":"set_mat_loss","percent":70}));
+        ok(&mut s, json!({"type":"set_bell_loss","percent":70}));
         advance(&mut s, 3_000);
         for (i, topic) in [json!(null), json!("tobacco"), json!("service")]
             .into_iter()
             .enumerate()
         {
-            let before = s.snapshot().mats[0].rings;
+            let before = s.snapshot().bells[0].rings;
             ok(
                 &mut s,
                 json!({"type":"call_staff","register":1,"topic":topic}),
@@ -1357,43 +1357,43 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
             advance(&mut s, 30_000);
             let snap = s.snapshot();
             assert_eq!(
-                snap.mats[0].rings,
+                snap.bells[0].rings,
                 before + 1,
                 "seed {seed} press {i}: every press rings once"
             );
             assert!(
-                !snap.mats[0].buzzing,
+                !snap.bells[0].buzzing,
                 "seed {seed}: no re-ring after release"
             );
             assert_eq!(
-                snap.mat_links[0].acked_seq, snap.bell.seq,
+                snap.bell_links[0].acked_seq, snap.signal.seq,
                 "delivery is acknowledged"
             );
         }
         ok(&mut s, json!({"type":"ff_button","register":2}));
         advance(&mut s, 20_000);
-        assert!(s.snapshot().mats[0].buzzing, "held FF keeps ringing");
+        assert!(s.snapshot().bells[0].buzzing, "held FF keeps ringing");
         ok(&mut s, json!({"type":"release_call","register":2}));
         advance(&mut s, 20_000);
-        assert!(!s.snapshot().mats[0].buzzing);
+        assert!(!s.snapshot().bells[0].buzzing);
     }
 }
 
 #[test]
-fn logout_returns_to_semi_self_even_while_customer_screen_holds() {
+fn logout_returns_to_self_operated_even_while_customer_screen_holds() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "staff", "ST001");
-    assert_eq!(reg(&s, 1).mode, Mode::Attended);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     assert_eq!(reg(&s, 1).active_side, None);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
-    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
     scan(&mut s, 1, "staff", "ST001");
     ok(
         &mut s,
         json!({"type":"register_ff","register":1,"side":"customer","code":"FF01","qty":1}),
     );
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
-    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
 #[test]
@@ -1600,7 +1600,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
 }
 
 #[test]
-fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
+fn self_operated_bill_checkout_calls_staff_to_check_the_slips() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", GAS_BILL);
     scan(&mut s, 1, "customer", GAS_BILL);
@@ -1623,7 +1623,7 @@ fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
     )
     .is_err());
     login(&mut s, 1);
-    assert_eq!(reg(&s, 1).mode, Mode::Attended);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     let ids = bill_ids(&s, 1);
     assert!(s.snapshot().calls.is_empty());
     check_bill(&mut s, 1, ids[0], true);
@@ -1753,7 +1753,7 @@ fn points_pay_only_for_point_eligible_goods() {
 }
 
 #[test]
-fn semi_self_cash_choice_calls_staff() {
+fn self_operated_cash_choice_calls_staff() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);
     ok(
@@ -1911,7 +1911,7 @@ fn void_and_logout_from_the_store_menu() {
     assert!(v.menu.is_none() && v.staff.lines.is_empty());
     ok(&mut s, top);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
-    assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
 #[test]
@@ -2176,22 +2176,22 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
 #[test]
 fn handheld_and_store_computer_bells_can_be_turned_off() {
     let mut s = Store::new(1, 2, 3);
-    let ids: Vec<String> = s.snapshot().mats.iter().map(|m| m.id.clone()).collect();
+    let ids: Vec<String> = s.snapshot().bells.iter().map(|m| m.id.clone()).collect();
     assert_eq!(ids, ["据え付け端末", "可搬性端末", "ストアコンピューター"]);
-    assert!(run(&mut s, json!({"type":"set_bell_on","mat":0,"on":false})).is_err());
-    ok(&mut s, json!({"type":"set_bell_on","mat":1,"on":false}));
-    ok(&mut s, json!({"type":"set_bell_on","mat":2,"on":false}));
+    assert!(run(&mut s, json!({"type":"set_bell_on","bell":0,"on":false})).is_err());
+    ok(&mut s, json!({"type":"set_bell_on","bell":1,"on":false}));
+    ok(&mut s, json!({"type":"set_bell_on","bell":2,"on":false}));
     ok(&mut s, json!({"type":"call_staff","register":1}));
     advance(&mut s, 1_000);
     let snap = s.snapshot();
-    assert!(snap.mats[0].buzzing);
-    assert!(!snap.mats[1].buzzing && !snap.mats[2].buzzing);
-    assert!(!snap.mats[1].bell_on);
+    assert!(snap.bells[0].buzzing);
+    assert!(!snap.bells[1].buzzing && !snap.bells[2].buzzing);
+    assert!(!snap.bells[1].bell_on);
     advance(&mut s, 8_000);
-    assert!(reg(&s, 1).staff.mat_down.is_empty());
-    ok(&mut s, json!({"type":"set_bell_on","mat":2,"on":true}));
+    assert!(reg(&s, 1).staff.bell_down.is_empty());
+    ok(&mut s, json!({"type":"set_bell_on","bell":2,"on":true}));
     advance(&mut s, 1_000);
-    assert!(s.snapshot().mats[2].buzzing);
+    assert!(s.snapshot().bells[2].buzzing);
 }
 
 #[test]
@@ -2201,7 +2201,7 @@ fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
         &mut s,
         json!({"type":"call_staff","register":1,"topic":"tobacco"}),
     );
-    assert!(!reg(&s, 1).tobacco_asked, "semi-self: not yet");
+    assert!(!reg(&s, 1).tobacco_asked, "self-operated: not yet");
     login(&mut s, 1);
     assert!(reg(&s, 1).tobacco_asked);
     scan(&mut s, 1, "staff", BREAD);
@@ -2234,12 +2234,12 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     assert!(!reg(&s, 1).change_left);
     advance(&mut s, 21_000);
     let v = reg(&s, 1);
-    assert!(v.change_left, "attended, 30 seconds: remind the customer");
+    assert!(v.change_left, "staff_operated, 30 seconds: remind the customer");
     assert!(v.staff.calls.is_empty());
     assert_eq!(v.idle_revert_in, Some(frozen), "countdown is paused");
     advance(&mut s, 30_000);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.calls.len(), 1, "attended, 1 minute: call staff");
+    assert_eq!(v.staff.calls.len(), 1, "staff_operated, 1 minute: call staff");
     assert_eq!(v.staff.calls[0].label, "釣銭忘れ");
     assert!(
         reg(&s, 1).last_receipt.is_some(),
@@ -2386,7 +2386,7 @@ fn emoney_balance(s: &Store) -> u32 {
 }
 
 #[test]
-fn semi_self_emoney_fan_calls_staff_while_shopping() {
+fn self_operated_emoney_fan_calls_staff_while_shopping() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);
     ok(
@@ -2693,7 +2693,7 @@ fn logout_and_pause_from_either_store_menu() {
     open_staff_menu(&mut s, 1);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SemiSelf);
+    assert_eq!(v.mode, Mode::SelfOperated);
     assert!(v.menu.is_none());
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
@@ -2703,7 +2703,7 @@ fn logout_and_pause_from_either_store_menu() {
     ok(&mut s, json!({"type":"pause","register":1}));
     let v = reg(&s, 1);
     assert!(v.paused);
-    assert_eq!(v.mode, Mode::SemiSelf);
+    assert_eq!(v.mode, Mode::SelfOperated);
     assert!(v.menu.is_none());
     assert!(run(
         &mut s,
@@ -2714,7 +2714,7 @@ fn logout_and_pause_from_either_store_menu() {
     scan(&mut s, 1, "staff", "ST001");
     let v = reg(&s, 1);
     assert!(!v.paused);
-    assert_eq!(v.mode, Mode::Attended);
+    assert_eq!(v.mode, Mode::StaffOperated);
     ok(
         &mut s,
         json!({"type":"open_menu","register":1,"screen":"top"}),

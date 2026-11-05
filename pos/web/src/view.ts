@@ -326,10 +326,10 @@ export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: 
     </div>`;
 }
 
-export function billPayCard(count: number, semi = false): string {
+export function billPayCard(count: number, selfOperated = false): string {
   return `<div class="point-screen bill-pay">
       <div class="big">公共料金${billN(count)}を受け付けます</div>
-      <p>${semi ? "現金はスタッフがお預かりします<br>スタッフをお呼びください" : "現金でお支払いください"}</p>
+      <p>${selfOperated ? "現金はスタッフがお預かりします<br>スタッフをお呼びください" : "現金でお支払いください"}</p>
     </div>`;
 }
 
@@ -360,13 +360,13 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
 const INSERT_DONE_MS = 30_000;
 
-function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, semi = false): string {
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   if (method && method !== "cash" && cashlessDue < due)
     return `<p>${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
   if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
-  if (semi) return `<p>キャッシュレスでお支払いください<br>お支払い方法を選んでください</p>`;
+  if (selfOperated) return `<p>キャッシュレスでお支払いください<br>お支払い方法を選んでください</p>`;
   if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
   if (inserted) return staff ? `<p>${sec}秒の無操作で、お支払いを確定します</p>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
@@ -531,19 +531,19 @@ const CALL_SHORT: Record<string, string> = {
 
 export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
-  const ageOnScreen = r.mode === "attended" && (v.age_choice_pending || v.id_pending);
+  const ageOnScreen = r.mode === "staff_operated" && (v.age_choice_pending || v.id_pending);
   const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
   if (side === "customer") {
     const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
     return (
       change +
-      (r.mode === "attended" && r.customer.staff_called && (!ageOnScreen || calls.length)
+      (r.mode === "staff_operated" && r.customer.staff_called && (!ageOnScreen || calls.length)
         ? `<div class="banner call">スタッフが向かっています</div>`
         : "")
     );
   }
-  const warn = v.mat_down.length
-    ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
+  const warn = v.bell_down.length
+    ? `<div class="banner danger">${esc(v.bell_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
   return warn;
 }
@@ -557,8 +557,8 @@ function elapsed(calls: { kind: string; created_at: number }[], now: number, bef
 
 export function callScreen(r: RegisterView, now: number): string {
   const v = r.staff;
-  const warn = v.mat_down.length
-    ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
+  const warn = v.bell_down.length
+    ? `<div class="banner danger">${esc(v.bell_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
   const details = [...new Set(v.calls.filter((c) => c.kind !== "bill").map((c) => c.detail).filter(Boolean))];
@@ -653,7 +653,7 @@ const GUIDES: [GuideKind, string, string][] = [
   ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
 ];
 
-const modeTitle = (attended: boolean): string => `<span class="mode-title ${attended ? "attended" : "semi"}">${attended ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
+const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
 
 export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {
   const reg = r.id;
@@ -673,12 +673,12 @@ const EMONEY_HEAD_LABEL = `<span>電子マネーの</span><span>チャージ・�
 
 function emoneyHead(r: RegisterView, side: Side): string {
   if (r.paused) return "";
-  const attended = r.mode === "attended";
-  const v = attended ? r.staff : r.customer;
-  const own: Side = attended ? "staff" : "customer";
+  const staffOperated = r.mode === "staff_operated";
+  const v = staffOperated ? r.staff : r.customer;
+  const own: Side = staffOperated ? "staff" : "customer";
   const label = `<button type="button" class="emoney-head neg" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">${EMONEY_HEAD_LABEL}</button>`;
   if (side !== own) return label;
-  const shopping = !attended && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
+  const shopping = !staffOperated && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
   if (shopping) {
     const st = find(r.customer.actions, "call_staff");
     const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
@@ -698,8 +698,8 @@ function voidBtn(reg: number, side: Side, st: ActionState): string {
 
 function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }[]; total: number; inserted: number }): string {
   const reg = r.id;
-  if (r.mode === "attended" && side === "customer") return pairNote("取引の中止を確認しています");
-  const st = find(r.mode === "attended" ? r.staff.actions : r.customer.actions, "void_transaction");
+  if (r.mode === "staff_operated" && side === "customer") return pairNote("取引の中止を確認しています");
+  const st = find(r.mode === "staff_operated" ? r.staff.actions : r.customer.actions, "void_transaction");
   const back = [
     view.inserted ? `入れたお金 ${yen(view.inserted)} は出金ボックスに戻ります` : "",
     r.prepaid && r.prepaid_method === "電子マネー" ? `電子マネーで払った ${yen(r.prepaid)} は残高に戻ります` : "",
@@ -718,29 +718,29 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
     <div class="back-foot"><button type="button" class="md ghost back-btn" data-void-cancel="${reg}">バック</button></div>`;
 }
 
-const ATTENDED_GUIDES: [GuideKind, string, string][] = [
+const STAFF_OP_GUIDES: [GuideKind, string, string][] = [
   ["shop", "お買い物", "商品のバーコードをスキャンしてください"],
   ["parcel", "宅配便", "宅配便の伝票、または受取用のバーコードをスキャンしてください"],
   ["bill", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
 ];
 
-function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
+function staffOperatedWelcome(r: RegisterView, notice: string, side: Side): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:staff`);
   const ro = side === "customer";
-  const guide = ATTENDED_GUIDES.find(([k]) => k === on);
-  const guides = ATTENDED_GUIDES.map(
+  const guide = STAFF_OP_GUIDES.find(([k]) => k === on);
+  const guides = STAFF_OP_GUIDES.map(
     ([k, label]) =>
       `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
-  return `${notice}<div class="welcome attended-welcome"><div class="big">${head}</div><p>${sub}</p>
+  return `${notice}<div class="welcome staff-operated-welcome"><div class="big">${head}</div><p>${sub}</p>
       <div class="guide-row">${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
 
-export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
+export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
   if (r.menu) return notice + (side === "staff" ? storeMenu(r) : confirm(pairNote("休止中", "空いているレジをお使い下さい")));
   const v = r.staff;
   const reg = r.id;
@@ -749,7 +749,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (r.pickup_handover && !v.lines.length) return notice + confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.last_receipt && !v.lines.length) return notice + confirm(r.outlet ? changeDue(side, r.outlet) : thanks());
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
-  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return attendedWelcome(r, notice, side);
+  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, notice, side);
   const ro = side === "customer";
   const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
@@ -882,16 +882,16 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
     return confirm(`<div class="point-screen paused-screen"><div class="big">レジ休止中</div><p>${
       side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します"
     }</p></div>`);
-  if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
+  if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
   if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return notice + confirm(emoneyScreen(r, side));
-  return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
+  return r.mode === "staff_operated" ? staffOperatedScreen(r, notice, side) : selfOperatedScreen(r, notice, side);
 }
 
 function emoneyScreen(r: RegisterView, side: Side): string {
   const reg = r.id;
-  const ro = r.mode === "attended" && side === "customer";
-  const actions = r.mode === "semi_self" ? r.customer.actions : r.staff.actions;
+  const ro = r.mode === "staff_operated" && side === "customer";
+  const actions = r.mode === "self_operated" ? r.customer.actions : r.staff.actions;
   const close = (label: string) =>
     ro ? "" : label === "バック" ? backCorner({ type: "close_emoney", register: reg, side }, find(actions, "emoney")) : `<div class="screen-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip")}</div>`;
   if (r.emoney_partial !== null) {
@@ -914,7 +914,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     const short = Math.max(0, r.staff.due - r.emoney_short);
     const buttons =
-      r.mode === "attended"
+      r.mode === "staff_operated"
         ? `<div class="emoney-choices row pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>
            <div class="emoney-foot">${choice("他の決済を使う", "cancel", "skip")}</div>`
         : `<div class="emoney-choices">${choice("他の決済を使う", "cancel", "primary")}</div>`;
@@ -969,10 +969,10 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const tip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
   const cmd = sos ? { type: "call_staff", register: r.id, topic: "sos" } : { type: "call_staff", register: r.id };
   const bell =
-    !sos && r.mode === "attended"
+    !sos && r.mode === "staff_operated"
       ? ""
       : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
-  const mode = r.paused ? "" : r.menu ? `<span class="mode-title semi">店舗処理モード</span>` : modeTitle(r.mode === "attended");
+  const mode = r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
   return `<span class="head-l"><time class="clock">${clockText(now)}</time>${mode}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
 }
 
@@ -989,7 +989,7 @@ export type FfUi = { tab: string; page: number };
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   const reg = r.id;
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
-  if (r.mode === "semi_self") {
+  if (r.mode === "self_operated") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
@@ -999,11 +999,11 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
-  if (r.mode === "attended" && side === "customer") return "";
-  if (r.mode === "attended" && r.staff.phase === "paying") return "";
-  if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
-  if (r.mode === "attended" && r.staff.lines.some((l) => l.parcel || l.pickup)) return "";
-  if (r.mode === "attended" && r.pickup_handover && !r.staff.lines.length) return "";
+  if (r.mode === "staff_operated" && side === "customer") return "";
+  if (r.mode === "staff_operated" && r.staff.phase === "paying") return "";
+  if (r.mode === "staff_operated" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
+  if (r.mode === "staff_operated" && r.staff.lines.some((l) => l.parcel || l.pickup)) return "";
+  if (r.mode === "staff_operated" && r.pickup_handover && !r.staff.lines.length) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
@@ -1020,7 +1020,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
         { type: "register_ff", register: reg, side, code: f.code, qty: 1 },
         f.stock > 0 ? can : { action: "register_ff", allowed: false, reason: "売り切れです" },
         `ff-item ${f.stock > 0 ? "" : "soldout"}`,
-      ).replace("</button>", `<small>${f.stock > 0 ? (r.mode === "attended" ? `残${f.stock}` : yen(f.price)) : "売り切れ"}</small></button>`),
+      ).replace("</button>", `<small>${f.stock > 0 ? (r.mode === "staff_operated" ? `残${f.stock}` : yen(f.price)) : "売り切れ"}</small></button>`),
     )
     .join("");
   const arrows =
@@ -1056,7 +1056,7 @@ const MENU_ITEMS: { screen: MenuScreen; cash: boolean }[] = [
 ];
 
 export function storeMenuUsable(r: RegisterView): boolean {
-  return r.mode === "attended" && r.staff.state === "ready" && !r.paused;
+  return r.mode === "staff_operated" && r.staff.state === "ready" && !r.paused;
 }
 
 export function storeMenu(r: RegisterView): string {
@@ -1114,7 +1114,7 @@ export function storeMenu(r: RegisterView): string {
   }
 }
 
-export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
+export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
@@ -1179,18 +1179,18 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
 
-export function matPanel(s: Snapshot): string {
-  return s.mats
+export function bellPanel(s: Snapshot): string {
+  return s.bells
     .map(
-      (m) => `<div class="mat ${m.buzzing ? "buzz" : ""} ${m.bell_on ? "" : "off"}">
-        <span class="bell">${BELL_ICON[m.kind]}</span><span class="mat-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="mat-state">呼び鈴OFF</span>` : m.buzzing ? `<span class="mat-state">鳴動中</span>` : ""}
+      (m) => `<div class="bell-unit ${m.buzzing ? "buzz" : ""} ${m.bell_on ? "" : "off"}">
+        <span class="bell-icon">${BELL_ICON[m.kind]}</span><span class="bell-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="bell-state">呼び鈴OFF</span>` : m.buzzing ? `<span class="bell-state">鳴動中</span>` : ""}
       </div>`,
     )
     .join("");
 }
 
 export function bellSettings(s: Snapshot): string {
-  return s.mats
+  return s.bells
     .map((m, i) =>
       m.kind === "fixed"
         ? `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" checked disabled aria-label="${esc(m.id)}の呼び鈴機能" /><span class="muted">常に ON</span></label>`
@@ -1349,10 +1349,10 @@ function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCA
 }
 
 export function shelfPanel(s: Snapshot, extra = ""): string {
-  const attended = s.registers.some((r) => r.mode === "attended");
+  const staffOperated = s.registers.some((r) => r.mode === "staff_operated");
   const asked = s.registers.some((r) => r.tobacco_asked);
   return SHELVES.map((g) => {
-    const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || attended);
+    const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || staffOperated);
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>

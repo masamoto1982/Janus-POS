@@ -3,15 +3,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
-    Attended,
-    SemiSelf,
+    StaffOperated,
+    SelfOperated,
 }
 
 impl Mode {
     pub fn label(self) -> &'static str {
         match self {
-            Mode::Attended => "スタッフ操作モード",
-            Mode::SemiSelf => "セルフ操作モード",
+            Mode::StaffOperated => "スタッフ操作モード",
+            Mode::SelfOperated => "セルフ操作モード",
         }
     }
 }
@@ -157,10 +157,10 @@ impl Context {
             Some(EMONEY_SHORT)
         } else if self.bill_unchecked {
             Some(BILL_UNCHECKED)
-        } else if self.mode == Mode::SemiSelf && self.cash_only_goods {
-            Some(SEMI_CASH_ONLY_GOODS)
-        } else if self.mode == Mode::SemiSelf && self.method == Some(PaymentMethod::Cash) {
-            Some(SEMI_CASH_CHOSEN)
+        } else if self.mode == Mode::SelfOperated && self.cash_only_goods {
+            Some(SELF_OP_CASH_ONLY_GOODS)
+        } else if self.mode == Mode::SelfOperated && self.method == Some(PaymentMethod::Cash) {
+            Some(SELF_OP_CASH_CHOSEN)
         } else if self.age_choice_pending {
             Some("スタッフが年齢確認をするか選んでいません")
         } else if self.id_pending {
@@ -189,11 +189,11 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります\n対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
-const SEMI_CASH_ONLY_GOODS: Denial =
+const SELF_OP_CASH_ONLY_GOODS: Denial =
     "切手・お支払いは現金のみです\nスタッフがお預かりします";
-const SEMI_NO_CASH: Denial =
+const SELF_OP_NO_CASH: Denial =
     "セルフレジでは現金を使えません\nキャッシュレスでお支払いください";
-const SEMI_CASH_CHOSEN: Denial = "現金はスタッフがお預かりします\nスタッフをお呼びしました";
+const SELF_OP_CASH_CHOSEN: Denial = "現金はスタッフがお預かりします\nスタッフをお呼びしました";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません\nどうするか選んでください";
 
 fn emoney(c: &Context) -> Result<(), Denial> {
@@ -298,10 +298,10 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
 }
 
 pub fn rules(action: Action, c: &Context) -> Result<(), Denial> {
-    if c.mode == Mode::Attended {
-        attended(action, c)
+    if c.mode == Mode::StaffOperated {
+        staff_operated(action, c)
     } else {
-        semi_self(action, c)
+        self_operated(action, c)
     }
 }
 
@@ -347,7 +347,7 @@ fn pay_action(action: Action, c: &Context) -> Result<(), Denial> {
     }
 }
 
-fn attended(action: Action, c: &Context) -> Result<(), Denial> {
+fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
     let paying = c.phase == Phase::Paying;
     match action {
         Action::Scan | Action::EndStaffMode => Ok(()),
@@ -395,7 +395,7 @@ fn attended(action: Action, c: &Context) -> Result<(), Denial> {
     }
 }
 
-fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
+fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
     let paying = c.phase == Phase::Paying;
     match action {
         Action::Scan => Ok(()),
@@ -434,7 +434,7 @@ fn semi_self(action: Action, c: &Context) -> Result<(), Denial> {
             Err("払込票の確認はスタッフがログインしてから行います")
         }
         Action::HandOverBills => hand_over_bills(c),
-        Action::InsertCash => Err(SEMI_NO_CASH),
+        Action::InsertCash => Err(SELF_OP_NO_CASH),
         Action::TapEmoney => pay_action(action, c),
         Action::CallStaff => Ok(()),
         Action::Emoney => emoney(c),
@@ -456,7 +456,7 @@ mod tests {
     fn contexts() -> Vec<Context> {
         let mut v = vec![];
         let b = [false, true];
-        for mode in [Mode::Attended, Mode::SemiSelf] {
+        for mode in [Mode::StaffOperated, Mode::SelfOperated] {
             for phase in [Phase::Registering, Phase::Paying] {
                 for has_lines in b {
                     for age_choice_pending in b {
@@ -552,9 +552,9 @@ mod tests {
     }
 
     #[test]
-    fn attended_ff_from_either_screen_when_nobody_touches() {
+    fn staff_operated_ff_from_either_screen_when_nobody_touches() {
         for c in contexts().into_iter().filter(|c| {
-            c.mode == Mode::Attended && !c.customer_turn && c.phase == Phase::Registering
+            c.mode == Mode::StaffOperated && !c.customer_turn && c.phase == Phase::Registering
         }) {
             assert_eq!(active_side(&c), None);
             for side in [Side::Staff, Side::Customer] {
@@ -587,7 +587,7 @@ mod tests {
             assert!(permitted(Side::Customer, Action::CheckBill, &c).is_err());
             assert_eq!(
                 permitted(Side::Staff, Action::CheckBill, &c).is_ok(),
-                c.mode == Mode::Attended,
+                c.mode == Mode::StaffOperated,
                 "{c:?}"
             );
             assert!(c.payment_blocker().is_some());

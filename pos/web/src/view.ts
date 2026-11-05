@@ -1010,7 +1010,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
   const page = Math.min(ui.page, pages - 1);
   const tabs = FF_TABS.map(
-    ([k, label]) => `<button type="button" class="ff-tab ${k === ui.tab ? "on" : ""}" data-fftab="${reg}:${k}" aria-pressed="${k === ui.tab}">${label}</button>`,
+    ([k, label]) => `<button type="button" role="tab" class="tab ff-tab ${k === ui.tab ? "on" : ""}" data-fftab="${reg}:${k}" aria-selected="${k === ui.tab}">${label}</button>`,
   ).join("");
   const grid = items
     .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
@@ -1029,7 +1029,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
           page > 0 ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:-1" aria-label="前のページ">▲</button>` : "<span></span>"
         }${page < pages - 1 ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:1" aria-label="次のページ">▼</button>` : "<span></span>"}</div>`
       : "";
-  return `<div class="ff-tabs" role="tablist">${tabs}</div><div class="ff-page"><div class="ff-grid">${grid}</div>${arrows}</div>`;
+  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page"><div class="ff-grid">${grid}</div>${arrows}</div>`;
 }
 
 const MENU_LABEL: Record<MenuScreen, string> = {

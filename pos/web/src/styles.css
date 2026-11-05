@@ -166,8 +166,8 @@ button { touch-action: manipulation; }
 .screen :is(.point-screen, .paybox, .welcome, .thanks, .ffv-screen) :is(p:not([class]), p.muted, p.guide, p.lead, p.fine),
 .screen .thanks > div:not(.big) { font-size: var(--msg-small); }
 .parcel-error { color: var(--danger); font-size: 14px; font-weight: 700; margin: 0; }
-.ff-tabs { display: flex; gap: var(--gap); align-items: center; flex: none; }
-.ff-tab { flex: 1 1 0; min-width: 0; padding: 2px 4px; font-size: 11px; white-space: nowrap; border-radius: 6px 6px 0 0; }
+.ff-tabs { flex: none; }
+.ff-tab { padding: 2px 4px; font-size: 11px; }
 .ff-page { flex: 1; min-height: 0; display: flex; gap: var(--gap); }
 .ff-arrows { flex: none; width: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--gap); }
 .ff-arrow { flex: 1; max-height: 48%; padding: 0; font-size: 9px; }
@@ -224,14 +224,23 @@ button {
   background: var(--btn-on); color: var(--btn-on-ink);
 }
 button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
-.ff-tab, .ff-arrow, .ff-item, .guide-btn, .void-btn, .call-btn, .swipe-tabs button,
+.ff-arrow, .ff-item, .guide-btn, .void-btn, .call-btn,
 .method-list .seg {
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong);
 }
 button:not(:disabled):active, .pressed { transform: translate(1px, 2px); }
-.guide-btn.on, .ff-tab.on, .ff-tab[aria-pressed="true"], button.seg.on, .method-list .seg.on, .swipe-tabs button.on {
+.guide-btn.on, button.seg.on, .method-list .seg.on {
   font-weight: 700; text-decoration: underline; text-underline-offset: 2px;
 }
+/* タブ（FFのタブ・モバイルの画面切替）。タブの並びは下の線に載り、選ばれた積極タブ（濃い背景・白文字）と
+   選ばれていない消極タブ（濃い枠線・濃い文字・背景なし）の二種類。上の角だけ丸く、下は線に付く。押しても位置はズレない */
+.tabs { display: flex; gap: var(--gap); align-items: flex-end; border-bottom: var(--frame-w) solid var(--border); }
+button.tab {
+  flex: 1 1 0; min-width: 0; white-space: nowrap; border-radius: 6px 6px 0 0;
+  background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-bottom: none;
+}
+button.tab.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }
+button.tab:not(:disabled):active { transform: none; }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost:disabled { opacity: .3; }
@@ -673,10 +682,10 @@ body.dragging .drop-hint { display: inline; }
   .register { padding: 8px; }
   .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: 15px; margin-bottom: 4px; }
   .register h2 .idle { font-size: 11px; }
-  .swipe-tabs { display: flex; gap: var(--gap); margin-bottom: 4px; }
-  .swipe-tabs button { flex: 1 1 0; min-width: 0; min-height: 30px; padding: 2px 4px; font-size: 13px; line-height: 1.2; transition: flex-grow .2s; }
-  .swipe-tabs button.on { flex-grow: 2; }
-  .swipe-tabs button.operable { filter: url(#ramp); }
+  .swipe-tabs { display: flex; border-bottom: none; }
+  .swipe-tabs .tab { min-height: 30px; padding: 2px 4px; font-size: 13px; line-height: 1.2; transition: flex-grow .2s; }
+  .swipe-tabs .tab.on { flex-grow: 2; }
+  .swipe-tabs .tab.operable { filter: url(#ramp); }
   .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .screens::-webkit-scrollbar { display: none; }
   .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }

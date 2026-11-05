@@ -384,7 +384,7 @@ function confiscatedCard(reg: number, v: StaffView): string {
 /** お渡し済みの FF を減らした・取り消した分の回収の案内（店員側）。「回収しました」で閉じる */
 function ffCollectCard(reg: number, v: StaffView): string {
   if (!v.ff_collect.length) return "";
-  const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}を${c.qty}点回収してください。</div>`).join("");
+  const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}を${c.qty}点回収してください</div>`).join("");
   return `<div class="point-screen collect">
       ${lines}
       <div class="point-choices">${btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { action: "dismiss_ff_collect", allowed: true, reason: null }, "primary")}</div>
@@ -442,8 +442,8 @@ export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: 
 /** 店員の確認が済んだ公共料金の支払い（お客様側）。公共料金は現金のみ */
 export function billPayCard(count: number, semi = false): string {
   return `<div class="point-screen bill-pay">
-      <div class="big">公共料金${billN(count)}を受け付けます。</div>
-      <p>${semi ? "現金はスタッフがお預かりします。スタッフをお呼びください。" : "現金でお支払いください。"}</p>
+      <div class="big">公共料金${billN(count)}を受け付けます</div>
+      <p>${semi ? "現金はスタッフがお預かりします<br>スタッフをお呼びください" : "現金でお支払いください"}</p>
     </div>`;
 }
 
@@ -493,7 +493,7 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
   // セミセルフはキャッシュレス専用機（現金の入金ボックスはスタッフ側の画面に付いている）
-  if (semi) return `<p>キャッシュレスでお支払いください。お支払い方法を選んでください</p>`;
+  if (semi) return `<p>キャッシュレスでお支払いください<br>お支払い方法を選んでください</p>`;
   // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
   // お客様側は不足額を大きく見せる
   if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
@@ -609,7 +609,7 @@ function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Ac
   const e = qtyEntry.get(`${reg}:${side}`);
   const typing = e?.id === l.id;
   const shown = typing ? e.digits || "　" : String(l.qty);
-  const key = `<button type="button" class="pad-field qty-key${typing ? " typing" : ""}" data-qtyentry="${reg}:${side}:${l.id}" aria-label="数量 ${l.qty}。押すとテンキーで数量を入力">${esc(shown)}</button>`;
+  const key = `<button type="button" class="pad-field qty-key${typing ? " typing" : ""}" data-qtyentry="${reg}:${side}:${l.id}" aria-label="数量 ${l.qty}、押すとテンキーで数量を入力">${esc(shown)}</button>`;
   return `<span class="qty-step">${minus}${key}${btn("＋", step(1), st, "small neg")}</span>`;
 }
 
@@ -768,16 +768,16 @@ export function callScreen(r: RegisterView, now: number): string {
 /** セミセルフで、現金のみの商品（切手）の係員を待つ間のお客様側の案内（会計ボタンで自動的に呼ぶ） */
 function cashOnlyWait(): string {
   return `<div class="point-screen">
-      <div class="big">切手は現金のみのお取り扱いです。</div>
-      <p>スタッフをお呼びしました。そのままお待ちください。</p>
+      <div class="big">切手は現金のみのお取り扱いです</div>
+      <p>スタッフをお呼びしました<br>そのままお待ちください</p>
     </div>`;
 }
 
 /** セミセルフで年確の係員を待つ間のお客様側の案内（登録画面・支払画面の代わりに出す） */
 function ageWait(age: number): string {
   return `<div class="point-screen">
-      <div class="big">年齢確認が必要な商品が含まれています。</div>
-      <p>${age}歳前後のお客様は身分証をご準備ください。</p>
+      <div class="big">年齢確認が必要な商品が含まれています</div>
+      <p>${age}歳前後のお客様は身分証をご準備ください</p>
     </div>`;
 }
 
@@ -832,8 +832,8 @@ export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: Ac
     .join("");
   const [head, body] =
     side === "staff"
-      ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください。対象商品を登録するか、クーポンを取り消すまで決済できません"]
-      : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください。対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
+      ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください<br>対象商品を登録するか、クーポンを取り消すまで決済できません"]
+      : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください<br>対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
   return `<div class="card coupon-card"><b>${head}</b><p>${body}</p><ul class="coupon-list">${list}</ul></div>`;
 }
 
@@ -934,13 +934,16 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
   if (r.mode === "attended" && side === "customer") return pairNote("取引の中止を確認しています");
   const st = find(r.mode === "attended" ? r.staff.actions : r.customer.actions, "void_transaction");
   const back = [
-    view.inserted ? `入れたお金 ${yen(view.inserted)} は出金ボックスに戻ります。` : "",
-    r.prepaid && r.prepaid_method === "電子マネー" ? `電子マネーで払った ${yen(r.prepaid)} は残高に戻ります。` : "",
-    r.prepaid && r.prepaid_method !== "電子マネー" ? `${esc(r.prepaid_method ?? "")}で払った ${yen(r.prepaid)} は取り消します。` : "",
-  ].join("");
+    view.inserted ? `入れたお金 ${yen(view.inserted)} は出金ボックスに戻ります` : "",
+    r.prepaid && r.prepaid_method === "電子マネー" ? `電子マネーで払った ${yen(r.prepaid)} は残高に戻ります` : "",
+    r.prepaid && r.prepaid_method !== "電子マネー" ? `${esc(r.prepaid_method ?? "")}で払った ${yen(r.prepaid)} は取り消します` : "",
+  ]
+    .filter(Boolean)
+    .map((s) => `<br>${s}`)
+    .join("");
   return `<div class="point-screen void-screen">
       <div class="big">取引を中止しますか？</div>
-      <p>登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します。${back}</p>
+      <p>登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}</p>
       <div class="void-choices">
         ${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}
       </div>
@@ -1061,7 +1064,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const slips = v.bills.length;
   if (paying && slips && v.bill_unchecked)
     return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "スタッフが払込票を確認しています"));
-  if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : billNote(slips, "お客様に現金でお支払いいただいています"));
+  if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : billNote(slips, "お客様に受付点数、合計金額をお伝えください"));
   if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
   const card = firstOf([
     side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
@@ -1082,7 +1085,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       ${taxNote(v)}
     </div>
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="3" class="muted">明細はありません。どのバーコードからでも読めます</td></tr>`}</tbody></table>
+      <tbody>${rows || `<tr><td colspan="3" class="muted">明細はありません<br>どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
 }
 
@@ -1098,7 +1101,7 @@ function pointCheck(reg: number, side: Side, st: ActionState): string {
       <div class="point-choices">
         <button type="button" class="primary ${reading ? "on" : ""}" data-guide="${reg}:${side}:point">付与する</button>
               </div>
-      ${reading ? `<p class="guide">ポイントサービスのバーコードを読み取ってください。</p>` : ""}
+      ${reading ? `<p class="guide">ポイントサービスのバーコードを読み取ってください</p>` : ""}
     </div>${skipCorner({ type: "confirm_point_card", register: reg, side }, st)}`;
 }
 
@@ -1230,7 +1233,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       : `<div class="point-screen emoney-screen"><p>電子マネーの残高</p><div class="big emoney-balance">${yen(e.balance)}</div>${close("閉じる")}</div>`;
   return `<div class="point-screen emoney-screen">
       <div class="big">チャージする紙幣を入れてください</div>
-      <p>${e.inserted ? "入れおわったら、電子マネーを決済端末にかざしてください" : "入金ボックスに入れます。1,000円札から使えます（残高は 20,000円まで）"}</p>
+      <p>${e.inserted ? "入れおわったら、電子マネーを決済端末にかざしてください" : "入金ボックスに入れます<br>1,000円札から使えます（残高は 20,000円まで）"}</p>
     </div>${close("バック")}`;
 }
 
@@ -1239,7 +1242,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
 function prepaidNote(r: RegisterView, due: number): string {
   // ポイントで払った後の残り（たばこなど）は、現金のみの商品だけでなければ支払方法を選び直す
   const rest = r.cashless_due ? "のお支払い方法をお選びください" : "を現金で";
-  return `<p>${esc(r.prepaid_method ?? "")}で ${yen(r.prepaid)} お支払い済み。残り <b>${yen(due)}</b> ${rest}</p>`;
+  return `<p>${esc(r.prepaid_method ?? "")}で ${yen(r.prepaid)} お支払い済み、残り <b>${yen(due)}</b> ${rest}</p>`;
 }
 
 /** 現金のみの商品（切手・代行収納）があるとき、支払方法を選ぶ前に知らせる */
@@ -1412,7 +1415,7 @@ export function storeMenu(r: RegisterView): string {
     case "waste":
     case "ff_fresh":
       return screen(`${head(MENU_LABEL[m.screen])}
-        <p class="muted">準備中です（今後つくりこみます）。</p>`);
+        <p class="muted">準備中です（今後つくりこみます）</p>`);
     case "refund":
     case "emergency":
     case "expense": {
@@ -1421,7 +1424,7 @@ export function storeMenu(r: RegisterView): string {
       const pw = padValue.get(padValueKey(reg, "mpw")) ?? "";
       const ready = cout.allowed && Number(amt) > 0 && pw !== "";
       return screen(`${head(MENU_LABEL[m.screen])}
-        <p class="muted">お金を抜く操作です。操作のたびに店舗パスワードが要ります。お金は下の「出金」ボックスに出ます。記録は担当者名つきで残ります。</p>
+        <p class="muted">お金を抜く操作です<br>操作のたびに店舗パスワードが要ります<br>お金は下の「出金」ボックスに出ます<br>記録は担当者名つきで残ります</p>
         <div class="menu-form">
           ${padField(reg, "staff", "mamt", amt, "金額（円）", "出金する金額")}
           ${padField(reg, "staff", "mpw", pw, "店舗パスワード", "店舗パスワード")}
@@ -1430,8 +1433,8 @@ export function storeMenu(r: RegisterView): string {
     }
     case "deposit":
       return screen(`${head(MENU_LABEL.deposit)}
-        <p>入金する金額を下の<b>「入金」ボックス</b>に入れて Enter を押してください。</p>
-        <p class="muted">記録は担当者名つきで残ります。</p>`);
+        <p>入金する金額を下の<b>「入金」ボックス</b>に入れて Enter を押してください</p>
+        <p class="muted">記録は担当者名つきで残ります</p>`);
     case "changer": {
       const have = (d: number) => v.drawer.find(([x]) => x === d)?.[1] ?? 0;
       const segs = [1000, 500, 100, 50, 10]
@@ -1439,7 +1442,7 @@ export function storeMenu(r: RegisterView): string {
         .join("");
       return screen(`${head(MENU_LABEL.changer)}
         <div class="row wrap">受け取る金種 ${segs}</div>
-        <p>両替する金額を<b>「入金」ボックス</b>に入れて Enter を押してください。同じ額を ${m.exchange_to.toLocaleString()}円 で<b>「出金」ボックス</b>に出します。</p>
+        <p>両替する金額を<b>「入金」ボックス</b>に入れて Enter を押してください<br>同じ額を ${m.exchange_to.toLocaleString()}円 で<b>「出金」ボックス</b>に出します</p>
         <p class="muted">釣銭機の ${m.exchange_to.toLocaleString()}円：残り ${have(m.exchange_to)} 枚　在高 ${yen(v.drawer_total)}</p>`);
     }
   }
@@ -1568,13 +1571,13 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   {
     id: "age",
     label: "年確設定",
-    note: "年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います。酒・たばこは法令どおり20歳以上で固定され、変更できません。",
+    note: "年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います<br>酒・たばこは法令どおり20歳以上で固定され、変更できません",
   },
-  { id: "limit", label: "制限設定", note: "1回のお会計で売れる販売個数の上限です。超える分はスキャンしても登録されません。" },
+  { id: "limit", label: "制限設定", note: "1回のお会計で売れる販売個数の上限です<br>超える分はスキャンしても登録されません" },
   {
     id: "tax",
     label: "税率設定",
-    note: "税率は税区分ごとに持ちます。法改正で税率が変わったら区分の税率を変え、新しい税率ができたら区分を追加してください。価格は税込で、1回のお会計で税率ごとに合計してから1回だけ端数処理します。変更はこれから登録する商品から適用されます。",
+    note: "税率は税区分ごとに持ちます<br>法改正で税率が変わったら区分の税率を変え、新しい税率ができたら区分を追加してください<br>価格は税込で、1回のお会計で税率ごとに合計してから1回だけ端数処理します<br>変更はこれから登録する商品から適用されます",
   },
 ];
 
@@ -1710,7 +1713,7 @@ const HINT_PAY = "支払方法を選んでから、決済端末にドラッグ�
 const HINT_EMONEY = "決済端末にドラッグ＆ドロップ";
 
 function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCAN): string {
-  return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">
+  return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ、${esc(hint)}">
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
@@ -1763,7 +1766,7 @@ function slipShelf(s: Snapshot): string {
 // ---------------------------------------------------------------------------
 
 function walletItem(key: string, name: string, sub: string, cls: string, hint: string): string {
-  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ。${esc(hint)}">
+  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ、${esc(hint)}">
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 

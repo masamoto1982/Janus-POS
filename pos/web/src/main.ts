@@ -195,7 +195,7 @@ function buildSkeleton(): void {
     <dialog class="rules-dlg" id="rules-dlg" aria-labelledby="rules-title">
       <div class="dlg-head"><h2 id="rules-title">商品ルール設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
       <form class="owner-auth" data-owner-auth>
-        <p class="muted">商品ルールを変えられるのはオーナーだけです。オーナーの従業員番号とパスワードを入れてください。閉じると認証は解除されます。</p>
+        <p class="muted">商品ルールを変えられるのはオーナーだけです<br>オーナーの従業員番号とパスワードを入れてください<br>閉じると認証は解除されます</p>
         <div class="row wrap">
           <input data-owner="id" placeholder="オーナーの従業員番号" value="000" aria-label="オーナーの従業員番号" />
           <input data-owner="pw" type="password" placeholder="パスワード" autocomplete="off" aria-label="オーナーのパスワード" />
@@ -207,7 +207,7 @@ function buildSkeleton(): void {
     </dialog>
     <dialog class="rules-dlg bell-dlg" id="bell-dlg" aria-labelledby="bell-title">
       <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
-      <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます。OFF の端末は鳴らず、不通の警告も出しません。据え付け端末は常に ON です。</p>
+      <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます<br>OFF の端末は鳴らず、不通の警告も出しません<br>据え付け端末は常に ON です</p>
       <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
     <dialog class="rules-dlg picker-dlg" id="picker-dlg" aria-labelledby="picker-title">

@@ -404,11 +404,13 @@ pub enum Command {
     Pause {
         register: u8,
     },
-    /// 出金（お客様側の店舗メニューに入っていれば、パスワードは要らない）
+    /// 出金（お金を抜く操作）。店舗メニューの中でも、操作のたびに店舗パスワードを求める
     CashOut {
         register: u8,
         kind: CashOutKind,
         amount: u32,
+        #[serde(default)]
+        password: String,
     },
     CashIn {
         register: u8,
@@ -2391,7 +2393,8 @@ impl Store {
                 register,
                 kind,
                 amount,
-            } => self.cash_out(register, kind, amount),
+                password,
+            } => self.cash_out(register, kind, amount, &password),
             C::CashIn {
                 register,
                 kind,
@@ -3477,9 +3480,14 @@ impl Store {
         register: u8,
         kind: CashOutKind,
         amount: u32,
+        password: &str,
     ) -> Result<Outcome, String> {
         self.check_active(register, Action::CashOut)?;
         self.require_cash_menu(register)?;
+        if amount == 0 {
+            return Err("金額を入力してください".into());
+        }
+        self.auth.verify_store(password, self.now)?;
         let now = self.now;
         let staff = self
             .reg(register)
@@ -3495,9 +3503,6 @@ impl Store {
                 result,
             });
         };
-        if amount == 0 {
-            return Err("金額を入力してください".into());
-        }
         let r = self.reg_mut(register)?;
         match r.drawer.take(amount, false) {
             Ok(c) => {

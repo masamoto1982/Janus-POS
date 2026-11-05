@@ -455,7 +455,7 @@ export const SCENES: Scene[] = [
     group: "店員操作モード：荷物と公共料金",
     title: "公共料金：お支払い",
     when: "払込票の確認が済んだ後",
-    staff: { strong: ["公共料金〈N〉枚"], weak: ["お客様に現金でお支払いいただいています"] },
+    staff: { strong: ["公共料金〈N〉枚"], weak: ["お客様に受付点数、合計金額をお伝えください"] },
     customer: { strong: ["公共料金〈N〉枚を受け付けます。"], weak: ["現金でお支払いください。"] },
     rules: ["P-07"],
     source: "billPayCard / billNote",

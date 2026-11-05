@@ -1,25 +1,12 @@
-//! 商品マスタとバーコードの振り分け。
-//!
-//! 会計画面になるまでは、どのバーコードもいつでも受け付ける。読んだ
-//! バーコードの種類（商品・ポイントカード・スタッフ・レジ袋・サービス商品）
-//! を [`classify`] で一か所で判定し、ふさわしい処理へつなげる。
-//! 「先に支払方法を選べ」「先にポイントカードを出せ」といった順番の縛りは持たない。
-//!
-//! 年齢確認の要否は商品マスタには持たせない。商品は「分類」だけを持ち、
-//! 年確の対象かどうかは [`crate::age_rules`] の設定で決まる。
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaxRate {
-    /// 軽減税率 8%
     Reduced8,
-    /// 標準税率 10%
     Standard10,
 }
 
-/// 商品の分類。年確ルールは分類単位でも指定できる。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Category {
@@ -38,7 +25,6 @@ pub enum Category {
     FastFood,
     Bag,
     Service,
-    /// 切手（現金でしか売れない）
     Stamp,
 }
 
@@ -85,25 +71,16 @@ impl Category {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Product {
-    /// バーコード（FF はバーコードを持たず、店員画面のメニューから登録する）
     pub code: &'static str,
     pub name: &'static str,
-    /// 税込価格（円）。荷物のサービス商品は受付時に金額が決まるため 0（払込票は印字された金額）
     pub price: u32,
     pub tax: TaxRate,
     pub category: Category,
-    /// 「要店員」：お客様側で読まれたら店員呼び出しをかけ、店員の受付操作を待つ
     pub needs_staff: bool,
-    /// 公共料金の払込票（代行収納）。ほかの商品と一緒に登録できず、会計の後に店員が払込票の内容を確認する
     pub utility_bill: bool,
-    /// 現金でしか払えない（切手・代行収納）。ほかの商品と一緒に買えるが、
-    /// キャッシュレスで払えるのはこれを除いた分だけ（有人・セミセルフ共通）
     pub cash_only: bool,
-    /// 宅配便の発送（荷物を送る）。サイズと届け先の郵便番号で料金が決まる。ほかの商品と一緒に会計できない
     pub parcel_send: bool,
-    /// 荷物を受取る（お客様の受取用バーコード）。お預かりの荷物を一件ずつ、ほかの商品と別に引き渡す
     pub parcel_pickup: bool,
-    /// 荷物を送る：着払い（料金はお届け先で受け取る。レジでは 0 円）
     pub parcel_collect: bool,
 }
 
@@ -129,7 +106,6 @@ const fn p(
     }
 }
 
-/// 公共料金の払込票（代行収納）。読み取りは普通の商品と同じ。会計ボタンで店員を呼び、店員が内容を確認する。現金のみ
 const fn bill(code: &'static str, name: &'static str, price: u32) -> Product {
     Product {
         needs_staff: false,
@@ -143,32 +119,23 @@ use Category::*;
 use TaxRate::*;
 
 pub const CATALOG: &[Product] = &[
-    // デモ用に商品名は抽象化し（将来 UI を英語にしても困らない一般名）、コンビニの 4 大分類ごとに代表的な商品を二つから四つ置く
-    // （FF は下のバーコードなしの商品。レジ画面下のタブから登録する）
-    // 日配食品
     p("4900000000028", "サンドイッチ", 320, Reduced8, Food),
     p("4900000000042", "牛乳", 198, Reduced8, Drink),
     p("4900000000011", "パン", 160, Reduced8, Food),
-    // 加工食品
     p("4900000000035", "ソフトドリンク", 150, Reduced8, Drink),
     p("4900000000103", "アルコール", 248, Standard10, Alcohol),
     p("4900000000073", "袋菓子", 150, Reduced8, Food),
     p("4900000000066", "即席麺", 214, Reduced8, Food),
-    // 非食品
     p("4910000000014", "新聞", 160, Standard10, Newspaper),
     p("4910000000038", "雑誌", 480, Standard10, Magazine),
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),
-    // 店舗判断の年確のデモ：ライターは店舗ルールの初期値 20 歳
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
-    // 切手は現金でしか売れない（消費税は非課税）
     p("4900000000141", "切手", 110, Standard10, Stamp),
-    // レジまわり（カトラリー・レジ袋）とサービス（お客様が持ち込む荷物・払込票）
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
     p("2000000000039", "フォーク", 3, Standard10, Bag),
     p("2000000000046", "スプーン", 3, Standard10, Bag),
     p("2000000000053", "お手拭き", 3, Standard10, Bag),
-    // 荷物を送るは、料金をレジで払う発払いと、お届け先で払う着払いの二つ
     Product {
         parcel_send: true,
         ..p("2100000000014", "荷物を送る 発払い", 0, Standard10, Service)
@@ -182,14 +149,9 @@ pub const CATALOG: &[Product] = &[
         parcel_pickup: true,
         ..p("2100000000038", "荷物を受取る", 0, Standard10, Service)
     },
-    // 公共料金の払込票（金額は印字済み）。1 枚目を読むと全部の枚数を尋ね、
-    // 申告した枚数を読み終えたらお客様が件数・金額を確認する。ほかの商品とは一緒に登録できない
-    // 設計メモ（ユーザー 2026-10-28）：実際の POS レジでは払込票ごとに手数料があり得るが、
-    // シミュレーターでは手数料の概念を扱わない（店員の確認は種類ごとの枚数、お客様への案内は枚数だけ。web の billVerifyScreen）
     bill("2100000000021", "電気料金", 5000),
     bill("2100000000043", "水道料金", 4000),
     bill("2100000000050", "ガス料金", 3000),
-    // FF（バーコードなし。レジ画面下のタブから登録する）
     p("FF01", "フライドチキン", 220, Reduced8, FastFood),
     p("FF02", "スパイシーチキン", 220, Reduced8, FastFood),
     p("FF03", "アメリカンドック", 140, Reduced8, FastFood),
@@ -220,7 +182,6 @@ pub const CATALOG: &[Product] = &[
     p("FF75", "牛筋", 150, Reduced8, FastFood),
 ];
 
-/// FF のタブ（レジ画面の下 1/3）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FfTab {
@@ -243,9 +204,6 @@ impl FfTab {
     }
 }
 
-/// FF のタブ分けと並び順。各タブの中は売れ筋順で、先頭ページの最上部に売れ筋が来る。
-/// 画面に収めるため各タブ 4 品（1 ページ）。フライヤーとドリンクは 8 品（2 ページ）。
-/// フライヤーの 2 ページ目は、廃止した常温総菜タブの商品
 pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF01", FfTab::Fried),
     ("FF02", FfTab::Fried),
@@ -281,8 +239,6 @@ pub fn find(code: &str) -> Option<&'static Product> {
     CATALOG.iter().find(|p| p.code == code)
 }
 
-/// FF の初期在庫。コロッケは最初から品切れ（登録できないことを確認できる）。
-/// カウンターのドリンクはカップがある限り作れるので多めにしておく。
 pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF01", 3),
     ("FF02", 2),
@@ -314,43 +270,33 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF75", 10),
 ];
 
-/// 読み取ったバーコードの種類。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Scanned {
     Product(&'static Product),
     PointCard(String),
     Coupon(&'static Coupon),
     Staff(String),
-    /// 保管場所から持ってきた、お預かり中の荷物のバーコード（荷物の番号）
     Pickup(String),
-    /// 登録済みの荷物（荷物を送る）の伝票のバーコード。読むとその荷物の受付を取り消す
     ParcelSlip(String),
     Unknown,
 }
 
 pub const POINT_CARD_PREFIX: &str = "PC";
 pub const COUPON_PREFIX: &str = "CP";
-/// お預かり中の荷物に貼ったバーコード（PK + 荷物の番号 12 桁）
 pub const PICKUP_PREFIX: &str = "PK";
-/// 荷物を送るの伝票のバーコード（PS + 伝票の番号 12 桁）
 pub const SLIP_PREFIX: &str = "PS";
 
-/// クーポンの効き方
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "yen")]
 pub enum CouponKind {
-    /// 引換券：対象商品 1 個が無料
     Exchange,
-    /// 割引券：対象商品 1 個から値引き
     Discount(u32),
 }
 
-/// 引換券・割引券。商品より先に読んでも、対象商品が登録されたときに効く
 #[derive(Debug, PartialEq, Eq)]
 pub struct Coupon {
     pub code: &'static str,
     pub name: &'static str,
-    /// 対象商品のバーコード
     pub target: &'static str,
     pub kind: CouponKind,
 }
@@ -371,7 +317,6 @@ pub const COUPONS: &[Coupon] = &[
 ];
 
 impl Coupon {
-    /// 対象商品 1 個に対する値引き額
     pub fn discount(&self, price: u32) -> u32 {
         match self.kind {
             CouponKind::Exchange => price,
@@ -402,7 +347,6 @@ pub fn classify(code: &str) -> Scanned {
             .map_or(Scanned::Unknown, Scanned::Coupon);
     }
     match find(code) {
-        // FF はバーコードでは登録しない（店員操作モードのメニューからのみ）
         Some(p) if p.category == FastFood => Scanned::Unknown,
         Some(p) => Scanned::Product(p),
         None => Scanned::Unknown,
@@ -452,7 +396,6 @@ mod tests {
         assert!(matches!(classify("2000000000015"), Scanned::Product(p) if p.category == Bag));
         assert!(matches!(classify("2100000000014"), Scanned::Product(p) if p.needs_staff));
         assert_eq!(classify("FF01"), Scanned::Unknown);
-        // FF はどれもタブに入り、在庫を持つ
         for p in CATALOG.iter().filter(|p| p.category == Category::FastFood) {
             assert!(FF_MENU.iter().any(|(c, _)| *c == p.code), "{}", p.code);
             assert!(

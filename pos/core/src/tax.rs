@@ -1,30 +1,15 @@
-//! 税率設定（軽減税率・インボイス・ゼロ税率）。
-//!
-//! - 税率は商品マスタに固定せず、この表の「税区分」で持つ。法改正で税率が変わっても、
-//!   新しい税率ができても、オーナーが区分の税率を変える・区分を足すだけで対応できる。
-//! - 商品マスタの税率は初期値。オーナーは商品ごとに区分を付け替えられる。
-//! - 価格は税込（内税）。インボイス制度に合わせ、1 回のお会計で税率ごとに
-//!   対象額を合計してから 1 回だけ端数処理する。
-//! - 税率は商品を登録した時点のものを明細に残す（会計の途中で設定を変えても、
-//!   登録済みの明細の税率は変わらない）。
-
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{self, TaxRate};
 
-/// 税区分の種類
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaxKind {
-    /// 標準税率
     Standard,
-    /// 軽減税率
     Reduced,
-    /// ゼロ税率（輸出免税など。課税取引だが税率 0%）
     Zero,
-    /// 非課税・不課税（代行収納など。消費税の対象外）
     Exempt,
 }
 
@@ -38,21 +23,16 @@ impl TaxKind {
         }
     }
 
-    /// 税率が 0% に決まっている種類
     fn always_zero(self) -> bool {
         matches!(self, TaxKind::Zero | TaxKind::Exempt)
     }
 }
 
-/// 端数処理（1 円未満）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Rounding {
-    /// 切り捨て
     Floor,
-    /// 四捨五入
     HalfUp,
-    /// 切り上げ
     Ceil,
 }
 
@@ -71,11 +51,9 @@ pub struct TaxClass {
     pub id: String,
     pub name: String,
     pub kind: TaxKind,
-    /// 税率（0.01% 単位。1000 = 10%）
     pub rate_bp: u32,
 }
 
-/// 税込の対象額に含まれる消費税額（内税）
 pub fn included_tax(gross: u32, rate_bp: u32, rounding: Rounding) -> u32 {
     if rate_bp == 0 {
         return 0;
@@ -90,7 +68,6 @@ pub fn included_tax(gross: u32, rate_bp: u32, rounding: Rounding) -> u32 {
     tax as u32
 }
 
-/// 税率の表示（1000 → "10%"、1050 → "10.5%"）
 pub fn rate_label(rate_bp: u32) -> String {
     let whole = rate_bp / 100;
     let frac = rate_bp % 100;
@@ -106,9 +83,7 @@ pub fn rate_label(rate_bp: u32) -> String {
 #[derive(Clone, Debug, Serialize)]
 pub struct TaxSettings {
     pub classes: Vec<TaxClass>,
-    /// 商品コード → 税区分（商品マスタの初期値から付け替えたものだけ）
     pub products: BTreeMap<String, String>,
-    /// 適格請求書発行事業者の登録番号（T + 13 桁。未登録なら空）
     pub invoice_no: String,
     pub rounding: Rounding,
     #[serde(skip)]
@@ -124,7 +99,6 @@ impl Default for TaxSettings {
             rate_bp,
         };
         let mut products = BTreeMap::new();
-        // 代行収納（お支払い）と切手は消費税の対象外
         for p in catalog::CATALOG {
             if p.cash_only {
                 products.insert(p.code.to_string(), "exempt".to_string());
@@ -150,7 +124,6 @@ impl TaxSettings {
         self.classes.iter().find(|c| c.id == id)
     }
 
-    /// 商品マスタの税率（初期値）にあたる区分
     fn default_class(rate: TaxRate) -> &'static str {
         match rate {
             TaxRate::Standard10 => "standard",
@@ -158,7 +131,6 @@ impl TaxSettings {
         }
     }
 
-    /// この商品の税区分
     pub fn class_for(&self, code: &str) -> &TaxClass {
         let id = self
             .products
@@ -170,7 +142,6 @@ impl TaxSettings {
             .unwrap_or(&self.classes[0])
     }
 
-    /// 表示に使う税率（0% を除き、低い順。区分が違っても同じ税率は一つにまとめる）
     pub fn display_rates(&self) -> Vec<u32> {
         let mut rates: Vec<u32> = self
             .classes
@@ -183,7 +154,6 @@ impl TaxSettings {
         rates
     }
 
-    /// 区分の税率を変える（法改正への対応）。変更前の説明を返す
     pub fn set_rate(&mut self, id: &str, rate_bp: u32) -> Result<String, String> {
         if rate_bp > 10_000 {
             return Err("税率は 0〜100% で指定してください".into());
@@ -209,7 +179,6 @@ impl TaxSettings {
         ))
     }
 
-    /// 新しい税区分を足す（新しい税率ができたとき）
     pub fn add_class(&mut self, name: &str, kind: TaxKind, rate_bp: u32) -> Result<String, String> {
         let name = name.trim();
         if name.is_empty() {
@@ -237,7 +206,6 @@ impl TaxSettings {
         ))
     }
 
-    /// 商品の税区分を付け替える
     pub fn set_product(&mut self, code: &str, id: &str) -> Result<String, String> {
         let p = catalog::find(code).ok_or("商品が見つかりません")?;
         let to = self.class(id).ok_or("税区分が見つかりません")?.name.clone();
@@ -253,7 +221,6 @@ impl TaxSettings {
         Ok(format!("{}の税区分：{before} → {to}", p.name))
     }
 
-    /// インボイスの登録番号と端数処理
     pub fn set_invoice(&mut self, invoice_no: &str, rounding: Rounding) -> Result<String, String> {
         let no = invoice_no.trim().to_uppercase();
         let valid = no.is_empty()

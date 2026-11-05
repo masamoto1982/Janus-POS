@@ -1,13 +1,3 @@
-//! 年齢確認ルール（問題7への対策と、店舗判断での年確）。
-//!
-//! - 年確の対象は商品マスタに固定せず、このルール表で決める。
-//! - 法令ルール（酒・たばこ 20 歳）は全店共通で、店舗からは外せない。
-//! - 店舗ルールはオーナーだけが追加・削除できる（ライター、18禁書籍など）。
-//!   分類単位でも、個別の商品単位でも指定できる。
-//! - 判定するのは会計ボタンを押した時点だけ。対象品が複数あれば、
-//!   最も厳しい年齢で 1 回だけ確認する。
-//! - あわせて、商品ごとの販売個数の上限（1 回のお会計で何点まで）もオーナーが決める。
-
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +17,6 @@ pub struct AgeRule {
     pub target: RuleTarget,
     pub label: String,
     pub min_age: u8,
-    /// 法令ルールは削除できない
     pub legal: bool,
 }
 
@@ -42,7 +31,6 @@ pub struct RuleChange {
 pub struct AgeRules {
     pub rules: Vec<AgeRule>,
     pub history: Vec<RuleChange>,
-    /// 商品コード → 1 回のお会計で売れる上限の個数
     pub limits: BTreeMap<String, u32>,
     #[serde(skip)]
     next_id: u32,
@@ -80,7 +68,6 @@ impl Default for AgeRules {
             20,
             true,
         );
-        // 店舗ルールの初期値（オーナーが商品ごとに変更できる）
         for p in catalog::CATALOG {
             let age = match p.category {
                 Category::SmokingGoods => 20,
@@ -113,7 +100,6 @@ impl AgeRules {
         id
     }
 
-    /// この商品に適用される最も厳しい年齢（対象外なら None）
     pub fn age_for(&self, code: &str, category: Category) -> Option<u8> {
         self.rules
             .iter()
@@ -125,7 +111,6 @@ impl AgeRules {
             .max()
     }
 
-    /// 法令ルールで決まる年齢（店舗からは変えられない部分）
     pub fn legal_age_for(&self, code: &str, category: Category) -> Option<u8> {
         self.rules
             .iter()
@@ -138,7 +123,6 @@ impl AgeRules {
             .max()
     }
 
-    /// この商品だけに店舗が付けた年齢
     pub fn store_age_for(&self, code: &str) -> Option<u8> {
         self.rules
             .iter()
@@ -146,7 +130,6 @@ impl AgeRules {
             .map(|r| r.min_age)
     }
 
-    /// 商品ごとの店舗ルールを設定する（None で外す）。法令の対象品（酒・たばこ）は変更できない。
     pub fn set_product(
         &mut self,
         code: &str,
@@ -184,13 +167,10 @@ impl AgeRules {
         Ok(())
     }
 
-    /// この商品を 1 回のお会計で売れる上限（なければ None）
     pub fn limit_for(&self, code: &str) -> Option<u32> {
         self.limits.get(code).copied()
     }
 
-    /// 商品ごとの販売個数の上限を設定する（None で外す）
-    /// ほかの商品ルール（税率設定など）の変更も、同じ変更履歴に残す
     pub fn record(&mut self, by: &str, change: String, now: u64) {
         self.history.push(RuleChange {
             at: now,
@@ -327,7 +307,6 @@ mod tests {
         assert_eq!(r.age_for(lighter, Category::SmokingGoods), Some(18));
         r.set_product(lighter, None, "オーナー", 0).unwrap();
         assert_eq!(r.age_for(lighter, Category::SmokingGoods), None);
-        // 法令の対象（酒・たばこ）は法令どおりで、緩くも厳しくもできない
         let beer = "4900000000103";
         for age in [None, Some(18), Some(25)] {
             assert!(r.set_product(beer, age, "オーナー", 0).is_err());

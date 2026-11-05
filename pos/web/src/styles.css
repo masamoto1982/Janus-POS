@@ -1,28 +1,17 @@
-/* 配色（2026-10-25 ユーザー指定）。色はこのパレット（と白・黒・背景との混色）だけを使い、意味ごとの変数に割り当てる。
-   ベースカラーは広い面積に、アクセントカラーは小さい面積に使う。
-   文字は背景とのコントラスト比 4.5:1 以上の組み合わせだけにする（明るい色の上は黒文字）。 */
 :root {
-  /* ボタンの大きさは大と小の二つだけ（2026-10-30 ユーザー）。狭いところでは幅だけ縮む。
-     大：取引中止・お会計・FF・サービス・たばこ、確認画面の選択肢、Item と Wallet。
-     小：待ち受け画面の案内（商品・レジ袋など）、明細の数量・−（削除）・＋ */
   --btn-w: 116px; --btn-h: 48px;
   --btn-sm-w: 56px; --btn-sm-h: 26px;
-  --btn-md-w: 64px; --btn-md-h: 34px; /* 中：テンキーの「←」と同じ大きさ。バック・スキップに使う */
-  /* 余白は一つの値に統一（2026-11-02 ユーザー）。ボタンとボタンの間・並べた部品の間はすべてこの幅 */
+  --btn-md-w: 64px; --btn-md-h: 34px;
   --gap: 6px;
-  /* 注意（黄・オレンジ）と解消（黄緑・緑）のしるし（2026-11-02 ユーザー）。赤は危険・警告・否定。入力欄と区別するため角は丸めない */
   --caution-bg: color-mix(in oklch, var(--ac-yellow) 22%, white);
   --caution-ink: color-mix(in oklch, var(--ac-orange) 55%, black);
   --caution-line: var(--ac-orange);
   --safe-bg: color-mix(in oklch, var(--base-lime) 45%, white);
   --safe-ink: color-mix(in oklch, var(--ac-green) 70%, black);
   --safe-line: var(--ac-green);
-  /* 年確などの札（オレンジ）とお渡し済の札（グリーン）：濃い文字に淡い背景（2026-11-03 ユーザー） */
   --flag-orange-ink: oklch(0.4772 0.113 59); --flag-orange-bg: oklch(0.9348 0.0518 74);
   --flag-green-ink: oklch(0.4583 0.104 154); --flag-green-bg: oklch(0.9352 0.0347 156);
-  /* 積極ボタンの濃い背景（白文字が読める濃さ）：注意＝オレンジ、安全・肯定＝グリーン */
   --caution-solid: color-mix(in oklch, var(--ac-orange) 68%, black);
-  /* ベースカラー：広い面積に用いる */
   --base-pink: oklch(0.883 0.063 32);
   --base-cream: oklch(0.975 0.149 109);
   --base-lime: oklch(0.914 0.180 118);
@@ -30,7 +19,6 @@
   --base-beige: oklch(0.870 0.110 75);
   --base-green: oklch(0.812 0.117 160);
   --base-purple: oklch(0.789 0.086 307);
-  /* アクセントカラー：小さい面積に用いる */
   --ac-red: oklch(0.666 0.225 37);
   --ac-yellow: oklch(0.939 0.200 105);
   --ac-green: oklch(0.667 0.144 163);
@@ -40,9 +28,6 @@
   --ac-orange: oklch(0.791 0.166 77);
   --ac-purple: oklch(0.479 0.220 328);
   --ac-brown: oklch(0.444 0.109 55);
-  /* ボタンの色（2026-10-24 ユーザー指定）。グレー表示の画面から色を載せ直す第一歩
-     標準色 = 押せる部品すべての地色（旧「FF」ボタンの薄いグレー）
-     選択色 = 選ばれている・押している部品の地色（旧「たばこ」ボタンのグレー） */
   --btn: oklch(0.7508 0 0);
   --btn-ink: oklch(0 0 0);
   --btn-on: oklch(0.4423 0 0);
@@ -54,10 +39,10 @@
   --muted: oklch(0.551 0.0234 264);
   --line: oklch(0.8699 0 0); --border: oklch(0.6234 0 0); --msg-strong: oklch(0.4423 0 0); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.8699 0 0); --off-ink: oklch(0.6234 0 0);
   --accent: var(--ac-blue);
-  --frame-w: 1.5px; /* 画面・入金/出金ボックス共通の枠線の太さ（受け付け中は2倍の太線） */
+  --frame-w: 1.5px;
   --accent-ink: oklch(1 0 0);
   --accent-soft: color-mix(in oklch, var(--ac-blue) 8%, transparent);
-  --reg-top-bg: oklch(0.8699 0 0); /* ボタン（#aeaeae）より一段薄いグレー。黒文字で読む */
+  --reg-top-bg: oklch(0.8699 0 0);
   --reg-top-ink: oklch(0 0 0);
   --staff-bg: oklch(0.2781 0.0296 257);
   --staff-ink: oklch(0.967 0.00287 265);
@@ -142,7 +127,6 @@ body {
   font: 14px/1.5 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
 }
 button, input, select { font: inherit; }
-/* タッチの遅延をなくす（問題1） */
 button { touch-action: manipulation; }
 
 .top {
@@ -157,43 +141,32 @@ button { touch-action: manipulation; }
 .screens { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 760px) { .screens { grid-template-columns: 1fr; } }
 
-/* 「店員側」「お客様側」は設置で自明なので、レジ画面の外（上）に小さく書く */
 .screen-wrap { min-width: 0; display: flex; flex-direction: column; }
 .screen-cap { font-size: 11px; letter-spacing: .08em; color: var(--muted); margin: 0 0 3px 2px; }
 .screen-cap::after { content: ""; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
-/* レジ画面：ヘッダー ＋ 上 4/5 が登録画面 ＋ 下 1/5 がバーコードなしアイテム欄（複数のレジと MAT を一画面に収める） */
-/* レジ画面は角を丸めない（2026-10-25 ユーザー） */
 .screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
-.screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; height: 51px; /* 窮屈なので 34px の 1.5 倍 */
-  /* 左右の余白は、顧客操作モードの呼び出しボタン（FF・サービス・たばこ）の行の左右の余白と揃える（.screen-items の左右 6px ＋ .call-row の space-evenly の余り） */
+.screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 6px; height: 51px;
   padding: 0 calc(6px + max(0px, (100% - 12px - 3 * var(--btn-w) - 2 * var(--gap)) / 4)); border-bottom: 1px solid var(--border); }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
-/* スタッフ側のヘッダーは右にスワイプして店舗メニューを開き、左にスワイプして閉じる（横の指の動きはスクロールにしない） */
 .staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }
-/* 稼働モードのバッジ：有人は濃いグレーの塗りに白文字、セミセルフは白地に濃いグレーの枠と文字。塗りの有無で一目で区別する */
 .screen-head .clock { font-size: 11px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 4 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
-/* 文字の強弱：強いメッセージ #535353、補足の弱いメッセージは枠線と同じ #878787。強いほうが必ず大きい */
 .screen { --muted: var(--msg-weak); }
 .screen .big, .screen .guide { color: var(--msg-strong); }
 .screen .muted, .welcome p:not(.guide), .pair-note p, .thanks > div:not(.big) { color: var(--msg-weak); }
 .parcel-wait p.lead { color: var(--msg-strong); }
-/* 案内文は一行目が大きい文字（積極テキスト）、二行目が小さい文字（消極テキスト）。
-   どの案内画面でも、店員側・お客様側とも、大きい文字と小さい文字はそれぞれこの一つの大きさにそろえる */
 .screen { --msg-big: 18px; --msg-small: 13px; }
 .screen .big { font-size: var(--msg-big); font-weight: 700; line-height: 1.35; margin-bottom: 0; }
 .screen .muted,
 .screen :is(.point-screen, .paybox, .welcome, .thanks, .ffv-screen) :is(p:not([class]), p.muted, p.guide, p.lead, p.fine),
 .screen .thanks > div:not(.big) { font-size: var(--msg-small); }
 .parcel-error { color: var(--danger); font-size: 14px; font-weight: 700; margin: 0; }
-/* FF タブ */
 .ff-tabs { display: flex; gap: var(--gap); align-items: center; flex: none; }
-/* タブは区画の横幅いっぱいに均等に並べる */
 .ff-tab { flex: 1 1 0; min-width: 0; padding: 2px 4px; font-size: 11px; white-space: nowrap; border-radius: 6px 6px 0 0; }
 .ff-page { flex: 1; min-height: 0; display: flex; gap: var(--gap); }
 .ff-arrows { flex: none; width: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--gap); }
@@ -202,18 +175,13 @@ button { touch-action: manipulation; }
 .ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 1px 3px; font-size: 10px; line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
 .ff-item small { font-size: 9px; }
 .ff-item.soldout { background: var(--off-bg); color: var(--off-ink); border-color: var(--off-ink); }
-/* 店員画面とお客様画面は同じ内容・同じ見た目。操作している側だけ色がつく */
 .staff-screen { background: var(--cust-bg); border: var(--frame-w) solid var(--border); }
 .customer-screen { background: var(--cust-bg); border: var(--frame-w) solid var(--border); }
-/* お客様側も店員側と同じ 4 段階のグレーで表す（2026-10-25 ユーザー：色への置き換えは一旦取りやめ）。
-   パレットの変数（--base-* / --ac-*）は、次に色を当てるときのために残す */
 
 .lines { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
-/* 明細は列幅を固定し、変更ボタンや FF のチェックの有無で店員側とお客様側の列がずれないようにする */
 .lines.cols3 { table-layout: fixed; }
 .lines.cols3 td { overflow-wrap: anywhere; }
 .lines.cols3 col.c-qty { width: 48px; }
-/* 数量を変えられる明細は小さいボタン三つ分。画面が狭いときは名前の欄を残してボタンの幅だけ縮める */
 .lines.cols3:has(.qty-step) col.c-qty { width: min(calc(var(--btn-sm-w) * 3 + 8px), 50%); }
 .lines.cols3 col.c-amt { width: 60px; }
 .lines th { text-align: left; font-weight: 500; font-size: 12px; color: var(--msg-weak); }
@@ -221,10 +189,6 @@ button { touch-action: manipulation; }
 .lines td, .lines th { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .num { text-align: right; white-space: nowrap; }
 
-/* 上の帯は 取引中止｜ポイント・合計・電子マネー｜会計 の三つの欄に分ける。
-   真ん中の欄は二行（ポイント・合計）でも三行（＋電子マネー）でも縦の中央にそろえ、帯の高さは三行のときに合わせる
-   （有人・セミセルフ、店員側・お客様側で帯の高さと合計の位置がそろう）。
-   左右のボタンは真ん中の欄とつり合う大きさで、それぞれの欄の外側の端に縦の中央で置く */
 .reg-top { --row: 18px; --sum-h: 34px; position: sticky; top: -8px; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 8px; min-height: calc(var(--row) * 2 + var(--sum-h)); margin: -8px -12px 6px; padding: 6px 12px; background: var(--reg-top-bg); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); box-sizing: content-box; }
 .reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
 .reg-top .total { font-size: 28px; }
@@ -237,7 +201,6 @@ button { touch-action: manipulation; }
 .reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
 .reg-top .void > button, .reg-top .action > button { width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; white-space: nowrap; }
-/* 帯が狭いとき（1024px 幅の有人など）は、合計とボタンの文字を詰める */
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
   .reg-top .mid { --sum-h: 26px; }
@@ -245,9 +208,7 @@ button { touch-action: manipulation; }
   .reg-top .sum { font-size: 13px; }
   .reg-top .void > button, .reg-top .action > button { font-size: 13px; padding: 4px 2px; }
 }
-/* 電子マネーのチャージ・残高確認は合計の下の段の中央に、下線の付いた文字リンクで（セミセルフの待ち受けと同じ表現） */
 .reg-top .count .full { margin-left: 6px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
-/* 登録の明細は表示エリアが狭いので小ぶりに */
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
 .screen-main .lines .tag { font-size: 10px; }
 .screen-main .lines button { font-size: 11px; padding: 1px 8px; }
@@ -258,10 +219,6 @@ button { touch-action: manipulation; }
 .row.wrap { flex-wrap: wrap; }
 .row.center, .center { justify-content: center; text-align: center; }
 
-/* ボタンは「積極ボタン」と「消極ボタン」の二種類だけ（2026-10-28 ユーザー指定）。
-   積極ボタン＝濃い背景色に白文字、枠線なし。ふつうのボタンはこちら（進む・決める・選ぶ）。
-   消極ボタン＝濃い枠線と濃い文字、背景なし。スキップ・やめる・戻る・閉じるなどの控えめな操作と、
-   切り替えボタン（タブ・支払い方法など）の選ばれていない側。選ばれている側は積極ボタンになる */
 button {
   border: 1.5px solid transparent; border-radius: 8px; padding: 8px 12px; cursor: pointer;
   background: var(--btn-on); color: var(--btn-on-ink);
@@ -271,43 +228,31 @@ button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
 .method-list .seg {
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong);
 }
-/* 押した表現は色を変えず、元の位置からわずかにずらすことと音だけ（2026-11-02 ユーザー）。
-   待ち受けの案内ボタン（商品・レジ袋・FF・サービス・たばこなど）は選択中でも色を変えない */
 button:not(:disabled):active, .pressed { transform: translate(1px, 2px); }
-/* 選ばれている切り替えボタン（タブ・案内・支払い方法など）も色を変えず、太字と下線のしるしで示す */
 .guide-btn.on, .ff-tab.on, .ff-tab[aria-pressed="true"], button.seg.on, .method-list .seg.on, .swipe-tabs button.on {
   font-weight: 700; text-decoration: underline; text-underline-offset: 2px;
 }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost:disabled { opacity: .3; }
-/* スキップは消極ボタン（年確はしたほうが、ポイントは付けたほうが商売上よいので） */
 button.skip { font-weight: 500; }
 button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { padding: 4px 10px; }
-/* 有人モードのお客様側の決済手段の案内：押せないが、店員側のボタンと同じ形（枠つき）で見せる */
 .method-list .seg { border-radius: 8px; padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: var(--gap); }
 
-/* 入力フォームは角を丸めない箱：枠線は薄い色（--border）、濃い文字、背景なし。角の丸みはボタンだけの表現（P-29） */
 input, select, button.pad-field {
   padding: 6px 8px; border-radius: 0; border: 1.5px solid var(--border); background: transparent; color: var(--ink); min-width: 0;
 }
-/* テンキーで打ち込む入力欄（押すとテンキーが開く）。見た目は入力欄そのもの。テンキーは入力欄とだけ組み合わせる */
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
-/* 記入例は Janus-POS で規定する一番薄いグレー（--line）。入力欄すべて共通 */
 input::placeholder { color: var(--line); opacity: 1; }
 button.pad-field .placeholder { color: var(--line); font-weight: 400; }
 button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }
-/* 年確は押せない注意のしるし：角を丸めず、枠線色の枠と文字だけ */
-/* 注意のしるし（年確・限定・現金のみ・お渡し前など）＝淡い黄色の背景・オレンジの文字と枠。
-   解消したしるし（お渡し済・受付済）＝淡い黄緑の背景・緑の文字と枠。角は丸めない（入力欄とは別の部品）。
-   意味のある色なので、画面のグレー置き換え（--warn などの再割り当て・filter）は受けない */
 .tag.warn { background: var(--caution-bg); color: var(--caution-ink); border: 1px solid var(--caution-line); border-radius: 0; }
 .tag.ok { background: var(--safe-bg); color: var(--safe-ink); border: 1px solid var(--safe-line); border-radius: 0; }
 .screen button.tag, .screen button.tag:disabled, .ff-btn, .screen button.ff-btn:disabled { filter: none !important; }
@@ -317,7 +262,6 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 
 .banner { border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-weight: 600; }
 .banner.call { background: var(--call-bg); color: var(--call); }
-/* 呼び出し中の店員側：登録画面の領域いっぱいに広げる（角は丸めない） */
 .call-screen { box-sizing: border-box; margin: -8px -12px; min-height: calc(100% + 16px); text-align: center; padding: 16px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: var(--call-bg); color: var(--call); }
 .call-screen .banner { align-self: stretch; }
 .call-screen .call-reason { font-size: 44px; font-weight: 800; line-height: 1.2; }
@@ -328,7 +272,6 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
-/* 確認画面は上下左右とも中央に（登録画面の領域を置き換えて、残りの高さいっぱいに広げる） */
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }
 .screen-main > .reg-top, .screen-main > .banner { flex: none; }
 .confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: var(--gap); }
@@ -343,45 +286,31 @@ details summary h3 { display: inline; }
 
 .welcome { box-sizing: border-box; min-height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 8px; text-align: center; }
 .welcome p { margin: 4px 0 0; }
-/* お礼・お釣りの案内は確認画面と同じく、登録領域の上下左右とも中央に */
 .thanks { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: 10px; }
-/* 押さなくても困らない補助ボタンは塗らずに枠線だけ。選択中は通常の選択色 */
 .guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: 11px; padding: 0 2px; border-radius: 999px; white-space: nowrap; }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
-/* 有人モードの初期画面：二段目の電子マネーも、お買い物などと同じ枠線だけの丸い形と色 */
-/* お客様側は押せないが、薄くせず店員側と同じ見た目で映す（選んだ用件も同じく塗る） */
 .attended-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-weight: 700; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }
 .point-screen { text-align: center; padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
-/* 選択肢のボタンは画面の幅によらず横一列に並べる（狭いときは縮める） */
 .point-choices { display: flex; gap: var(--gap); flex-wrap: nowrap; justify-content: center; max-width: 100%; }
 .point-services { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .point-service { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: 14px; }
-/* 確認画面の選択肢は大きいボタン（取引中止・お会計と同じ大きさ） */
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
-/* 支払方法は切り替えボタンの並び。セミセルフの狭い確認画面にも収まるよう、高さは小さいボタンにそろえる */
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
-/* お支払い内容の確認は、角の丸い枠に入れず登録エリアいっぱいに広げる（最上段と会計バーは除く。2026-10-28 ユーザー） */
-/* FF の「お渡し前」は押せるアイコン（押すとお渡し照合の画面） */
-/* 年確・限定・現金のみのしるし＝淡い黄色の背景にオレンジの文字、お渡し済＝淡い黄緑の背景に緑の文字。ボタンではないので枠線・角の丸み・押下の動きはない（ボタンと区別する） */
 .tag.age { background: var(--flag-orange-bg); border: none; border-radius: 0; color: var(--flag-orange-ink); font-weight: 700; }
 .ff-done { background: var(--flag-green-bg); color: var(--flag-green-ink); font-weight: 700; }
-/* 年確・お渡し前（ボタン）・お渡し済の札は、小ボタン（56×26）と同じ大きさにそろえる */
 .screen-main .lines .tag.age, .tag.age, .ff-done, .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; line-height: 1; white-space: nowrap; }
-/* 押すと位置がずれて音が鳴る（共通のボタンの動き）。お渡し前＝オレンジ、お渡し済＝グリーンの積極・小ボタン
-   （濃い背景・白文字・枠線なし）。意味のある色なので、画面のグレー置き換えは受けない */
 .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; border: none; border-radius: 4px; color: oklch(1 0 0); }
 .ff-btn.ff-waiting { background: var(--caution-solid); }
 button.ff-btn.ff-verify { cursor: pointer; }
 button.ff-btn.ff-verify:disabled { cursor: not-allowed; opacity: .35; }
 span.ff-btn { cursor: default; }
-/* お渡し照合の画面：品目｜注文数｜お渡し数｜照合 の表。入力するとその場で OK / NG */
 .ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; text-align: center; }
 .ffv-screen .lines.ffv { margin-bottom: auto; }
 .ffv-screen .lines.ffv td, .ffv-screen .lines.ffv th { padding-top: 1px; padding-bottom: 1px; }
@@ -392,23 +321,16 @@ span.ff-btn { cursor: default; }
 button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0 4px; }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
-/* 引き返すボタンは左下 */
 .ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 8px 0 0; }
-/* お客様の「確認しました」は右下 */
 .ffv-foot.end { justify-content: flex-end; }
 .ff-return-list { list-style: none; margin: 0 0 auto; padding: 0; font-size: 15px; }
-/* 引き返すボタンは左下、進むボタンは右下 */
 .emoney-screen:has(> .emoney-foot) { align-self: stretch; flex: 1 0 auto; }
 .emoney-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
-/* 確認画面の最下段：引き返すボタン（やめる・閉じる）は左下、お客様の「確認しました」は右下 */
 .point-screen:has(> .screen-foot) { align-self: stretch; flex: 1 0 auto; }
-/* 最下段にボタンがあっても、案内文は残りの高さの上下中央に置く（上の余白と下の余白を等しく分ける） */
 .point-screen:has(> .screen-foot) > :first-child, .emoney-screen:has(> .emoney-foot) > :first-child { margin-top: auto; }
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
-/* 会計中の「バック」は確認画面の左下（中身の中央寄せは崩さない） */
 .confirm { position: relative; }
 .confirm:has(> .back-foot), .confirm:has(> .skip-foot) { padding-bottom: calc(var(--btn-md-h) + 4px); }
-/* セミセルフは最下段に呼び出しボタンがあって狭いので、ボタンの分だけ上下の余白を詰める */
 .confirm:has(> .back-foot) > .point-screen { padding-top: 2px; padding-bottom: 2px; gap: 6px; }
 .confirm:has(> .back-foot) > .point-screen .big { margin-bottom: 0; }
 .confirm:has(> .back-foot) > .point-screen.emoney-screen .big { margin-bottom: 16px; }
@@ -416,21 +338,18 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
 .confirm:has(> .back-foot) > .paybox p { margin: 2px 0 0; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
-/* 「スキップ」は「バック」と左右対称に右下へ（小ボタン・消極）。進むボタンは右、引き返すボタンは左 */
 .skip-foot { position: absolute; right: 0; bottom: 0; }
 .confirm button.skip.md, button.skip.md { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
-/* 「バック」はどこでも小ボタン（56×26）で、画面（テンキーはポップアップ）の左下に置く */
 .menu-screen { display: flex; flex-direction: column; min-height: 100%; }
 .qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
 .confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
-/* 狭い画面（セミセルフは最下段に呼び出しボタンがある）でもボタンまで収まるよう、詰めて置く */
 .change { font-size: 18px; margin: 8px 0; }
 
 .toast {
   position: absolute; left: 10px; right: 10px; bottom: 8px; padding: 8px 10px; border-radius: 8px;
   background: oklch(0.2101 0.0318 265); color: oklch(1 0 0); opacity: 0; transform: translateY(6px); pointer-events: none;
   transition: opacity .15s, transform .15s; font-size: 13px;
-  white-space: pre-line; /* 文の区切りは「。」の代わりに改行 */
+  white-space: pre-line;
 }
 .toast.show { opacity: .95; transform: none; }
 .toast.error { background: var(--danger); }
@@ -460,12 +379,9 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .loading, .error { padding: 24px; }
 .error { color: var(--danger); }
 
-/* ---- 画面構成：ヘッダー／アーティクル（左 2/3・右 1/3）／フッター ---- */
 .top h1 { font-size: 18px; margin: 0; }
 .top .logo { width: 73px; height: 73px; flex: none; }
-/* ビルド番号：白い文字が引き立つ濃い背景の角丸バッジ */
 .build-badge { font-size: 12px; font-weight: 600; color: oklch(1 0 0); background: oklch(0.3717 0.0392 257); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
-/* ホバーで案内を出すタイトル（ⓘ で案内があることを示す） */
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
 .tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
@@ -484,19 +400,15 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .hw-label { font-size: 12px; color: var(--muted); }
 .hw .row { margin: 0; }
 
-/* MAT は 1 行に収める（MAT とレジ 2 台が一画面に入るように） */
 .mat-area { position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 8px; }
 .mat-area h2 { margin: 0; }
 .mat-area .toast { position: static; margin-top: 8px; display: none; }
 .mat-area .toast.show { display: block; }
-/* ヘッダーの呼び出し色（OKLCH）：緑→赤を OKLCH 空間で補間する。明度と彩度がそろうので、途中の黄色付近でも濁らない */
 :root { --call-lo: oklch(0.93 0.08 155); --call-hi: oklch(0.90 0.09 25); }
-/* 呼び出し中：レジ画面のヘッダーが点滅する。放置時間は色で表す（--call-t: 0%=淡いグリーン → 100%=淡いレッド） */
 .screen-head.calling { animation: head-call 1s steps(1) infinite; }
 @keyframes head-call { 0% { background: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo)); } 50% { background: transparent; } }
 @media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo)); } }
 
-/* 売り場：スクロールしてもドラッグ元が見えるよう追従させる */
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
 @media (max-width: 900px) { .right-col { position: static; max-height: none; } }
 .shelf + .shelf { margin-top: 6px; }
@@ -511,7 +423,6 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .item-name { font-weight: 600; font-size: 12px; }
 .item-sub { font-size: 11px; color: var(--muted); }
 .item-sub b { color: var(--warn); font-weight: 600; }
-/* たばこボタンの呼び出しで有人モードになったら、たばこの枠と文字を点滅させる */
 @keyframes item-call-blink { 50% { border-color: var(--border); color: var(--ink); } }
 .item.call-blink { border: 2px solid var(--call); color: var(--call); animation: item-call-blink 1s steps(1) infinite; }
 .item.call-blink .item-name, .item.call-blink .item-sub, .item.call-blink .item-sub b { color: inherit; }
@@ -521,25 +432,17 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }
 .lines tr.coupon td { color: var(--danger); }
 .item.card { background: var(--call-bg); color: var(--call); margin: 0; }
-/* お金は金額だけ。紙幣はほかのボタンと同じ大きさの札、硬貨はその高さの真円 */
 .item.bill { background: var(--bill-bg); border-color: var(--border); justify-content: center; min-height: 34px; }
 .item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: var(--btn-h); height: var(--btn-h); padding: 0; align-items: center; justify-content: center; text-align: center; }
 .item.coin .item-name { font-size: 11px; white-space: nowrap; }
 .item.pay { background: var(--pay-bg); border-color: var(--border); }
-/* Item の商品と、Wallet のお金以外（ポイントカード・クーポン・決済手段）は、それぞれ同じ大きさ
-   （いちばん長い名前・補足が収まる幅で、引き延ばさない）。文字は縦横とも中央に */
 .wallet-cards { margin-top: 4px; }
 .items.uniform .item, .wallet-cards .item, .item.bill { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); justify-content: center; align-items: center; text-align: center; }
 .items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-/* ドロップ先 */
 .drop-hint { display: none; margin-left: 8px; letter-spacing: 0; }
 body.dragging, body.dragging * { cursor: grabbing !important; }
-/* アプリ全体の原則：枠線を点線にする＝操作を受け付けている、枠線の点滅＝注意喚起。
-   ドラッグ中は、落とせる先（レジ画面、お金・決済なら入金ボックス）の枠線を太線（--frame-w の2倍）にして accent 色にする。
-   通常の枠は --frame-w。内側に同じ幅の線を足すので、レイアウトはずれない */
 body.dragging .screen { border-color: var(--accent); }
-/* 内側の線は box-shadow だと子の背景（会計ボタンのある .reg-top など）に塗りつぶされるので、最前面の疑似要素で描く */
 body.dragging .screen::after { content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; border: var(--frame-w) solid var(--accent); }
 body.dragging-wallet .money-io :is(.inlet, .reader) { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); }
 body.dragging-wallet .money-io .reader { box-shadow: none; outline-color: var(--accent); }
@@ -552,7 +455,6 @@ body.dragging .drop-hint { display: inline; }
 
 .bottom { border-top: 1px solid var(--border); background: var(--panel); padding-block: 8px; }
 
-/* ドラッグ中に文字が選択されないようにする（入力欄は除く） */
 .floor { user-select: none; -webkit-user-select: none; }
 .floor input, .floor select { user-select: text; -webkit-user-select: text; }
 .ffmenu { display: flex; flex-wrap: wrap; gap: var(--gap); align-items: center; margin: 6px 0; }
@@ -560,9 +462,6 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-/* 店員側もお客様側も、4 段階のグレー（#535353・#878787・#aeaeae・#d4d4d4）と白黒だけで表す。
-   画面全体にグレースケールのフィルターを掛けると、中の部品だけを青にできない（フィルターは親子で重なる）ため、
-   画面の中で使う色の変数を、グレースケールにしたときと同じグレーに置き換えておく */
 .staff-screen, .customer-screen {
   --base-pink: oklch(0.8699 0 0); --base-cream: oklch(0.9731 0 0); --base-lime: oklch(0.9097 0 0); --base-sky: oklch(0.9006 0 0);
   --base-beige: oklch(0.8576 0 0); --base-green: oklch(0.8109 0 0); --base-purple: oklch(0.7763 0 0); --ac-red: oklch(0.5313 0 0);
@@ -602,27 +501,18 @@ body.dragging .drop-hint { display: inline; }
   --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0); --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.3092 0 0);
   --coin-bg: oklch(0.329 0 0); --pay-bg: oklch(0.3132 0 0);
 }
-/* 色の付いたボタン（硬貨・電子マネーなど）やチェックボックスの既定色も、操作できない部品ではグレーで描く */
 .screen :is(button, input, select, summary) { filter: grayscale(1); }
-/* 操作できる部品だけを、白と 4 段階の青で表す（グレーの濃淡をそのまま置き換える。main.ts の rampFilter）。
-   操作できる側の画面の部品・お客様本人が押すボタン（お客様側の画面）・身分証などを確かめる店員のボタン（店員側の画面）・稼働モードのバッジ。
-   押せないボタン（売り切れなど）は下の :disabled でグレーに戻す */
 .screen.operable [data-region] :is(button, input, select, summary),
 .staff-screen [data-region] .staff-only button,
 .screen-head .emoney-head:not(:disabled) { filter: url(#ramp); }
 .screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
-/* 絵文字のアイコン（呼び出し理由・ポイントサービス）は文字なので、操作できない箇所としてグレー */
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
-/* 操作できない側の画面（排他）：表示はそのまま（薄くしない）で、押せなくするだけ */
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
 .screen.inactive [data-region] select, .screen.inactive [data-region] summary {
   pointer-events: none;
 }
-/* 身分証の確認は店員本人が行う：店員側の画面でだけ押せる */
 .staff-screen.inactive [data-region] .staff-only button:not(:disabled) { pointer-events: auto; opacity: 1; }
-/* 押せないボタン（売り切れなど）は半透明にせず、四色のグレーで描く（塗り #D4D4D4・文字 #878787。絵文字のアイコンもグレー）。枠線だけの補助ボタンは塗らない。
-   もう一方の画面が操作中で、この画面から触れないだけのボタンは、薄くせずふだんの色のまま表示する */
 .screen button:disabled {
   opacity: 1 !important; filter: grayscale(1) !important; background: var(--off-bg) !important; color: var(--off-ink) !important; border-color: var(--border);
 }
@@ -630,9 +520,7 @@ body.dragging .drop-hint { display: inline; }
 .id-card { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; }
 .id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
 .id-head button { min-width: 64px; }
-/* 荷物の受け取り：お預かりの番号は離れても読めるよう大きく */
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
-/* 荷物の受付・受け取りは入力欄とボタンを一画面に収める（年確の入力より詰める） */
 .parcel-entry, .parcel-ask, .pickup-step, .parcel-wait { padding: 12px; gap: 10px; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: 6px; font-size: 15px; }
@@ -650,14 +538,12 @@ body.dragging .drop-hint { display: inline; }
 .id-card p { margin: 4px 0 0; font-size: 11px; }
 .id-card.refused { background: var(--danger-bg); color: var(--danger); }
 
-/* 店員画面に映すお客様画面の内容 */
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }
 .mirror { background: var(--cust-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
 .mirror .muted { color: var(--muted); }
 .login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
 .login-sel select { font-size: 13px; padding: 4px 8px; }
 
-/* 年確ルール設定（売り場タイトルの右端から開く） */
 .rules-open { margin-left: auto; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
 .rules-dlg::backdrop { background: oklch(0 0 0 / .45); }
@@ -669,7 +555,6 @@ body.dragging .drop-hint { display: inline; }
 .lines.rules select { font-size: 13px; padding: 3px 6px; }
 .idle { margin-left: 6px; font-size: 12px; font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
-/* 店舗メニューの歯車（レジ画面ヘッダーの左上。店員ログイン中だけ） */
 .icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: 14px; margin: 14px 0 6px; }
@@ -677,7 +562,6 @@ body.dragging .drop-hint { display: inline; }
 .rules-dlg .rules-tab { display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; font-weight: 600; }
 .rules-dlg .rate-in { width: 6em; text-align: right; }
 .rules-dlg .owner-auth[hidden] { display: none; }
-/* お客様画面の店舗メニュー（一画面ずつ） */
 .menu-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .menu-head b { flex: 1; }
 .menu-list { display: grid; gap: var(--gap); }
@@ -685,46 +569,33 @@ body.dragging .drop-hint { display: inline; }
 .menu-item { text-align: left; padding: 10px 12px; }
 .menu-form { display: flex; flex-wrap: wrap; gap: var(--gap); }
 .menu-form input { flex: 1 1 8em; min-width: 0; }
-/* 投入口・排出口（各レジの最下段。売り場側の機器） */
-/* 投入口・排出口はお客様側にしかないので、お客様画面の下にだけ置く */
 .money-io { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 8px; }
-/* 入金・出金ボックスと店舗メニューの入口はスタッフ側の画面の下、決済端末はお客様側の画面の下 */
 .money-io-staff { grid-column: 1; min-width: 0; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; }
 .money-io-cust > *, .money-io-boxes > * { min-width: 0; }
 .emoney-head { min-height: 0; height: 28px; padding: 0 8px; display: inline-flex; flex-direction: column; justify-content: center; align-items: flex-start; font-size: 10px; line-height: 1.15; white-space: nowrap; cursor: pointer; }
 .emoney-head.pressing { transform: translate(1px, 2px); }
-/* レジ画面ヘッダー中央に出す動作モード（両画面）。有人：濃い塗り、セミセルフ：枠線 */
 .mode-title { display: inline-block; padding: 1px 12px; font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
 .mode-title.attended { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
 .mode-title.semi { background: oklch(1 0 0); color: var(--msg-strong); border: 1px solid var(--msg-strong); }
-/* 投入口・排出口はただの箱（角は丸めない）。中に「入金」「出金」のプレースホルダー。
-   入金ボックスを押すとテンキーが開き、金額（連続値）を打ち込んで入れる */
 .money-io .inlet, .money-io .outlet, .money-io .reader {
   height: 40px; padding: 0 12px; border: var(--frame-w) solid var(--msg-strong); border-radius: 0;
   background: transparent; color: var(--ink); font: inherit; font-size: 16px; text-align: right;
 }
 .money-io .inlet, .money-io .outlet, .money-io .reader { display: flex; align-items: center; justify-content: flex-end; cursor: pointer; }
 .money-io .inlet .placeholder, .money-io .outlet .placeholder, .money-io .reader .placeholder { color: var(--muted); font-weight: 400; }
-/* 注意喚起は枠線の点滅：支払方法が決まったら入金ボックスの枠を、出金ボックスにお金があれば枠と金額を点滅させる。
-   入金ボックスの中の文字は点滅させず、支払方法に合わせた案内（現金を入れる など）にする */
 @keyframes io-blink { 50% { color: transparent; } }
 @keyframes io-frame { 50% { border-color: var(--msg-strong); box-shadow: inset 0 0 0 var(--frame-w) var(--msg-strong); } }
 .money-io .inlet.blink, .money-io .outlet.blink, .money-io .reader.blink { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); animation: io-frame 1s steps(1) infinite; }
 .money-io .inlet.blink .placeholder, .money-io .reader.blink .placeholder { color: var(--ink); font-weight: 700; }
-/* 決済端末は入金ボックスと同じ大きさで、お客様側の列の中央に置く。
-   入力フォーム（細い一重の枠）とは別の部品なので、枠は二重線にする（点滅は線の色だけ変える） */
 .money-io .reader-slot { display: flex; justify-content: center; }
-/* 外側の線は入金ボックスと同じ枠線（同じ太さ・同じ色）、内側の線は同じ太さの outline を1本分あけて重ねる。
-   border の double は線の太さが端数になって薄く見える画面があるので使わない。中の文字は中央 */
 .money-io .reader { width: calc((100% - 8px) / 2); outline: var(--frame-w) solid var(--msg-strong); outline-offset: calc(var(--frame-w) * -3); justify-content: center; text-align: center; }
 @keyframes io-frame-double { 50% { border-color: var(--msg-strong); outline-color: var(--msg-strong); } }
 .money-io .reader.blink { box-shadow: none; outline-color: var(--accent); animation-name: io-frame-double; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-staff, .money-io-cust { grid-column: 1; } }
 
-/* セミセルフの店員呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ） */
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: var(--gap); }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(1px, 2px); }
@@ -732,25 +603,20 @@ body.dragging .drop-hint { display: inline; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; }
 
-/* 適用先のないクーポンの注意と、取り消したクーポンの返却 */
 .coupon-card { border: 2px solid var(--border); background: var(--danger-bg); padding: 8px 10px; font-size: 13px; }
 .coupon-card p { margin: 4px 0; }
 .coupon-card.returned { border-style: dashed; }
 .coupon-list { margin: 4px 0 0; padding-left: 20px; }
 .coupon-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
-/* 登録した行は一瞬目立つ色にする（レジ画面を覆い隠すメッセージは出さない） */
 @keyframes line-flash { from { background: var(--flash); } to { background: transparent; } }
 .lines tr.flash td { animation: line-flash .9s ease-out; }
 @media (prefers-reduced-motion: reduce) { .lines tr.flash td { animation: none; background: var(--flash); } }
 
-/* 数量の両脇の − ＋（数量 1 では − が「削除」）。押すとその場で数量が変わる */
 .qty-step { display: flex; align-items: center; justify-content: flex-end; gap: var(--gap); white-space: nowrap; }
 .screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 2px; font-size: 11px; }
-/* 数量そのものは積極ボタン。テンキーで打っている間は破線の枠（ここで入力を受け付ける） */
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: 13px; }
 .qty-fixed { min-width: 1.4em; text-align: center; }
-/* 数量のテンキー：レジ画面の上に重ねるポップアップ（レジ画面で覆いかぶさる表示を出す唯一の例外） */
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, oklch(0 0 0) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 6px; box-shadow: 0 6px 18px oklch(0 0 0 / .25); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: 6px; font-size: 13px; color: var(--msg-strong); }
@@ -760,49 +626,32 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); flex: 1 1 auto; min-height: 0; }
 .qty-pop-keys .pad-key { height: var(--btn-md-h); padding: 0; font-size: 16px; font-weight: 600; min-height: 0; }
 .qty-pop-keys .zero { grid-column: span 2; }
-/* 引き返す「やめる」は左、進める「決定」は右 */
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
 .qty-pop-foot button { flex: 1; height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
 
 .emoney-choices { display: flex; flex-direction: column; gap: var(--gap); align-items: center; width: min(100%, 280px); margin: 0 auto; }
-/* チャージと残高確認は横に並べ、やめるは次の行に置く */
 .emoney-choices.row { display: grid; grid-template-columns: 1fr 1fr; width: 280px; max-width: 100%; margin-bottom: 8px; }
 .emoney-choices.row > * { white-space: nowrap; }
-/* 残高不足：「不足額を現金で払う」「電子マネーをチャージする」を大ボタンのまま横に並べ、文言は二行に折る */
 .emoney-choices.row.pair { display: flex; flex-direction: row; justify-content: center; width: auto; margin-bottom: 0; }
 .emoney-choices.row.pair > button { white-space: pre-line; line-height: 1.25; font-size: 14px; }
-/* 「電子マネー」（積極テキスト）のすぐ下に「選択してください」（消極テキスト） */
 .emoney-screen .big + .muted { margin-top: -14px; }
 .emoney-screen .emoney-balance { font-size: 28px; font-variant-numeric: tabular-nums; }
 
-/* 取引中止：明細の上の帯の左に消極ボタンで置く（会計ボタンから離す）。高さは合計・会計とそろえる。確認画面の「はい」で決まる */
 .void-btn { white-space: nowrap; }
 .staff-head { gap: 8px; }
 .void-choices { display: flex; gap: var(--gap); justify-content: center; flex-wrap: wrap; }
 
 
-/* 待ち受け画面の背景：画面中央の明るい点から、外へいくほど暗くなる円形グラデーション。
-   両モードで同じ（主役はスキャンとご用件の案内。電子マネーの扇形は右下端にあるだけ）（P-31） */
-/* 案内画面（確認画面・知らせ・お礼など、登録画面を置き換えるもの）も同じ背景にする。商品登録画面（明細）は白のまま */
 .screen { --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
   --guide-bg: radial-gradient(circle farthest-corner at 50% 50%, var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
-/* 操作する側（アクティブ）の画面は、同じグラデーションを淡い空色にする（待ち受け・案内画面とも）。表示のみの側はグレーのまま */
 .screen.operable { --sky: oklch(0.80 0.09 230); --glow: color-mix(in oklab, var(--cust-bg) 88%, var(--sky)); --dark: color-mix(in oklab, var(--cust-bg) 55%, var(--sky)); }
 .scan-welcome, .attended-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; background: var(--guide-bg); }
-/* 案内画面は登録領域の余白まで背景を広げる（上に合計の帯があれば帯の下から） */
 .confirm { isolation: isolate; }
 .confirm::before { content: ""; position: absolute; inset: -6px -12px -8px; z-index: -1; background: var(--guide-bg); pointer-events: none; }
 .screen-main > .confirm:first-child::before { top: -8px; }
-/* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
-/* 使い方の説明（Item・Wallet のボタンにカーソルを重ねると出る）。画面に固定して置くので横スクロールを生まない */
 .hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
 .hover-tip[hidden] { display: none; }
 
-/* ---------------------------------------------------------------------------
-   モバイルモード（画面の小さい端末）：Item・Wallet は出さず、Bell と 2 台のレジを縦に並べる。
-   店員側とお客様側の画面は横に並べてスワイプで切り替える（上のタブでも切り替わる）。
-   レジ画面を長押しすると Item の商品を、入金ボックスを長押しすると Wallet の決済方法を選べる
-   --------------------------------------------------------------------------- */
 .swipe-tabs { display: none; }
 .picker-dlg { width: min(720px, calc(100vw - 16px)); max-height: calc(100dvh - 32px); overflow: auto; }
 .picker-dlg .item { cursor: pointer; touch-action: manipulation; }
@@ -815,7 +664,6 @@ body.dragging .drop-hint { display: inline; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   .left { gap: 8px; }
   .right-col { display: none; }
-  /* Bell：見出し・端末・⚙ を詰めて並べ、端末の下に余白を残さない */
   .mat-area { gap: 6px 8px; padding: 8px 44px 8px 10px; }
   .mat-area .bell-open { position: absolute; top: 6px; right: 6px; margin: 0; }
   .mats { gap: 6px; }
@@ -825,7 +673,6 @@ body.dragging .drop-hint { display: inline; }
   .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: 15px; margin-bottom: 4px; }
   .register h2 .idle { font-size: 11px; }
   .swipe-tabs { display: flex; gap: var(--gap); margin-bottom: 4px; }
-  /* 表に出ている面のタブを幅 2/3、裏の面のタブを 1/3 にして、どちらを見ているかを一目でわかるようにする */
   .swipe-tabs button { flex: 1 1 0; min-width: 0; min-height: 30px; padding: 2px 4px; font-size: 13px; line-height: 1.2; transition: flex-grow .2s; }
   .swipe-tabs button.on { flex-grow: 2; }
   .swipe-tabs button.operable { filter: url(#ramp); }
@@ -834,15 +681,12 @@ body.dragging .drop-hint { display: inline; }
   .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
   .screen-cap { display: none; }
   .screen { height: clamp(280px, 46vh, 420px); }
-  /* 長押しで選ぶので、文字選択やコンテキストメニューを出さない */
   .screen, [data-inlet], [data-reader] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .money-io { margin-top: 6px; }
-  /* 見ている面の機器だけ出す：スタッフ側＝入金・出金ボックス、お客様側＝決済端末 */
   .money-io.face-staff .money-io-cust, .money-io.face-customer .money-io-staff { display: none; }
   .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
 }
 
-/* 公共料金：受付枚数は合計金額より大事なので、どの確認画面でも大きく */
 .bill-n { font-size: 1.7em; font-weight: 800; margin: 0 .12em; line-height: 1; font-variant-numeric: tabular-nums; }
 .bill-verify > .big { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
 .bill-sum { font-size: 14px; font-weight: 600; margin-left: 12px; }
@@ -850,7 +694,6 @@ body.dragging .drop-hint { display: inline; }
 .bill-tick { text-align: center; width: 48px; }
 .bill-tick input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .bill-call { margin: 0; }
-/* 払込票の確認：事業者・金額・バーコード番号・確認は同じ重みなので、同じ間隔で中央にそろえる */
 .ffv-screen .lines.bill-table { table-layout: fixed; width: 100%; }
 .ffv-screen .lines.bill-table th, .ffv-screen .lines.bill-table td { text-align: center; }
 .bill-table th:nth-child(1), .bill-table th:nth-child(2) { width: 22%; }
@@ -858,28 +701,6 @@ body.dragging .drop-hint { display: inline; }
 .bill-table th:nth-child(4) { width: 16%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
 
-/* ===== エリア構造の確認用の点線枠（一時。2026-11-03 ユーザー依頼）=====
-   Muted パレット（Paul Tol）をネストの深さごとに割り当てる。outline なのでレイアウトは動かない。
-   消すときは main.ts の "debug-areas" の1行とこのブロックを削除する。URL に ?debug=0 で一時的に消せる */
-/* 【今は無効（コメントアウト中）。使うときはこの行と下の「*/」を消し、main.ts のコメントアウトも戻す】
-body.debug-areas {
-  --dbg-indigo: oklch(0.347 0.159 281.8); --dbg-cyan: oklch(0.812 0.084 230.8); --dbg-teal: oklch(0.674 0.098 180.4);
-  --dbg-green: oklch(0.499 0.135 148.6); --dbg-olive: oklch(0.663 0.123 109.3); --dbg-sand: oklch(0.841 0.108 98.3);
-  --dbg-rose: oklch(0.635 0.130 11.0); --dbg-wine: oklch(0.432 0.145 354.5); --dbg-purple: oklch(0.553 0.167 334.6);
-  --dbg-gray: oklch(0.898 0 89.9);
-}
-body.debug-areas :is(.top, .floor, .bottom)                          { outline: 1px solid var(--dbg-indigo); outline-offset: -2px; }
-body.debug-areas :is(.left, .right-col)                              { outline: 1px solid var(--dbg-cyan); outline-offset: -4px; }
-body.debug-areas :is(.mat-area, .register, aside.right)              { outline: 1px solid var(--dbg-teal); outline-offset: -6px; }
-body.debug-areas :is(.screens, .money-io, .swipe-tabs)               { outline: 1px solid var(--dbg-green); outline-offset: -8px; }
-body.debug-areas :is(.screen-wrap, .money-io-staff, .money-io-cust, .items)           { outline: 1px solid var(--dbg-olive); outline-offset: -10px; }
-body.debug-areas :is(.screen, .screen-cap)                           { outline: 1px solid var(--dbg-sand); outline-offset: -2px; }
-body.debug-areas :is(.screen-head, .screen-body, .screen-items)      { outline: 1px solid var(--dbg-rose); outline-offset: -4px; }
-body.debug-areas :is(.screen-main)                                 { outline: 1px solid var(--dbg-wine); outline-offset: -6px; }
-body.debug-areas :is(.reg-top, .screen-foot, .banner, .confirm, .welcome) { outline: 1px solid var(--dbg-purple); outline-offset: -8px; }
-body.debug-areas :is(.inlet, .outlet, .mats, h2)                     { outline: 1px solid var(--dbg-gray); outline-offset: -2px; }
-*/
-/* スタッフ側のベル（仲間に応援を頼む）も、お客様側が操作中でも押せる（ログインしていない顧客操作モードでも） */
 .staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }
 .bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .bell-btn.pressing { transform: translate(1px, 2px); }

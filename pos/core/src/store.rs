@@ -1,9 +1,3 @@
-//! 店舗全体（レジ・MAT・共有設定）の状態と、コマンド処理。
-//!
-//! レジ 1 台につき情報空間は 1 つだけ。店員画面とお客様画面は、同じ取引を
-//! 別の切り口で見せる「ビュー」にすぎない（問題2）。お客様ビューには公開してよい
-//! 情報だけを載せる。画面が 1 枚の機種になっても、ビューの出し分けを変えるだけで済む。
-
 use serde::{Deserialize, Serialize};
 
 use crate::age_rules::{AgeRules, RuleTarget};
@@ -25,20 +19,16 @@ use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 pub const MAX_REGISTERS: u8 = 10;
 pub const MAX_MATS: u8 = 5;
 
-/// お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収が要る）
 const FF_RECEIVED_SELF: &str =
     "お渡し済みの FF の数量はスタッフが変更します\nスタッフをお呼びください";
 const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現金でお支払いください";
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）";
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
-/// 荷物を送る（宅配便の伝票）の商品コード
 const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str =
     "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
-/// 荷物の受け取りの照合と引き渡しは、名札でログインした係員が行う
 const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、スタッフがログインしてから行います";
-/// 荷物の受け取りは一件ずつ、ほかの商品と別に扱う
 const PICKUP_ALONE: &str =
     "荷物のお受け取りは一件ずつ、ほかの商品と別にお取り扱いします（お受け取りが済んでから登録してください）";
 const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引中止にしてください";
@@ -53,48 +43,31 @@ const EMONEY_NO_CASH: &str =
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません\nお会計のあとにどうぞ";
 
-// ---------------------------------------------------------------------------
-// コマンド
-// ---------------------------------------------------------------------------
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CashOutKind {
-    /// 返品返金
     Refund,
-    /// 経費支出
     Expense,
-    /// 緊急出金
     Emergency,
-    /// 途中集金
     Pickup,
-    /// 自動釣銭機からの回収
     ChangerCollect,
 }
 
-/// 店舗メニュー（スタッフ側の画面から開く）。一度に一つの画面だけを出す。
-/// 自動釣銭機の入金・出金ボックスはスタッフ側の画面に付いているので、お金の出し入れもスタッフ側で行う
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MenuScreen {
-    /// 項目の一覧
     Top,
     Refund,
     Emergency,
     Deposit,
     Expense,
-    /// 自動釣銭機（両替）
     Changer,
-    /// ジャーナル確認（店員側。仮設）
     Journal,
-    /// 廃棄登録（店員側。仮設）
     Waste,
-    /// FF 鮮度管理：作成数の登録（店員側。仮設）
     FfFresh,
 }
 
 impl MenuScreen {
-    /// 自動釣銭機へのお金の出し入れを伴う画面
     fn moves_cash(self) -> bool {
         matches!(
             self,
@@ -110,17 +83,13 @@ impl MenuScreen {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub struct Menu {
     pub screen: MenuScreen,
-    /// 両替で受け取る金種
     pub exchange_to: u32,
 }
 
-/// 取引外の入金（お金を入れる操作はパスワード不要）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CashInKind {
-    /// 取引外入金
     Deposit,
-    /// 自動釣銭機への釣銭補充
     ChangerRefill,
 }
 
@@ -145,58 +114,39 @@ impl CashOutKind {
     }
 }
 
-/// 電子マネーの手続き（レジ画面の最下段の右のボタン）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EmoneyKind {
-    /// 「電子マネー」ボタンを押した直後：チャージか残高確認かを選ぶ
     Menu,
-    /// チャージ：紙幣を入金ボックスに入れて、電子マネーをかざす
     Charge,
-    /// 残高確認：電子マネーをかざすと残高を出す
     Inquiry,
 }
 
-/// 電子マネーの残高が足りないときの選択
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ShortChoice {
-    /// 電子マネーを使うのをやめる（支払方法を選び直す）
     Cancel,
-    /// 残高をすべて使い、残りを現金で払う（まず案内を出す）
     Cash,
-    /// 「残高を引き出し、残りを現金で」の案内を確認した。ここで初めて電子マネーを受け付ける
     CashConfirmed,
-    /// 電子マネーをチャージする（済んだらもう一度かざす）
     Charge,
 }
 
-/// 電子マネーの残高の上限（チャージで超えられない）
 pub const EMONEY_MAX: u32 = 20_000;
-/// シミュレーターの電子マネー（財布に 1 枚）の最初の残高。残高不足を試しやすい額にしておく
 pub const EMONEY_INITIAL: u32 = 1_000;
 
-/// 開いている電子マネーの手続き
 #[derive(Clone, Debug)]
 enum EmoneyTask {
-    /// チャージか残高確認かを選ぶ
     Menu,
-    /// shown：かざして残高を出した
     Inquiry { shown: bool },
-    /// inserted：チャージ用に入れた紙幣
     Charge { inserted: Cash },
 }
 
-/// 店員呼び出しボタンのショートカット（FF は FfButton）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallTopic {
-    /// 代行収納・宅配便
     Service,
     Tobacco,
-    /// 電子マネーのチャージ・残高確認（セミセルフのお買い物の途中。スタッフが有人モードで手続きする）
     Emoney,
-    /// スタッフ側のベル：スタッフが仲間に応援を頼む。Bell を鳴らすだけで、呼び出しの記録・通知画面は出さない
     Sos,
 }
 
@@ -210,7 +160,6 @@ pub enum Command {
     },
     RegisterFf {
         register: u8,
-        /// 省略時は店員側。有人モードではお客様側の画面からも登録できる
         #[serde(default = "staff_side")]
         side: Side,
         code: String,
@@ -219,8 +168,6 @@ pub enum Command {
     FfButton {
         register: u8,
     },
-    /// FF の明細のお渡し照合。渡した個数を入力するたびに判定し、注文数と合えばお渡し済み、合わなければお渡し前になる
-    /// （チェックだけだと数量を意識せずに済ませられ、渡し忘れを防げないため。照合が揃うまで会計に進めない）
     CheckFf {
         register: u8,
         side: Side,
@@ -232,41 +179,33 @@ pub enum Command {
         line_id: u32,
         amount: u32,
     },
-    /// 荷物を送る：一段階目。三辺の合計（cm）を決める
     ParcelLength {
         register: u8,
         line_id: u32,
         sum_cm: u32,
     },
-    /// 荷物を送る：三辺の合計（cm）と重さ（g）から取り扱いサイズを決める（二段階目の「決定」）
     ParcelSize {
         register: u8,
         line_id: u32,
         sum_cm: u32,
         weight_g: u32,
     },
-    /// 荷物を送る：届け先の郵便番号を決めて料金を確定する
     ParcelPostal {
         register: u8,
         line_id: u32,
         postal: String,
     },
-    /// 荷物を送る：一段階戻る（郵便番号 → 重さ → 三辺の合計 → この荷物の受付をやめる）
     ParcelBack {
         register: u8,
         line_id: u32,
     },
-    /// 荷物を送る：料金が決まった後の「次の荷物はありますか」への答え
     ParcelNext {
         register: u8,
         more: bool,
     },
-    /// 荷物を受取る：照合が済み、店舗控えにサインをもらって荷物を引き渡した（取引を終える）
     PickupHandover {
         register: u8,
     },
-    /// 荷物を受取る：保管場所に荷物が「有り」（照合済みとする）「無し」、None は探し直す。
-    /// 本来は荷物のバーコードを読んで照合するが、シミュレーターでは二択で次の工程に進める
     PickupFound {
         register: u8,
         found: Option<bool>,
@@ -276,20 +215,17 @@ pub enum Command {
         side: Side,
         line_id: u32,
     },
-    /// 明細の個数を手で変える（取り消しは RemoveLine）。変えた行は動きがあったので一番上に出る
     SetQty {
         register: u8,
         side: Side,
         line_id: u32,
         qty: u32,
     },
-    /// 読み取ったクーポンを取り消す（お会計中でもよい）。取り消したクーポンはお客様に返す
     RemoveCoupon {
         register: u8,
         side: Side,
         coupon_id: u32,
     },
-    /// クーポンの返却の案内を閉じる（返却しました／受け取りました）
     DismissReturned {
         register: u8,
     },
@@ -306,14 +242,12 @@ pub enum Command {
         side: Side,
         method: PaymentMethod,
     },
-    /// 年確商品があるとき、店員が年齢確認を「する」（身分証の生年月日を入力）か「しない」か選ぶ
     ChooseAgeCheck {
         register: u8,
         #[serde(default = "staff_side")]
         side: Side,
         id_check: bool,
     },
-    /// 身分証の生年月日を入力して判定する（YYYY-MM-DD）。today はレジの日付
     CheckId {
         register: u8,
         #[serde(default = "staff_side")]
@@ -321,17 +255,12 @@ pub enum Command {
         birth: String,
         today: String,
     },
-    /// 回収する商品の一覧を閉じる（店員が商品を引き取った）
     DismissConfiscated {
         register: u8,
     },
-    /// お渡し済みの FF を減らした・取り消した分の回収の案内を閉じる（店員が「回収しました」）
     DismissFfCollect {
         register: u8,
     },
-    /// 公共料金の払込票の内容確認（店員）。一枚ずつ、手元の払込票の事業者・金額と画面が
-    /// 合っていればチェックを入れる（`checked` false で外す）。数字の打ち込みはさせない。
-    /// すべてにチェックが入るまで支払いに進めない。店員側の画面からだけ
     CheckBill {
         register: u8,
         #[serde(default = "staff_side")]
@@ -339,7 +268,6 @@ pub enum Command {
         line_id: u32,
         checked: bool,
     },
-    /// 決済の後、払込票に収納印を押してお客様に渡した（店員の「お渡し済」）
     HandOverBills {
         register: u8,
         #[serde(default = "staff_side")]
@@ -350,47 +278,37 @@ pub enum Command {
         denomination: u32,
         count: u32,
     },
-    /// 「投入おわり」（入金ボックスの Enter はその近道）：現金の投入を終え、決済する（投入額が足りなければ受け付けない）
     FinishInsert {
         register: u8,
     },
-    /// 財布のカード・スマホを端末にかざす（電子マネー・バーコード決済・クレジットカード）。
-    /// 選ばれた支払方法と違うものをかざすと受け付けない（省略時は選ばれた方法）
     TapEmoney {
         register: u8,
         #[serde(default)]
         method: Option<PaymentMethod>,
     },
-    /// 電子マネーのチャージ・残高確認を始める（お買い物の途中でもよい）
     StartEmoney {
         register: u8,
         side: Side,
         kind: EmoneyKind,
     },
-    /// 電子マネーの手続きをやめる・閉じる（チャージ用に入れた紙幣は出金ボックスに返す）
     CloseEmoney {
         register: u8,
         side: Side,
     },
-    /// 電子マネーの残高が足りないときの選択
     ResolveEmoneyShort {
         register: u8,
         side: Side,
         choice: ShortChoice,
     },
-    /// 店員呼び出しボタンに触れた。topic はショートカットボタン（サービス・たばこ）。
-    /// 省略時は「係員を呼ぶ」。離す（ReleaseCall）まで MAT が鳴る
     CallStaff {
         register: u8,
         #[serde(default)]
         topic: Option<CallTopic>,
     },
-    /// 会計時のポイントカードの最終確認で「ポイントカードなし」で進む
     ConfirmPointCard {
         register: u8,
         side: Side,
     },
-    /// 呼び出しボタン（FF・サービス・たばこ・係員を呼ぶ）から指を離した
     ReleaseCall {
         register: u8,
     },
@@ -400,11 +318,9 @@ pub enum Command {
     EndStaffMode {
         register: u8,
     },
-    /// レジ休止中にする：ログアウトし、スタッフバーコードを読むまでどの操作も受け付けない
     Pause {
         register: u8,
     },
-    /// 出金（お金を抜く操作）。店舗メニューの中でも、操作のたびに店舗パスワードを求める
     CashOut {
         register: u8,
         kind: CashOutKind,
@@ -417,23 +333,19 @@ pub enum Command {
         kind: CashInKind,
         amount: u32,
     },
-    /// 店舗メニューを開く・画面を切り替える（None で閉じる）。スタッフ側の画面だけ。ログインしたスタッフが使える
     OpenMenu {
         register: u8,
         screen: Option<MenuScreen>,
         #[serde(default)]
         exchange_to: Option<u32>,
     },
-    /// 投入口にお金を入れる（金額で指定）。店舗メニューの入金・両替画面ならそちらに使う
     Insert {
         register: u8,
         amount: u32,
     },
-    /// 排出口のお金を取り出す
     TakeOutlet {
         register: u8,
     },
-    /// 有人モードで、グレーの画面にタッチして操作を引き継ぐ
     Claim {
         register: u8,
         side: Side,
@@ -461,12 +373,10 @@ pub enum Command {
         code: String,
         limit: Option<u32>,
     },
-    /// 商品ルール設定を開くときのオーナー認証（変更は操作のたびにも認証する）
     VerifyOwner {
         owner_id: String,
         password: String,
     },
-    /// 税区分の税率を変える（0.01% 単位。1000 = 10%）
     SetTaxRate {
         owner_id: String,
         password: String,
@@ -499,7 +409,6 @@ pub enum Command {
         mat: usize,
         offline: bool,
     },
-    /// 検品端末・ストアコンピューターの呼び鈴機能の ON/OFF（Bell エリアの歯車から）
     SetBellOn {
         mat: usize,
         on: bool,
@@ -507,7 +416,6 @@ pub enum Command {
 }
 
 impl Command {
-    /// 対象のレジ（店舗全体の操作なら None）
     pub fn register(&self) -> Option<u8> {
         use Command as C;
         match self {
@@ -558,7 +466,6 @@ impl Command {
         }
     }
 
-    /// どちらの画面が触られたか（機器の操作と店舗全体の操作は None）
     fn screen(&self) -> Option<Side> {
         use Command as C;
         match self {
@@ -577,7 +484,6 @@ impl Command {
             | C::CloseEmoney { side, .. }
             | C::ResolveEmoneyShort { side, .. }
             | C::Claim { side, .. } => Some(*side),
-            // スタッフ側のベル（応援を呼ぶ）は、お客様側の操作をふさがない（Bell を鳴らすだけ）
             C::CallStaff {
                 topic: Some(CallTopic::Sos),
                 ..
@@ -585,9 +491,7 @@ impl Command {
             C::FfButton { .. } | C::CallStaff { .. } => {
                 Some(Side::Customer)
             }
-            // 自動釣銭機の入金・出金ボックスはスタッフ側の画面に付いている
             C::CashOut { .. } | C::CashIn { .. } => Some(Side::Staff),
-            // 店舗メニューはスタッフ側の画面だけ
             C::OpenMenu { .. } => Some(Side::Staff),
             C::CompleteService { .. }
             | C::ParcelLength { .. }
@@ -603,20 +507,13 @@ impl Command {
     }
 }
 
-/// 公共料金の払込票 1 枚ごとの内容（店員の確認と、お客様への案内に使う）。
-/// 同じ事業者でも FF のようにまとめない：持ち込んだ払込票のすり替わりや、控えを分けて持ち込んだときの
-/// 金額の食い違い（読んだ本部控えと収納印を押すお客様控えで金額が違う）を一枚ずつ確かめるため
 #[derive(Clone, Debug, Serialize)]
 pub struct BillRow {
-    /// 明細番号（確認のチェックの宛先）
     pub line_id: u32,
     pub code: &'static str,
-    /// 事業者（電気料金・水道料金・ガス料金）
     pub name: &'static str,
     pub amount: u32,
-    /// 払込票のバーコード番号（便宜的に作ったもの）
     pub slip_no: String,
-    /// 店員が事業者・金額・バーコード番号を確かめた（チェックを入れた）
     pub checked: bool,
 }
 
@@ -631,16 +528,10 @@ fn done(msg: impl Into<String>) -> Result<Outcome, String> {
     })
 }
 
-// ---------------------------------------------------------------------------
-// 取引
-// ---------------------------------------------------------------------------
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FfState {
-    /// 登録済み・お渡し確認のチェック前
     Waiting,
-    /// お渡し確認のチェック済み
     Received,
 }
 
@@ -651,7 +542,6 @@ pub enum LineKind {
     Ff {
         state: FfState,
     },
-    /// `confirm_pending`：公共料金の払込票の内容を、店員がまだ確認していない
     Service {
         done: bool,
         confirm_pending: bool,
@@ -661,55 +551,41 @@ pub enum LineKind {
 #[derive(Clone, Debug, Serialize)]
 pub struct Line {
     pub id: u32,
-    /// 最後に動きのあった順番（明細番号と同じ通し番号）。画面は動きの新しい行ほど上に出す
     pub touched: u32,
     pub code: &'static str,
     pub name: &'static str,
     pub unit_price: u32,
     pub qty: u32,
-    /// FF：すでにお渡しの照合が済んでいる個数。追加注文で数量が増えたときは、増えた分だけを照合する
     pub ff_base: u32,
-    /// 登録した時点の税区分と税率（あとで設定を変えても、登録済みの明細は変わらない）
     pub tax: String,
     pub rate_bp: u32,
     pub category: Category,
-    /// 現金でしか払えない（切手・代行収納）
     pub cash_only: bool,
     #[serde(flatten)]
     pub kind: LineKind,
-    /// 公共料金の払込票のバーコード番号（シミュレーターでは読み取ったときに便宜的に作る）
     #[serde(skip)]
     pub slip_no: Option<String>,
-    /// 荷物を送る：サイズ・届け先（受付の途中も含む）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parcel: Option<Parcel>,
-    /// 荷物を受取る：お預かりの荷物の番号と照合の結果
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pickup: Option<Pickup>,
 }
 
-/// 払込票のバーコード番号を便宜的に作る（16 桁を 4 桁ずつ区切る）。
-/// 実物の払込票のバーコード（44 桁など）は事業者ごとに決まった形式だが、シミュレーターでは扱わない
 fn slip_no(seed: u64) -> String {
     let d = format!("91{:014}", mix(seed) % 100_000_000_000_000);
     format!("{} {} {} {}", &d[..4], &d[4..8], &d[8..12], &d[12..])
 }
 
-/// 荷物を送るの伝票の番号を便宜的に作る（12 桁を 4 桁ずつ区切る）。
-/// 実物は伝票に印字されたバーコードを読むが、シミュレーターでは読み取ったときに作る
 fn parcel_slip(seed: u64) -> String {
     let d = format!("{:012}", mix(seed ^ 0x534C_4950) % 1_000_000_000_000);
     format!("{}-{}-{}", &d[..4], &d[4..8], &d[8..])
 }
 
-/// お預かりの荷物の番号を便宜的に作る（12 桁を 4 桁ずつ区切る）。
-/// 実物は受取用バーコードから運送会社の荷物の番号を引くが、シミュレーターでは読み取ったときに作る
 fn pickup_no(seed: u64) -> String {
     let d = format!("{:012}", mix(seed) % 1_000_000_000_000);
     format!("{}-{}-{}", &d[..4], &d[4..8], &d[8..])
 }
 
-/// splitmix64 で混ぜ、読み取りごとに別の番号にする
 fn mix(seed: u64) -> u64 {
     let mut x = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
     x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -722,12 +598,10 @@ impl Line {
         self.unit_price * self.qty
     }
 
-    /// 荷物を送る（宅配便の発送）
     fn is_parcel(&self) -> bool {
         self.parcel.is_some()
     }
 
-    /// ポイント付与の対象（宅配便・代金引換・公共料金・切手・たばこは対象外）
     fn earns_points(&self) -> bool {
         !self.is_parcel()
             && !self.is_pickup()
@@ -735,13 +609,10 @@ impl Line {
             && !matches!(self.category, Category::Stamp | Category::Tobacco)
     }
 
-    /// 荷物を受取る
     fn is_pickup(&self) -> bool {
         self.pickup.is_some()
     }
 
-    /// 荷物を受取る：保管場所に荷物が「有り」（Some(true)）なら受付済みにして会計できるようにし、
-    /// 「無し」（Some(false)）・探し直し（None）なら受付待ちに戻す
     fn set_pickup_found(&mut self, found: Option<bool>) {
         let Some(pk) = self.pickup.as_mut() else {
             return;
@@ -749,7 +620,6 @@ impl Line {
         pk.matched = found == Some(true);
         pk.missing = found == Some(false);
         pk.wrong = None;
-        // 金額は受取用バーコードを読んだときから出している。有無が決まるまで会計はできない
         self.unit_price = pk.amount;
         self.kind = LineKind::Service {
             done: pk.matched,
@@ -757,7 +627,6 @@ impl Line {
         };
     }
 
-    /// 公共料金の払込票
     fn is_bill(&self) -> bool {
         catalog::find(self.code).is_some_and(|p| p.utility_bill)
     }
@@ -765,53 +634,32 @@ impl Line {
 
 #[derive(Clone, Debug, Default)]
 struct Txn {
-    /// 荷物の料金が決まり、「次の荷物はありますか」の答えを待っている
     parcel_ask: bool,
-    /// たばこボタンで呼ばれた店員がログインした（たばこを登録するまで Item のたばこを点滅させる）
     tobacco_asked: bool,
     lines: Vec<Line>,
     next_line: u32,
     paying: bool,
     point_card: Option<String>,
-    /// 会計ボタンの時点で求められた年齢（年確不要なら None）
     required_age: Option<u8>,
-    /// 読み取った引換券・割引券（取消用の番号つき。対象商品の登録を待つものも含む）。
-    /// 同じクーポンを何枚使ってもよい
     coupons: Vec<(u32, &'static Coupon)>,
-    /// 取り消したクーポン（お客様に返却する。true は適用先がなかったもの）
     returned: Vec<(&'static str, bool)>,
-    /// 店員が選んだ年齢確認のやり方（None はまだ選んでいない）
     age_method: Option<AgeMethod>,
-    /// 年確が済んだ年齢（「しない」ならお客様の申告、「する」なら身分証の年齢）
     verified_age: Option<u8>,
-    /// 年確で販売できず、買い物から取り除いた商品（店員が回収する）
     confiscated: Vec<(&'static str, u32)>,
-    /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する。品名と個数）
     ff_collect: Vec<(&'static str, u32)>,
     method: Option<PaymentMethod>,
-    /// 会計ボタンの後のポイントカードの最終確認が済んだ
     point_checked: bool,
     inserted: Cash,
-    /// 最後に入金ボックスへ現金を入れた時刻（30 秒入れなければ投入おわりとみなす）
     inserted_at: u64,
-    /// セミセルフで店員が会計に進め、お客様に支払いを任せている（店員が名札を読むと解除）
     customer_turn: bool,
-    /// キャッシュレスで先に払った額（電子マネーの残高不足で「不足分を現金で払う」を選んだとき、
-    /// または現金のみの商品（切手・代行収納）を除いた分をキャッシュレスで払ったとき）。残りは現金で払う
     prepaid: u32,
-    /// 先に払ったキャッシュレスの種類
     prepaid_method: Option<PaymentMethod>,
-    /// 電子マネーで払おうとしたが残高が足りず、どうするか選んでいない
     emoney_short: bool,
-    /// 「不足分を現金で払う」を選んだ（残高を引き出し、残りを現金で払う）
     emoney_partial: bool,
-    /// その案内を確認し、電子マネーをかざすのを待っている（確認前にかざしても引き落とさない）
     emoney_partial_ok: bool,
 }
 
 impl Txn {
-    /// 読み取ったクーポンと、その値引き額（対象商品がまだなければ None）。
-    /// 対象商品 1 個につきクーポン 1 枚。読んだ順番（商品より先か後か）は関係ない
     fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, u32)>)> {
         let mut used: Vec<(&str, u32)> = vec![];
         self.coupons
@@ -831,7 +679,6 @@ impl Txn {
                     Some(e) => e.1 += 1,
                     None => used.push((c.target, 1)),
                 }
-                // 値引きは対象商品の税率の対象額から引く
                 let p = catalog::find(c.target);
                 let rate = self
                     .lines
@@ -857,12 +704,10 @@ impl Txn {
         gross.saturating_sub(self.discount_of(None))
     }
 
-    /// これから払う額（キャッシュレスで先に払った分を除く）
     fn due(&self) -> u32 {
         self.total().saturating_sub(self.prepaid)
     }
 
-    /// 現金でしか払えない商品（切手・代行収納）の合計
     fn cash_only(&self) -> u32 {
         self.lines
             .iter()
@@ -871,13 +716,10 @@ impl Txn {
             .sum()
     }
 
-    /// これから払う額のうち、キャッシュレスで払える分（現金のみの商品を除く）
     fn cashless_due(&self) -> u32 {
         self.due().saturating_sub(self.cash_only())
     }
 
-    /// これから払う額のうち、ポイントで払える分（ポイント付与の対象商品の分だけ。ポイントは一度だけ使える）。
-    /// ポイントが付く商品とポイントを使える商品は同じ（宅配便・公共料金・切手・たばこは付かず、使えない）
     fn points_due(&self) -> u32 {
         if self.prepaid > 0 {
             return 0;
@@ -891,10 +733,6 @@ impl Txn {
         eligible.min(self.due())
     }
 
-    /// その支払方法が使えない理由（使えれば None）。決済の組み合わせの原則（有人・セミセルフ共通）：
-    /// 現金と併用できるのは電子マネーだけ。クレジットカード・バーコード決済は現金と併用できないので、
-    /// 現金のみの商品（切手・代行収納）がある取引では使えない。
-    /// ポイントはポイント付与の対象商品の分だけに使え、残りはほかの支払方法で払う
     fn method_refusal(&self, m: PaymentMethod) -> Option<&'static str> {
         match m {
             PaymentMethod::Cash => None,
@@ -906,8 +744,6 @@ impl Txn {
         }
     }
 
-    /// 税率ごとの対象額と内税額（インボイス：税率ごとに合計してから 1 回だけ端数処理する）。
-    /// `rates` は明細がなくても出す税率（表示が増えたり減ったりしないように）
     fn taxes(&self, rates: &[u32], rounding: Rounding) -> Vec<TaxTotal> {
         let mut all: Vec<u32> = rates
             .iter()
@@ -947,12 +783,10 @@ impl Txn {
             .any(|l| matches!(l.kind, LineKind::Service { done: false, .. }))
     }
 
-    /// 読み取った公共料金の払込票の枚数
     fn bill_slips(&self) -> u32 {
         self.lines.iter().filter(|l| l.is_bill()).count() as u32
     }
 
-    /// 店員がまだ内容を確認していない払込票がある
     fn bill_unchecked(&self) -> bool {
         self.lines.iter().any(|l| {
             l.is_bill()
@@ -966,7 +800,6 @@ impl Txn {
         })
     }
 
-    /// 払込票の種類ごとの枚数・金額（読み取った順）
     fn bill_rows(&self) -> Vec<BillRow> {
         self.lines
             .iter()
@@ -988,7 +821,6 @@ impl Txn {
             .collect()
     }
 
-    /// 承認済みの年齢で、いまの年確商品がすべて足りている
     fn age_cleared(&self) -> bool {
         match (self.required_age, self.verified_age) {
             (None, _) => true,
@@ -997,18 +829,14 @@ impl Txn {
         }
     }
 
-    /// 店員の「する／しない」待ち
     fn age_choice_pending(&self) -> bool {
         self.paying && !self.age_cleared() && self.age_method.is_none()
     }
 
-    /// 「する」を選び、店員の生年月日の入力待ち
     fn id_pending(&self) -> bool {
         self.paying && !self.age_cleared() && self.age_method == Some(AgeMethod::Id)
     }
 
-    /// 買い物点数（数量の合計）
-    /// 適用先（対象商品）のないクーポンがある
     fn coupon_unmatched(&self) -> bool {
         self.coupon_uses().iter().any(|(_, _, u)| u.is_none())
     }
@@ -1017,7 +845,6 @@ impl Txn {
         self.lines.iter().map(|l| l.qty).sum()
     }
 
-    /// この商品をいくつ登録しているか（行が分かれていても合計する）
     fn qty_of(&self, code: &str) -> u32 {
         self.lines
             .iter()
@@ -1027,9 +854,6 @@ impl Txn {
     }
 
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind, tax: (String, u32)) {
-        // 同じ商品を続けて読んだときだけ、一番上（直前に登録した）の行に足す。
-        // 間に別の商品をはさんだら、前に登録した行にはまとめず新しい行にする
-        // （個数を変える人が、ずっと前に登録した分まで覚えていなくて済むように）
         self.next_line += 1;
         let touched = self.next_line;
         if let Some(l) = self.lines.iter_mut().max_by_key(|l| l.touched).filter(|l| {
@@ -1089,32 +913,19 @@ struct Register {
     txn: Txn,
     drawer: Drawer,
     last_receipt: Option<Receipt>,
-    /// 公共料金の決済が済み、店員が払込票に収納印を押してお渡しするのを待っている（枚数）。
-    /// 店員の「お渡し済」まで、お客様側には払込票・レシート・お釣りの受け取りを案内する
     bill_handover: Option<u32>,
-    /// 代金引換の決済が済み、店員が店舗控えにサインをもらって荷物を引き渡すのを待っている（荷物の番号）
     pickup_handover: Option<String>,
-    /// 最後に操作された時刻（無操作でセミセルフに戻すため）
     last_op: u64,
-    /// 排出口（売り場側）にたまっているお金。取り出すまで残る
     outlet: Cash,
-    /// 排出口にお金が残り始めた時刻。残っている間は、無操作でセミセルフに戻るカウントダウンを止める
     outlet_since: Option<u64>,
-    /// 開いている店舗メニュー
     menu: Option<Menu>,
-    /// お客様側から店舗メニューを開くための使い捨てパスワード（スタッフ側の画面にだけ出す）
-    /// レジ休止中（スタッフバーコードを読むまで、どの操作も受け付けない）
     paused: bool,
-    /// いま触れている側と、その一瞬が終わる時刻（その間だけもう一方は操作できない）
     touch: Option<(Side, u64)>,
-    /// お客様画面の呼び出しボタンが押されている（触れている間 MAT が鳴る）
     pressing: bool,
-    /// 開いている電子マネーの手続き（チャージ・残高確認）
     emoney: Option<EmoneyTask>,
 }
 
 impl Register {
-    /// 運用モードは名札で決まる：名札でログイン中なら有人、いなければセミセルフ
     fn sync_mode(&mut self) {
         if self.staff_state() != StaffState::Ready {
             self.menu = None;
@@ -1126,8 +937,6 @@ impl Register {
         };
     }
 
-    /// 取引も呼び出しもなく、待機に戻してよい状態か
-    /// 釣り銭の取り忘れ：お客様画面に案内するまでと、店員を呼ぶまで（ミリ秒）
     fn change_timers(&self) -> (u64, u64) {
         if self.mode == Mode::Attended {
             (ATTENDED_CHANGE_REMIND_MS, ATTENDED_CHANGE_CALL_MS)
@@ -1136,7 +945,6 @@ impl Register {
         }
     }
 
-    /// 取引がない（明細・クーポン・会計・電子マネーの手続きのどれもない）
     fn idle(&self) -> bool {
         self.txn.lines.is_empty()
             && self.txn.coupons.is_empty()
@@ -1144,14 +952,12 @@ impl Register {
             && self.emoney.is_none()
     }
 
-    /// 排出口のお金が取り出されたら、止めていた無操作のカウントダウンを続きから再開する
     fn resume_idle_countdown(&mut self, now: u64) {
         if let Some(since) = self.outlet_since.take() {
             self.last_op = (self.last_op + now.saturating_sub(since)).min(now);
         }
     }
 
-    /// 無操作でセミセルフに戻るまでの残り（排出口にお金が残っている間は止まって見える）
     fn idle_revert_in(&self, now: u64) -> u64 {
         let counted_until = self.outlet_since.unwrap_or(now).max(self.last_op);
         IDLE_REVERT_MS.saturating_sub(counted_until - self.last_op)
@@ -1175,9 +981,6 @@ impl Register {
             },
             staff: self.staff_state(),
             has_lines: !t.lines.is_empty(),
-            // 確認の優先順：年確＞ポイントカード＞決済手段。
-            // 一つの画面で複数の確認をしないよう、先の確認が済むまで後の確認は始めない
-            // （公共料金はほかの商品と一緒に登録できないので、年確と重ならない）
             age_choice_pending: t.age_choice_pending(),
             id_pending: t.id_pending(),
             ff_waiting: t.any_ff(FfState::Waiting),
@@ -1190,7 +993,6 @@ impl Register {
             has_bills: t.bill_slips() > 0,
             bill_unchecked: t.bill_unchecked(),
             bill_handover: self.bill_handover.is_some(),
-            // 年確が先。年確で販売が成立しないこともあるので、ポイントカードの確認はその後
             point_pending: t.paying
                 && !t.point_checked
                 && !(t.age_choice_pending() || t.id_pending()),
@@ -1217,10 +1019,6 @@ pub struct AuditEntry {
     pub result: String,
 }
 
-// ---------------------------------------------------------------------------
-// 店舗
-// ---------------------------------------------------------------------------
-
 pub struct Store {
     now: u64,
     rng: Rng,
@@ -1235,37 +1033,28 @@ pub struct Store {
     mat_loss: u8,
     bell: Bell,
     seen_raised: u64,
-    /// MAT を鳴らした回数（ボタンを押した・呼び出しが起きた）
     presses: u64,
     receipts: u32,
-    /// 財布の電子マネーの残高
     emoney_balance: u32,
 }
 
-/// 年確のやり方（店員が選ぶ）
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum AgeMethod {
-    /// 「しない」：店員の判断で年確を済ませる
     Skip,
-    /// 「する」：身分証の生年月日で判定する
     Id,
 }
 
-/// 読み取ったクーポン。discount が None なら対象商品の登録待ち
 #[derive(Clone, Debug, Serialize)]
 pub struct CouponView {
-    /// 取消に使う番号
     pub id: u32,
     pub code: &'static str,
     pub name: &'static str,
     pub discount: Option<u32>,
 }
 
-/// 取り消して、お客様に返すクーポン
 #[derive(Clone, Debug, Serialize)]
 pub struct ReturnedCoupon {
     pub name: &'static str,
-    /// 適用先（対象商品）がなかった
     pub unmatched: bool,
 }
 
@@ -1275,7 +1064,6 @@ pub struct Confiscated {
     pub qty: u32,
 }
 
-/// 日付を読む。西暦 8 桁（19821002）か YYYY-MM-DD。存在しない日付は読まない
 fn ymd(s: &str) -> Option<(u32, u32, u32)> {
     let s = s.trim();
     let (y, m, d) = if s.len() == 8 && s.bytes().all(|b| b.is_ascii_digit()) {
@@ -1303,12 +1091,6 @@ fn ymd(s: &str) -> Option<(u32, u32, u32)> {
     (y >= 1900 && (1..=days).contains(&d)).then_some((y, m, d))
 }
 
-/// 生年月日 birth の人の today 時点の年齢。
-///
-/// 生年月日は身分証の西暦を 8 桁で打ち込む（19821002）。カレンダーから選ぶ方式は、
-/// 今年から 18〜20 年も遡るのがかえって手間なので使わない。
-/// 設計メモ：和暦（S57.10.2 のような元号入力）にも対応できるが、身分証は西暦表記が
-/// 主流になりつつあり導入の重要性は薄いため、いまは西暦のみ受け付ける。
 pub fn age_on(birth: &str, today: &str) -> Result<u8, String> {
     let (by, bm, bd) = ymd(birth).ok_or("生年月日を西暦 8 桁で入力してください（例：19821002）")?;
     let (ty, tm, td) = ymd(today).ok_or("日付が正しくありません")?;
@@ -1323,39 +1105,28 @@ fn staff_side() -> Side {
     Side::Staff
 }
 
-/// 無操作がこの時間続くと、レジはセミセルフモードに戻って待機する
-/// 決済後の「ありがとうございました」を出す時間。過ぎると新しいお客様の待ち受けに戻る
 pub const THANKS_MS: u64 = 3000;
-/// 最後の投入から、これだけ入れなければ「投入おわり」とみなす
 pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
-/// 排出口に釣り銭が残ったまま、お客様画面に「釣り銭が残っています」を出すまで（セミセルフ）
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
-/// 排出口に釣り銭が残ったまま、店員を呼ぶ（釣銭忘れ）まで（セミセルフ）
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
-/// 有人モードは店員がその場にいるので、早めに知らせる
 pub const ATTENDED_CHANGE_REMIND_MS: u64 = 30 * 1000;
 pub const ATTENDED_CHANGE_CALL_MS: u64 = 60 * 1000;
-/// 放置された呼び出しほど大きく鳴らす。最初は RING_MIN、RING_FULL_MS 放置で最大
 pub const RING_MIN: f32 = 0.25;
 pub const RING_FULL_MS: u64 = 60 * 1000;
 
-/// 呼び出しの放置時間から鳴動の音量（0〜1）を決める。複数のレジが鳴っても、
-/// 先に呼んだ（長く待たせている）レジほど大きく聞こえる
 pub fn ring_volume(waiting_ms: u64) -> f32 {
     let t = waiting_ms.min(RING_FULL_MS) as f32 / RING_FULL_MS as f32;
     RING_MIN + (1.0 - RING_MIN) * t
 }
 
 impl Store {
-    /// 基本構成はレジ 2 台・MAT 1 台。レジは 10 台、MAT は 5 台まで増やせる。
     pub fn new(seed: u64, registers: u8, mats: u8) -> Store {
         let registers = registers.clamp(1, MAX_REGISTERS);
         let mats = mats.clamp(1, MAX_MATS);
         let regs = (1..=registers)
             .map(|id| {
-                // 既定はセミセルフ（名札なし）
                 Register {
                     id,
                     mode: Mode::SemiSelf,
@@ -1400,18 +1171,13 @@ impl Store {
         self.now
     }
 
-    // ---- 時間の経過：MAT の鳴動状態の同期 --------------------------------
-
     pub fn tick(&mut self, now: u64) {
         self.now = self.now.max(now);
         let now = self.now;
-        // 触れている一瞬が過ぎたら、両方の画面に戻す
         for r in &mut self.registers {
             if r.touch.is_some_and(|(_, until)| until <= now) {
                 r.touch = None;
             }
-            // お礼の画面は、排出口の釣り銭が取り出されるまで初期画面に戻さない
-            // （公共料金は、店員が払込票をお渡しするまで）
             if r.outlet.total() == 0
                 && r.bill_handover.is_none()
                 && r.pickup_handover.is_none()
@@ -1422,7 +1188,6 @@ impl Store {
                 r.last_receipt = None;
             }
         }
-        // 最後の投入から 30 秒入れなければ投入おわり（足りていれば「投入おわり」を押したのと同じ）
         let done_ids: Vec<u8> = self
             .registers
             .iter()
@@ -1440,8 +1205,6 @@ impl Store {
         for id in done_ids {
             let _ = self.finish_insert_auto(id);
         }
-        // MAT はデジタルな呼び鈴：ボタンが押されている間だけ鳴る。鳴らし直しはしない。
-        // 年確・代行収納の読み取りのようにボタンを介さない呼び出しは、起きた瞬間に短く鳴る
         if self.calls.raised > self.seen_raised {
             self.seen_raised = self.calls.raised;
             self.presses += 1;
@@ -1456,11 +1219,9 @@ impl Store {
                 m.kick();
             }
         }
-        // 呼び鈴機能を OFF にした端末には鳴動状態を送らない
         for m in self.mats.iter_mut().filter(|m| m.bell_on) {
             m.tick(now, self.bell, self.mat_loss, &mut self.rng);
         }
-        // 排出口の釣り銭：残ったまま 2 分（有人モードは 1 分）で店員を呼ぶ（釣銭忘れ）。取り出せばカウントダウンを再開する
         for r in &mut self.registers {
             if r.outlet.total() > 0 {
                 let since = *r.outlet_since.get_or_insert(now);
@@ -1477,9 +1238,6 @@ impl Store {
                 self.calls.resolve(r.id, CallKind::ChangeLeft, now);
             }
         }
-        // 無操作が 5 分続いたら、登録中の取引も中止し、名札のログインを外してセミセルフに戻る。
-        // 5 分あれば、財布を車に取りに行くくらいは待てる（取引の保留機能はあえて持たない）。
-        // 排出口にお金が残っている間と、係員を呼んでいる間は数えない
         let due: Vec<u8> = self
             .registers
             .iter()
@@ -1508,15 +1266,12 @@ impl Store {
         }
     }
 
-    /// 取引を中止する。入れたお金とチャージ用の紙幣は出金ボックスへ、電子マネーで払った分は残高へ戻す。
-    /// 戻したお金の額を返す
     fn void_txn(&mut self, register: u8, now: u64) -> u32 {
         let Some(r) = self.registers.iter_mut().find(|r| r.id == register) else {
             return 0;
         };
         r.menu = None;
         let txn = std::mem::take(&mut r.txn);
-        // 入れたお金と、チャージ用に入れた紙幣は出金ボックスに戻す
         r.outlet.merge(&txn.inserted);
         let mut back = txn.inserted.total();
         if let Some(EmoneyTask::Charge { inserted }) = r.emoney.take() {
@@ -1524,7 +1279,6 @@ impl Store {
             r.outlet.merge(&inserted);
         }
         r.emoney = None;
-        // 電子マネーで先に払った分は、電子マネーに戻す（ほかのキャッシュレスは取り消す）
         if txn.prepaid_method == Some(PaymentMethod::Emoney) {
             self.emoney_balance += txn.prepaid;
         }
@@ -1551,8 +1305,6 @@ impl Store {
         back
     }
 
-    // ---- コマンド --------------------------------------------------------
-
     fn reg(&self, id: u8) -> Option<&Register> {
         self.registers.iter().find(|r| r.id == id)
     }
@@ -1564,7 +1316,6 @@ impl Store {
             .ok_or_else(|| format!("レジ{id}はありません"))
     }
 
-    /// 画面を指定しないコマンド（店舗メニュー・呼び出しボタンなど）は、操作側の画面からの操作
     fn check_active(&self, register: u8, action: Action) -> Result<(), String> {
         let r = self
             .reg(register)
@@ -1581,7 +1332,6 @@ impl Store {
     }
 
     pub fn dispatch(&mut self, cmd: Command) -> Result<Outcome, String> {
-        // レジ休止中は、スタッフバーコード（再開）と出金ボックスのお金の取り出しだけを受け付ける
         if let Some(id) = cmd.register() {
             let resume = match &cmd {
                 Command::Scan { code, .. } => {
@@ -1594,7 +1344,6 @@ impl Store {
                 return Err("このレジは休止中です（スタッフバーコードで再開）".into());
             }
         }
-        // 成否にかかわらず、触られたレジは「操作あり」
         if let Some(id) = cmd.register() {
             let now = self.now;
             if let Ok(r) = self.reg_mut(id) {
@@ -1650,8 +1399,6 @@ impl Store {
                     .find(|l| l.id == line_id && matches!(l.kind, LineKind::Ff { .. }))
                     .ok_or("FF の明細が見つかりません")?;
                 let name = l.name;
-                // 入力のたびに判定する。合えばお渡し済み（OK）、合わなければお渡し前（NG）
-                // すでに照合の済んだ分（追加注文の前）は数えず、追加分だけを比べる
                 let matched = handed == l.qty - l.ff_base;
                 l.kind = LineKind::Ff {
                     state: if matched {
@@ -1688,7 +1435,6 @@ impl Store {
                     return Err("荷物のバーコードを読んで照合してから、お渡しください".into());
                 }
                 l.unit_price = amount;
-                // 代行収納は、受付した内容・金額をお客様が会計時に確認する
                 l.kind = LineKind::Service {
                     done: true,
                     confirm_pending: catalog::find(l.code).is_some_and(|p| p.utility_bill),
@@ -1740,8 +1486,6 @@ impl Store {
                     pc.weight_g = 0;
                     return done("三辺の合計を入力し直してください".to_string());
                 }
-                // 三辺の合計の入力から戻ると、この荷物の受付をやめる
-                // （受付済みの荷物があれば「次の荷物はありますか」に、なければ登録画面に戻る）
                 let now = self.now;
                 let r = self.reg_mut(register)?;
                 r.txn.lines.retain(|l| l.id != line_id);
@@ -1765,7 +1509,6 @@ impl Store {
                 pc.postal = Some(format!("{}-{}", &code[..3], &code[3..]));
                 pc.region = Some(region.label());
                 pc.fee = fee;
-                // 着払いは料金をお届け先で受け取るので、レジでは 0 円
                 let charge = if pc.collect { 0 } else { fee };
                 let now = self.now;
                 let r = self.reg_mut(register)?;
@@ -1795,7 +1538,6 @@ impl Store {
                 if r.txn.item_count() >= MAX_ITEMS {
                     return Err(ITEMS_FULL.into());
                 }
-                // 次の荷物は、直前の荷物と同じ払い方（発払い・着払い）で受け付ける
                 let code = r
                     .txn
                     .lines
@@ -1828,7 +1570,6 @@ impl Store {
                 if r.staff_state() != StaffState::Ready {
                     return Err(PICKUP_STAFF.into());
                 }
-                // 代金引換の決済が済んだ荷物：サインをもらって引き渡す
                 if let Some(no) = r.pickup_handover.take() {
                     return done(format!("荷物（{no}）をお渡ししました"));
                 }
@@ -1847,7 +1588,6 @@ impl Store {
                     .into());
                 }
                 let no = pk.no.clone();
-                // 荷物が見つからなければ、お受け取りをやめて取引を終える（お支払いはない）
                 r.txn = Txn::default();
                 r.last_receipt = None;
                 self.calls.resolve(register, CallKind::Service, now);
@@ -1869,7 +1609,6 @@ impl Store {
                     .iter_mut()
                     .find(|l| l.is_pickup())
                     .ok_or("お受け取りの手続き中ではありません")?;
-                // 荷物が有ると確かめたら、探し直さない。受け取らないなら取引中止、受け取るなら会計する
                 if l.pickup.as_ref().is_some_and(|pk| pk.matched) {
                     return Err(PICKUP_NO_REMOVE.into());
                 }
@@ -1898,16 +1637,12 @@ impl Store {
                     .iter()
                     .position(|l| l.id == line_id)
                     .ok_or("明細が見つかりません")?;
-                // 公共料金の払込票は、一度登録したら明細ごとには取り消さない（数え違い・取り違えを防ぐ）。
-                // 払えないときは取引中止で最初からやり直す
                 if r.txn.lines[i].is_bill() {
                     return Err(BILL_NO_REMOVE.into());
                 }
-                // 宅配便は、取り消す荷物の伝票のバーコードを読んで取り消す（取り違えを防ぐ）
                 if r.txn.lines[i].is_parcel() {
                     return Err(PARCEL_SLIP_TO_REMOVE.into());
                 }
-                // 荷物の受け取りも同じ。受け取らないなら取引中止、受け取るなら会計する
                 if r.txn.lines[i].is_pickup() {
                     return Err(PICKUP_NO_REMOVE.into());
                 }
@@ -1915,7 +1650,6 @@ impl Store {
                     == LineKind::Ff {
                         state: FfState::Received,
                     };
-                // お渡し済みの FF は店員がお客様から回収する。係員のいないセミセルフでは取り消せない
                 if received && r.staff_state() != StaffState::Ready {
                     return Err(FF_RECEIVED_SELF.into());
                 }
@@ -1970,9 +1704,6 @@ impl Store {
                 r.txn.method = Some(method);
                 let semi = r.mode == Mode::SemiSelf;
                 let no_cash_goods = r.txn.cash_only() == 0;
-                // セミセルフは現金を扱わない：現金を選んだらスタッフ呼び出しを発動する
-                // （カードが通らず現金で払いたい、などの場合。スタッフが有人モードで預かる）。
-                // 別の支払方法に選び直したら、その呼び出しは片付ける（現金のみの商品があるときは残す）
                 if semi {
                     if method == PaymentMethod::Cash {
                         self.calls
@@ -1983,7 +1714,6 @@ impl Store {
                         self.calls.resolve(register, CallKind::CashOnly, self.now);
                     }
                 }
-                // ポイント利用なのにポイントカードが読まれていなければ、ポイントカードの確認に差し戻す
                 let r = self.reg_mut(register)?;
                 if method == PaymentMethod::Points && r.txn.point_card.is_none() {
                     r.txn.point_checked = false;
@@ -2006,7 +1736,6 @@ impl Store {
                     r.txn.age_method = Some(AgeMethod::Id);
                     done("身分証の生年月日を入力してください")
                 } else {
-                    // 店員が見た目で判断して確認しないなら、年確はそこで済む（お客様のボタンは挟まない）
                     r.txn.age_method = Some(AgeMethod::Skip);
                     r.txn.verified_age = r.txn.required_age;
                     done(format!("{age}歳以上の年齢確認を省略しました"))
@@ -2113,11 +1842,9 @@ impl Store {
             } => self.insert_cash(register, denomination, count),
             C::FinishInsert { register } => self.finish_insert(register),
             C::TapEmoney { register, method } => {
-                // チャージ・残高確認の手続き中なら、そちらに使う
                 if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
                     return self.tap_emoney_task(register, method);
                 }
-                // 「不足分を現金で払う」：案内（残高を引き出し、残りを現金で）を確認してから、かざした電子マネーの残高を引き出す
                 if self.reg(register).is_some_and(|r| r.txn.emoney_partial) {
                     if method.is_some_and(|m| m != PaymentMethod::Emoney) {
                         return Err("電子マネーをかざしてください".into());
@@ -2152,7 +1879,6 @@ impl Store {
                 }
                 let method = chosen;
                 let due = r.txn.due();
-                // ポイントで払うのは、ポイント付与の対象商品の分だけ。残り（たばこ・切手など）はほかの支払方法で
                 if method == PaymentMethod::Points {
                     let part = r.txn.points_due();
                     if part == 0 {
@@ -2161,7 +1887,6 @@ impl Store {
                     if part < due {
                         r.txn.prepaid += part;
                         r.txn.prepaid_method = Some(method);
-                        // 残りが現金のみの商品だけなら現金、ほかは支払方法を選び直す
                         let cash = r.txn.cashless_due() == 0;
                         r.txn.method = cash.then_some(PaymentMethod::Cash);
                         let rest = r.txn.due();
@@ -2172,13 +1897,11 @@ impl Store {
                         });
                     }
                 }
-                // 現金のみの商品（切手・代行収納）があれば、キャッシュレスで払うのはそれを除いた分だけ。残りは現金で
                 let part = r.txn.cashless_due();
                 if part == 0 {
                     return Err(CASH_ONLY.into());
                 }
                 if part < due {
-                    // 現金と併用できるのは電子マネーだけ
                     if method != PaymentMethod::Emoney {
                         return Err(NO_CASH_MIX.into());
                     }
@@ -2201,7 +1924,6 @@ impl Store {
                 }
                 if method == PaymentMethod::Emoney {
                     if balance < due {
-                        // 残高不足：やめる・残りを現金で払う・チャージするから選んでもらう
                         r.txn.emoney_short = true;
                         return done(format!(
                             "電子マネーの残高が足りません（残高 {balance}円・お支払い {due}円）"
@@ -2218,19 +1940,15 @@ impl Store {
             } => {
                 self.check(register, side, Action::Emoney)?;
                 let r = self.reg_mut(register)?;
-                // セミセルフでは、お買い物の途中にチャージ・残高確認はできない
                 let shopping = !r.txn.lines.is_empty() || !r.txn.coupons.is_empty();
                 if r.mode == Mode::SemiSelf && shopping {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
-                // セミセルフでチャージが選ばれたら、スタッフ呼び出しイベントを発動する
-                // （チャージの現金はスタッフが有人モードで預かる。残高照会は呼び出さない）
                 if r.mode == Mode::SemiSelf && kind == EmoneyKind::Charge {
                     r.emoney = None;
                     self.call(register, CallKind::Emoney, "チャージ");
                     return done("チャージはスタッフがお手伝いします\nスタッフをお呼びしました");
                 }
-                // 選ぶ画面からは、チャージ・残高確認に進める
                 if r.emoney
                     .as_ref()
                     .is_some_and(|e| !matches!(e, EmoneyTask::Menu))
@@ -2281,7 +1999,6 @@ impl Store {
                 if r.mode == Mode::SemiSelf && choice == ShortChoice::Charge {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
-                // セミセルフはキャッシュレス専用：残りを現金で払う道はない
                 if r.mode == Mode::SemiSelf
                     && matches!(choice, ShortChoice::Cash | ShortChoice::CashConfirmed)
                 {
@@ -2303,7 +2020,6 @@ impl Store {
                         done("電子マネーを使うのをやめました\nお支払い方法を選んでください")
                     }
                     ShortChoice::Cash => {
-                        // すぐには引き落とさない：かざしたままの電子マネーで、案内を見ないうちに決済が走らないように
                         r.txn.emoney_partial = true;
                         let drawn = balance.min(r.txn.cashless_due());
                         let rest = r.txn.due().saturating_sub(drawn);
@@ -2322,7 +2038,6 @@ impl Store {
             }
             C::CallStaff { register, topic } => {
                 self.check_active(register, Action::CallStaff)?;
-                // 応援を呼ぶ：Bell を鳴らすだけ（呼び出しの記録・通知画面はなし。来た仲間とは口頭で話す）
                 if topic == Some(CallTopic::Sos) {
                     self.press(register)?;
                     return done("仲間のスタッフを呼んでいます");
@@ -2348,7 +2063,6 @@ impl Store {
                 self.check(register, side, Action::ConfirmPointCard)?;
                 let t = &mut self.reg_mut(register)?.txn;
                 t.point_checked = true;
-                // ポイントカードなしなら、差し戻し前に選ばれていたポイント利用は取り消す
                 if t.method == Some(PaymentMethod::Points) {
                     t.method = None;
                 }
@@ -2362,7 +2076,6 @@ impl Store {
                 self.check_active(register, Action::VoidTransaction)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
-                // 開いていた店舗メニューは閉じる
                 r.menu = None;
                 let back = self.void_txn(register, now);
                 if back > 0 {
@@ -2414,7 +2127,6 @@ impl Store {
                     return Err("出金ボックスにお金はありません".into());
                 }
                 r.outlet = Cash::default();
-                // 釣り銭を取り出したところから「ありがとうございました」を THANKS_MS 出す
                 if let Some(rc) = r.last_receipt.as_mut() {
                     rc.at = now;
                 }
@@ -2522,7 +2234,6 @@ impl Store {
                     return Err("据え付け端末は OFF にできません".into());
                 }
                 if on && !m.bell_on {
-                    // OFF の間の呼び出しを、ON にした途端に鳴らさない
                     m.received.presses = bell.presses;
                     m.buzz_until = 0;
                 }
@@ -2545,7 +2256,6 @@ impl Store {
         }
     }
 
-    /// この商品の今の税区分と税率
     fn tax_for(&self, code: &str) -> (String, u32) {
         let c = self.tax.class_for(code);
         (c.id.clone(), c.rate_bp)
@@ -2556,8 +2266,6 @@ impl Store {
         Ok(auth::account(id).map_or("?", |a| a.name))
     }
 
-    /// 商品ごとの販売個数の上限を超えないか（add 個増やすとき）
-    /// 受付中（料金がまだ決まっていない）の荷物
     fn pending_parcel(&mut self, register: u8, line_id: u32) -> Result<&mut Parcel, String> {
         self.reg_mut(register)?
             .txn
@@ -2581,7 +2289,6 @@ impl Store {
     }
 
     fn call(&mut self, register: u8, kind: CallKind, detail: &str) {
-        // 店員がすでにそのレジで操作できる状態なら、呼び出しは不要
         if self
             .reg(register)
             .is_some_and(|r| r.staff_state() == StaffState::Ready)
@@ -2591,7 +2298,6 @@ impl Store {
         self.calls.raise(register, kind, self.now, detail);
     }
 
-    /// 呼び出しボタンに触れた：離すまで MAT を鳴らす。触れるたびに必ず鳴る
     fn press(&mut self, register: u8) -> Result<(), String> {
         self.reg_mut(register)?.pressing = true;
         self.presses += 1;
@@ -2605,7 +2311,6 @@ impl Store {
         line_id: u32,
         qty: u32,
     ) -> Result<Outcome, String> {
-        // 取消と同じく、登録画面での明細の手直し
         self.check(register, side, Action::RemoveLine)?;
         if qty == 0 {
             return Err("取り消すときは「取り消し」を押してください".into());
@@ -2624,7 +2329,6 @@ impl Store {
             };
         match kind {
             LineKind::Service { .. } => return Err("サービス商品の個数は変えられません".into()),
-            // お渡し済みの FF の数量を変えるのは店員（増やせばお渡し前に戻し、減らせば回収してもらう）
             _ if received && r.staff_state() != StaffState::Ready => {
                 return Err(FF_RECEIVED_SELF.into())
             }
@@ -2636,8 +2340,6 @@ impl Store {
         if qty > old {
             self.check_limit(register, code, qty - old)?;
         }
-        // FF は増やした分を在庫から取る。減らした分は、お渡し前なら在庫に戻す
-        // （お渡し済みはお客様の手に渡ったので戻さず、回収してもらう）
         if matches!(kind, LineKind::Ff { .. }) {
             if qty > old {
                 let stock = self
@@ -2653,19 +2355,16 @@ impl Store {
                 self.restock(code, old - qty);
             }
         }
-        // 数量の − ＋ は明細の行の上で押すので、行の並びは変えない（押した行が動くと、次に押す行を取り違える）
         let t = &mut self.reg_mut(register)?.txn;
         let l = t.lines.iter_mut().find(|l| l.id == line_id).unwrap();
         l.qty = qty;
         if received && qty > old {
-            // 増やした分はまだ渡していないので、お渡し前に戻す。照合し直すのは増やした分だけ
             l.ff_base = old;
             l.kind = LineKind::Ff {
                 state: FfState::Waiting,
             };
         }
         if matches!(kind, LineKind::Ff { .. }) && !received && qty <= l.ff_base {
-            // 追加注文の途中で、すでにお渡しした分まで減らした：渡した分は回収してもらう
             let handed = l.ff_base;
             l.ff_base = qty;
             l.kind = LineKind::Ff {
@@ -2691,7 +2390,6 @@ impl Store {
 
     fn scan(&mut self, register: u8, side: Side, code: &str) -> Result<Outcome, String> {
         let scanned = catalog::classify(code);
-        // スタッフバーコードは、未ログインでも・休止中でも読む（ログイン・再開）
         if let Scanned::Staff(id) = &scanned {
             let acc = auth::account(id).ok_or("登録されていないスタッフバーコードです")?;
             let now = self.now;
@@ -2700,27 +2398,19 @@ impl Store {
             let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.customer_turn;
             r.staff = Some(StaffSession { account: acc });
-            // ログイン後は両方の画面が操作できる（触れている一瞬だけ排他）
             r.touch = None;
-            // ログインで店員側が操作できるようになる（お客様の支払い中でも）
             r.txn.customer_turn = false;
-            // 店員が来たので、呼び出しボタンの鳴動も止める
             r.pressing = false;
-            // 店員が来たら、ボタンでの呼び出しは片付く（サービス商品の受付待ちがあれば残す）
             let service_pending = r.txn.service_pending();
             self.calls.resolve(register, CallKind::CustomerHelp, now);
             if self.calls.is_open(register, CallKind::Tobacco) {
                 self.reg_mut(register)?.txn.tobacco_asked = true;
             }
             self.calls.resolve(register, CallKind::Tobacco, now);
-            // 電子マネーの呼び出しは、ログインした有人モードで扇形から手続きするので片付く
             self.calls.resolve(register, CallKind::Emoney, now);
             if !service_pending {
                 self.calls.resolve(register, CallKind::Service, now);
             }
-            // 呼び出しイベントは、店員のログインで解除される（ユーザー指定 2026-11-03）。
-            // 買い物がないままログアウトしても（目当ての銘柄がなく取引がお流れになった等）呼び出しは復活しない。
-            // FF・サービス商品・年確・代行収納の仕事そのものは取引側の状態に残る（呼び出しの記録だけを片付ける）
             for k in [
                 CallKind::FastFood,
                 CallKind::Service,
@@ -2753,10 +2443,8 @@ impl Store {
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
-        // 次のお買い物が始まったら、払込票・荷物のお渡しは済んだものとする
         r.bill_handover = None;
         r.pickup_handover = None;
-        // ポイントカードの最終確認中に読まれたポイントカードは、そのまま確認済みにして支払いへ
         if let Scanned::PointCard(no) = &scanned {
             if r.txn.paying && !r.txn.point_checked {
                 r.txn.point_card = Some(no.clone());
@@ -2764,7 +2452,6 @@ impl Store {
                 return done("ポイントカードを読みました\nお支払い方法を選んでください");
             }
         }
-        // 公共料金の払込票は、ほかの商品と一緒に登録できない（どちらを先に読んでも）
         if let Scanned::Product(p) = &scanned {
             if r.txn.lines.iter().any(Line::is_pickup) || p.parcel_pickup && !r.txn.lines.is_empty()
             {
@@ -2780,11 +2467,9 @@ impl Store {
                 return Err(PARCEL_ALONE.into());
             }
         }
-        // 買い物点数の上限を超える商品は登録しない（会計画面にもとどまる）
         if matches!(scanned, Scanned::Product(_)) && r.txn.item_count() >= MAX_ITEMS {
             return Err(ITEMS_FULL.into());
         }
-        // 会計画面で読まれたら、登録画面に引き返して追加する（投入済みの現金はそのまま）
         let back = if r.txn.paying {
             r.txn.paying = false;
             r.txn.method = None;
@@ -2801,7 +2486,6 @@ impl Store {
                 done(format!("ポイントカードを読みました{back}"))
             }
             Scanned::Coupon(c) => {
-                // 明細と同じ通し番号（先に進めてから使う。明細の番号と重ならない）
                 r.txn.next_line += 1;
                 let id = r.txn.next_line;
                 r.txn.coupons.push((id, c));
@@ -2858,18 +2542,15 @@ impl Store {
                     if let Some(l) = r.txn.lines.last_mut() {
                         let pk = Pickup {
                             no: pickup_no(seed),
-                            // 代金引換の金額は、シミュレーターでは 1,000〜9,900円（100円単位）を便宜的に決める
                             amount: 1_000 + (mix(seed ^ 0xC0D) % 90) as u32 * 100,
                             matched: false,
                             wrong: None,
                             missing: false,
                         };
-                        // 代金引換の合計は、受取用バーコードを読んだときから両方の画面に出す
                         l.unit_price = pk.amount;
                         l.pickup = Some(pk);
                     }
                 }
-                // 次の荷物の伝票を読んだら、「次の荷物はありますか」には「ある」と答えたことになる
                 r.txn.parcel_ask = false;
                 let ready = r.staff_state() == StaffState::Ready;
                 if !ready {
@@ -2898,13 +2579,6 @@ impl Store {
         }
     }
 
-    /// 保管場所から持ってきた荷物のバーコードを読み、お預かりの番号と照合する
-    /// 登録済みの宅配便の取り消し：取り消す荷物の伝票のバーコードを、係員が店員側で読む。
-    ///
-    /// 設計メモ（ユーザー 2026-10-30）：会計の済んだ荷物も、集荷の前なら伝票のバーコードを読んで
-    /// 取り消し・返品返金できるのが実際の運用。会計後・集荷前の取り消しにも伝票のスキャンを必須とする。
-    /// ただし Janus-POS はシミュレーターなので、会計後の取り消しはサポートの対象外とする
-    /// （ここで扱うのは、会計前の取引の中で登録した荷物だけ）
     fn cancel_parcel(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
         let now = self.now;
         let r = self.reg_mut(register)?;
@@ -3035,7 +2709,6 @@ impl Store {
         ))
     }
 
-    /// 身分証の年齢で判定する。年齢に届かない年確商品は買い物から取り除き、回収の一覧に載せる
     fn verify_age(&mut self, register: u8, age: u8) -> Result<Outcome, String> {
         let rules = &self.age_rules;
         let r = self
@@ -3062,7 +2735,6 @@ impl Store {
             .filter_map(|l| rules.age_for(l.code, l.category))
             .max();
         if r.txn.lines.is_empty() {
-            // すべて取り除いたら登録画面に戻る
             r.txn.paying = false;
             r.txn.method = None;
             r.txn.customer_turn = false;
@@ -3087,7 +2759,6 @@ impl Store {
             .iter_mut()
             .find(|r| r.id == register)
             .ok_or("レジがありません")?;
-        // 年確の判定はこの時点だけ。対象品が複数あっても最も厳しい年齢で 1 回
         let age = r
             .txn
             .lines
@@ -3096,23 +2767,16 @@ impl Store {
             .max();
         r.txn.paying = true;
         r.txn.required_age = age;
-        // 済んだ年齢で足りなければ（より厳しい商品を足した等）、年確のやり方の選択からやり直す
         if !r.txn.age_cleared() {
             r.txn.age_method = None;
         }
-        // 会計ボタンの後は、まずポイントカードの最終確認。読み取り済みなら確認済み。
-        // 公共料金の支払いにはポイントがつかないので、確認しない
-        // ポイント付与の対象になる商品がない会計（公共料金・宅配便など）では、ポイントカードの確認をしない
         r.txn.point_checked = r.txn.point_card.is_some()
             || r.txn.bill_slips() > 0
             || !r.txn.lines.iter().any(Line::earns_points);
-        // セミセルフでは、会計に進めたら支払いはお客様に任せる
         r.txn.customer_turn = r.mode == Mode::SemiSelf;
         let ready = r.staff_state() == StaffState::Ready;
         let pending = r.txn.age_choice_pending();
         let mode = r.mode;
-        // 公共料金は現金のみ。会計ボタンで店員を呼び、店員が払込票の内容を確認してから現金で払う
-        // （ストアスタンプ＝収納印の押印は店員の作業。非プロに任せるセルフレジでは扱わせない）
         let slips = r.txn.bill_slips();
         if slips > 0 {
             r.txn.method = Some(PaymentMethod::Cash);
@@ -3128,8 +2792,6 @@ impl Store {
                 "公共料金 {slips}枚：スタッフ側の画面で払込票の内容を確認してください"
             ));
         }
-        // セミセルフは現金を扱わない：現金のみの商品（切手）は、会計ボタンでスタッフを呼ぶ
-        // （スタッフがログインして有人モードで現金をお預かりする）
         if mode != Mode::Attended && !ready && r.txn.cash_only() > 0 {
             self.calls
                 .raise(register, CallKind::CashOnly, self.now, "切手");
@@ -3172,7 +2834,6 @@ impl Store {
         self.pay_cash(register, c)
     }
 
-    /// 電子マネーの手続き中に入金ボックスへ入れたお金（チャージは紙幣だけ）
     fn charge_cash(&mut self, register: u8, c: Cash) -> Result<Outcome, String> {
         let balance = self.emoney_balance;
         let r = self.reg_mut(register)?;
@@ -3194,7 +2855,6 @@ impl Store {
         ))
     }
 
-    /// 電子マネーの手続き中にかざした：残高確認なら残高を出し、チャージなら入れた紙幣の分を足す
     fn tap_emoney_task(
         &mut self,
         register: u8,
@@ -3232,8 +2892,6 @@ impl Store {
         }
     }
 
-    /// 投入口：店舗メニューの入金・両替画面が開いていればそちら、なければお会計の支払い
-    /// 画面に触れる。もう一方が触れている一瞬や、お客様側に限られる場面では利かない
     fn claim(&mut self, register: u8, side: Side) -> Result<Outcome, String> {
         let r = self.reg(register).ok_or("レジがありません")?;
         let c = r.context();
@@ -3271,7 +2929,6 @@ impl Store {
         }
     }
 
-    /// 両替：入れた金額と同じ額を、指定の金種で排出口に出す
     fn exchange(&mut self, register: u8, amount: u32, to: u32) -> Result<Outcome, String> {
         self.check_active(register, Action::CashIn)?;
         if amount % to != 0 {
@@ -3297,9 +2954,6 @@ impl Store {
         ))
     }
 
-    /// 現金を入れる。会計の確認が済んでいれば、入れただけで支払方法は現金になる
-    /// （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）。
-    /// 投入額は積み上がり、「投入おわり」（[`Command::FinishInsert`]）を押すと決済する。入金ボックスの Enter はその近道
     fn pay_cash(&mut self, register: u8, c: Cash) -> Result<Outcome, String> {
         let now = self.now;
         let r = self.reg_mut(register)?;
@@ -3322,7 +2976,6 @@ impl Store {
         self.finish_insert_auto(register)
     }
 
-    /// 投入おわりの決済（操作者の確認なし。30 秒の自動判定からも使う）
     fn finish_insert_auto(&mut self, register: u8) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         let paid = r.txn.inserted.total();
@@ -3350,7 +3003,6 @@ impl Store {
         let r = self.reg_mut(register)?;
         let total = r.txn.total();
         let due = r.txn.due();
-        // 釣銭は紙幣・硬貨をそろえて一度に渡したものとする（排出タイミングは扱わない。cash.rs 参照）
         for (d, n) in &inserted.0 {
             r.drawer.cash.add(*d, *n);
         }
@@ -3366,13 +3018,10 @@ impl Store {
                 return Err(format!("{e}\nスタッフをお呼びください"));
             }
         };
-        // おつりは排出口に出る（お客様が取り出すまで残る）
         r.outlet.merge(&change);
         let txn = std::mem::take(&mut r.txn);
-        // 公共料金は、決済の後に店員が払込票に収納印を押してお渡しする
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
-        // 荷物の受け取りは、代金引換の決済の後にサインをもらって引き渡す
         r.pickup_handover = txn
             .lines
             .iter()
@@ -3398,7 +3047,6 @@ impl Store {
             change_total: change.total(),
             change,
             items: txn.lines.iter().map(|l| l.qty).sum(),
-            // 宅配便・公共料金・切手・たばこはポイント付与の対象外
             points: if txn.point_card.is_some() {
                 txn.lines
                     .iter()
@@ -3443,12 +3091,10 @@ impl Store {
             return Err("店舗メニューはログインしたスタッフだけが使えます".into());
         }
         let Some(screen) = screen else {
-            // 閉じる
             self.reg_mut(register)?.menu = None;
             return Ok(Outcome::default());
         };
         let r = self.reg_mut(register)?;
-        // 取引中はお金の出し入れの画面を開けない（一覧・取引に関わらない項目は開ける）
         if screen.moves_cash() && !r.txn.lines.is_empty() {
             return Err("取引中は店舗メニューを開けません".into());
         }
@@ -3465,7 +3111,6 @@ impl Store {
         Ok(Outcome::default())
     }
 
-    /// 自動釣銭機へのお金の出し入れは、スタッフ側の店舗メニューを開いているときだけ
     fn require_cash_menu(&self, register: u8) -> Result<(), String> {
         let r = self.reg(register).ok_or("レジがありません")?;
         if r.menu.is_some() {
@@ -3520,7 +3165,6 @@ impl Store {
         }
     }
 
-    /// お金を入れる操作。抜く操作と違ってパスワードは求めない（記録は残す）
     fn cash_in(&mut self, register: u8, kind: CashInKind, amount: u32) -> Result<Outcome, String> {
         self.check_active(register, Action::CashIn)?;
         self.require_cash_menu(register)?;
@@ -3541,8 +3185,6 @@ impl Store {
         });
         done(format!("{} {amount}円を入金しました", kind.label()))
     }
-
-    // ---- スナップショット ------------------------------------------------
 
     pub fn snapshot(&self) -> Snapshot {
         let now = self.now;
@@ -3635,7 +3277,6 @@ impl Store {
         }
     }
 
-    /// FF のメニュー：タブごとに売れ筋順
     fn ff_menu(&self) -> Vec<FfMenuItem> {
         FF_MENU
             .iter()
@@ -3658,12 +3299,10 @@ impl Store {
         let c = r.context();
         let t = &r.txn;
         let taxes = t.taxes(&self.tax.display_rates(), self.tax.rounding);
-        // どちらの画面にも同じボタンが並ぶ。触れている一瞬は、触れている側の画面だけが押せる
         let c_side = active_side(&c).unwrap_or(Side::Customer);
         let actions = |side: Side, list: &[Action]| {
             list.iter()
                 .map(|&a| {
-                    // 年齢確認・身分証確認などは、どちらが操作側でも決まった側の画面で押す
                     let side = fixed_side(a).unwrap_or(side);
                     let res = permitted(side, a, &c);
                     ActionState {
@@ -3676,7 +3315,6 @@ impl Store {
         };
         let total = t.total();
         let inserted = t.inserted.total();
-        // 現金が足りていて、最後の投入からの無操作で確定するまでの残り時間
         let settle_in_ms = (t.paying
             && t.method == Some(PaymentMethod::Cash)
             && r.emoney.is_none()
@@ -3875,10 +3513,6 @@ impl Store {
     }
 }
 
-// ---------------------------------------------------------------------------
-// ビュー
-// ---------------------------------------------------------------------------
-
 #[derive(Clone, Debug, Serialize)]
 pub struct ActionState {
     pub action: Action,
@@ -3891,30 +3525,22 @@ pub struct StaffLine {
     #[serde(flatten)]
     pub line: Line,
     pub amount: u32,
-    /// 年確ルールに該当する年齢（参考表示。判定は会計時）
     pub age: Option<u8>,
-    /// 1 回のお会計で買える個数の上限（店舗ルール）
     pub limit: Option<u32>,
 }
 
-/// お客様画面に出してよい明細（分類・商品コードは出さない）。
-/// 年確と販売個数の上限は注意のしるしとして出す（有人モードの店員側と同じ見た目にする）
 #[derive(Clone, Debug, Serialize)]
 pub struct CustomerLine {
     pub id: u32,
     pub touched: u32,
     pub name: &'static str,
     pub qty: u32,
-    /// FF：すでに照合の済んだ個数（追加注文のときは、残りの追加分だけを照合する）
     pub ff_base: u32,
     pub amount: u32,
     pub age: Option<u8>,
     pub limit: Option<u32>,
-    /// 現金でしか払えない（切手・代行収納）
     pub cash_only: bool,
-    /// 荷物の受け取り（数量は変えられず、取り消しは取引中止で行う）
     pub pickup: bool,
-    /// 荷物を送る（受付中はお客様側に、係員を待つ案内を出す）
     pub parcel: bool,
     #[serde(flatten)]
     pub kind: LineKind,
@@ -3929,40 +3555,27 @@ pub struct StaffView {
     pub lines: Vec<StaffLine>,
     pub total: u32,
     pub taxes: Vec<TaxTotal>,
-    /// 読み取った引換券・割引券
     pub coupons: Vec<CouponView>,
     pub point_card: Option<String>,
     pub required_age: Option<u8>,
-    /// 店員の「年齢確認をする／しない」待ち
     pub age_choice_pending: bool,
-    /// 年確で販売できず取り除いた商品（店員が回収する）
     pub confiscated: Vec<Confiscated>,
-    /// お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する）
     pub ff_collect: Vec<Confiscated>,
-    /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
     pub coupon_unmatched: bool,
-    /// 取り消して、お客様に返却するクーポン
     pub returned: Vec<ReturnedCoupon>,
-    /// 「する」を選び、店員の生年月日の入力待ち
     pub id_pending: bool,
-    /// 公共料金の払込票の種類ごとの枚数・金額（払込票がなければ空）
     pub bills: Vec<BillRow>,
-    /// 店員がまだ内容を確認していない払込票がある
     pub bill_unchecked: bool,
-    /// ポイントカードの最終確認待ち（会計ボタンの直後）
     pub point_pending: bool,
-    /// 荷物の料金が決まり、「次の荷物はありますか」の答えを待っている
     pub parcel_ask: bool,
     pub method: Option<PaymentMethod>,
     pub inserted: u32,
-    /// 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ）
     pub settle_in_ms: Option<u64>,
     pub due: u32,
     pub payment_blocker: Option<&'static str>,
     pub calls: Vec<Call>,
     pub actions: Vec<ActionState>,
     pub drawer_total: u32,
-    /// 自動釣銭機の在高（金種, 枚数）
     pub drawer: Vec<(u32, u32)>,
     pub mat_down: Vec<String>,
 }
@@ -3972,27 +3585,19 @@ pub struct CustomerView {
     pub phase: Phase,
     pub lines: Vec<CustomerLine>,
     pub coupons: Vec<CouponView>,
-    /// 会計に進んだが、適用先のないクーポンが残っている（決済できない）
     pub coupon_unmatched: bool,
-    /// 取り消して、お返しするクーポン
     pub returned: Vec<ReturnedCoupon>,
     pub total: u32,
-    /// 税率ごとの内税額（有人モードと同じ表示をセミセルフにも出す）
     pub taxes: Vec<TaxTotal>,
     pub inserted: u32,
-    /// 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ）
     pub settle_in_ms: Option<u64>,
     pub due: u32,
     pub point_card: bool,
     pub point_pending: bool,
-    /// 荷物の料金が決まり、店員が「次の荷物はありますか」を尋ねている
     pub parcel_ask: bool,
-    /// 公共料金の払込票の種類ごとの枚数・金額（払込票がなければ空）
     pub bills: Vec<BillRow>,
-    /// 店員がまだ内容を確認していない払込票がある
     pub bill_unchecked: bool,
     pub staff_called: bool,
-    /// セミセルフで年確の係員を待っている間の年齢（身分証の準備を案内する）
     pub age_wait: Option<u8>,
     pub staff_present: bool,
     pub method: Option<PaymentMethod>,
@@ -4003,60 +3608,34 @@ pub struct CustomerView {
 #[derive(Clone, Debug, Serialize)]
 pub struct RegisterView {
     pub id: u8,
-    /// 操作できる側が片方に限られているなら、その側（None なら両方の画面が操作できる）
     pub active_side: Option<Side>,
-    /// 買い物点数の上限
     pub max_items: u32,
-    /// レジ本体の呼び出しランプ。店員が来るまで点きっぱなし（音は MAT だけ。
-    /// 呼び出しは順番待ちにせず、どれも発生した瞬間から知らせる）
     pub lamp: bool,
-    /// 店員が来ていない呼び出しの放置時間（最も古いもの）
     pub call_waiting_ms: Option<u64>,
-    /// 鳴動の音量（放置が長いほど大きい。呼び出しがなければ 0）
     pub ring_volume: f32,
-    /// たばこボタンの呼び出しで有人モードになり、まだたばこを登録していない
     pub tobacco_asked: bool,
     pub mode: Mode,
     pub mode_label: &'static str,
-    /// 排出口にたまっているお金
     pub outlet: u32,
     pub outlet_detail: Vec<(u32, u32)>,
-    /// お客様画面に開いている店舗メニュー
     pub menu: Option<Menu>,
-    /// お客様側から店舗メニューを開くための使い捨てパスワード（スタッフ側の画面にだけ出す）
-    /// お客様側から店舗メニューを開くための使い捨てパスワード（店員画面にだけ出す）
-    /// レジ休止中（スタッフバーコードで再開）
     pub paused: bool,
-    /// セミセルフ以外で待機中なら、セミセルフに戻るまでの残り時間（ミリ秒）
     pub idle_revert_in: Option<u64>,
-    /// 無操作が続くと、登録中の取引を中止する（取引があるとき）
     pub idle_voids: bool,
-    /// 排出口に釣り銭が残ったまま 1 分（有人モードは 30 秒）たった（お客様画面に「釣り銭が残っています」）
     pub change_left: bool,
     pub staff: StaffView,
     pub customer: CustomerView,
-    /// 開いている電子マネーの手続き（チャージ・残高確認）
     pub emoney: Option<EmoneyView>,
-    /// 電子マネーの残高が足りず、どうするかを選んでもらう（値は残高）
     pub emoney_short: Option<u32>,
-    /// 「不足分を現金で払う」：電子マネーをかざして残高を引き出すのを待つ（値は引き出す残高）
     pub emoney_partial: Option<u32>,
-    /// その案内を確認済みで、電子マネーをかざすのを待っている
     pub emoney_partial_ok: bool,
-    /// このお会計でキャッシュレスで先に払った額（残りを現金で払うとき）
     pub prepaid: u32,
-    /// 先に払ったキャッシュレスの名前
     pub prepaid_method: Option<&'static str>,
-    /// 現金でしか払えない商品（切手・代行収納）の合計
     pub cash_only: u32,
-    /// これから払う額のうち、キャッシュレスで払える分
     pub cashless_due: u32,
-    /// いまの取引で使えない支払方法とその理由
     pub unavailable: Vec<Unavailable>,
     pub last_receipt: Option<Receipt>,
-    /// 公共料金の決済の後、払込票のお渡し待ち（枚数）。店員の「お渡し済」で消える
     pub bill_handover: Option<u32>,
-    /// 代金引換の決済の後、荷物の引き渡し待ち（荷物の番号）。店員の「お渡ししました」で消える
     pub pickup_handover: Option<String>,
 }
 
@@ -4069,23 +3648,15 @@ pub struct Unavailable {
 #[derive(Clone, Debug, Serialize)]
 pub struct EmoneyView {
     pub kind: EmoneyKind,
-    /// チャージ用に入れた紙幣の合計
     pub inserted: u32,
-    /// 残高確認でかざしたあとの残高
     pub balance: Option<u32>,
 }
 
-/// 呼び鈴（Bell）の種類。据え付け型の呼び鈴が主で、携帯型の検品端末と事務所のストアコンピューターの
-/// 呼び鈴は「あれば便利」（設定で OFF にできる）。
-/// スタッフが重い端末を常に持ち歩く前提は現実的でない（制服にポケットもない）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BellKind {
-    /// 据え付け型の呼び鈴（1 台目）
     Fixed,
-    /// 携帯型の検品端末（2 台目、4 台目以降）
     Handheld,
-    /// 事務所のストアコンピューター（3 台目）
     StoreComputer,
 }
 
@@ -4097,8 +3668,6 @@ fn bell_kind(i: u8) -> BellKind {
     }
 }
 
-/// 1 台目は「据え付け端末」、2 台目は「可搬性端末」、3 台目は「ストアコンピューター」、
-/// 4 台目以降は番号付きの可搬性端末
 fn bell_name(i: u8) -> String {
     match i {
         0 => "据え付け端末".into(),
@@ -4108,7 +3677,6 @@ fn bell_name(i: u8) -> String {
     }
 }
 
-/// MAT 自身の画面：鳴動と不通表示だけ
 #[derive(Clone, Debug, Serialize)]
 pub struct MatView {
     pub id: String,
@@ -4120,7 +3688,6 @@ pub struct MatView {
     pub bell_on: bool,
 }
 
-/// レジ側から見た MAT の通信状態（シミュレーター表示用）
 #[derive(Clone, Debug, Serialize)]
 pub struct MatLink {
     pub id: String,
@@ -4164,13 +3731,10 @@ pub struct CatalogItem {
     pub age: Option<u8>,
     pub legal_age: Option<u8>,
     pub store_age: Option<u8>,
-    /// 1 回のお会計で売れる上限（なければ None）
     pub limit: Option<u32>,
-    /// 今の税区分
     pub tax_class: String,
 }
 
-/// 税率ごとの対象額（税込）と内税額
 #[derive(Clone, Debug, Serialize)]
 pub struct TaxTotal {
     pub rate_bp: u32,
@@ -4213,6 +3777,5 @@ pub struct Snapshot {
     pub catalog: Vec<CatalogItem>,
     pub tax: TaxView,
     pub categories: Vec<(Category, &'static str)>,
-    /// 財布の電子マネーの残高
     pub emoney_balance: u32,
 }

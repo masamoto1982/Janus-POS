@@ -1,13 +1,3 @@
-//! 店員呼び出し（問題8への対策）。
-//!
-//! - 通知先は「発生したレジ」と「全 MAT」だけ。他のレジには出さない。
-//!   どのレジが鳴っているかが、そのまま店員への情報になる。
-//! - 呼び出しは一件ずつ独立した記録で、単一の順番待ちキューも、後続を
-//!   止めるモーダルも持たない。どれか一件の対応が、他の呼び出しの通知を
-//!   妨げることはない。
-//! - 呼び出しは原因が片付いたとき（年確が済んだ、FF を登録した、
-//!   サービス商品の受付が済んだ、店員がそのレジに来た）に自動で閉じる。
-
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -18,13 +8,9 @@ pub enum CallKind {
     Service,
     Tobacco,
     CustomerHelp,
-    /// 排出口に釣り銭が残ったまま 2 分（有人モードは 1 分）たった（釣銭忘れ）
     ChangeLeft,
-    /// セミセルフで公共料金の会計ボタンが押された（店員が払込票の内容を確認し、収納印を押す）
     Bill,
-    /// セミセルフのお買い物の途中に、電子マネーの扇形が押された（スタッフがログインして有人モードで手続きする）
     Emoney,
-    /// セミセルフで、現金のみの商品（切手）の会計ボタンが押された、または支払方法で現金が選ばれた（スタッフがログインして有人モードで現金をお預かりする）
     CashOnly,
 }
 
@@ -68,12 +54,10 @@ pub struct Calls {
     next_id: u32,
     pub open: Vec<Call>,
     pub history: Vec<ResolvedCall>,
-    /// 新しい呼び出しが立った回数（MAT の鳴動合図に使う）
     pub raised: u64,
 }
 
 impl Calls {
-    /// 同じレジ・同じ種類の呼び出しがすでに開いていれば、新たには立てない
     pub fn raise(
         &mut self,
         register: u8,
@@ -149,7 +133,6 @@ mod tests {
             !c.raise(2, CallKind::FastFood, 2, ""),
             "duplicate is not raised twice"
         );
-        // 後から来たレジ1を先に片付けても、レジ2はそのまま
         c.resolve(1, CallKind::CustomerHelp, 3);
         assert!(c.is_open(2, CallKind::FastFood));
         assert!(!c.is_open(1, CallKind::CustomerHelp));

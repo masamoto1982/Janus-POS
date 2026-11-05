@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-# Rebuild the wasm bundle consumed by the web UI (pos/web/src/wasm/generated/).
-# Same approach as the repository's scripts/rebuild-wasm.sh: build into a
-# scratch dir and copy only the four runtime files.
 set -euo pipefail
 
 pos_root="$(cd "$(dirname "$0")/.." && pwd)"

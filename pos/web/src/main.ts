@@ -1,17 +1,7 @@
-// 画面の組み立てとイベント処理。
-//
-// - 状態はすべて Rust コア（WASM）にあり、ここは「コマンドを送る」「スナップショットを描く」だけ。
-// - 描き直しは領域ごとに、内容が変わったときだけ行う（問題1：無駄な再描画で操作が重くならない）。
-//   入力中の値とフォーカスは描き直しの前後で引き継ぐ。
-// - 確認ダイアログは使わない。結果はその画面に数秒だけ出るお知らせで返す（問題4）。
-// - 買い物は、右の売り場から商品をレジの画面へドラッグ＆ドロップして再現する。
-//   店員画面に落とせば店員側スキャナー、お客様画面に落とせばお客様側スキャナーで読んだことになる。
-
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { Command, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, setMatRinging, unlockAudio } from "./sound";
-// 仮のロゴマーク（正式なロゴは後日差し替え）
 import logoUrl from "./logo.jpg";
 import {
   esc,
@@ -48,7 +38,6 @@ import {
 
 declare global {
   interface Window {
-    /** 単一 HTML 版でだけ埋め込まれる WASM 本体（base64） */
     __JANUS_WASM_B64__?: string;
   }
 }
@@ -70,7 +59,6 @@ function bytesFromB64(b64: string): Uint8Array {
 async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
-  // Bell は据え付け端末 1 台、可搬性端末 1 台、事務所のストアコンピューター 1 台
   reset(2, 3);
   setupDrag();
   window.setInterval(frame, 100);
@@ -82,12 +70,8 @@ function reset(registers: number, mats: number): void {
   t0 = performance.now();
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   buildSkeleton();
-  // 【今は無効。使うときは下の2行のコメントを外す】
-  // エリア構造の確認用の点線枠（styles.css 末尾）。不要になったらこの1行と CSS の末尾ブロックを消す。URL に ?debug=0 で消せる
-  // document.body.classList.toggle("debug-areas", new URLSearchParams(location.search).get("debug") !== "0");
   wireSwipe();
   wireMenuSwipe();
-  // 閉じたら（Esc でも）認証を解除し、パスワードを消す
   rulesDlg().addEventListener("close", lockRules);
   rulesDlg()
     .querySelector("[data-owner-auth]")
@@ -104,11 +88,6 @@ function reset(registers: number, mats: number): void {
   render();
 }
 
-// ---------------------------------------------------------------------------
-// 骨組み（一度だけ作る）
-// ---------------------------------------------------------------------------
-
-/** 呼び出しの色が淡いレッドに到達するまでの放置時間（core の RING_FULL_MS と同じ） */
 const CALL_FULL_MS = 60_000;
 
 function buildSkeleton(): void {
@@ -166,7 +145,7 @@ function buildSkeleton(): void {
     <header class="top">
       <img class="logo" src="${logoUrl}" width="73" height="73" alt="Janus POS ロゴ" />
       <h1>Janus POS</h1>
-      <span class="build-badge" title="ビルド番号">Build ${esc(String(import.meta.env.VITE_BUILD ?? "dev"))}</span>
+      <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
     </header>
     <article class="floor">
       <div class="left">
@@ -218,8 +197,6 @@ function buildSkeleton(): void {
     ${rampFilter()}`;
 }
 
-/** 操作できる画面の配色：グレーで描いた画面の濃淡を、そのまま青の濃淡に置き換える。
- *  白と黒はそのまま。4 段階のグレーは明るさをそろえた青（OKLab の明度をそろえ、P型・D型・T型の色覚でも灰色と見分けられる色相）になるので、文字のコントラストは変わらない */
 const RAMP_STEPS: [number, string][] = [
   [0x00, "oklch(0 0 0)"],
   [0x53, "oklch(0.4415 0.11 245)"],
@@ -230,7 +207,6 @@ const RAMP_STEPS: [number, string][] = [
 ];
 
 function rampFilter(): string {
-  // OKLCH の指定を sRGB（0〜255 の実数）に直す。SVG フィルターの表は sRGB で持つため
   const toRgb = (oklch: string): [number, number, number] => {
     const [L, C, H] = oklch.match(/oklch\(([^)]*)\)/)![1].split(/\s+/).map(Number);
     const a = C * Math.cos((H * Math.PI) / 180);
@@ -249,7 +225,6 @@ function rampFilter(): string {
     }) as [number, number, number];
   };
   const steps = RAMP_STEPS.map(([g, c]) => [g, toRgb(c)] as const);
-  // グレーの値（0〜255）ごとに、隣り合う段のあいだを直線で結んだ表をつくる
   const table = (ch: number) =>
     Array.from({ length: 256 }, (_, v) => {
       const i = steps.findIndex(([g]) => g >= v);
@@ -270,15 +245,10 @@ function rampFilter(): string {
     </svg>`;
 }
 
-// ---------------------------------------------------------------------------
-// 描画
-// ---------------------------------------------------------------------------
-
 function setRegion(name: string, html: string): void {
   const el = app.querySelector(`[data-region="${name}"]`);
   if (!el || cache.get(el) === html) return;
   cache.set(el, html);
-  // 入力中の値とフォーカスを引き継ぐ
   const values = new Map<string, string>();
   el.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-key]").forEach((i) => values.set(i.dataset.key!, i.value));
   const active = document.activeElement as HTMLInputElement | null;
@@ -304,13 +274,10 @@ function setRegion(name: string, html: string): void {
   }
 }
 
-/** 登録した行を一瞬目立たせる時間 */
 const FLASH_MS = 900;
-/** 明細ごとの最後に見た数量（レジ:明細番号 → 数量）。新しい行や数量の変わった行を光らせる */
 const seenQty = new Map<string, number>();
 const flashUntil = new Map<string, number>();
 
-/** 新しい動きがあったレジ（登録画面を一番上まで戻して、動いた行を見せる） */
 const movedRegs = new Set<number>();
 
 function trackFlashes(): void {
@@ -328,7 +295,6 @@ function trackFlashes(): void {
       }
     }
   }
-  // 取引が終わると明細番号は振り直されるので、消えた行は忘れる
   for (const k of seenQty.keys()) if (!present.has(k)) seenQty.delete(k);
   flashing.clear();
   for (const [k, t] of flashUntil) {
@@ -339,19 +305,16 @@ function trackFlashes(): void {
 
 function render(): void {
   trackFlashes();
-  // 明細が表示エリアをはみ出してスクロールしていても、動きのあった行（一番上）が見えるように戻す
   for (const reg of movedRegs) {
     app.querySelectorAll<HTMLElement>(`[data-drop^="${reg}:"] .screen-main`).forEach((el) => (el.scrollTop = 0));
   }
   movedRegs.clear();
   for (const r of snap.registers) {
-    // 店員ログインのセレクタは、操作中でなければ現在のログイン状態に合わせる
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);
     if (sel && document.activeElement !== sel) {
       const acc = r.staff.state === "absent" ? undefined : snap.accounts.find((a) => a.name === r.staff.name);
       sel.value = acc?.barcode ?? "";
     }
-    // 呼び出し中はレジ画面のヘッダー自体が点滅する。放置時間は点滅の速さではなく色（淡いグリーン→淡いレッド）で表す
     const waitMs = r.lamp ? (r.call_waiting_ms ?? 0) : 0;
     const t = Math.min(1, waitMs / CALL_FULL_MS);
     for (const side of ["staff", "customer"] as const) {
@@ -366,29 +329,22 @@ function render(): void {
         head.removeAttribute("title");
       }
     }
-    // もう一方が触れている一瞬（またはお客様側に限られる場面）は、この画面の操作が利かない
     for (const side of ["staff", "customer"] as const) {
-      // 数量を打ち込んでいる明細がなくなった・会計に進んだら、テンキーを閉じる
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.staff.phase !== "registering" || !r.staff.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
       const items = itemsPanel(r, snap, ffUi(r.id), side);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
-      // 色を載せるのは操作できる面だけ。有人モードのお客様側は見るだけ（押せるのはお客様本人のボタンだけ）なのでグレー
       const operable = r.active_side !== null ? r.active_side === side : r.mode !== "attended" || side === "staff";
       el?.classList.toggle("operable", operable);
-      // モバイルの切り替えタブも、操作できる面のタブだけ青にする
       app.querySelector(`[data-swipe-to="${r.id}:${side}"]`)?.classList.toggle("operable", operable);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
-      // レジ画面のヘッダー（稼働モードのバッジ・時刻・ベル。有人モードの店員側ではバッジが店舗メニューを開く）
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side));
       setRegion(`items-${r.id}-${side}`, items);
-      // 打ち込んでいる入力欄が画面から消えたら（手続きが進んだ・戻ったなど）、テンキーを閉じる
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
-      // 出金の画面を離れたら、入れかけの金額と店舗パスワードを消す（パスワードを残さない）
       if (side === "staff" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {
         padValue.delete(padValueKey(r.id, "mamt"));
         padValue.delete(padValueKey(r.id, "mpw"));
@@ -396,9 +352,6 @@ function render(): void {
       setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side));
       el?.classList.toggle("no-items", !items);
     }
-    // モバイルモード：操作する面（アクティブ面）が変わったら、その面を表にする。
-    // セミセルフはお客様側、有人は店員側、店舗メニューはスタッフ側。
-    // 有人モードで触れている一瞬だけ変わる操作側には付いていかない。表にした後もスワイプで切り替えられる
     const face: Side = r.menu ? "staff" : r.mode === "attended" ? "staff" : "customer";
     if (face !== activeShown.get(r.id)) {
       activeShown.set(r.id, face);
@@ -415,7 +368,6 @@ function render(): void {
           : ""
       }`,
     );
-    // 両方の画面に同じ内容を出す（呼び出しの表示だけは側ごとに出し分ける）
     const staffMain = sharedScreen(r, snap, "staff");
     const custMain = sharedScreen(r, snap, "customer");
     setRegion(`staff-${r.id}`, staffMain);
@@ -424,16 +376,11 @@ function render(): void {
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
     );
-    // おつりなど、出金ボックスにお金があれば枠と文字を点滅させる
     app.querySelector(`[data-outlet="${r.id}"]`)?.classList.toggle("blink", r.outlet > 0);
-    // 入金ボックス（現金。スタッフ側）と決済端末（キャッシュレス。お客様側）：支払方法が決まったら枠を点滅させる。
-    // 現金は投入額を積み上げて見せる
     const inlet = app.querySelector<HTMLElement>(`[data-inlet="${r.id}"]`);
     const reader = app.querySelector<HTMLElement>(`[data-reader="${r.id}"]`);
     const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null && r.emoney_partial === null;
-    // 電子マネーのチャージ・残高確認の間は、その手続きの案内を出す
     const emoney = r.menu ? null : r.emoney;
-    // 「不足額を現金で払う」では、案内を確認したあとで電子マネーをかざしてもらう
     const partial = !r.menu && r.emoney_partial !== null && r.emoney_partial_ok;
     const cashPay = paying && r.staff.method === "cash";
     const cashlessPay = (paying && r.staff.method !== "cash") || partial;
@@ -459,15 +406,12 @@ function render(): void {
 }
 
 
-// FF タブとページ（画面の表示だけの状態なので、レジごとに UI 側で持つ）
 const ffTabs = new Map<number, FfUi>();
 const ffUi = (reg: number): FfUi => ffTabs.get(reg) ?? { tab: FF_TABS[0][0], page: 0 };
 
 function frame(): void {
   sim.tick(performance.now() - t0);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
-  // MAT が鳴動中の間だけ鳴らす（お客様が呼び出しボタンに触れている間。順番待ちにはしない）。
-  // 音量は最も長く待たせている呼び出しで決まる
   setMatRinging(
     snap.mats.some((m) => m.buzzing),
     Math.max(0, ...snap.registers.map((r) => r.ring_volume)),
@@ -475,10 +419,6 @@ function frame(): void {
   render();
   app.querySelectorAll<HTMLElement>("[data-hold]").forEach((b) => b.classList.toggle("pressing", b.dataset.hold === held?.cmd));
 }
-
-// ---------------------------------------------------------------------------
-// 呼び出しボタン：触れている間だけ鳴る。離す・指が外れる・画面を離れると止まる
-// ---------------------------------------------------------------------------
 
 const activeShown = new Map<number, Side>();
 
@@ -511,7 +451,6 @@ function toast(where: string, text: string, error: boolean): void {
   );
 }
 
-/** 連続値のテンキーの一打ち。桁数は対象ごとの上限まで、小数点は重さだけ一つ。「決定」で値を送る */
 function padKey(key: string, k: string): void {
   const e = padEntry.get(key);
   if (!e) return;
@@ -524,22 +463,18 @@ function padKey(key: string, k: string): void {
     const side = key.split(":")[1];
     if (e.target === "inlet") {
       const r = snap.registers.find((x) => x.id === register);
-      // 店舗メニューの入金・両替は、打ち込んだ金額をそのまま入れる
       if (r?.menu) {
         if (value <= 0 || !send({ type: "insert", register, amount: value })) return;
       } else {
-        // お会計：打ち込んだ分を入れてから、投入を終えて決済する（何も打たずに決定すると、入れた分で投入を終える）
         if (value > 0 && !send({ type: "insert", register, amount: value })) return;
         send({ type: "finish_insert", register });
       }
     } else if (e.target === "ffv") {
-      // お渡し数：入れたその場で注文数と照合する（判定ボタンはない）
       if (e.digits === "") return;
       const ffKey = `${register}:${side}:${e.line}`;
       ffvInput.set(ffKey, String(value));
       send({ type: "check_ff", register, side, line_id: e.line!, handed: value });
     } else {
-      // 入力欄に入れるだけ。送るのは画面の「決定」「判定」
       if (e.digits === "" || (!d.code && value <= 0)) return;
       padValue.set(padValueKey(register, e.target, e.line), d.code ? e.digits : String(value));
     }
@@ -548,14 +483,12 @@ function padKey(key: string, k: string): void {
     if (d.decimal && !e.digits.includes(".") && e.digits.replace(".", "").length < d.max) e.digits = (e.digits || "0") + ".";
   } else if (/^[0-9]$/.test(k) && e.digits.replace(".", "").length < d.max) {
     const next = e.digits + k;
-    // 小数は第 1 位まで。整数の先頭の 0 は打てない
     if (/\.\d{2}$/.test(next)) return;
     e.digits = next.includes(".") || d.code ? next : next.replace(/^0+/, "");
   }
   frame();
 }
 
-/** テンキーの一打ち。数字は 2 桁まで（買い物点数の上限が 10 点のため）。「決定」で数量を置き換える */
 function qtyKey(key: string, k: string): void {
   const e = qtyEntry.get(key);
   if (!e) return;
@@ -573,8 +506,6 @@ function qtyKey(key: string, k: string): void {
 function send(cmd: Command): boolean {
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
-  // レジ画面には覆い隠すメッセージを出さない（登録した行が一瞬色を変えて知らせる）。
-  // 知らせを出すのは、レジ画面の外（年確ルールの設定・店舗全体の操作）だけ
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {
@@ -582,27 +513,18 @@ function send(cmd: Command): boolean {
     } else toast(where, res.error ?? "操作できません", true);
   }
   if (!res.ok) {
-    // 買い物点数の上限は表示エリアに合わせたシミュレーターだけの制約（実際のシステムでは起きない）
     if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
-    // 販売個数の上限はオーナーが決めた売り方なので、登録できない理由をその場で知らせる
     if (res.error?.includes("1回のお会計で")) setTimeout(() => alert(res.error), 0);
   }
-  // 荷物の受付は、決定を押しても進めない理由を入力画面に出す（レジ画面にはトーストを出さないため）
   if (cmd.type.startsWith("parcel_")) {
     if (res.ok) parcelError.delete(Number(cmd.register));
     else parcelError.set(Number(cmd.register), res.error ?? "受け付けられません");
   }
-  // スキャナーと FF 登録の音（読めたら「ピッ」、受け付けられなければ「ブッブー」）
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok ? beepScan : beepError)();
   frame();
   return res.ok;
 }
 
-// ---------------------------------------------------------------------------
-// イベント（委譲。描き直しでボタンが入れ替わっても取りこぼさない）
-// ---------------------------------------------------------------------------
-
-// 使い方の説明：Item・Wallet のボタンにカーソルを重ねると、少し遅れて出す（画面の外にはみ出さない位置に置く）
 const hoverTip = document.createElement("div");
 hoverTip.className = "hover-tip";
 hoverTip.setAttribute("role", "tooltip");
@@ -642,7 +564,6 @@ document.addEventListener("pointerout", (e) => {
 document.addEventListener("pointerdown", hideHint, true);
 window.addEventListener("scroll", hideHint, true);
 
-// 両方の画面に同じ入力欄があるので、押したボタンのある画面（操作している側）の欄を読む
 let scope: ParentNode = app;
 const val = (key: string): string => scope.querySelector<HTMLInputElement>(`[data-key="${key}"]`)?.value.trim() ?? "";
 
@@ -672,7 +593,6 @@ function form(b: HTMLElement): void {
       if (send({ type: "check_id", register: reg, side: "staff", birth: padValue.get(padValueKey(reg, "birth")) ?? "", today: isoDate(new Date()) })) padValue.delete(padValueKey(reg, "birth"));
       break;
     case "cashout":
-      // パスワードは成否にかかわらず送ったら消す（次の出金でもまた入れる）。金額は出金できたときだけ消す
       if (
         send({
           type: "cash_out",
@@ -691,8 +611,6 @@ function form(b: HTMLElement): void {
 
 app.addEventListener("input", (e) => {
   const el = e.target as HTMLInputElement;
-  // 生年月日：西暦 8 桁。全角の数字は半角に直す
-  // 払込票の確認：事業者・金額が合っていれば一枚ずつチェックを入れる（外すこともできる）
   if (el.dataset.billCheck) {
     const [reg, side, line] = el.dataset.billCheck.split(":");
     send({ type: "check_bill", register: Number(reg), side, line_id: Number(line), checked: el.checked });
@@ -708,7 +626,6 @@ app.addEventListener("change", (e) => {
     return;
   }
   if (sel.dataset.ffcheck) {
-    // 単品の FF の照合：チェックを入れた＝1 つお渡しした。その場で注文数（1）と照合する
     const box = sel as unknown as HTMLInputElement;
     const [reg, side] = box.dataset.ffreg!.split(":");
     if (!box.checked) return;
@@ -718,7 +635,6 @@ app.addEventListener("change", (e) => {
     return;
   }
   if (sel.dataset.collect) {
-    // 回収リストのチェック。画面の中だけで持ち、全部入ると「回収しました」が押せる
     const box = sel as unknown as HTMLInputElement;
     const [reg, i] = box.dataset.collect!.split(":").map(Number);
     const set = collected.get(reg) ?? new Set<number>();
@@ -736,7 +652,6 @@ app.addEventListener("change", (e) => {
   if (sel.dataset.taxRate && ownerAuth) {
     const rate = Number((sel as unknown as HTMLInputElement).value);
     const ok = Number.isFinite(rate) && send({ type: "set_tax_rate", ...ownerAuth, class_id: sel.dataset.taxRate, rate_bp: Math.round(rate * 100) });
-    // 認められなかったら表示を元の税率に戻す
     if (!ok) (sel as unknown as HTMLInputElement).value = (sel as unknown as HTMLInputElement).defaultValue;
     return;
   }
@@ -752,7 +667,6 @@ app.addEventListener("change", (e) => {
       code: sel.dataset.age,
       min_age: sel.value ? Number(sel.value) : null,
     });
-    // 認められなかったら表示を元の設定に戻す
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
@@ -775,7 +689,6 @@ app.addEventListener("change", (e) => {
 
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
-// 商品ルール設定：開くときにオーナー認証し、閉じるまでの変更はその認証で送る（コアは操作のたびにも検証する）
 const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
 let ownerAuth: { owner_id: string; password: string } | null = null;
 let rulesTab: RulesTab = "age";
@@ -789,10 +702,8 @@ function lockRules(): void {
   render();
 }
 
-// ブラウザは操作があるまで音を出せないので、最初のタッチ・キー入力で音を準備する
 document.addEventListener("pointerdown", unlockAudio, { capture: true });
 document.addEventListener("keydown", unlockAudio, { capture: true });
-// どのボタン（タブも）も、押した瞬間に同じ音を鳴らす。見た目は CSS の :active（わずかな位置のずれ）だけ
 document.addEventListener(
   "pointerdown",
   (e) => {
@@ -801,7 +712,6 @@ document.addEventListener(
   },
   { capture: true },
 );
-// テンキー（数量・長さ・重さ・入金）は、キーボードの数字・小数点・Backspace・Enter・Esc でも打てる（入力欄で打っているときは除く）
 document.addEventListener("keydown", (e) => {
   if ((!qtyEntry.size && !padEntry.size) || e.isComposing || (e.target as HTMLElement).closest?.("input, select, textarea")) return;
   const k = /^[0-9.]$/.test(e.key) ? e.key : e.key === "Backspace" ? "back" : e.key === "Enter" ? "ok" : e.key === "Escape" ? "cancel" : null;
@@ -810,11 +720,9 @@ document.addEventListener("keydown", (e) => {
   if (qtyEntry.size) qtyKey([...qtyEntry.keys()].at(-1)!, k);
   else padKey([...padEntry.keys()].at(-1)!, k);
 });
-// iOS は pointerdown では音を出す準備ができないので、指を離したときにも準備する
 document.addEventListener("touchend", unlockAudio, { capture: true });
 
 app.addEventListener("click", (e) => {
-  // テンキーのポップアップの外側（暗くした部分）を押すと、打ち込みをやめる
   const backdrop = (e.target as HTMLElement).dataset?.qtypadBackdrop;
   if (backdrop) return qtyKey(backdrop, "cancel");
   const padBackdrop = (e.target as HTMLElement).dataset?.padBackdrop;
@@ -856,7 +764,6 @@ app.addEventListener("click", (e) => {
     send({ type: "take_outlet", register: Number(b.dataset.outlet) });
     return;
   }
-  // 取引中止：確認画面を開く・閉じる（決めるのは確認画面の「はい」だけ）
   if (b.dataset.voidAsk) {
     const [reg, side] = b.dataset.voidAsk.split(":");
     const r = Number(reg);
@@ -868,7 +775,6 @@ app.addEventListener("click", (e) => {
     return frame();
   }
   if (b.dataset.guide) {
-    // 初期画面の案内ボタン：もう一度押すと閉じる
     const [reg, side, kind] = b.dataset.guide.split(":");
     const key = `${reg}:${side}`;
     if (scanGuide.get(key) === kind) scanGuide.delete(key);
@@ -876,20 +782,17 @@ app.addEventListener("click", (e) => {
     frame();
     return;
   }
-  // FF の「お渡し前」：お渡し照合の画面を開く（登録画面を置き換える）
   if (b.dataset.ffverify) {
     ffVerifying.add(b.dataset.ffverify);
     frame();
     return;
   }
-  // バック：商品登録に戻る（照合の途中でも）。入力した数は消す
   if (b.dataset.ffverifyClose) {
     ffVerifying.delete(b.dataset.ffverifyClose);
     for (const k of [...ffvInput.keys()]) if (k.startsWith(`${b.dataset.ffverifyClose}:`)) ffvInput.delete(k);
     frame();
     return;
   }
-  // 数量のボタン：テンキーで新しい数量を打ち込む（もう一度押すとやめる）
   if (b.dataset.qtyentry) {
     const [reg, side, id] = b.dataset.qtyentry.split(":");
     const key = `${reg}:${side}`;
@@ -901,7 +804,6 @@ app.addEventListener("click", (e) => {
     frame();
     return;
   }
-  // 連続値のテンキーを開く（荷物の長さ・重さ、入金ボックス）。もう一度押すとやめる
   if (b.dataset.padopen) {
     const [reg, s0, target, line] = b.dataset.padopen.split(":");
     const side = s0;
@@ -928,11 +830,6 @@ app.addEventListener("click", (e) => {
   else if (b.dataset.form) form(b);
 });
 
-// ---------------------------------------------------------------------------
-// ドラッグ＆ドロップ（ポインターイベントで実装。マウスでもタッチでも同じに動く）
-// ---------------------------------------------------------------------------
-
-// 決済端末の中の文字（支払方法ごと）
 const READER_HINT: Record<string, string> = {
   emoney: "電子マネーをかざす",
   qr: "バーコードをかざす",
@@ -942,7 +839,6 @@ const READER_HINT: Record<string, string> = {
 
 function setupDrag(): void {
   const ghost = document.getElementById("ghost")!;
-  // code：レジで読むもの（商品・ポイントカード）、wallet：お金（cash:金額）とかざす決済（pay:方法）
   let drag: { code?: string; wallet?: string; label: string; x: number; y: number; moved: boolean; id: number } | null = null;
 
   const target = (x: number, y: number): Element | null => document.elementFromPoint(x, y)?.closest("[data-drop], [data-cash-drop], [data-pay-drop]") ?? null;
@@ -967,7 +863,6 @@ function setupDrag(): void {
       ghost.textContent = drag.label;
       ghost.hidden = false;
       document.body.classList.add("dragging");
-      // お金・決済は入金ボックスにも落とせる
       document.body.classList.toggle("dragging-wallet", !!drag.wallet);
     }
     ghost.style.transform = `translate(${e.clientX + 8}px, ${e.clientY + 8}px)`;
@@ -984,15 +879,12 @@ function setupDrag(): void {
     }
     if (!t) return;
     const el = t as HTMLElement;
-    // 入金ボックスの周りはスタッフ側、決済端末の周りはお客様側として扱う
     const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "staff" : "customer"];
     const register = Number(reg);
-    // ポイント利用を選んだあとは、ポイントカード・アプリを決済端末にかざすと決済になる
     const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
     if (d.code?.startsWith("PC") && el.dataset.payDrop && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
     if (d.code) return void send({ type: "scan", register, side, code: d.code });
     const [kind, value] = d.wallet!.split(":");
-    // 現金はスタッフが預かって入金ボックスへ。キャッシュレスはお客様がお客様側の決済端末にかざす
     if (kind === "cash") {
       if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
       send({ type: "insert", register, amount: Number(value) });
@@ -1012,7 +904,6 @@ function setupDrag(): void {
   });
   window.addEventListener("pointermove", (e) => {
     if (!held || e.pointerId !== held.pointer) return;
-    // 指がボタンから外れたら離したのと同じ
     const over = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-hold]");
     if (over?.dataset.hold !== held.cmd) release();
   });
@@ -1026,7 +917,6 @@ function setupDrag(): void {
   app.addEventListener("contextmenu", (e) => {
     if ((e.target as Element).closest("[data-hold]")) e.preventDefault();
   });
-  // キーボード：Space / Enter を押している間
   app.addEventListener("keydown", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-hold]");
     if (!b || e.repeat || (e.key !== " " && e.key !== "Enter")) return;
@@ -1038,20 +928,11 @@ function setupDrag(): void {
   });
 }
 
-// ---------------------------------------------------------------------------
-// モバイルモード（画面の小さい端末）：Item・Wallet の欄は出さず、レジ画面を長押しすると Item の商品を、
-// 入金ボックスを長押しすると Wallet の決済方法（お金・カード）を選べる。選んだものは、その画面のスキャナー
-// （お金・決済はそのレジの入金ボックス）で読む。店員側とお客様側の画面はスワイプで切り替える
-// ---------------------------------------------------------------------------
-
 const MOBILE = window.matchMedia("(max-width: 760px)");
 const isMobile = (): boolean => MOBILE.matches;
-/** 長押しとみなす時間 */
 const LONG_PRESS_MS = 500;
 let longPress: { timer: number; x: number; y: number; id: number } | null = null;
-/** 長押しのあとの指を離したクリックは、下にあるボタンに届けない */
 let swallowClick = false;
-/** 長押しで開いた選択画面の行き先 */
 let pickFor: { register: number; side: Side; kind: "item" | "wallet" } | null = null;
 
 const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg") as HTMLDialogElement;
@@ -1061,7 +942,6 @@ function openPicker(register: number, side: Side, kind: "item" | "wallet"): void
   const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の${side === "staff" ? "入金ボックス（現金）" : "決済端末（かざす）"}`;
   document.getElementById("picker-title")!.textContent = title;
   const body = document.getElementById("picker-body")!;
-  // レジ画面の長押しは、商品の棚のオプションの下にポイント・クーポンの棚も並べる（モバイル専用の見せ方）
   body.innerHTML = kind === "item" ? shelfPanel(snap, readableCardsShelves()) : walletPanel(snap.emoney_balance);
   pickerDlg().showModal();
 }
@@ -1092,7 +972,6 @@ function syncSwipeTabs(reg: number): void {
     b.classList.toggle("on", on);
     b.setAttribute("aria-selected", String(on));
   });
-  // 入金・出金ボックスはスタッフ側、決済端末はお客様側の機器なので、モバイルでは見ている面のものだけ出す（CSS）
   const io = app.querySelector(`[data-swipe="${reg}"]`)?.parentElement?.querySelector(".money-io");
   io?.classList.toggle("face-staff", side === "staff");
   io?.classList.toggle("face-customer", side === "customer");
@@ -1103,17 +982,11 @@ function cancelLongPress(): void {
   longPress = null;
 }
 
-/**
- * 店舗メニュー：スタッフ側の画面のヘッダーを右にスワイプすると開き、左にスワイプすると閉じる。
- * ヘッダーの上の横の指の動きは画面の切り替え（モバイル）にしない（CSS の touch-action: pan-y）。
- * マウスでも、ヘッダーを左右へドラッグすれば同じ
- */
 const MENU_SWIPE_PX = 40;
 function wireMenuSwipe(): void {
   let start: { reg: number; x: number; y: number; id: number } | null = null;
   app.addEventListener("pointerdown", (e) => {
     const head = (e.target as Element).closest<HTMLElement>(".staff-screen .screen-head");
-    // 呼び鈴（押している間鳴る）から始めた指の動きは、呼び鈴の操作として扱う
     if (!head || e.button !== 0 || (e.target as Element).closest("[data-hold]")) return;
     const reg = Number(head.dataset.region!.split("-")[1]);
     start = { reg, x: e.clientX, y: e.clientY, id: e.pointerId };
@@ -1127,7 +1000,6 @@ function wireMenuSwipe(): void {
     if (Math.abs(dx) < MENU_SWIPE_PX || Math.abs(dy) > Math.abs(dx) / 2) return;
     const r = snap.registers.find((v) => v.id === reg);
     if (!r || !storeMenuUsable(r)) return;
-    // 右：開く、左：閉じる
     if (dx > 0 && !r.menu) send({ type: "open_menu", register: reg, screen: "top" });
     if (dx < 0 && r.menu) send({ type: "open_menu", register: reg, screen: null });
   };
@@ -1145,12 +1017,10 @@ function wireSwipe(): void {
   app.querySelectorAll<HTMLElement>("[data-swipe]").forEach((el) => {
     el.addEventListener("scroll", () => syncSwipeTabs(Number(el.dataset.swipe)), { passive: true });
   });
-  // 長押し：レジ画面なら Item、入金ボックスなら Wallet
   app.addEventListener("pointerdown", (e) => {
     if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
     const t = e.target as Element;
     const inlet = t.closest<HTMLElement>("[data-inlet], [data-reader]");
-    // 最上部（呼び鈴など）と最下段（FF・サービス・たばこ）は長押しで操作するボタンがあるので対象外
     const screen = t.closest(".screen-head, .screen-items") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;
     cancelLongPress();
@@ -1180,12 +1050,10 @@ function wireSwipe(): void {
     },
     true,
   );
-  // 長押しを離したときの click が出ない端末もあるので、次に触れた時点で打ち消しをやめる
   window.addEventListener("pointerdown", () => (swallowClick = false), true);
   app.addEventListener("contextmenu", (e) => {
     if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-reader]")) e.preventDefault();
   });
-  // 選択画面：タップで選ぶ（指で縦にスクロールできるよう、ドラッグはしない）
   const dlg = pickerDlg();
   dlg.addEventListener("click", (e) => {
     const t = e.target as Element;

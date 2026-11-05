@@ -52,7 +52,6 @@ describe("view helpers", () => {
     for (const h of ["事業者", "金額", "バーコード番号", "確認"]) expect(html).toContain(`>${h}<`);
     expect(html).toContain("9100 2222 3333 4444");
     expect(html).not.toContain(">枚数<");
-    // 同じ事業者でもまとめず、一枚ずつ
     expect(html.match(/電気料金/g)?.length).toBe(4);
     expect(html).toContain('type="checkbox" checked data-bill-check="1:staff:1"');
     expect(html).toContain('type="checkbox"  data-bill-check="1:staff:3"');

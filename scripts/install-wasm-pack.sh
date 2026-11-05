@@ -1,10 +1,4 @@
 #!/usr/bin/env bash
-# Install wasm-pack in CI without depending on rustwasm.github.io's installer.
-#
-# The upstream installer is a thin wrapper around the GitHub release tarball and
-# has failed CI with transient HTTP 504 responses. This script downloads the
-# release archive directly with retries, then falls back to `cargo install` if
-# the archive remains unavailable.
 set -euo pipefail
 
 version="${WASM_PACK_VERSION:-0.13.1}"

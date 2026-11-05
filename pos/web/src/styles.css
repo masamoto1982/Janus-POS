@@ -786,6 +786,8 @@ body.dragging .drop-hint { display: inline; }
 /* 案内画面（確認画面・知らせ・お礼など、登録画面を置き換えるもの）も同じ背景にする。商品登録画面（明細）は白のまま */
 .screen { --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
   --guide-bg: radial-gradient(circle farthest-corner at 50% 50%, var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
+/* 操作する側（アクティブ）の画面は、同じグラデーションを淡い空色にする（待ち受け・案内画面とも）。表示のみの側はグレーのまま */
+.screen.operable { --sky: oklch(0.80 0.09 230); --glow: color-mix(in oklab, var(--cust-bg) 88%, var(--sky)); --dark: color-mix(in oklab, var(--cust-bg) 55%, var(--sky)); }
 .scan-welcome, .attended-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; background: var(--guide-bg); }
 /* 案内画面は登録領域の余白まで背景を広げる（上に合計の帯があれば帯の下から） */
 .confirm { isolation: isolate; }

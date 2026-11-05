@@ -885,7 +885,7 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
 }
 
 /**
- * 電子マネーのチャージ・残高確認の入口：レジ画面ヘッダーの、ハンバーガーと稼働モードの間に置くボタン。
+ * 電子マネーのチャージ・残高確認の入口：レジ画面ヘッダー右の、呼び鈴の左隣に置くボタン。
  * ヘッダーなので常に見え、商品登録画面をふさがない。押すのは操作する側（有人は店員側、セミセルフはお客様側）で、
  * もう一方の画面には押せない形で映す。セミセルフのお買い物の途中は、押すとスタッフを呼ぶ
  * （押している間鳴る。スタッフがログインした有人モードで手続きすれば、お客様は取引を終えずに済む）
@@ -1247,7 +1247,8 @@ function cashOnlyNote(r: RegisterView): string {
 }
 
 // ---------------------------------------------------------------------------
-// レジ画面のヘッダー：左に店舗メニューのハンバーガーと時刻、中央に稼働モード、右に呼び出しベル。
+// レジ画面のヘッダー：左に日時と稼働モード、右に電子マネーと呼び鈴。
+// 店舗メニューは、スタッフ側のヘッダーを右にスワイプして開き、左にスワイプして閉じる（main.ts の wireMenuSwipe）。
 //どちらが店員側・お客様側かは設置で自明なので画面には出さない
 // ---------------------------------------------------------------------------
 
@@ -1271,8 +1272,8 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
     !sos && r.mode === "attended"
       ? ""
       : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
-  // 左：店舗メニューのハンバーガー、中央：日時と稼働モード（日時が上）、右：電子マネーと呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
-  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}</span><span class="head-c"><time class="clock">${clockText(now)}</time>${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
+  // 左：日時と稼働モード（日時が上）、右：電子マネーと呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
+  return `<span class="head-l"><time class="clock">${clockText(now)}</time>${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1376,15 +1377,9 @@ const MENU_ITEMS: { screen: MenuScreen; cash: boolean }[] = [
   { screen: "ff_fresh", cash: false },
 ];
 
-/**
- * 店舗メニューの入口：スタッフ側の画面のヘッダーにあるハンバーガー。有人モードでログインしているときだけ押せる。
- * 開いている間は同じボタンで閉じる（開く所と閉じる所を同じにする）。お客様側の画面には出さない
- */
-function hamburger(r: RegisterView, side: Side): string {
-  if (side !== "staff") return "";
-  const usable = r.mode === "attended" && r.staff.state === "ready";
-  const open = !!r.menu;
-  return `<button type="button" class="hamburger" data-gear="${r.id}:staff" aria-label="レジ${r.id}の店舗メニュー"${open ? ' aria-expanded="true"' : ""}${usable ? "" : " disabled"} title="${usable ? (open ? "店舗メニューを閉じる" : "店舗メニュー（返品返金・両替・ジャーナル確認など）") : "スタッフがログインすると使えます"}">☰</button>`;
+/** 店舗メニューを開けるのは、スタッフ側の画面で、店員操作モードでログインしているときだけ */
+export function storeMenuUsable(r: RegisterView): boolean {
+  return r.mode === "attended" && r.staff.state === "ready" && !r.paused;
 }
 
 /** 一度に一つの画面だけを出す：一覧 → 各項目の画面 */

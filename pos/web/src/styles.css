@@ -783,9 +783,14 @@ body.dragging .drop-hint { display: inline; }
 
 /* 待ち受け画面の背景：画面中央の明るい点から、外へいくほど暗くなる円形グラデーション。
    両モードで同じ（主役はスキャンとご用件の案内。電子マネーの扇形は右下端にあるだけ）（P-31） */
-.scan-welcome, .attended-welcome { position: relative; --spot: 50% 50%; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px;
-  --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
-  background: radial-gradient(circle farthest-corner at var(--spot), var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
+/* 案内画面（確認画面・知らせ・お礼など、登録画面を置き換えるもの）も同じ背景にする。商品登録画面（明細）は白のまま */
+.screen { --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
+  --guide-bg: radial-gradient(circle farthest-corner at 50% 50%, var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
+.scan-welcome, .attended-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; background: var(--guide-bg); }
+/* 案内画面は登録領域の余白まで背景を広げる（上に合計の帯があれば帯の下から） */
+.confirm { isolation: isolate; }
+.confirm::before { content: ""; position: absolute; inset: -6px -12px -8px; z-index: -1; background: var(--guide-bg); pointer-events: none; }
+.screen-main > .confirm:first-child::before { top: -8px; }
 /* お客様側から店舗メニューを開くときの使い捨てパスワード（店員画面に大きく出し、お客様画面で入力する） */
 /* 使い方の説明（Item・Wallet のボタンにカーソルを重ねると出る）。画面に固定して置くので横スクロールを生まない */
 .hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }

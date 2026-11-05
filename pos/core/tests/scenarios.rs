@@ -2918,3 +2918,53 @@ fn ff_handover_cannot_be_confirmed_after_staff_logs_out() {
         }
     ));
 }
+
+fn same_after_reload(s: &Store) -> Store {
+    let saved = s.save_json();
+    let back = Store::load_json(&saved).unwrap_or_else(|e| panic!("load failed: {e}"));
+    assert_eq!(
+        serde_json::to_value(s.snapshot()).unwrap(),
+        serde_json::to_value(back.snapshot()).unwrap()
+    );
+    assert_eq!(saved, back.save_json());
+    back
+}
+
+#[test]
+fn saved_state_restores_every_register() {
+    let mut s = Store::new(7, 2, 3);
+    let set = json!({"type":"set_product_age","owner_id":"000","password":"9999","code":SANDWICH,"min_age":20});
+    ok(&mut s, set);
+    scan(&mut s, 2, "customer", BEER);
+    scan(&mut s, 2, "customer", TEA);
+    ok(&mut s, json!({"type":"checkout","register":2,"side":"customer"}));
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "staff", SANDWICH);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    advance(&mut s, 1500);
+    let mut back = same_after_reload(&s);
+
+    for st in [&mut s, &mut back] {
+        no_id_check(st, 1);
+        confirm_point(st, 1);
+        ok(st, json!({"type":"insert","register":1,"amount":1000}));
+        ok(st, json!({"type":"finish_insert","register":1}));
+        advance(st, 3000);
+    }
+    assert_eq!(
+        serde_json::to_value(s.snapshot()).unwrap(),
+        serde_json::to_value(back.snapshot()).unwrap(),
+        "restored store keeps running the same way"
+    );
+    same_after_reload(&back);
+}
+
+#[test]
+fn broken_or_old_saved_state_is_refused() {
+    assert!(Store::load_json("{").is_err());
+    let s = Store::new(1, 2, 1);
+    let mut v: Value = serde_json::from_str(&s.save_json()).unwrap();
+    v["schema"] = json!(0);
+    assert!(Store::load_json(&v.to_string()).is_err());
+}

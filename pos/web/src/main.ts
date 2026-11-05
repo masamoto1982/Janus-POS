@@ -59,17 +59,56 @@ function bytesFromB64(b64: string): Uint8Array {
 async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
-  reset(2, 3);
+  start();
   setupDrag();
+  window.addEventListener("pagehide", save);
   window.setInterval(frame, 100);
 }
 
-function reset(registers: number, mats: number): void {
-  sim?.free();
-  sim = new PosSimulator(Date.now() & 0xffff, registers, mats);
-  t0 = performance.now();
+const SAVE_KEY = "janus-pos-state";
+const SAVE_EVERY_MS = 1000;
+let lastSave = 0;
+let discarding = false;
+
+function restore(): PosSimulator | null {
+  try {
+    const saved = localStorage.getItem(SAVE_KEY);
+    return saved ? PosSimulator.restore(saved) : null;
+  } catch {
+    forget();
+    return null;
+  }
+}
+
+function save(): void {
+  if (discarding) return;
+  lastSave = performance.now();
+  try {
+    localStorage.setItem(SAVE_KEY, sim.save());
+  } catch {
+    return;
+  }
+}
+
+function forget(): void {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    return;
+  }
+}
+
+function start(): void {
+  sim = restore() ?? new PosSimulator(Date.now() & 0xffff, 2, 3);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
+  t0 = performance.now() - snap.now;
   buildSkeleton();
+  app.querySelector("[data-reset]")?.addEventListener("click", () => {
+    if (!confirm("保存されている状態を消して、最初からやり直しますか")) return;
+    discarding = true;
+    forget();
+    location.reload();
+  });
   wireSwipe();
   wireMenuSwipe();
   rulesDlg().addEventListener("close", lockRules);
@@ -146,6 +185,7 @@ function buildSkeleton(): void {
       <img class="logo" src="${logoUrl}" width="73" height="73" alt="Janus POS ロゴ" />
       <h1>Janus POS</h1>
       <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
+      <button type="button" class="neg small reset-btn" data-reset title="保存されている状態を消して最初からやり直す">リセット</button>
     </header>
     <article class="floor">
       <div class="left">
@@ -417,6 +457,7 @@ function frame(): void {
     Math.max(0, ...snap.registers.map((r) => r.ring_volume)),
   );
   render();
+  if (performance.now() - lastSave >= SAVE_EVERY_MS) save();
   app.querySelectorAll<HTMLElement>("[data-hold]").forEach((b) => b.classList.toggle("pressing", b.dataset.hold === held?.cmd));
 }
 
@@ -522,6 +563,7 @@ function send(cmd: Command): boolean {
   }
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok ? beepScan : beepError)();
   frame();
+  if (res.ok) save();
   return res.ok;
 }
 

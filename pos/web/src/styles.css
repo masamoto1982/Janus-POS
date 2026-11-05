@@ -382,6 +382,7 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .top h1 { font-size: 18px; margin: 0; }
 .top .logo { width: 73px; height: 73px; flex: none; }
 .build-badge { font-size: 12px; font-weight: 600; color: oklch(1 0 0); background: oklch(0.3717 0.0392 257); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
+.reset-btn { margin-left: auto; }
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
 .tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }

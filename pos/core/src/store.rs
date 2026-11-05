@@ -16,6 +16,8 @@ use crate::parcel::{self, Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 
+mod persist;
+
 pub const MAX_REGISTERS: u8 = 10;
 pub const MAX_MATS: u8 = 5;
 
@@ -80,7 +82,7 @@ impl MenuScreen {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Menu {
     pub screen: MenuScreen,
     pub exchange_to: u32,
@@ -134,7 +136,7 @@ pub enum ShortChoice {
 pub const EMONEY_MAX: u32 = 20_000;
 pub const EMONEY_INITIAL: u32 = 1_000;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 enum EmoneyTask {
     Menu,
     Inquiry { shown: bool },
@@ -528,14 +530,14 @@ fn done(msg: impl Into<String>) -> Result<Outcome, String> {
     })
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FfState {
     Waiting,
     Received,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LineKind {
     Item,
@@ -1038,7 +1040,7 @@ pub struct Store {
     emoney_balance: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 enum AgeMethod {
     Skip,
     Id,

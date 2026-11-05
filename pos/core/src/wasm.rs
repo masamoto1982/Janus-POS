@@ -17,6 +17,17 @@ impl PosSimulator {
         }
     }
 
+    pub fn restore(saved_json: &str) -> Result<PosSimulator, JsValue> {
+        console_error_panic_hook::set_once();
+        Store::load_json(saved_json)
+            .map(|store| PosSimulator { store })
+            .map_err(|e| JsValue::from_str(&e))
+    }
+
+    pub fn save(&self) -> String {
+        self.store.save_json()
+    }
+
     pub fn dispatch(&mut self, command_json: &str) -> String {
         crate::dispatch_json(&mut self.store, command_json)
     }

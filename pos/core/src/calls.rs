@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CallKind {
     AgeCheck,
@@ -51,7 +51,7 @@ pub struct ResolvedCall {
 
 #[derive(Clone, Debug, Default)]
 pub struct Calls {
-    next_id: u32,
+    pub(crate) next_id: u32,
     pub open: Vec<Call>,
     pub history: Vec<ResolvedCall>,
     pub raised: u64,

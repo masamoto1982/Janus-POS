@@ -46,7 +46,7 @@ impl Rounding {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaxClass {
     pub id: String,
     pub name: String,
@@ -87,7 +87,7 @@ pub struct TaxSettings {
     pub invoice_no: String,
     pub rounding: Rounding,
     #[serde(skip)]
-    next_id: u32,
+    pub(crate) next_id: u32,
 }
 
 impl Default for TaxSettings {

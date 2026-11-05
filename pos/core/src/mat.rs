@@ -7,15 +7,15 @@ pub const HEARTBEAT_MS: u64 = 2_000;
 pub const LINK_TIMEOUT_MS: u64 = 5_000;
 pub const MIN_RING_MS: u64 = 1_000;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Bell {
     pub seq: u64,
     pub held: usize,
     pub presses: u64,
 }
 
-#[derive(Clone, Debug)]
-struct Packet {
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
+pub(crate) struct Packet {
     bell: Bell,
     deliver_at: u64,
     lost_down: bool,
@@ -30,11 +30,11 @@ pub struct Mat {
     pub last_rx_at: u64,
     pub last_ack_at: u64,
     #[serde(skip)]
-    last_sent_at: Option<u64>,
+    pub(crate) last_sent_at: Option<u64>,
     #[serde(skip)]
-    last_sent_seq: u64,
+    pub(crate) last_sent_seq: u64,
     #[serde(skip)]
-    in_flight: Vec<Packet>,
+    pub(crate) in_flight: Vec<Packet>,
     pub sent: u64,
     pub retries: u64,
     pub offline: bool,

@@ -11,7 +11,7 @@ pub enum RuleTarget {
     Product { code: String },
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AgeRule {
     pub id: u32,
     pub target: RuleTarget,
@@ -20,7 +20,7 @@ pub struct AgeRule {
     pub legal: bool,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RuleChange {
     pub at: u64,
     pub by: String,
@@ -33,7 +33,7 @@ pub struct AgeRules {
     pub history: Vec<RuleChange>,
     pub limits: BTreeMap<String, u32>,
     #[serde(skip)]
-    next_id: u32,
+    pub(crate) next_id: u32,
 }
 
 fn label_of(target: &RuleTarget) -> String {

@@ -45,10 +45,10 @@ pub fn account(id: &str) -> Option<&'static StaffAccount> {
     ACCOUNTS.iter().find(|a| a.id == id)
 }
 
-#[derive(Clone, Debug, Default)]
-struct Guard {
-    failures: u32,
-    locked_until: u64,
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub(crate) struct Guard {
+    pub(crate) failures: u32,
+    pub(crate) locked_until: u64,
 }
 
 impl Guard {
@@ -79,8 +79,8 @@ impl Guard {
 
 #[derive(Clone, Debug, Default)]
 pub struct Authenticator {
-    owner: Guard,
-    store: Guard,
+    pub(crate) owner: Guard,
+    pub(crate) store: Guard,
 }
 
 fn constant_time_eq(a: &str, b: &str) -> bool {

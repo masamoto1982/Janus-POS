@@ -156,7 +156,7 @@ pub struct Parcel {
     pub fee: u32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Pickup {
     pub no: String,
     pub amount: u32,

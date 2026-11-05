@@ -11,7 +11,7 @@ pub fn is_valid_denomination(d: u32) -> bool {
     is_bill(d) || COINS.contains(&d)
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Cash(pub Vec<(u32, u32)>);
 
 impl Cash {

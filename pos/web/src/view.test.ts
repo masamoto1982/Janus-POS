@@ -59,8 +59,8 @@ describe("view helpers", () => {
     expect(html).toContain(`<span class="bill-n">3枚</span>`);
     expect(html).toContain("合計 13,000円");
     const pay = billPayCard(3);
-    expect(pay).toContain(`公共料金<span class="bill-n">3枚</span>を受け付けます。`);
-    expect(pay).toContain("現金でお支払いください。");
+    expect(pay).toContain(`公共料金<span class="bill-n">3枚</span>を受け付けます</div>`);
+    expect(pay).toContain("現金でお支払いください</p>");
   });
 
   it("shows the stamp-and-hand-over step after a utility bill payment", () => {

@@ -27,7 +27,7 @@ pub const MAX_MATS: u8 = 5;
 
 /// お渡し済みの FF の数量変更・取り消しは店員が行う（増やせばお渡し前に戻り、減らせば回収が要る）
 const FF_RECEIVED_SELF: &str =
-    "お渡し済みの FF の数量はスタッフが変更します。スタッフをお呼びください";
+    "お渡し済みの FF の数量はスタッフが変更します\nスタッフをお呼びください";
 const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現金でお支払いください";
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）";
@@ -45,13 +45,13 @@ const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取
 const PARCEL_SLIP_TO_REMOVE: &str =
     "宅配便を取り消すときは、取り消す荷物の伝票のバーコードを読み取ってください";
 const BILL_NO_REMOVE: &str =
-    "公共料金の払込票は取り消せません。お支払いをやめるときは取引中止にしてください";
+    "公共料金の払込票は取り消せません\nお支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
     "ポイントを使える商品がありません（宅配便・代金引換・公共料金・切手・たばこにはポイントを使えません）";
 const EMONEY_NO_CASH: &str =
-    "セルフレジでは現金を使えません。ほかの支払方法を選ぶか、スタッフをお呼びください";
+    "セルフレジでは現金を使えません\nほかの支払方法を選ぶか、スタッフをお呼びください";
 const EMONEY_NO_CHARGE: &str =
-    "お買い物の途中は電子マネーのチャージ・残高確認はできません。お会計のあとにどうぞ";
+    "お買い物の途中は電子マネーのチャージ・残高確認はできません\nお会計のあとにどうぞ";
 
 // ---------------------------------------------------------------------------
 // コマンド
@@ -1633,7 +1633,7 @@ impl Store {
                 self.check_active(register, Action::FfButton)?;
                 self.call(register, CallKind::FastFood, "FF のご注文");
                 self.press(register)?;
-                done("スタッフをお呼びしました。FF のご注文を伺います")
+                done("スタッフをお呼びしました\nFF のご注文を伺います")
             }
             C::CheckFf {
                 register,
@@ -1712,7 +1712,7 @@ impl Store {
                 pc.weight_g = weight_g;
                 pc.size = Some(size);
                 done(format!(
-                    "{size} サイズに決まりました。届け先の郵便番号を入力してください"
+                    "{size} サイズに決まりました\n届け先の郵便番号を入力してください"
                 ))
             }
             C::ParcelLength {
@@ -1947,7 +1947,7 @@ impl Store {
                 self.check(register, side, Action::BackToRegistering)?;
                 let r = self.reg_mut(register)?;
                 if r.txn.prepaid > 0 {
-                    return Err("一部お支払い済みです。残りをお支払いください".into());
+                    return Err("一部お支払い済みです\n残りをお支払いください".into());
                 }
                 r.txn.paying = false;
                 r.txn.method = None;
@@ -1962,7 +1962,7 @@ impl Store {
                 self.check(register, side, Action::SelectPayment)?;
                 let r = self.reg_mut(register)?;
                 if r.txn.inserted.total() > 0 && method != PaymentMethod::Cash {
-                    return Err("現金が投入済みです。現金でお支払いください".into());
+                    return Err("現金が投入済みです\n現金でお支払いください".into());
                 }
                 if let Some(why) = r.txn.method_refusal(method) {
                     return Err(why.into());
@@ -1977,7 +1977,7 @@ impl Store {
                     if method == PaymentMethod::Cash {
                         self.calls
                             .raise(register, CallKind::CashOnly, self.now, "現金でのお支払い");
-                        return done("スタッフをお呼びしました。現金はスタッフがお預かりします");
+                        return done("スタッフをお呼びしました\n現金はスタッフがお預かりします");
                     }
                     if no_cash_goods {
                         self.calls.resolve(register, CallKind::CashOnly, self.now);
@@ -1988,7 +1988,7 @@ impl Store {
                 if method == PaymentMethod::Points && r.txn.point_card.is_none() {
                     r.txn.point_checked = false;
                     return done(
-                        "ポイントカードが読まれていません。ポイントカードを読み取ってください",
+                        "ポイントカードが読まれていません\nポイントカードを読み取ってください",
                     );
                 }
                 done(format!("{}を選びました", method.label()))
@@ -2046,7 +2046,7 @@ impl Store {
                 let (_, c) = r.txn.coupons.remove(i);
                 r.txn.returned.push((c.name, unmatched));
                 done(format!(
-                    "{}を取り消しました。お客様に返却してください",
+                    "{}を取り消しました\nお客様に返却してください",
                     c.name
                 ))
             }
@@ -2136,7 +2136,7 @@ impl Store {
                     let due = r.txn.due();
                     self.emoney_balance -= drawn;
                     return done(format!(
-                        "電子マネーで {drawn}円 お支払いしました。残り {due}円を現金でお支払いください"
+                        "電子マネーで {drawn}円 お支払いしました\n残り {due}円を現金でお支払いください"
                     ));
                 }
                 self.check(register, Side::Customer, Action::TapEmoney)?;
@@ -2166,9 +2166,9 @@ impl Store {
                         r.txn.method = cash.then_some(PaymentMethod::Cash);
                         let rest = r.txn.due();
                         return done(if cash {
-                            format!("ポイントで {part}円 お支払いしました。残り {rest}円を現金でお支払いください")
+                            format!("ポイントで {part}円 お支払いしました\n残り {rest}円を現金でお支払いください")
                         } else {
-                            format!("ポイントで {part}円 お支払いしました。残り {rest}円のお支払い方法を選んでください")
+                            format!("ポイントで {part}円 お支払いしました\n残り {rest}円のお支払い方法を選んでください")
                         });
                     }
                 }
@@ -2195,7 +2195,7 @@ impl Store {
                     r.txn.method = Some(PaymentMethod::Cash);
                     let rest = r.txn.due();
                     return done(format!(
-                        "{}で {part}円 お支払いしました。残り {rest}円（現金のみの商品）を現金でお支払いください",
+                        "{}で {part}円 お支払いしました\n残り {rest}円（現金のみの商品）を現金でお支払いください",
                         method.label()
                     ));
                 }
@@ -2228,7 +2228,7 @@ impl Store {
                 if r.mode == Mode::SemiSelf && kind == EmoneyKind::Charge {
                     r.emoney = None;
                     self.call(register, CallKind::Emoney, "チャージ");
-                    return done("チャージはスタッフがお手伝いします。スタッフをお呼びしました");
+                    return done("チャージはスタッフがお手伝いします\nスタッフをお呼びしました");
                 }
                 // 選ぶ画面からは、チャージ・残高確認に進める
                 if r.emoney
@@ -2262,7 +2262,7 @@ impl Store {
                         let back = inserted.total();
                         r.outlet.merge(&inserted);
                         done(format!(
-                            "チャージをやめました。{back}円を出金ボックスから取り出してください"
+                            "チャージをやめました\n{back}円を出金ボックスから取り出してください"
                         ))
                     }
                     Some(EmoneyTask::Charge { .. }) => done("チャージをやめました"),
@@ -2300,7 +2300,7 @@ impl Store {
                 match choice {
                     ShortChoice::Cancel => {
                         r.txn.method = None;
-                        done("電子マネーを使うのをやめました。お支払い方法を選んでください")
+                        done("電子マネーを使うのをやめました\nお支払い方法を選んでください")
                     }
                     ShortChoice::Cash => {
                         // すぐには引き落とさない：かざしたままの電子マネーで、案内を見ないうちに決済が走らないように
@@ -2352,7 +2352,7 @@ impl Store {
                 if t.method == Some(PaymentMethod::Points) {
                     t.method = None;
                 }
-                done("ポイントカードなしで進みます。お支払い方法を選んでください")
+                done("ポイントカードなしで進みます\nお支払い方法を選んでください")
             }
             C::ReleaseCall { register } => {
                 self.reg_mut(register)?.pressing = false;
@@ -2367,7 +2367,7 @@ impl Store {
                 let back = self.void_txn(register, now);
                 if back > 0 {
                     done(format!(
-                        "取引を中止しました。{back}円を出金ボックスから取り出してください"
+                        "取引を中止しました\n{back}円を出金ボックスから取り出してください"
                     ))
                 } else {
                     done("取引を中止しました")
@@ -2761,7 +2761,7 @@ impl Store {
             if r.txn.paying && !r.txn.point_checked {
                 r.txn.point_card = Some(no.clone());
                 r.txn.point_checked = true;
-                return done("ポイントカードを読みました。お支払い方法を選んでください");
+                return done("ポイントカードを読みました\nお支払い方法を選んでください");
             }
         }
         // 公共料金の払込票は、ほかの商品と一緒に登録できない（どちらを先に読んでも）
@@ -2812,7 +2812,7 @@ impl Store {
                     .is_some_and(|(_, _, u)| u.is_none());
                 done(if waiting {
                     format!(
-                        "{}を読みました。対象商品を登録すると値引きします{back}",
+                        "{}を読みました\n対象商品を登録すると値引きします{back}",
                         c.name
                     )
                 } else {
@@ -2952,7 +2952,7 @@ impl Store {
         if !pk.matches(no) {
             pk.wrong = Some(no.to_string());
             return Err(format!(
-                "番号が違います。この荷物はお渡しできません（お受け取りの荷物は {}）",
+                "番号が違います\nこの荷物はお渡しできません（お受け取りの荷物は {}）",
                 pk.no
             ));
         }
@@ -2967,7 +2967,7 @@ impl Store {
             l.set_pickup_found(Some(true));
         }
         self.calls.resolve(register, CallKind::Service, now);
-        done("照合しました。代金引換の金額をお預かりしてください")
+        done("照合しました\n代金引換の金額をお預かりしてください")
     }
 
     fn register_ff(
@@ -3030,7 +3030,7 @@ impl Store {
         );
         self.calls.resolve(register, CallKind::FastFood, now);
         done(format!(
-            "{} ×{qty} を登録しました。お渡ししたらチェックを入れてください",
+            "{} ×{qty} を登録しました\nお渡ししたらチェックを入れてください",
             p.name
         ))
     }
@@ -3068,7 +3068,7 @@ impl Store {
             r.txn.customer_turn = false;
         }
         if removed.is_empty() {
-            return done(format!("{age}歳です。年齢確認が済みました"));
+            return done(format!("{age}歳です\n年齢確認が済みました"));
         }
         let list = removed
             .iter()
@@ -3076,7 +3076,7 @@ impl Store {
             .collect::<Vec<_>>()
             .join("・");
         r.txn.confiscated.extend(removed);
-        done(format!("{age}歳です。販売できない{list}を取り除きました"))
+        done(format!("{age}歳です\n販売できない{list}を取り除きました"))
     }
 
     fn checkout(&mut self, register: u8, side: Side) -> Result<Outcome, String> {
@@ -3151,7 +3151,7 @@ impl Store {
         }
         if pending {
             done(format!(
-                "{}歳以上の年齢確認があります。スタッフ側の画面で年齢確認をするか選んでください",
+                "{}歳以上の年齢確認があります\nスタッフ側の画面で年齢確認をするか選んでください",
                 age.unwrap_or(0)
             ))
         } else {
@@ -3189,7 +3189,7 @@ impl Store {
         }
         inserted.merge(&c);
         done(format!(
-            "チャージ {}円。電子マネーをかざしてください",
+            "チャージ {}円\n電子マネーをかざしてください",
             inserted.total()
         ))
     }
@@ -3222,7 +3222,7 @@ impl Store {
                 self.emoney_balance += amount;
                 let now = self.emoney_balance;
                 done(if paying_emoney {
-                    format!("{amount}円チャージしました（残高 {now}円）。もう一度電子マネーをかざしてください")
+                    format!("{amount}円チャージしました（残高 {now}円）\nもう一度電子マネーをかざしてください")
                 } else {
                     format!("{amount}円チャージしました（残高 {now}円）")
                 })
@@ -3292,7 +3292,7 @@ impl Store {
             result: "実行".into(),
         });
         done(format!(
-            "{amount}円を {to}円×{} に両替しました。出金ボックスから取り出してください",
+            "{amount}円を {to}円×{} に両替しました\n出金ボックスから取り出してください",
             amount / to
         ))
     }
@@ -3312,7 +3312,7 @@ impl Store {
             return done(format!("{paid}円 投入（あと {}円）", total - paid));
         }
         done(format!(
-            "{paid}円 投入。{}秒の無操作で、お支払いを確定します",
+            "{paid}円 投入\n{}秒の無操作で、お支払いを確定します",
             INSERT_DONE_MS / 1000
         ))
     }
@@ -3363,7 +3363,7 @@ impl Store {
                     }
                 }
                 self.receipts -= 1;
-                return Err(format!("{e}。スタッフをお呼びください"));
+                return Err(format!("{e}\nスタッフをお呼びください"));
             }
         };
         // おつりは排出口に出る（お客様が取り出すまで残る）
@@ -3413,7 +3413,7 @@ impl Store {
             point_card: txn.point_card,
         };
         let msg = if receipt.change_total > 0 {
-            format!("お支払いが完了しました。おつり {}円", receipt.change_total)
+            format!("お支払いが完了しました\nおつり {}円", receipt.change_total)
         } else {
             "お支払いが完了しました".to_string()
         };
@@ -3509,7 +3509,7 @@ impl Store {
                 r.outlet.merge(&c);
                 log(self, "実行".into());
                 done(format!(
-                    "{} {amount}円を出金しました。出金ボックスから取り出してください",
+                    "{} {amount}円を出金しました\n出金ボックスから取り出してください",
                     kind.label()
                 ))
             }

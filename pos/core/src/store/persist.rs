@@ -133,7 +133,6 @@ struct SavedRegister {
     menu: Option<Menu>,
     paused: bool,
     touch: Option<(Side, u64)>,
-    pressing: bool,
     emoney: Option<EmoneyTask>,
 }
 
@@ -374,7 +373,6 @@ impl SavedRegister {
             menu: r.menu,
             paused: r.paused,
             touch: r.touch,
-            pressing: r.pressing,
             emoney: r.emoney.clone(),
         }
     }
@@ -415,7 +413,6 @@ impl SavedRegister {
             pressing: false,
             emoney: self.emoney,
         };
-        let _ = self.pressing;
         r.sync_mode();
         Ok(r)
     }

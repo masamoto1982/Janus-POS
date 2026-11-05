@@ -141,9 +141,9 @@ function buildSkeleton(): void {
           </select>
         </label>
       </h2>
-      <div class="swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
-        <button type="button" role="tab" class="on" data-swipe-to="${r.id}:staff">スタッフ側</button>
-        <button type="button" role="tab" data-swipe-to="${r.id}:customer">お客様側</button>
+      <div class="tabs swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
+        <button type="button" role="tab" class="tab on" aria-selected="true" data-swipe-to="${r.id}:staff">スタッフ側</button>
+        <button type="button" role="tab" class="tab" aria-selected="false" data-swipe-to="${r.id}:customer">お客様側</button>
       </div>
       <div class="screens" data-swipe="${r.id}">
         <div class="screen-wrap" data-wrap="${r.id}:staff">

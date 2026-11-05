@@ -165,12 +165,14 @@ button { touch-action: manipulation; }
 /* レジ画面：ヘッダー ＋ 上 4/5 が登録画面 ＋ 下 1/5 がバーコードなしアイテム欄（複数のレジと MAT を一画面に収める） */
 /* レジ画面は角を丸めない（2026-10-25 ユーザー） */
 .screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
-.screen-head { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; height: 51px; /* 窮屈なので 34px の 1.5 倍 */ padding: 0 4px; border-bottom: 1px solid var(--border); }
+.screen-head { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; height: 51px; /* 窮屈なので 34px の 1.5 倍 */
+  /* 左右の余白は、顧客操作モードの呼び出しボタン（FF・サービス・たばこ）の行の左右の余白と揃える（.screen-items の左右 6px ＋ .call-row の space-evenly の余り） */
+  padding: 0 calc(6px + max(0px, (100% - 12px - 3 * var(--btn-w) - 2 * var(--gap)) / 4)); border-bottom: 1px solid var(--border); }
 .screen-head .head-l { display: flex; align-items: center; gap: 8px; }
-.screen-head .head-c { justify-self: center; }
+.screen-head .head-c { justify-self: center; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }
 /* 稼働モードのバッジ：有人は濃いグレーの塗りに白文字、セミセルフは白地に濃いグレーの枠と文字。塗りの有無で一目で区別する */
-.screen-head .clock { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.screen-head .clock { font-size: 11px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 4 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 6px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }

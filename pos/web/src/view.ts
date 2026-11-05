@@ -1253,8 +1253,11 @@ function cashOnlyNote(r: RegisterView): string {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
+const WEEKDAY = ["日", "月", "火", "水", "木", "金", "土"];
+
+/** 「2026年11月5日 木曜日 09:21」 */
 export function clockText(d: Date): string {
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${WEEKDAY[d.getDay()]}曜日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
@@ -1268,8 +1271,8 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
     !sos && r.mode === "attended"
       ? ""
       : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
-  // 左：店舗メニューのハンバーガーと時刻、中央：稼働モード、右：呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
-  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}${emoneyHead(r, side)}</span><span class="head-c">${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r"><time class="clock">${clockText(now)}</time>${bell}</span>`;
+  // 左：店舗メニューのハンバーガー、中央：日時と稼働モード（日時が上）、右：電子マネーと呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
+  return `<span class="head-l">${r.paused ? "" : hamburger(r, side)}</span><span class="head-c"><time class="clock">${clockText(now)}</time>${r.paused ? "" : modeTitle(r.mode === "attended")}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
 }
 
 // ---------------------------------------------------------------------------

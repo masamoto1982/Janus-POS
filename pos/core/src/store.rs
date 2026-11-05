@@ -2387,7 +2387,7 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 r.staff = None;
                 r.menu = None;
-                done("ログアウトしました（セルフレジ）")
+                done("ログアウトしました（セルフ操作モード）")
             }
             C::CashOut {
                 register,
@@ -2731,9 +2731,9 @@ impl Store {
                 self.calls.resolve(register, k, now);
             }
             return done(match was {
-                _ if resumed => format!("{}さんがレジを再開しました（スタッフが対応します）", acc.name),
+                _ if resumed => format!("{}さんがレジを再開しました（スタッフ操作モード）", acc.name),
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),
-                _ => format!("{}さんがログインしました（スタッフが対応します）", acc.name),
+                _ => format!("{}さんがログインしました（スタッフ操作モード）", acc.name),
             });
         }
         self.check(register, side, Action::Scan)?;

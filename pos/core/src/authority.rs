@@ -34,8 +34,8 @@ pub enum Mode {
 impl Mode {
     pub fn label(self) -> &'static str {
         match self {
-            Mode::Attended => "スタッフが対応します",
-            Mode::SemiSelf => "セルフレジ",
+            Mode::Attended => "スタッフ操作モード",
+            Mode::SemiSelf => "セルフ操作モード",
         }
     }
 }

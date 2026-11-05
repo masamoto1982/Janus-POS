@@ -1178,14 +1178,17 @@ fn inlet_pays_and_change_waits_in_outlet() {
     let v = reg(&s, 1);
     assert_eq!(v.outlet, 1100 - 160);
     // 「ありがとうございました」は 3 秒で消え、新しいお客様の待ち受けに戻る。
-    // ただし排出口に釣り銭が残っている間は、取り出されるまで戻らない
+    // ただし排出口に釣り銭が残っている間は、取り出されるまで戻らない。
+    // 「ありがとうございました」の 3 秒は、釣り銭を取り出したときから数える
     assert!(v.last_receipt.is_some());
     let at = v.last_receipt.as_ref().unwrap().at;
-    s.tick(at + 3000);
+    s.tick(at + 5000);
     assert!(reg(&s, 1).last_receipt.is_some());
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).outlet, 0);
-    s.tick(at + 3001);
+    s.tick(at + 7999);
+    assert!(reg(&s, 1).last_receipt.is_some(), "thanks shows 3 s after the change is taken");
+    s.tick(at + 8000);
     assert!(reg(&s, 1).last_receipt.is_none());
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
 }
@@ -2451,6 +2454,11 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     let v = reg(&s, 1);
     assert!(!v.change_left && v.staff.calls.is_empty());
     advance(&mut s, 100);
+    assert!(
+        reg(&s, 1).last_receipt.is_some(),
+        "thanks for 3 s after the change is taken"
+    );
+    advance(&mut s, 3_000);
     assert!(
         reg(&s, 1).last_receipt.is_none(),
         "back to the initial screen"

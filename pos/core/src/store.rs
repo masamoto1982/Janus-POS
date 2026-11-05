@@ -2411,6 +2411,10 @@ impl Store {
                     return Err("出金ボックスにお金はありません".into());
                 }
                 r.outlet = Cash::default();
+                // 釣り銭を取り出したところから「ありがとうございました」を THANKS_MS 出す
+                if let Some(rc) = r.last_receipt.as_mut() {
+                    rc.at = now;
+                }
                 r.resume_idle_countdown(now);
                 self.calls.resolve(register, CallKind::ChangeLeft, now);
                 done(format!("{total}円を取り出しました"))

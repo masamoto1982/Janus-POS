@@ -166,6 +166,15 @@ function thanks(): string {
   return `<div class="thanks"><div class="big">ありがとうございました</div><div>お忘れ物にご注意ください</div></div>`;
 }
 
+/**
+ * 有人モードの現金決済でお釣りがあるとき、出金ボックスから抜き取られるまでの画面。
+ * 抜き取られると両画面とも「ありがとうございました」に変わる
+ */
+function changeDue(side: Side, amount: number): string {
+  const msg = side === "staff" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
+  return `<div class="thanks"><div class="big">${msg}</div></div>`;
+}
+
 /** 日付を YYYY-MM-DD で（レジの日付として生年月日の判定に使う） */
 export function isoDate(t: Date): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
@@ -486,10 +495,12 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   // セミセルフはキャッシュレス専用機（現金の入金ボックスはスタッフ側の画面に付いている）
   if (semi) return `<p>キャッシュレスでお支払いください。お支払い方法を選んでください</p>`;
   // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
-  if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> お預かりしてください</p>` : `<p>あと <b>${yen(due)}</b> お預かりします</p>`;
+  // お客様側は不足額を大きく見せる
+  if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
   // 現金はスタッフが預かり、スタッフ側の入金ボックスに入れる。「投入おわり」もスタッフが押す
-  // 最後の投入から無操作が続くと確定する。残り秒数は数え下げる
-  if (inserted) return `<p>${Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000)}秒の無操作で、お支払いを確定します</p>`;
+  // 最後の投入から無操作が続くと確定する。残り秒数は数え下げる（お客様側には追加投入の受付期限として大きく）
+  const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
+  if (inserted) return staff ? `<p>${sec}秒の無操作で、お支払いを確定します</p>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
   if (method === "cash" && staff) return `<p>お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   if (method === "cash") return `<p>スタッフが現金をお預かりします</p>`;
   return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
@@ -970,7 +981,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.pickup_handover && !v.lines.length) return notice + confirm(pickupHandover(reg, side, r.pickup_handover));
-  if (r.last_receipt && !v.lines.length) return notice + thanks();
+  if (r.last_receipt && !v.lines.length) return notice + (r.outlet ? changeDue(side, r.outlet) : thanks());
   // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return attendedWelcome(r, notice, side);

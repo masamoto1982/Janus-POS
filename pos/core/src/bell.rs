@@ -8,7 +8,7 @@ pub const LINK_TIMEOUT_MS: u64 = 5_000;
 pub const MIN_RING_MS: u64 = 1_000;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
-pub struct Bell {
+pub struct BellSignal {
     pub seq: u64,
     pub held: usize,
     pub presses: u64,
@@ -16,16 +16,16 @@ pub struct Bell {
 
 #[derive(Clone, Debug, Serialize, serde::Deserialize)]
 pub(crate) struct Packet {
-    bell: Bell,
+    signal: BellSignal,
     deliver_at: u64,
     lost_down: bool,
     lost_up: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct Mat {
+pub struct Bell {
     pub id: String,
-    pub received: Bell,
+    pub received: BellSignal,
     pub acked_seq: u64,
     pub last_rx_at: u64,
     pub last_ack_at: u64,
@@ -43,11 +43,11 @@ pub struct Mat {
     pub bell_on: bool,
 }
 
-impl Mat {
-    pub fn new(id: &str) -> Mat {
-        Mat {
+impl Bell {
+    pub fn new(id: &str) -> Bell {
+        Bell {
             id: id.into(),
-            received: Bell::default(),
+            received: BellSignal::default(),
             acked_seq: 0,
             last_rx_at: 0,
             last_ack_at: 0,
@@ -75,7 +75,7 @@ impl Mat {
         self.bell_on && (self.buzz_until > now || (self.received.held > 0 && self.rx_ok(now)))
     }
 
-    pub fn tick(&mut self, now: u64, bell: Bell, loss_percent: u8, rng: &mut Rng) {
+    pub fn tick(&mut self, now: u64, signal: BellSignal, loss_percent: u8, rng: &mut Rng) {
         let (arrived, pending): (Vec<Packet>, Vec<Packet>) = std::mem::take(&mut self.in_flight)
             .into_iter()
             .partition(|p| p.deliver_at <= now);
@@ -84,41 +84,41 @@ impl Mat {
             if p.lost_down {
                 continue;
             }
-            if p.bell.seq >= self.received.seq {
-                if p.bell.presses > self.received.presses {
+            if p.signal.seq >= self.received.seq {
+                if p.signal.presses > self.received.presses {
                     self.buzz_until = now + MIN_RING_MS;
                     self.rings += 1;
                 }
-                self.received = p.bell;
+                self.received = p.signal;
             }
             self.last_rx_at = now;
             if !p.lost_up {
-                self.acked_seq = self.acked_seq.max(p.bell.seq);
+                self.acked_seq = self.acked_seq.max(p.signal.seq);
                 self.last_ack_at = now;
             }
         }
 
         let since = self.last_sent_at.map(|t| now.saturating_sub(t));
-        let behind = self.acked_seq < bell.seq;
+        let behind = self.acked_seq < signal.seq;
         let due = match since {
             None => true,
-            Some(s) => ((behind || bell.held > 0) && s >= RETRY_MS) || s >= HEARTBEAT_MS,
+            Some(s) => ((behind || signal.held > 0) && s >= RETRY_MS) || s >= HEARTBEAT_MS,
         };
         if due {
-            if behind && self.last_sent_at.is_some() && self.last_sent_seq == bell.seq {
+            if behind && self.last_sent_at.is_some() && self.last_sent_seq == signal.seq {
                 self.retries += 1;
             }
             let lost_down = self.offline || rng.chance(loss_percent);
             let lost_up = self.offline || rng.chance(loss_percent);
             self.in_flight.push(Packet {
-                bell,
+                signal,
                 deliver_at: now + rng.range(60, 200),
                 lost_down,
                 lost_up,
             });
             self.sent += 1;
             self.last_sent_at = Some(now);
-            self.last_sent_seq = bell.seq;
+            self.last_sent_seq = signal.seq;
         }
     }
 

@@ -1,5 +1,5 @@
 export type Side = "staff" | "customer";
-export type Mode = "attended" | "semi_self";
+export type Mode = "staff_operated" | "self_operated";
 export type Phase = "registering" | "paying";
 export type Method = "cash" | "emoney" | "qr" | "credit" | "points";
 export type StaffState = "absent" | "ready";
@@ -117,7 +117,7 @@ export interface StaffView {
   actions: ActionState[];
   drawer_total: number;
   drawer: [number, number][];
-  mat_down: string[];
+  bell_down: string[];
 }
 
 export interface BillRow {
@@ -215,15 +215,15 @@ export interface TaxView {
 export interface Snapshot {
   now: number;
   registers: RegisterView[];
-  mats: { id: string; kind: "fixed" | "handheld" | "store_computer"; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean; bell_on: boolean }[];
-  mat_links: { id: string; link_ok: boolean; acked_seq: number; sent: number; retries: number }[];
-  bell: { seq: number; held: number; presses: number };
+  bells: { id: string; kind: "fixed" | "handheld" | "store_computer"; buzzing: boolean; link_ok: boolean; rings: number; offline: boolean; bell_on: boolean }[];
+  bell_links: { id: string; link_ok: boolean; acked_seq: number; sent: number; retries: number }[];
+  signal: { seq: number; held: number; presses: number };
   calls: Call[];
   call_history: { id: number; register: number; label: string; created_at: number; resolved_at: number }[];
   age_rules: { rules: AgeRule[]; history: { at: number; by: string; change: string }[] };
   audit: { at: number; register: number; staff: string; operation: string; amount: number; result: string }[];
   ff_stock: { code: string; name: string; price: number; stock: number; tab: string; tab_label: string }[];
-  mat_loss: number;
+  bell_loss: number;
   accounts: { id: string; barcode: string; name: string; role: string }[];
   catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string }[];
   tax: TaxView;

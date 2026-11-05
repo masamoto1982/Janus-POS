@@ -10,10 +10,10 @@ pub struct PosSimulator {
 #[wasm_bindgen]
 impl PosSimulator {
     #[wasm_bindgen(constructor)]
-    pub fn new(seed: u32, registers: u8, mats: u8) -> PosSimulator {
+    pub fn new(seed: u32, registers: u8, bells: u8) -> PosSimulator {
         console_error_panic_hook::set_once();
         PosSimulator {
-            store: Store::new(u64::from(seed), registers, mats),
+            store: Store::new(u64::from(seed), registers, bells),
         }
     }
 

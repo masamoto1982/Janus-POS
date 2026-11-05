@@ -1,7 +1,7 @@
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { Command, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
-import { beepError, beepPress, beepScan, setMatRinging, unlockAudio } from "./sound";
+import { beepError, beepPress, beepScan, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
 import {
   esc,
@@ -26,7 +26,7 @@ import {
   voidAsk,
   collected,
   parcelError,
-  matPanel,
+  bellPanel,
   bellSettings,
   ownerPanel,
   shelfPanel,
@@ -173,7 +173,7 @@ function buildSkeleton(): void {
           </div>
         </div>
         <div class="money-io-cust" aria-label="レジ${r.id}の決済端末（お客様側の画面に付いています）">
-          <div class="reader-slot" data-pay-drop="${r.id}"><button type="button" class="reader" data-reader="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・カード・バーコードをかざす）"><span data-region="reader-${r.id}"></span></button></div>
+          <div class="terminal-slot" data-pay-drop="${r.id}"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・カード・バーコードをかざす）"><span data-region="terminal-${r.id}"></span></button></div>
         </div>
       </div>
     </section>`,
@@ -189,9 +189,9 @@ function buildSkeleton(): void {
     </header>
     <article class="floor">
       <div class="left">
-        <section class="mat-area" aria-label="Bell（呼び鈴）">
+        <section class="bell-area" aria-label="Bell（呼び鈴）">
           <h2>Bell</h2>
-          <div class="mats" data-region="mats"></div>
+          <div class="bells" data-region="bells"></div>
           <button type="button" class="icon-btn bell-open" data-open-bell aria-haspopup="dialog" aria-label="Bell の設定" title="Bell の設定">⚙</button>
           <div class="toast" id="toast-store"></div>
         </section>
@@ -376,7 +376,7 @@ function render(): void {
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
-      const operable = r.active_side !== null ? r.active_side === side : r.mode !== "attended" || side === "staff";
+      const operable = r.active_side !== null ? r.active_side === side : r.mode !== "staff_operated" || side === "staff";
       el?.classList.toggle("operable", operable);
       app.querySelector(`[data-swipe-to="${r.id}:${side}"]`)?.classList.toggle("operable", operable);
       const wrap = el?.parentElement;
@@ -392,7 +392,7 @@ function render(): void {
       setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side));
       el?.classList.toggle("no-items", !items);
     }
-    const face: Side = r.menu ? "staff" : r.mode === "attended" ? "staff" : "customer";
+    const face: Side = r.menu ? "staff" : r.mode === "staff_operated" ? "staff" : "customer";
     if (face !== activeShown.get(r.id)) {
       activeShown.set(r.id, face);
       if (isMobile()) swipeTo(r.id, face);
@@ -403,7 +403,7 @@ function render(): void {
       `${
         idle !== null
           ? `<span class="idle" title="5分間操作がないと、登録中の取引も中止してセルフ操作モードに戻ります">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} で${
-              r.idle_voids ? (r.mode === "semi_self" ? "取引を中止します" : "取引を中止してセルフ操作モードに戻ります") : "セルフ操作モードに戻ります"
+              r.idle_voids ? (r.mode === "self_operated" ? "取引を中止します" : "取引を中止してセルフ操作モードに戻ります") : "セルフ操作モードに戻ります"
             }</span>`
           : ""
       }`,
@@ -418,7 +418,7 @@ function render(): void {
     );
     app.querySelector(`[data-outlet="${r.id}"]`)?.classList.toggle("blink", r.outlet > 0);
     const inlet = app.querySelector<HTMLElement>(`[data-inlet="${r.id}"]`);
-    const reader = app.querySelector<HTMLElement>(`[data-reader="${r.id}"]`);
+    const terminal = app.querySelector<HTMLElement>(`[data-terminal="${r.id}"]`);
     const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null && r.emoney_partial === null;
     const emoney = r.menu ? null : r.emoney;
     const partial = !r.menu && r.emoney_partial !== null && r.emoney_partial_ok;
@@ -432,13 +432,13 @@ function render(): void {
       const shown = emoney ? emoney.inserted : !r.menu ? r.staff.inserted : 0;
       setRegion(`inlet-${r.id}`, shown ? `<b>${shown.toLocaleString()}円</b>` : `<span class="placeholder">${esc(hint)}</span>`);
     }
-    if (reader) {
-      reader.classList.toggle("blink", cashlessPay || tapping);
-      const hint = cashlessPay || tapping ? (cashlessPay && !partial ? (READER_HINT[r.staff.method!] ?? "決済端末") : "電子マネーをかざす") : "決済端末";
-      setRegion(`reader-${r.id}`, `<span class="placeholder">${esc(hint)}</span>`);
+    if (terminal) {
+      terminal.classList.toggle("blink", cashlessPay || tapping);
+      const hint = cashlessPay || tapping ? (cashlessPay && !partial ? (TERMINAL_HINT[r.staff.method!] ?? "決済端末") : "電子マネーをかざす") : "決済端末";
+      setRegion(`terminal-${r.id}`, `<span class="placeholder">${esc(hint)}</span>`);
     }
   }
-  setRegion("mats", matPanel(snap));
+  setRegion("bells", bellPanel(snap));
   setRegion("bell-settings", bellSettings(snap));
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("shelf", shelfPanel(snap));
@@ -452,8 +452,8 @@ const ffUi = (reg: number): FfUi => ffTabs.get(reg) ?? { tab: FF_TABS[0][0], pag
 function frame(): void {
   sim.tick(performance.now() - t0);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
-  setMatRinging(
-    snap.mats.some((m) => m.buzzing),
+  setBellRinging(
+    snap.bells.some((m) => m.buzzing),
     Math.max(0, ...snap.registers.map((r) => r.ring_volume)),
   );
   render();
@@ -664,7 +664,7 @@ app.addEventListener("change", (e) => {
   const sel = e.target as HTMLSelectElement;
   if (sel.dataset.bellOn) {
     const box = sel as unknown as HTMLInputElement;
-    if (!send({ type: "set_bell_on", mat: Number(box.dataset.bellOn), on: box.checked })) box.checked = !box.checked;
+    if (!send({ type: "set_bell_on", bell: Number(box.dataset.bellOn), on: box.checked })) box.checked = !box.checked;
     return;
   }
   if (sel.dataset.ffcheck) {
@@ -872,7 +872,7 @@ app.addEventListener("click", (e) => {
   else if (b.dataset.form) form(b);
 });
 
-const READER_HINT: Record<string, string> = {
+const TERMINAL_HINT: Record<string, string> = {
   emoney: "電子マネーをかざす",
   qr: "バーコードをかざす",
   credit: "カードをかざす",
@@ -1062,7 +1062,7 @@ function wireSwipe(): void {
   app.addEventListener("pointerdown", (e) => {
     if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
     const t = e.target as Element;
-    const inlet = t.closest<HTMLElement>("[data-inlet], [data-reader]");
+    const inlet = t.closest<HTMLElement>("[data-inlet], [data-terminal]");
     const screen = t.closest(".screen-head, .screen-items") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;
     cancelLongPress();
@@ -1070,7 +1070,7 @@ function wireSwipe(): void {
       longPress = null;
       swallowClick = true;
       if (inlet) {
-        openPicker(Number(inlet.dataset.inlet ?? inlet.dataset.reader), inlet.dataset.inlet ? "staff" : "customer", "wallet");
+        openPicker(Number(inlet.dataset.inlet ?? inlet.dataset.terminal), inlet.dataset.inlet ? "staff" : "customer", "wallet");
       } else {
         const [reg, side] = screen!.dataset.drop!.split(":");
         openPicker(Number(reg), side as Side, "item");
@@ -1094,7 +1094,7 @@ function wireSwipe(): void {
   );
   window.addEventListener("pointerdown", () => (swallowClick = false), true);
   app.addEventListener("contextmenu", (e) => {
-    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-reader]")) e.preventDefault();
+    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-terminal]")) e.preventDefault();
   });
   const dlg = pickerDlg();
   dlg.addEventListener("click", (e) => {

@@ -17,7 +17,7 @@ describe("view helpers", () => {
     expect(sideOf({ type: "scan", register: 1, side: "customer" })).toBe("customer");
     expect(sideOf({ type: "insert_cash", register: 1 })).toBe("customer");
     expect(sideOf({ type: "void_transaction", register: 1 })).toBe("staff");
-    expect(sideOf({ type: "set_mat_loss", percent: 30 })).toBe("store");
+    expect(sideOf({ type: "set_bell_loss", percent: 30 })).toBe("store");
   });
 
   it("lays out the top bar as item count, then total, then checkout", () => {
@@ -75,10 +75,10 @@ describe("view helpers", () => {
     expect(customer).not.toContain("お渡し済");
   });
 
-  it("shows the open calls only on the semi-self staff screen", () => {
+  it("shows the open calls only on the self-operated staff screen", () => {
     const call = (kind: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, created_at, detail: "" });
     const r = {
-      staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], mat_down: [] },
+      staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
     const staff = callScreen(r, 6000);
@@ -89,10 +89,10 @@ describe("view helpers", () => {
     expect(customer).toBe("");
   });
 
-  it("tells the customer that staff are on the way in attended mode", () => {
+  it("tells the customer that staff are on the way in staff-operated mode", () => {
     const r = {
-      mode: "attended",
-      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "" }], mat_down: [] },
+      mode: "staff_operated",
+      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "" }], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
     expect(callNotice(r, 6000, "customer")).toContain("スタッフが向かっています");
@@ -101,7 +101,7 @@ describe("view helpers", () => {
 
   it("shows no elapsed time for an age-check call", () => {
     const r = {
-      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "20歳以上" }], mat_down: [] },
+      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "20歳以上" }], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
     expect(callNotice(r, 6000, "staff")).not.toContain("経過");

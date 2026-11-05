@@ -1,7 +1,3 @@
-// 画面の描画。どれもスナップショットから HTML 文字列を作る純粋関数で、
-// ボタンの出し分けはコアが返す actions（操作可否と理由）だけで決める。
-// 画面側で「押せるかどうか」を独自に判断しない。
-
 import type {
   ActionState,
   BillRow,
@@ -40,28 +36,20 @@ function find(actions: ActionState[], name: string): ActionState {
   return actions.find((a) => a.action === name) ?? { action: name, allowed: false, reason: null };
 }
 
-/** コマンドを持つボタン。押せないときは理由を title に出す */
 export function btn(label: string, cmd: Command, a?: ActionState, cls = ""): string {
   const disabled = a && !a.allowed;
   const title = disabled && a.reason ? ` title="${esc(a.reason)}"` : "";
   return `<button class="${cls}" data-cmd="${esc(JSON.stringify(cmd))}"${disabled ? " disabled" : ""}${title}>${esc(label)}</button>`;
 }
 
-/** 手続きを引き返す「バック」。どこでも小ボタンにし、画面の左下に置く（`.screen-foot` などの左端） */
 export function backBtn(cmd: Command, a?: ActionState): string {
   return btn("バック", cmd, a, "md ghost back-btn");
 }
 const backFootRow = (cmd: Command, a?: ActionState): string => `<div class="screen-foot">${backBtn(cmd, a)}</div>`;
-/** 確認画面（`.confirm`）の左下に置く「バック」。確認画面の中身の直後に並べる */
 const backCorner = (cmd: Command, a?: ActionState): string => `<div class="back-foot">${backBtn(cmd, a)}</div>`;
-/**
- * セミセルフの支払方法の選択画面の右下に置く「現金」。消極の小ボタン（セミセルフはキャッシュレス専用なので控えめに）。
- * 押すとスタッフ呼び出しが発動する（カードが通らず現金で払いたい場合など）
- */
 const cashCorner = (reg: number, side: Side, method: string | null, st: ActionState): string =>
   `<div class="skip-foot">${btn("現金", { type: "select_payment", register: reg, side, method: "cash" }, st, `md skip${method === "cash" ? " on" : ""}`)}</div>`;
 
-/** 先へ進むのを省く「スキップ」。「バック」と左右対称に、確認画面の右下へ小さな消極ボタンで置く */
 const skipCorner = (cmd: Command, a?: ActionState): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "md skip")}</div>`;
 
 const FF_LABEL: Record<FfState, string> = {
@@ -69,68 +57,43 @@ const FF_LABEL: Record<FfState, string> = {
   received: "お渡し済",
 };
 
-/**
- * FF の明細の個数の右に置く、お渡し確認のチェックボックス。
- * 全部にチェックが入るまで会計に進めない。どちらの画面から押したかは、押した画面で決まる
- */
-/**
- * FF の明細のお渡し状況。お渡し前は押せるアイコンで、押すとお渡し照合の画面になる。
- * 照合ではお渡しした個数を入力させる（チェックだけだと数量を意識せずに済ませられ、渡し忘れを防げない）
- */
 function ffTag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: ActionState, ro: boolean, labels = FF_LABEL): string {
   if (l.kind !== "ff" || !l.state) return "";
   const text = labels[l.state];
-  // お渡し済はボタンではなく緑の文字だけ。お渡し前は積極の小ボタン（オレンジ）。見るだけの画面ではボタンの形で押せない
   if (l.state === "received") return `<span class="ff-done">${text}</span>`;
-  // お渡し確認はスタッフ側の画面だけ。顧客側（見るだけの画面）にはお渡し前を出さない
   if (ro) return "";
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
   return `<button type="button" class="ff-btn ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
 }
 
-/** お渡し照合の画面を開いている画面（レジ:画面）。「バック」で閉じる */
 export const ffVerifying = new Set<string>();
-/** 照合画面に入力したお渡し数（レジ:画面:明細番号 → 入力） */
 export const ffvInput = new Map<string, string>();
 
-/** 照合画面を閉じた（または出せなくなった）ら、その画面の入力も忘れる */
 function closeFfVerify(reg: number, side: Side): void {
   ffVerifying.delete(`${reg}:${side}`);
   for (const k of [...ffvInput.keys()]) if (k.startsWith(`${reg}:${side}:`)) ffvInput.delete(k);
 }
 
-/** 照合画面に並べる FF：未照合（お渡し前）のものと、この画面で入力したもの */
 function ffVerifyRows<L extends { id: number; kind: string; state?: FfState }>(reg: number, side: Side, lines: L[]): L[] {
   return lines.filter((l) => l.kind === "ff" && (l.state === "waiting" || ffvInput.has(`${reg}:${side}:${l.id}`)));
 }
 
-/** 照合画面を開いたままにするか。出せる行があり、全部の照合が一致するまで開く（全部一致したら自動で登録画面へ戻る） */
 function ffVerifyOpen<L extends { id: number; kind: string; state?: FfState }>(reg: number, side: Side, lines: L[]): boolean {
   if (!ffVerifying.has(`${reg}:${side}`)) return false;
   const rows = ffVerifyRows(reg, side, lines);
   return rows.length > 0 && !rows.every((l) => l.state === "received");
 }
 
-/**
- * お渡し照合：表で 品目｜注文数｜お渡し数｜照合。手続きを引き返す「バック」は左下に置く
- * （物事は右へ進む感覚に合わせ、進めるボタンは右、引き返すボタンは左）。お渡し数を入力すると、その場で注文数と比べて OK / NG を出す
- * （判定ボタンはない）。注文数を見ながら数を打ち込むことで、いくつ渡したかに注意が向く。
- * 画面が切り替わると直前に見た数は忘れやすいので、注文数はここにも出す
- */
 function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number; ff_base?: number }[], customer: boolean): string {
-  // 並べるのは未照合の FF だけ（この画面で入力して OK になった行は、判定が見えるよう残す）。
-  // 並びは登録画面と同じ（新しい動きのあった行ほど上）
   const ff = ffVerifyRows(reg, side, lines).sort((a, b) => b.touched - a.touched);
   const rows = ff
     .map((l) => {
       const key = `${reg}:${side}:${l.id}`;
-      // 追加注文のときは、すでに照合の済んだ分を除いた追加分だけを照合する
       const base = l.ff_base ?? 0;
       const need = l.qty - base;
       const name = base > 0 ? `${l.name}（追加分）` : l.name;
       const value = ffvInput.get(key) ?? (l.state === "received" ? String(need) : "");
       const judge = value === "" ? "" : l.state === "received" ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
-      // 単品（注文数 1）は数を打たず、チェックボックスで照合する（チェック＝1 つお渡しした）
       if (need === 1) {
         const done = l.state === "received";
         return `<tr><td>${esc(name)}</td><td class="num">1</td><td class="num"><input type="checkbox" class="ffv-check" data-ffcheck="${l.id}" data-ffreg="${reg}:${side}" ${done ? "checked disabled" : ""} aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}を確認した" /></td><td class="ffv-judge">${done ? `<span class="ffv-ok">OK</span>` : ""}</td></tr>`;
@@ -138,7 +101,6 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
       return `<tr><td>${esc(name)}</td><td class="num">${need}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${customer ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
-  // 見出しは「お渡しの確認」（荷物や支払いの控えのお渡しにも同じ形の画面を使える）
   return `<div class="ffv-screen">
       <div class="big">お渡しの確認</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
@@ -149,52 +111,30 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
 const METHOD_LABEL: Record<string, string> = { cash: "現金", emoney: "電子マネー", qr: "バーコード決済", credit: "クレジットカード", points: "ポイント利用" };
 const METHODS = ["cash", "emoney", "qr", "credit", "points"] as const;
 
-// ---------------------------------------------------------------------------
-// レジ画面。店員側・お客様側の区別はなく、二つの画面に同じものを映す。
-// 中身はモードで決まる（有人：係員の登録画面／セミセルフ：お客様の登録画面）。
-// ボタンが送る side は操作側の画面（押せるのは操作側だけ）
-// ---------------------------------------------------------------------------
-
 type Side = "staff" | "customer";
 
-/** 支払いが終わった後のお礼とおつり */
-/**
- * 決済後の画面。3 秒（core THANKS_MS）で新しいお客様の待ち受けに戻る。
- * 買った商品や持ち物の忘れ物はセルフレジで起こりがちなので、二行目で注意を促す
- */
 function thanks(): string {
   return `<div class="thanks"><div class="big">ありがとうございました</div><div>お忘れ物にご注意ください</div></div>`;
 }
 
-/**
- * 有人モードの現金決済でお釣りがあるとき、出金ボックスから抜き取られるまでの画面。
- * 抜き取られると両画面とも「ありがとうございました」に変わる
- */
 function changeDue(side: Side, amount: number): string {
   const msg = side === "staff" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
   return `<div class="thanks"><div class="big">${msg}</div></div>`;
 }
 
-/** 日付を YYYY-MM-DD で（レジの日付として生年月日の判定に使う） */
 export function isoDate(t: Date): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
-/**
- * 店員側の年齢確認（例外：店員側の画面からしか押せない）。まず「する／スキップ」を選び、
- * 「する」なら身分証の生年月日を入力して判定する
- */
 function idCard(reg: number, age: number, v: StaffView, a: (n: string) => ActionState): string {
   const choose = (idCheck: boolean, label: string, cls = "") =>
     btn(label, { type: "choose_age_check", register: reg, side: "staff", id_check: idCheck }, a("choose_age_check"), cls);
   if (v.age_choice_pending) {
-    // ポイントカードの確認と同じ形：問いを一行、ボタンをその下の行に、どちらも中央に
     return `<div class="point-screen">
         <div class="big">${age}歳以上の年齢確認をしますか？</div>
         <div class="point-choices">${choose(true, "する", "primary")}</div>
       </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
   }
-  // 生年月日の入力もポイントカードの確認と同じ形：問いを一行、入力欄、ボタンの行。どれも中央に
   const st = a("check_id");
   return `<div class="point-screen id-entry">
       <div class="big">身分証の生年月日を入力してください</div>
@@ -205,23 +145,11 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
     </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
 }
 
-// ---------------------------------------------------------------------------
-// 荷物を受取る：受取用バーコード → 係員がお預かりの荷物を探して読む（照合）→ サインをもらって引き渡す
-// ---------------------------------------------------------------------------
-
-/** 明細の札：照合の前と後（見つからなかったときは「見つかりません」） */
 function pickupTag(p: Pickup): string {
   if (p.missing) return `<span class="tag warn">見つかりません</span>`;
   return p.matched ? `<span class="tag ok">照合済</span>` : `<span class="tag warn">照合待ち</span>`;
 }
 
-/**
- * 店員側：お預かりの荷物の番号を大きく出し、保管場所に荷物が有るかを選ぶ。
- * 本来は荷物のバーコードを読んで照合するが、シミュレーターでは「有り」「無し」の二択で次の工程に進める。
- * 代金引換の金額は受取用バーコードを読んだときから合計に出ている（同じ金額をここで重ねて出さない）。
- * 有り：登録画面に戻って会計する（決済の後にサインをもらって引き渡す）。
- * 無し：お詫びしてお受け取りを終える。どちらからも探し直せる
- */
 function pickupStep(reg: number, p: Pickup, st: ActionState): string {
   const found = (v: boolean | null) => ({ type: "pickup_found", register: reg, found: v });
   const end = { type: "pickup_handover", register: reg };
@@ -239,7 +167,6 @@ function pickupStep(reg: number, p: Pickup, st: ActionState): string {
     </div>`;
 }
 
-/** 代金引換の決済の後：店員側はサインをもらって引き渡し、お客様側にはサインをお願いする */
 function pickupHandover(reg: number, side: Side, no: string): string {
   if (side === "customer")
     return `<div class="point-screen pickup-step">
@@ -253,36 +180,22 @@ function pickupHandover(reg: number, side: Side, no: string): string {
     </div>`;
 }
 
-// ---------------------------------------------------------------------------
-// 荷物を送る（宅配便の発送）：サイズ → 郵便番号 → 料金 → 次の荷物
-// ---------------------------------------------------------------------------
-
-/** 明細の札：決まったサイズと届け先（受付中は「受付中」） */
 function parcelTag(p: Parcel, done: boolean): string {
   if (done && p.size && p.region) return `<span class="tag ok">${p.size}サイズ・${esc(p.region)}あて</span>`;
   return `<span class="tag warn">${p.size ? `${p.size}サイズ・届け先未定` : "受付中"}</span>`;
 }
 
-/** 受付中（料金がまだ決まっていない）の荷物 */
 export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
   return lines.find((l) => l.kind === "service" && !l.done && l.parcel);
 }
 
 
-/**
- * 荷物の受付で、入力を受け付けられなかった理由（レジごと）。画面の中だけの状態。
- * レジ画面にはトーストを出さないので、決定を押しても進めない理由を、入力の案内の行に差し替えて出す
- */
 export const parcelError = new Map<number, string>();
 const parcelErr = (reg: number): string => {
   const e = parcelError.get(reg);
   return e ? `<p class="parcel-error" role="alert">${esc(e)}</p>` : "";
 };
 
-/**
- * 有人モードのお客様側：店員がサイズ・届け先を入力する間の案内（店員側の入力画面と対）。
- * 上限を超えて受け付けられないときは、その旨をお客様にも出す
- */
 function parcelNote(reg: number, l: StaffLine): string {
   const p = l.parcel as Parcel;
   const [head, sub] = p.size
@@ -293,7 +206,6 @@ function parcelNote(reg: number, l: StaffLine): string {
   return pairNote(head, parcelError.get(reg) ?? sub);
 }
 
-/** セミセルフ：伝票を読んで係員を待つ間のお客様側の案内（登録画面の代わり） */
 function parcelWait(): string {
   return `<div class="point-screen pair-note parcel-wait">
       <div class="big">スタッフがお伺いします</div>
@@ -302,15 +214,10 @@ function parcelWait(): string {
     </div>`;
 }
 
-/**
- * 店員側：受付中の荷物のサイズ決定、または届け先の郵便番号の入力。
- * 長さ・重さ・郵便番号は入力欄を押してテンキーで打ち、画面の「決定」で送る
- */
 function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): string {
   const p = l.parcel as Parcel;
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
-  // 「戻る」は手続きを一段階引き返す（左）。三辺の合計から戻ると、この荷物の受付をやめる
   const back = () => backCorner({ type: "parcel_back", register: reg, line_id: l.id }, st);
   const field = (target: PadTarget, placeholder: string, aria: string) =>
     padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`);
@@ -340,7 +247,6 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
     </div>${back()}`;
 }
 
-/** 店員側：料金が決まった後の「次の荷物はありますか」。直前に受け付けた荷物の料金と、受付済みの個数を添える */
 function parcelAsk(reg: number, lines: StaffLine[], st: ActionState): string {
   const done = lines.filter((l) => l.parcel && l.kind === "service" && l.done);
   const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
@@ -356,10 +262,8 @@ function parcelAsk(reg: number, lines: StaffLine[], st: ActionState): string {
     </div>`;
 }
 
-/** 回収リストでチェックを入れた行（レジごと）。画面の中だけの状態で、コアには「回収しました」だけを送る */
 export const collected = new Map<number, Set<number>>();
 
-/** 年確で販売できず取り除いた商品。店員がお客様から回収する。全部にチェックを入れると「回収しました」が押せる */
 function confiscatedCard(reg: number, v: StaffView): string {
   if (!v.confiscated.length) {
     collected.delete(reg);
@@ -381,7 +285,6 @@ function confiscatedCard(reg: number, v: StaffView): string {
     </div>`;
 }
 
-/** お渡し済みの FF を減らした・取り消した分の回収の案内（店員側）。「回収しました」で閉じる */
 function ffCollectCard(reg: number, v: StaffView): string {
   if (!v.ff_collect.length) return "";
   const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}を${c.qty}点回収してください</div>`).join("");
@@ -391,7 +294,6 @@ function ffCollectCard(reg: number, v: StaffView): string {
     </div>`;
 }
 
-/** 有人モードのお客様側：スタッフ側の FF の回収と対になる案内（見るだけ。閉じるのはスタッフの「回収しました」） */
 function ffReturnCard(v: StaffView): string {
   if (!v.ff_collect.length) return "";
   const items = v.ff_collect.map((c) => `<li><b>${esc(c.name)}</b> × ${c.qty}</li>`).join("");
@@ -402,27 +304,12 @@ function ffReturnCard(v: StaffView): string {
 }
 
 
-/** 会計中の確認画面の左下に置く、手続きを引き返すボタン（引き返すボタンは左） */
 function backFoot(reg: number, side: Side, st: ActionState): string {
   return backCorner({ type: "back_to_registering", register: reg, side }, st);
 }
 
-/** 公共料金の受付枚数。合計金額よりも大事な情報なので、どの確認画面でも大きく出す */
 const billN = (n: number): string => `<span class="bill-n">${n}枚</span>`;
 
-/**
- * 公共料金の払込票の確認（店員）。会計ボタンの後、表で 事業者｜金額｜バーコード番号｜確認。
- * どれも同じ重みの確認項目なので、列は同じ間隔で中央にそろえる（金額だけが目立たないように）。
- * 同じ事業者でも FF のようにまとめず、一枚ずつ並べる：ため込んだ払込票を大量に持ち込まれたとき、
- * 店員が来るまでに読んだ払込票と読んでいない払込票がすり替わることや、控えを分けて持ち込まれ、
- * スキャナーに通した本部控えと収納印を押すお客様控えで金額が違うことがあるため。
- * 手元の払込票の事業者・金額・バーコード番号を確かめ、合っていればチェックを入れる（数字の打ち込みはさせない）。
- * すべてにチェックが入ると、お客様側に現金での支払いを案内する。
- *
- * 設計メモ（ユーザー 2026-10-28・29）：実際の POS レジでは、払込票ごとの支払いの内容・金額・手数料と合計額に加え、
- * 払込票のバーコード番号（実物の桁数・形式）も記載して、厳密な確認に耐えるようにする。Janus POS はシミュレーターで
- * 表示エリアが足りないため、事業者・金額と便宜的なバーコード番号（16 桁）だけにし、手数料（収納手数料）の概念も扱わない。
- */
 export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: ActionState): string {
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const rows = bills
@@ -439,7 +326,6 @@ export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: 
     </div>`;
 }
 
-/** 店員の確認が済んだ公共料金の支払い（お客様側）。公共料金は現金のみ */
 export function billPayCard(count: number, semi = false): string {
   return `<div class="point-screen bill-pay">
       <div class="big">公共料金${billN(count)}を受け付けます</div>
@@ -447,10 +333,6 @@ export function billPayCard(count: number, semi = false): string {
     </div>`;
 }
 
-/**
- * 公共料金の決済の後。店員側には収納印を押してお渡しする案内と「お渡し済」、
- * お客様側には払込票（控え）・レシート・お釣りの受け取りの案内（「お渡し済」まで出す）
- */
 export function billHandover(reg: number, side: Side, count: number, st: ActionState): string {
   if (side === "customer")
     return `<div class="point-screen bill-done">
@@ -464,41 +346,28 @@ export function billHandover(reg: number, side: Side, count: number, st: ActionS
     </div>`;
 }
 
-/** 公共料金の確認の最中に、操作しない側に出すメッセージ（受付枚数を大きく） */
 function billNote(count: number, sub: string): string {
   return `<div class="point-screen pair-note"><div class="big">公共料金${billN(count)}</div><p>${esc(sub)}</p></div>`;
 }
 
-/** 確認画面の入れ物：登録画面の領域いっぱいに広げ、中身を上下左右とも中央に置く */
 const confirm = (body: string): string => `<div class="confirm">${body}</div>`;
 
-/** 確認の最中に、操作しない側に出す対のメッセージ */
 function pairNote(head: string, sub = ""): string {
   return `<div class="point-screen pair-note"><div class="big">${esc(head)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}</div>`;
 }
 
-/** 確認のうち、出すべき最初の一つ（一つの画面で複数の確認をしない） */
 const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
-/** 最後の投入から、この時間（ms）入れなければ投入おわりとみなす（core の INSERT_DONE_MS と同じ） */
 const INSERT_DONE_MS = 30_000;
 
-/** 支払方法を選んだ後の案内 */
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, semi = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
-  // 現金のみの商品（切手・代行収納）があれば、電子マネーで払う額と現金で払う額をかざす前に見せる
-  // （現金と併用できるのは電子マネーだけ。かざし方は決済端末の点滅する案内に任せ、ここは金額の内訳だけにする）
   if (method && method !== "cash" && cashlessDue < due)
     return `<p>${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
   if (method === "points") return `<p>Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
   if (method && method !== "cash") return `<p>Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
-  // セミセルフはキャッシュレス専用機（現金の入金ボックスはスタッフ側の画面に付いている）
   if (semi) return `<p>キャッシュレスでお支払いください<br>お支払い方法を選んでください</p>`;
-  // 残りの金額はここだけに出す（合計は上の帯、投入額は入金ボックス）
-  // お客様側は不足額を大きく見せる
   if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
-  // 現金はスタッフが預かり、スタッフ側の入金ボックスに入れる。「投入おわり」もスタッフが押す
-  // 最後の投入から無操作が続くと確定する。残り秒数は数え下げる（お客様側には追加投入の受付期限として大きく）
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
   if (inserted) return staff ? `<p>${sec}秒の無操作で、お支払いを確定します</p>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
   if (method === "cash" && staff) return `<p>お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
@@ -506,13 +375,8 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
 }
 
-/**
- * 支払方法の選択肢。現金は入れただけで支払方法が現金に決まるので、入れた後は出さない
- * （キャッシュレスは電子マネーとバーコード決済を取り違える人がいるので、必ず選んでもらう）
- */
 function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = "", unavailable: Unavailable[] = [], noCash = false): string {
   if (method === "cash" && inserted) return "";
-  // 決済の組み合わせの原則で使えない支払方法は押せなくする（理由は core が返す）
   const off = (m: string): ActionState => {
     const u = unavailable.find((x) => x.method === m);
     return u ? { action: st.action, allowed: false, reason: u.reason } : st;
@@ -524,30 +388,17 @@ function methodRow(reg: number, side: Side, method: string | null, inserted: num
 
 const CASH_ONLY_NOTE = "現金のみの商品（切手・お支払い）は現金でお支払いください";
 
-/**
- * 有人モードのお客様側：支払方法の一覧を見せるだけ（選ぶのは店員）。電子マネーとバーコード決済、
- * 電子マネーとポイントを取り違えるお客様が多いので、現金以外は店員を介して決める
- */
 function methodList(method: string | null, inserted: number, unavailable: Unavailable[] = []): string {
   if (method === "cash" && inserted) return "";
   return `<div class="row wrap method-list">${METHODS.map((m) => `<span class="seg ${method === m ? "on" : ""}${unavailable.some((u) => u.method === m) ? " off" : ""}">${METHOD_LABEL[m]}</span>`).join("")}</div>`;
 }
 
-/**
- * 明細の列：品目・数量・小計。数量はボタンの形で、押すと数量変更・削除の行が広がる。
- * 押せない画面でも同じ幅にし、店員側とお客様側で列の位置がずれないようにする
- */
 const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /></colgroup>`;
 
-// 内税の表示（有人・セミセルフ共通）
 function taxNote(v: { taxes: TaxTotal[] }): string {
   return `<span class="muted tax-note">内税 ${v.taxes.map((t) => `${esc(t.rate)} ${yen(t.tax)}`).join(" / ")}</span>`;
 }
 
-/**
- * 注意のしるし（年確・限定）。品目の横、FF のお渡し前・お渡し済と同じ位置に出す
- * （年確が要る FF はないので重ならず、専用の列を持たずに済む）
- */
 function warnTags(l: { age: number | null; limit: number | null; cash_only?: boolean }): string {
   return [
     l.age ? `<span class="tag age">年確${l.age}</span>` : "",
@@ -558,17 +409,14 @@ function warnTags(l: { age: number | null; limit: number | null; cash_only?: boo
 
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
   const tags: string[] = [];
-  // 有人モードのお客様側は見るだけ（操作は店員側の画面で行う）
   const ro = side === "customer";
   if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
-  // 払込票（現金のみのサービス）は受付が要らないので、受付の札を出さない
   if (l.kind === "service" && l.parcel) tags.push(parcelTag(l.parcel, l.done));
   else if (l.pickup) tags.push(pickupTag(l.pickup));
   else if (l.kind === "service" && !isBill(l)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
   tags.push(warnTags(l));
   const remove = find(v.actions, "remove_line");
   let svc = "";
-  // 荷物を送るは、サイズと郵便番号を決める画面で料金を決める（金額は打ち込まない）
   if (l.kind === "service" && !l.done && !ro && !l.parcel && !l.pickup) {
     const a = find(v.actions, "complete_service");
     svc = `<div class="svc">
@@ -587,20 +435,10 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   </tr>`;
 }
 
-/** 公共料金の払込票（明細ごとには取り消せない。やめるときは取引中止） */
 const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolean => l.kind === "service" && !!l.done && l.cash_only;
 
-/**
- * 数量を打ち込んでいる明細（レジ:画面 → 明細番号と打った数字）。
- * 数量のボタンを押すと、その画面の上にテンキーのポップアップが開く
- */
 export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
-/**
- * 数量の欄：数量そのものが積極ボタンで、押すとテンキーで新しい数量を打ち込む。
- * 両脇の「−」（数量 1 では「削除」）と「＋」は消極ボタンで、押すとその場で 1 つずつ変わる。
- * 数量を変えられないもの（サービス商品・クーポン）は「削除」と数字だけ。押せないときは数字だけ
- */
 function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false): string {
   if (!st.allowed) return `${l.qty}`;
   if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b></span>`;
@@ -613,11 +451,6 @@ function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Ac
   return `<span class="qty-step">${minus}${key}${btn("＋", step(1), st, "small neg")}</span>`;
 }
 
-/**
- * 数量のテンキー（レジ画面の上に重ねるポップアップ。レジ画面で覆いかぶさる表示を出す唯一の例外）。
- * 品名と今の数量を見せ、打った数で置き換える。左下に引き返す「やめる」、右下に進める「決定」。
- * 0 では決定できない（消すときは「削除」）。外側を押してもやめる
- */
 export function qtyPopup(r: RegisterView, side: Side): string {
   const reg = r.id;
   const e = qtyEntry.get(`${reg}:${side}`);
@@ -635,18 +468,11 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-/**
- * テンキーで打ち込む連続値（数量のほかに、荷物の三辺の合計・重さ、入金ボックスの金額）。
- * 離散値は選択肢から選ぶので、テンキーを使うのは連続値だけ。キーは「レジ番号:画面」
- */
 export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "inlet" | "mamt" | "mpw";
 export type PadEntry = { target: PadTarget; line?: number; digits: string };
-/** いまテンキーを開いている入力欄（キーは「レジ:側」） */
 export const padEntry = new Map<string, PadEntry>();
-/** テンキーで入力欄に入れた値（キーは「レジ:対象:明細」）。画面の「決定」「判定」で送る */
 export const padValue = new Map<string, string>();
 export const padValueKey = (reg: number, target: PadTarget, line?: number): string => `${reg}:${target}:${line ?? ""}`;
-/** max は打てる桁数、decimal は小数点（0.1 単位）を打てるか、code は先頭の 0 も打てる番号か */
 export const PAD: Record<PadTarget, { title: string; unit: string; max: number; decimal?: boolean; code?: boolean }> = {
   pcm: { title: "三辺の長さの合計", unit: "cm", max: 3 },
   pkg: { title: "荷物の重さ", unit: "kg", max: 3, decimal: true },
@@ -657,15 +483,9 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   mamt: { title: "出金する金額", unit: "円", max: 6 },
   mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
 };
-/** 郵便番号は 3 桁目のあとにハイフンを入れて見せる */
-/** 店舗パスワードは打った桁数だけ ● で見せる */
 export const padShow = (target: PadTarget, digits: string): string =>
   target === "mpw" ? "●".repeat(digits.length) : target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits;
 
-/**
- * テンキーで打ち込む入力欄（角を丸めない箱。濃い枠線・濃い文字・背景なし）。押すと、その画面の上にテンキーが開く。
- * テンキーは入力欄とだけ組み合わせる（ボタンからは開かない）
- */
 function padField(reg: number, side: Side, target: PadTarget, value: string, placeholder: string, aria: string, line?: number, cls = ""): string {
   const typing = padEntry.get(`${reg}:${side}`);
   const on = typing?.target === target && typing.line === line;
@@ -675,7 +495,6 @@ function padField(reg: number, side: Side, target: PadTarget, value: string, pla
   }</button>`;
 }
 
-/** テンキーのポップアップ（数量のテンキーと同じ形）。左下に「やめる」、右下に「決定」。決定で入力欄に入る */
 export function padPopup(r: RegisterView, side: Side): string {
   const reg = r.id;
   const e = padEntry.get(`${reg}:${side}`);
@@ -683,7 +502,6 @@ export function padPopup(r: RegisterView, side: Side): string {
   const d = PAD[e.target];
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-pad="${reg}:${side}:${key}">${label}</button>`;
   const inserted = e.target === "inlet" ? (r.emoney && !r.menu ? r.emoney.inserted : !r.menu ? r.staff.inserted : 0) : 0;
-  // 入金ボックスは、何も打たずに「決定」すると投入を終える（入れたお金があるとき）。番号とお渡し数は 0 も打てる
   const ok = e.digits !== "" ? d.code || Number(e.digits) > 0 : e.target === "inlet" && !r.menu && inserted > 0;
   const now = e.target === "inlet" && inserted ? `<span class="muted">入金済み ${yen(inserted)}</span>` : "";
   const name = e.target === "ffv" ? r.staff.lines.find((l) => l.id === e.line)?.name : undefined;
@@ -700,7 +518,6 @@ export function padPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-/** 呼び出しの種類の短い表示（店員側画面） */
 const CALL_SHORT: Record<string, string> = {
   fast_food: "FF",
   tobacco: "煙草",
@@ -712,17 +529,11 @@ const CALL_SHORT: Record<string, string> = {
   emoney: "電子マネー",
 };
 
-/**
- * 呼び出し中の表示。両画面同内容の原則の、表示上の例外：
- * 有人モードのお客様側には「店員が向かっています」を出す。店員側は Bell の不通だけを知らせる。
- */
 export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
-  // 有人モードで年確の工程を出している間は、年確の呼び出しは表示しない（年確の画面そのものが知らせる）
   const ageOnScreen = r.mode === "attended" && (v.age_choice_pending || v.id_pending);
   const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
   if (side === "customer") {
-    // 排出口に釣り銭が残ったまま 1 分たったら知らせる（2 分で店員を呼ぶ）
     const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
     return (
       change +
@@ -734,11 +545,9 @@ export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  // 有人モードでは店員がレジにいるので、呼び出しの内容や経過時間は店員側に出さない
   return warn;
 }
 
-/** 呼び出しの経過時間。年確の呼び出しは数えない（経過時間を出さない） */
 function elapsed(calls: { kind: string; created_at: number }[], now: number, before: string, after = ""): string {
   const timed = calls.filter((c) => c.kind !== "age_check");
   if (!timed.length) return "";
@@ -746,17 +555,14 @@ function elapsed(calls: { kind: string; created_at: number }[], now: number, bef
   return `<span class="muted">${before}${secs(now, oldest)}経過${after}</span>`;
 }
 
-/** セミセルフの呼び出し中の店員側の画面：呼び出しの理由（「年確」「FF＆煙草」など）を大きく */
 export function callScreen(r: RegisterView, now: number): string {
   const v = r.staff;
   const warn = v.mat_down.length
     ? `<div class="banner danger">${esc(v.mat_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
-  // 公共料金の受付枚数は大きく出す（合計金額より大事な情報）
   const details = [...new Set(v.calls.filter((c) => c.kind !== "bill").map((c) => c.detail).filter(Boolean))];
   const bill = v.calls.find((c) => c.kind === "bill");
-  // 登録画面の領域いっぱいに広げて出す（最下段の FF・サービス・たばこボタンはそのまま）
   return `<div class="call-screen">${warn}
       <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
       ${bill ? `<p class="bill-call"><span class="bill-n">${esc(bill.detail)}</span></p>` : ""}
@@ -765,7 +571,6 @@ export function callScreen(r: RegisterView, now: number): string {
     </div>`;
 }
 
-/** セミセルフで、現金のみの商品（切手）の係員を待つ間のお客様側の案内（会計ボタンで自動的に呼ぶ） */
 function cashOnlyWait(): string {
   return `<div class="point-screen">
       <div class="big">切手は現金のみのお取り扱いです</div>
@@ -773,7 +578,6 @@ function cashOnlyWait(): string {
     </div>`;
 }
 
-/** セミセルフで年確の係員を待つ間のお客様側の案内（登録画面・支払画面の代わりに出す） */
 function ageWait(age: number): string {
   return `<div class="point-screen">
       <div class="big">年齢確認が必要な商品が含まれています</div>
@@ -781,18 +585,15 @@ function ageWait(age: number): string {
     </div>`;
 }
 
-/** 会計時の年確。店員側の画面だけで行う（する：身分証の生年月日、スキップ：店員の判断で済む） */
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
   const age = v.required_age;
   if (!age || side === "customer") return "";
   return v.age_choice_pending || v.id_pending ? idCard(reg, age, v, a) : "";
 }
 
-/** 登録した直後の行（レジ:明細番号）。一瞬目立つ色にする（main.ts が数量の変化から決める） */
 export const flashing = new Set<string>();
 const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
 
-/** 読み取ったクーポンの行。対象商品がまだなければ「対象商品待ち」（商品より先に読んでもよい）。数量の欄の「削除」で取り消す */
 export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState, ro = false): Row[] {
   return coupons.map((c) => [
     c.id,
@@ -802,13 +603,8 @@ export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Actio
   ]);
 }
 
-/** 明細の 1 行（最後に動きのあった順番, HTML）。クーポンの番号は読んだ順番 */
 type Row = [number, string];
 
-/**
- * 新しい動きのあった行ほど上に出す。同じ商品は続けて読んだときだけ一番上の行に足す（前の行にはまとめない）
- * （買い物が多いとき、最初の行の数量が表示エリアの外で増えて見えない、ということがない）
- */
 function newestFirst(rows: Row[]): string {
   return [...rows]
     .sort((x, y) => y[0] - x[0])
@@ -820,11 +616,6 @@ function removeCoupon(reg: number, side: Side, c: Coupon, st: ActionState): stri
   return btn("取消", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small ghost");
 }
 
-/**
- * 会計に進んだのに、適用先（対象商品）のないクーポンが残っているときの注意。
- * クーポンで安く買うつもりの商品が似て非なる商品だった、という事故を防ぐため、
- * 対象商品を登録するかクーポンを取り消すまで決済できない
- */
 export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: ActionState, ro = false): string {
   const list = coupons
     .filter((c) => c.discount === null)
@@ -837,10 +628,6 @@ export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: Ac
   return `<div class="card coupon-card"><b>${head}</b><p>${body}</p><ul class="coupon-list">${list}</ul></div>`;
 }
 
-/**
- * 取り消したクーポンの返却。店員側には返却を促し、お客様側にはお返しする旨を案内する。
- * done はこの画面で案内を閉じるボタン（有人モードのお客様側は、店員の「返却しました」で閉じる）
- */
 export function returnedCard(reg: number, side: Side, returned: Returned[], done: boolean): string {
   if (!returned.length) return "";
   const list = returned.map((c) => `<li><b>${esc(c.name)}</b></li>`).join("");
@@ -856,7 +643,6 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
   }</div><ul class="coupon-list">${list}</ul></div>`;
 }
 
-/** 初期画面のボタンで選んだ案内（レジ:画面 → 種類）。選ばなくても、どのバーコードでも読める */
 export const scanGuide = new Map<string, GuideKind>();
 export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon" | "shop" | "parcel" | "bill";
 const GUIDES: [GuideKind, string, string][] = [
@@ -867,11 +653,6 @@ const GUIDES: [GuideKind, string, string][] = [
   ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
 ];
 
-/**
- * 初期画面。慣れた人はそのままスキャンし、不慣れな人はボタンで何を読むか選んで案内を見る
- * （自由度がなさすぎても、ありすぎても人は迷う）
- */
-/** レジ画面ヘッダー中央に出す動作モード（両画面）。有人：濃い塗り、セミセルフ：枠線 */
 const modeTitle = (attended: boolean): string => `<span class="mode-title ${attended ? "attended" : "semi"}">${attended ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
 
 export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {
@@ -888,13 +669,6 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
     </div>`;
 }
 
-/**
- * 電子マネーのチャージ・残高確認の入口：レジ画面ヘッダー右の、呼び鈴の左隣に置くボタン。
- * ヘッダーなので常に見え、商品登録画面をふさがない。押すのは操作する側（有人は店員側、セミセルフはお客様側）で、
- * もう一方の画面には押せない形で映す。セミセルフのお買い物の途中は、押すとスタッフを呼ぶ
- * （押している間鳴る。スタッフがログインした有人モードで手続きすれば、お客様は取引を終えずに済む）
- */
-// ヘッダーは狭いので、「電子マネーの」「チャージ・残高確認」の二行にする
 const EMONEY_HEAD_LABEL = `<span>電子マネーの</span><span>チャージ・残高確認</span>`;
 
 function emoneyHead(r: RegisterView, side: Side): string {
@@ -906,7 +680,6 @@ function emoneyHead(r: RegisterView, side: Side): string {
   if (side !== own) return label;
   const shopping = !attended && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
   if (shopping) {
-    // セミセルフのお買い物の途中：スタッフを呼ぶ
     const st = find(r.customer.actions, "call_staff");
     const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
     return `<button type="button" class="emoney-head neg" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
@@ -916,13 +689,8 @@ function emoneyHead(r: RegisterView, side: Side): string {
   return `<button type="button" class="emoney-head neg" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
 }
 
-/**
- * 取引中止の確認（レジ番号 → 中止ボタンを押した画面）。登録画面を置き換えて出し、
- * 「はい」を押したときだけ中止する（大量に登録した後の誤操作で、登録をやり直させない）
- */
 export const voidAsk = new Map<number, Side>();
 
-/** 明細の上の帯に置く「取引中止」。会計ボタンから離した控えめなボタン */
 function voidBtn(reg: number, side: Side, st: ActionState): string {
   const title = st.allowed ? "取引を中止する（確認があります）" : (st.reason ?? "");
   return `<button type="button" class="void-btn"${st.allowed ? ` data-void-ask="${reg}:${side}"` : " disabled"} title="${esc(title)}">取引中止</button>`;
@@ -930,7 +698,6 @@ function voidBtn(reg: number, side: Side, st: ActionState): string {
 
 function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }[]; total: number; inserted: number }): string {
   const reg = r.id;
-  // 有人モードのお客様側には、店員側の確認と対になる知らせだけを出す
   if (r.mode === "attended" && side === "customer") return pairNote("取引の中止を確認しています");
   const st = find(r.mode === "attended" ? r.staff.actions : r.customer.actions, "void_transaction");
   const back = [
@@ -951,18 +718,12 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
     <div class="back-foot"><button type="button" class="md ghost back-btn" data-void-cancel="${reg}">バック</button></div>`;
 }
 
-/** 有人モードの初期画面の案内ボタン（店員側で押す。お客様側には同じボタンを押せない形で映す） */
 const ATTENDED_GUIDES: [GuideKind, string, string][] = [
   ["shop", "お買い物", "商品のバーコードをスキャンしてください"],
   ["parcel", "宅配便", "宅配便の伝票、または受取用のバーコードをスキャンしてください"],
   ["bill", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
 ];
 
-/**
- * 有人モードの初期画面。あいさつと声かけの二行に、ご用件の案内ボタンを添える。
- * 一段目は お買い物・宅配便・お支払い（押すと読むバーコードを案内）。電子マネーも同じ並びに置く（emoneyBtn）。
- * 両方の画面に出し、操作できるのは店員側だけ（お客様側はどの用件を受け付けているかを見せる）
- */
 function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:staff`);
@@ -979,9 +740,7 @@ function attendedWelcome(r: RegisterView, notice: string, side: Side): string {
     </div>`;
 }
 
-/** 有人モードの登録画面（係員がいる）。どちらの画面にも同じものを出す */
 export function attendedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
-  // 店舗メニューはスタッフ側の画面だけ。お客様側には対になる知らせを出す
   if (r.menu) return notice + (side === "staff" ? storeMenu(r) : confirm(pairNote("休止中", "空いているレジをお使い下さい")));
   const v = r.staff;
   const reg = r.id;
@@ -989,21 +748,14 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.pickup_handover && !v.lines.length) return notice + confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.last_receipt && !v.lines.length) return notice + confirm(r.outlet ? changeDue(side, r.outlet) : thanks());
-  // 有人モードの初期画面（まだ何も登録していない）は、あいさつと声かけの二行だけ。店員側には対になる行動の案内
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return attendedWelcome(r, notice, side);
-  // お客様側に出すボタンは、お客様本人が押すもの（お支払い内容の確認・投入おわり）だけ。
-  // ほかの操作（会計・変更・ポイントカード・支払方法など）は店員側の画面で行う
   const ro = side === "customer";
-  // 新しい動きのあった行ほど上に出す
   const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
 
-  // 会計ボタンの後は、年確 → ポイントカードの最終確認 → 決済手段の確認の順に進む
   const pointPending = paying && v.point_pending;
   const agePending = paying && (v.age_choice_pending || v.id_pending);
-  // 決済手段の確認：登録画面と年確の状況は出さず、決済手段だけを示す（選ぶのは店員側の画面）。
-  // 同じ情報を複数個所に出さない：点数・合計は上の帯、投入額は入金ボックス、選んだ手段はボタンの強調で示す
   const payStage = paying && !pointPending && !agePending;
   const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
   const pay = payStage
@@ -1016,12 +768,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
       ? ageStep(reg, v, side, a)
       : "";
 
-  // 合計と会計ボタンは登録画面の最上部に常に出す（明細が増えてもスクロールで隠れない）
   const top = regTop(
     v.total,
     itemCount(v.lines),
-    // 「投入おわり」はスタッフ側だけに出す（現金はスタッフが預かって入金ボックスに入れる）。
-    // 会計ボタンは会計中に別のボタンに置き換えない（引き返す「バック」は確認画面の左下）
     (paying && v.method === "cash" && !ro
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro || paying
@@ -1031,17 +780,9 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
     !!v.point_card,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
   );
-  // 一つの画面では一つの確認だけを、登録画面を置き換えて出す。優先順は
-  // 代行収納の金額と件数（受付で即座に）＞年確（店員側だけ。お客様側は明細のまま）＞回収・クーポン＞ポイントカード＞決済手段。
-  // 会計中は、手続きを引き返す「バック」を確認画面の左下に置く（スタッフ側だけ）
   const back = paying && !ro ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
-  // 取引中止の確認は、ほかのどの確認よりも先に出す（どの場面からでも中止できる）
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
-  // 確認の最中は、店員側とお客様側に対になるメッセージを出す（片方が操作し、もう片方はその旨を知る）
-  // 公共料金：会計ボタンの後に店員が払込票を確認し、済んだらお客様に現金での支払いを案内する
-  // 荷物を送る：店員がサイズと郵便番号を決める間、お客様には伝票の貼り付けをお願いする
-  // 荷物を受取る：店員がお預かりの荷物を探す間は「お持ちします」。「有り」なら登録画面に戻って会計できる
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
   if (!paying && pickup && !pickup.matched)
     return screen(
@@ -1052,7 +793,6 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
           : pairNote("荷物をお持ちします", "少々お待ちください"),
     );
   const parcel = pendingParcel(v.lines);
-  // 受付中の荷物がなくなったら、前の荷物の入力エラーは持ち越さない
   if (!parcel) parcelError.delete(reg);
   if (!paying && parcel)
     return screen(
@@ -1089,12 +829,7 @@ export function attendedScreen(r: RegisterView, notice = "", side: Side = r.acti
 `;
 }
 
-/**
- * 会計ボタンの後のポイントカードの最終確認。有人モードの店員側と、セルフ・セミセルフのお客様側で同じ形。
- * 読み取りを促し、なければ「スキップ」。会計前に読み取り済みなら出ない
- */
 function pointCheck(reg: number, side: Side, st: ActionState): string {
-  // 年確と同じ形。「付与する」を押すと読み取りの案内を出す（押さずにスキャンしても読める）
   const reading = scanGuide.get(`${reg}:${side}`) === "point";
   return `<div class="point-screen">
       <div class="big">ポイントを付与しますか？</div>
@@ -1105,13 +840,11 @@ function pointCheck(reg: number, side: Side, st: ActionState): string {
     </div>${skipCorner({ type: "confirm_point_card", register: reg, side }, st)}`;
 }
 
-/** このお店で使えるポイントサービス（お客様側の最終確認に並べるアイコン） */
 const POINT_SERVICES: [string, string][] = [
   ["💳", "ポイントカード"],
   ["📱", "ポイントアプリ"],
 ];
 
-/** 有人モード：ポイントカードの最終確認中のお客様側。案内文と使えるポイントサービスのアイコンだけ */
 function customerPointAsk(): string {
   return `<div class="point-screen">
       <div class="big">ポイントをお付けします</div>
@@ -1119,15 +852,6 @@ function customerPointAsk(): string {
     </div>`;
 }
 
-/**
- * 登録画面の最上部に固定する帯：左から買い物点数・合計金額・会計ボタン。
- * 商品登録が一つもないときは出さない（案内を広く見せる）。
- */
-/**
- * 現金払いのときだけ、スタッフ側の会計ボタンの位置が「投入おわり」に切り替わる（お客様側には出さない。
- * 入金ボックスはスタッフ側の画面に付いていて、現金はスタッフが預かって入れる）。
- * 入金ボックスで Enter を押すのは、このボタンを押す近道
- */
 function finishInsert(reg: number, inserted: number, due: number, st: ActionState): string {
   const ready: ActionState = !st.allowed
     ? st
@@ -1136,65 +860,41 @@ function finishInsert(reg: number, inserted: number, due: number, st: ActionStat
       : due > 0
         ? { ...st, allowed: false, reason: `あと ${yen(due)} 入れてください` }
         : st;
-  // 現金を入れたスタッフ本人が押すボタン（スタッフ側の画面でだけ押せる）
   return `<span class="staff-only">${btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary")}</span>`;
 }
 
 export function regTop(total: number, count: number, action: string, max = Infinity, pointCard?: boolean, voidHtml = "", infoHtml = ""): string {
   if (count === 0) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  // 合計「合計 x点 XXX円」の上にポイントカードの読み取り状況を控えめに、下に電子マネーを出す
-  // （ポイントカードの状況はほかの場所には出さない。ボタンは合計額の右に出し、有無で点数・合計額の位置は動かない）
   const point =
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
-  // 合計の上：ポイントの読み取り状況。合計の下：電子マネーのチャージ・残高照会（お買い物の途中でも始められる）
-  // 真ん中の欄は二行でも三行でも縦の中央にそろえる。帯の高さは三行のときに合わせる（大は小を兼ねる）
   const info = point ? `<small class="info">${point}</small>` : "";
   const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
-  // 取引中止は引き返すボタンなので、合計の左（会計ボタンとは反対の端）。登録中・確認中・会計中のどこからでも押せる。
-  // 合計は左右の欄の有無にかかわらず常に中央（取引中止のない有人のお客様側でも店員側と同じ位置）
   return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid">${info}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${below}</span><span class="action">${action}</span></div>`;
 }
 
-/** 買い物点数（数量の合計） */
 export function itemCount(lines: { qty: number }[]): number {
   return lines.reduce((n, l) => n + l.qty, 0);
 }
 
-/**
- * 二つの画面は、同じ内容を映す（情報空間は一つ）。中身はモードで決まり、
- * どちらの画面もカラーで、その画面から触れない操作だけをグレーにする。
- * 例外は呼び出し中の表示（`callNotice`）と、有人モードのお客様側の画面。
- * 有人モードのお客様側には、お客様本人が押すボタン（お支払い内容の確認・投入おわり）だけを出す。
- */
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
-  // レジ休止中：どちらの画面も休止の案内だけ（店員側には再開のしかた）
   if (r.paused)
     return confirm(`<div class="point-screen paused-screen"><div class="big">レジ休止中</div><p>${
       side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します"
     }</p></div>`);
-  // セミセルフの呼び出し中、店員側の画面は呼び出しの理由だけを大きく出す（年確の工程などは出さない：
-  // お客様が店員側に回り込んで操作できないよう、店員がログインして有人モードになってから進める）
   if (r.mode === "semi_self" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
   if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return notice + confirm(emoneyScreen(r, side));
   return r.mode === "attended" ? attendedScreen(r, notice, side) : semiSelfScreen(r, notice, side);
 }
 
-/**
- * 電子マネーの選択（チャージ・残高確認）・チャージ・残高確認・残高不足。登録画面を置き換えて一つだけ出す。
- * ボタンを押すのはセミセルフではお客様、有人モードでは店員（お客様側には案内だけ）
- */
 function emoneyScreen(r: RegisterView, side: Side): string {
   const reg = r.id;
   const ro = r.mode === "attended" && side === "customer";
   const actions = r.mode === "semi_self" ? r.customer.actions : r.staff.actions;
-  // やめる・閉じるは手続きを引き返すボタンなので左下
   const close = (label: string) =>
     ro ? "" : label === "バック" ? backCorner({ type: "close_emoney", register: reg, side }, find(actions, "emoney")) : `<div class="screen-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip")}</div>`;
   if (r.emoney_partial !== null) {
-    // 「不足額を現金で払う」：残高を引き出し残りを現金で払うことを確かめてから、電子マネーを受け付ける
-    // （かざしたままの電子マネーで、案内を見ないうちに決済が走らないように）
     const rest = Math.max(0, r.staff.due - r.emoney_partial);
     const st = find(actions, "resolve_emoney_short");
     const go = (label: string, c: string, cls: string) => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
@@ -1210,7 +910,6 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       </div>`;
   }
   if (r.emoney_short !== null) {
-    // 残高とお支払いの額は出さず、不足額だけを出す。現金で払う・チャージは横に並べ、他の決済を使うは最下段の左
     const st = find(actions, "resolve_emoney_short");
     const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     const short = Math.max(0, r.staff.due - r.emoney_short);
@@ -1244,15 +943,11 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     </div>${close("バック")}`;
 }
 
-/** 残りを現金で払うとき、電子マネーで払った分を知らせる */
-/** キャッシュレスで先に払ったあと、残りを現金で払う案内（一行に収める） */
 function prepaidNote(r: RegisterView, due: number): string {
-  // ポイントで払った後の残り（たばこなど）は、現金のみの商品だけでなければ支払方法を選び直す
   const rest = r.cashless_due ? "のお支払い方法をお選びください" : "を現金で";
   return `<p>${esc(r.prepaid_method ?? "")}で ${yen(r.prepaid)} お支払い済み、残り <b>${yen(due)}</b> ${rest}</p>`;
 }
 
-/** 現金のみの商品（切手・代行収納）があるとき、支払方法を選ぶ前に知らせる */
 function cashOnlyNote(r: RegisterView): string {
   if (!r.cash_only || r.prepaid) return "";
   return r.cashless_due
@@ -1260,24 +955,15 @@ function cashOnlyNote(r: RegisterView): string {
     : `<p>${CASH_ONLY_NOTE}</p>`;
 }
 
-// ---------------------------------------------------------------------------
-// レジ画面のヘッダー：左に日時と稼働モード、右に電子マネーと呼び鈴。
-// 店舗メニューは、スタッフ側のヘッダーを右にスワイプして開き、左にスワイプして閉じる（main.ts の wireMenuSwipe）。
-//どちらが店員側・お客様側かは設置で自明なので画面には出さない
-// ---------------------------------------------------------------------------
-
 const pad = (n: number) => String(n).padStart(2, "0");
 
 const WEEKDAY = ["日", "月", "火", "水", "木", "金", "土"];
 
-/** 「2026年11月5日 木曜日 09:21」 */
 export function clockText(d: Date): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${WEEKDAY[d.getDay()]}曜日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
-  // スタッフ側のベルは、スタッフが仲間に応援を頼むのに使う（ログインの有無を問わない。Bell を鳴らすだけで通知画面は出さない）。
-  // お客様側のベルはスタッフを呼ぶ。店員操作モードではスタッフが対応しているので、お客様側にはベルを出さない
   const call = find(r.customer.actions, "call_staff");
   const sos = side === "staff";
   const tip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
@@ -1286,18 +972,9 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
     !sos && r.mode === "attended"
       ? ""
       : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
-  // 左：日時と稼働モード（日時が上）、右：電子マネーと呼び鈴。休止中は画面の「レジ休止中」と重ねてモードを出さない
-  // 店舗メニューを開いている間は、両側とも稼働モードの代わりに「メンテナンス」
   const mode = r.paused ? "" : r.menu ? `<span class="mode-title semi">店舗処理モード</span>` : modeTitle(r.mode === "attended");
   return `<span class="head-l"><time class="clock">${clockText(now)}</time>${mode}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
 }
-
-// ---------------------------------------------------------------------------
-// バーコードなしアイテム欄（レジ画面の下 1/3）
-// - セミセルフ：店員呼び出しベルのショートカット（FF・サービス・たばこ）。触れている間だけ鳴る
-// - 有人・セルフ：FF をタブ（フライヤー・ドリンク・コールド・中華まん・おでん）で選ぶ。
-//   各タブはページを持ち、売れ筋順に並ぶので先頭ページの最上部に売れ筋が来る
-// ---------------------------------------------------------------------------
 
 export const FF_TABS = [
   ["fried", "フライヤー"],
@@ -1311,8 +988,6 @@ export type FfUi = { tab: string; page: number };
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
   const reg = r.id;
-  // 店舗メニューと電子マネーの手続き（チャージ・残高不足）は登録画面を置き換えるので、最下段も出さない
-  // 取引中止の確認中も、確認画面が登録画面を置き換えるので出さない
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (r.mode === "semi_self") {
     const a = (n: string) => find(r.customer.actions, n);
@@ -1324,16 +999,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("たばこ", "", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
-  // 有人モードの FF は店員側の画面から登録する（お客様側には出さない）
   if (r.mode === "attended" && side === "customer") return "";
-  // 会計に進んだら FF は登録できない（登録に戻る）ので、タブも出さない
   if (r.mode === "attended" && r.staff.phase === "paying") return "";
-  // 確認画面（代行収納の確認・クーポンの返却など）を出している間は、登録画面の一部である FF タブも出さない
   if (r.mode === "attended" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
-  // 荷物の発送はほかの商品と一緒に会計できないので、荷物の取引では FF タブを出さない（受付の画面を広く使う）
-  // 荷物の受け取りも、ほかの商品と別に一件ずつ扱うので FF タブを出さない
   if (r.mode === "attended" && r.staff.lines.some((l) => l.parcel || l.pickup)) return "";
-  // 代金引換の決済の後、荷物を引き渡す画面も登録画面を置き換えるので FF タブを出さない
   if (r.mode === "attended" && r.pickup_handover && !r.staff.lines.length) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
@@ -1354,7 +1023,6 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       ).replace("</button>", `<small>${f.stock > 0 ? (r.mode === "attended" ? `残${f.stock}` : yen(f.price)) : "売り切れ"}</small></button>`),
     )
     .join("");
-  // ページ送りの上下矢印はページの右端。上（前）・下（次）に隠れたページがあるときだけ出す
   const arrows =
     pages > 1
       ? `<div class="ff-arrows">${
@@ -1363,11 +1031,6 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       : "";
   return `<div class="ff-tabs" role="tablist">${tabs}</div><div class="ff-page"><div class="ff-grid">${grid}</div>${arrows}</div>`;
 }
-
-// ---------------------------------------------------------------------------
-// 店舗メニュー（スタッフ側の画面に付いた入口から。有人モードの店員だけが使う）
-// 自動釣銭機の入金・出金ボックスもスタッフ側の画面に付いているので、入出金の操作もスタッフ側で行う
-// ---------------------------------------------------------------------------
 
 const MENU_LABEL: Record<MenuScreen, string> = {
   top: "メニュー",
@@ -1381,7 +1044,6 @@ const MENU_LABEL: Record<MenuScreen, string> = {
   ff_fresh: "FF鮮度管理",
 };
 
-/** 店舗メニューの項目（お金の出し入れを伴うものは、取引中は開けない） */
 const MENU_ITEMS: { screen: MenuScreen; cash: boolean }[] = [
   { screen: "refund", cash: true },
   { screen: "emergency", cash: true },
@@ -1393,12 +1055,10 @@ const MENU_ITEMS: { screen: MenuScreen; cash: boolean }[] = [
   { screen: "ff_fresh", cash: false },
 ];
 
-/** 店舗メニューを開けるのは、スタッフ側の画面で、店員操作モードでログインしているときだけ */
 export function storeMenuUsable(r: RegisterView): boolean {
   return r.mode === "attended" && r.staff.state === "ready" && !r.paused;
 }
 
-/** 一度に一つの画面だけを出す：一覧 → 各項目の画面 */
 export function storeMenu(r: RegisterView): string {
   const v = r.staff;
   const reg = r.id;
@@ -1406,7 +1066,6 @@ export function storeMenu(r: RegisterView): string {
   const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
   const head = (title: string) => `<div class="menu-head"><b>${esc(title)}</b></div>`;
   const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
-  // 各項目の画面は、左下の「バック」で一覧に戻る
   const screen = (body: string) => `<div class="menu-screen">${body}${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
@@ -1455,10 +1114,6 @@ export function storeMenu(r: RegisterView): string {
   }
 }
 
-// ---------------------------------------------------------------------------
-// セミセルフモードの登録画面（係員なし。お客様が登録して支払う）
-// ---------------------------------------------------------------------------
-
 export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
   const c: CustomerView = r.customer;
   const reg = r.id;
@@ -1466,7 +1121,6 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
   if (r.bill_handover && !c.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.last_receipt && !c.lines.length) return notice + confirm(thanks());
 
-  // 新しい動きのあった行ほど上に出す
   const lineRows = c.lines.map((l): Row => {
       const tag =
         l.kind === "ff"
@@ -1474,7 +1128,6 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
           : l.kind === "service" && !l.done
             ? `<span class="tag warn">スタッフが受付します</span>`
             : "";
-      // お渡し済みの FF の数量はスタッフが変える（増やせばお渡し前に戻り、減らせば回収の案内が出る）
       const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
       const qty =
         c.phase === "registering" && !fixedHere
@@ -1484,11 +1137,9 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
-  // 合計とお会計ボタンは登録画面の最上部に常に出す
   const top = regTop(
     c.total,
     itemCount(c.lines),
-    // セミセルフではお買い物の途中に電子マネーのチャージ・残高確認はできない（ボタンを出さない）
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : ""),
@@ -1499,18 +1150,13 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
 
   if (!c.lines.length && !c.coupons.length) voidAsk.delete(reg);
   if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(r, side, a("emoney"))}`;
-  // 一つの画面では一つの確認だけを、登録画面を置き換えて出す（優先順は有人モードと同じ）。
-  // お会計中は、手続きを引き返す「バック」を確認画面の左下に置く
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
-  // 公共料金：係員を待つ間は案内だけ。係員の確認が済んでいれば（その後にログアウトしても）現金で支払う
   const slips = c.bills.length;
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : billPayCard(slips, true));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
-  // 切手などの現金のみの商品：セミセルフは現金を扱わないので、スタッフが有人モードで会計する
   if (c.phase === "paying" && r.cash_only) return screen(cashOnlyWait());
-  // 荷物を送る：伝票を読んで係員を待つ間は、登録画面ではなく案内だけを出す
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
@@ -1531,10 +1177,6 @@ export function semiSelfScreen(r: RegisterView, notice = "", side: Side = r.acti
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-// ---------------------------------------------------------------------------
-// Bell（呼び鈴：据え付け型・携帯型の検品端末・ストアコンピューター）・店舗の設定
-// ---------------------------------------------------------------------------
-
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
 
 export function matPanel(s: Snapshot): string {
@@ -1547,7 +1189,6 @@ export function matPanel(s: Snapshot): string {
     .join("");
 }
 
-/** Bell の設定：可搬性端末とストアコンピューターの呼び鈴機能の ON/OFF（据え付け端末は常に ON） */
 export function bellSettings(s: Snapshot): string {
   return s.mats
     .map((m, i) =>
@@ -1561,7 +1202,6 @@ export function bellSettings(s: Snapshot): string {
 const AGE_CHOICES = [15, 18, 20];
 const LIMIT_CHOICES = [1, 2, 3, 4, 5];
 
-/** 販売個数の上限を選ぶ欄（1 回のお会計で何点まで） */
 function limitSelect(p: Snapshot["catalog"][number]): string {
   const ns = LIMIT_CHOICES.slice();
   if (p.limit && !ns.includes(p.limit)) ns.push(p.limit);
@@ -1588,7 +1228,6 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   },
 ];
 
-/** 売り場の棚ごとに、商品 1 行ずつの表を作る */
 function shelfRows(s: Snapshot, cols: number, row: (p: Snapshot["catalog"][number]) => string): string {
   return SHELVES.map((g) => {
     const items = s.catalog.filter(g.match);
@@ -1599,7 +1238,6 @@ function shelfRows(s: Snapshot, cols: number, row: (p: Snapshot["catalog"][numbe
 
 function ageRows(s: Snapshot): string {
   return shelfRows(s, 4, (p) => {
-    // 酒・たばこは法令どおりで固定。店舗ルールは付けられない
     if (p.legal_age)
       return `<tr><td>${esc(p.name)}</td><td><span class="tag">法令 ${p.legal_age}歳</span></td>
           <td><span class="muted">変更できません</span></td>
@@ -1666,7 +1304,6 @@ function taxPanel(s: Snapshot): string {
     <table class="lines rules"><thead><tr><th>商品</th><th>税区分</th></tr></thead><tbody>${products}</tbody></table>`;
 }
 
-/** 商品ルール設定：オーナー認証のあと、年確・販売個数の制限・税率をセレクタで切り替えて設定する */
 export function ownerPanel(s: Snapshot, tab: RulesTab): string {
   const cur = RULES_TABS.find((x) => x.id === tab) ?? RULES_TABS[0];
   const body =
@@ -1684,36 +1321,23 @@ export function ownerPanel(s: Snapshot, tab: RulesTab): string {
     <h4>変更履歴</h4><ul>${hist}</ul>`;
 }
 
-// ---------------------------------------------------------------------------
-// ハードウェア（スキャナー・現金・電子マネー端末）
-// ---------------------------------------------------------------------------
-
 type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean };
 
-/**
- * 売り場の棚。デモのため商品は抽象化し（将来 UI を英語にしても困らない一般名）、
- * コンビニの 4 大分類ごとに代表的な商品を置く（FF はレジ画面下のタブから登録するので置かない）
- */
 const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(p.code);
 const SHELVES: Shelf[] = [
   { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011") },
   { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073", "4900000000066") },
   { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134", "4900000000141") },
-  // 4 大分類の外：お客様が持ち込む払込票・送る荷物と受け取る荷物、レジに置いてあるカトラリー・レジ袋
   { label: "サービス", match: (p) => p.category === "service" },
   { label: "オプション", match: (p) => p.category === "bag" },
 ];
 
-/** 荷物を送る（発払い・着払い） */
 const PARCEL_CODES = ["2100000000014", "2100000000045"];
 
-/** 荷物を受取る（お客様がコピー機で出した、またはスマホに出した受取用のバーコード） */
 const PICKUP_CODE = "2100000000038";
 
-/** 公共料金の払込票（電気・水道・ガス） */
 const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
 
-/** 使い方の説明（ボタンにカーソルを重ねると出る） */
 const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
 const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
 const HINT_PAY = "支払方法を選んでから、決済端末にドラッグ＆ドロップ";
@@ -1724,23 +1348,17 @@ function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCA
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
-/** Item：4 大分類ごとに小さな見出しを付けて並べる */
-/** extra：オプションの棚の下（伝票の棚の上）に足す棚。モバイルの長押しで使う */
 export function shelfPanel(s: Snapshot, extra = ""): string {
-  // たばこはカウンターの内側の商品。有人モードのレジがあるときだけ並べ、
-  // たばこボタンで呼ばれて有人モードになったら（まだ登録していなければ）枠と文字を点滅させる
   const attended = s.registers.some((r) => r.mode === "attended");
   const asked = s.registers.some((r) => r.tobacco_asked);
   return SHELVES.map((g) => {
-    // 棚の並びは SHELVES に書いた順
     const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || attended);
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
-        // 払込票は一行目に「公共料金」、二行目に種類と金額（例：電気 5,000円）
         BILL_CODES.includes(p.code)
           ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
-          : // 荷物を送るは二行（一行目に「荷物を送る」、二行目に発払い・着払い）
+          :
             PARCEL_CODES.includes(p.code)
             ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
             : item(
@@ -1754,10 +1372,6 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
   }).join("") + extra + slipShelf(s);
 }
 
-/**
- * 受付済みの荷物の伝票（レジのそばにある荷物に貼ったもの）。店員側に読むと、その荷物の受付を取り消す。
- * 宅配便の取り消しは明細の取り消しボタンではなく、取り消す荷物の伝票のバーコードを読んで行う（取り違えを防ぐ）
- */
 function slipShelf(s: Snapshot): string {
   const slips = s.registers.flatMap((r) =>
     r.staff.lines
@@ -1767,17 +1381,11 @@ function slipShelf(s: Snapshot): string {
   return slips.length ? `<div class="shelf"><h3>荷物の伝票（取り消し用）</h3><div class="items uniform">${slips.join("")}</div></div>` : "";
 }
 
-// ---------------------------------------------------------------------------
-// 財布（お客様の持ち物）。レジに落とすと、お金は投入口へ、カードは読み取り・端末へ
-// 実在のサービス名は使わない
-// ---------------------------------------------------------------------------
-
 function walletItem(key: string, name: string, sub: string, cls: string, hint: string): string {
   return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ、${esc(hint)}">
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
-/** レジが読むカード類（ポイント・クーポン）。モバイルのレジ画面の長押しで、商品の棚のオプションの下に並べる */
 export function readableCardsShelves(): string {
   const shelf = (label: string, items: string[]) => `<div class="shelf"><h3>${label}</h3><div class="items uniform">${items.join("")}</div></div>`;
   return (
@@ -1798,11 +1406,9 @@ export function walletPanel(emoneyBalance: number): string {
     walletItem("pay:credit", "クレジットカード", "", "pay", HINT_PAY),
     walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay", HINT_EMONEY),
   ];
-  // 見出しなし（表示スペースの節約）。お金以外は同じ大きさのボタンに揃える
   return `<div class="shelf"><div class="items">${[...bills, ...coins].join("")}</div><div class="items wallet-cards">${cards.join("")}</div></div>`;
 }
 
-/** コマンドがどちらの画面からの操作か（お知らせを出す場所を決める） */
 export function sideOf(cmd: Command): "staff" | "customer" | "store" {
   if (cmd.side === "staff" || cmd.side === "customer") return cmd.side;
   if (["ff_button", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";

@@ -1,5 +1,3 @@
-// コアの Snapshot（core/src/store.rs）を TypeScript から読むための型。
-
 export type Side = "staff" | "customer";
 export type Mode = "attended" | "semi_self";
 export type Phase = "registering" | "paying";
@@ -18,66 +16,51 @@ export type LineKind =
   | { kind: "ff"; state: FfState }
   | { kind: "service"; done: boolean; confirm_pending: boolean };
 
-/** 読み取ったクーポン。discount が null なら対象商品の登録待ち */
 export interface Coupon {
-  /** 取消に使う番号 */
   id: number;
   code: string;
   name: string;
   discount: number | null;
 }
 
-/** 取り消して返すクーポン（unmatched は適用先がなかったもの） */
 export interface Returned {
   name: string;
   unmatched: boolean;
 }
 
-/** 荷物を送る：サイズ（三辺の合計・重さから決まる）と届け先。郵便番号まで決まると料金が確定する */
 export interface Parcel {
   sum_cm: number;
   weight_g: number;
   size: number | null;
   postal: string | null;
   region: string | null;
-  /** 伝票の番号。登録済みの荷物は、この伝票のバーコードを読んで取り消す */
   slip: string;
-  /** 着払い（レジでは 0 円） */
   collect: boolean;
-  /** 料金（郵便番号を決めると入る） */
   fee: number;
 }
 
-/** 荷物を受取る：お預かりの荷物の番号と、荷物のバーコードを読んで照合したか */
 export interface Pickup {
   no: string;
-  /** 代金引換の金額（荷物が「有り」と決まったら明細の金額になる） */
   amount: number;
   matched: boolean;
-  /** 直前に読んだ、番号の違う荷物 */
   wrong: string | null;
-  /** 保管場所に荷物が見つからなかった */
   missing: boolean;
 }
 
 export type StaffLine = LineKind & {
   id: number;
-  /** 最後に動きのあった順番（クーポンの id と同じ通し番号） */
   touched: number;
   code: string;
   name: string;
   unit_price: number;
   qty: number;
-  /** FF：すでに照合の済んだ個数（追加注文のときは追加分だけを照合する） */
   ff_base: number;
   category: string;
   cash_only: boolean;
   amount: number;
   age: number | null;
   limit: number | null;
-  /** 荷物を送る明細だけにある */
   parcel?: Parcel;
-  /** 荷物を受取る明細だけにある */
   pickup?: Pickup;
 };
 
@@ -115,28 +98,18 @@ export interface StaffView {
   coupons: Coupon[];
   point_card: string | null;
   required_age: number | null;
-  /** 店員の「年齢確認をする／しない」待ち */
   age_choice_pending: boolean;
-  /** 年確で販売できず取り除いた商品（店員が回収する） */
   confiscated: { name: string; qty: number }[];
-  /** お渡し済みの FF を減らした・取り消した分（店員がお客様から回収する） */
   ff_collect: { name: string; qty: number }[];
-  /** 会計に進んだが、適用先のないクーポンが残っている（決済できない） */
   coupon_unmatched: boolean;
-  /** 取り消して、お客様に返却するクーポン */
   returned: Returned[];
-  /** 「する」を選び、店員の生年月日の入力待ち */
   id_pending: boolean;
-  /** 公共料金の払込票（1 枚ずつ。なければ空） */
   bills: BillRow[];
-  /** 店員がまだ内容を確認していない払込票がある */
   bill_unchecked: boolean;
   point_pending: boolean;
-  /** 荷物の料金が決まり、「次の荷物はありますか」の答えを待っている */
   parcel_ask: boolean;
   method: Method | null;
   inserted: number;
-  /** 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ） */
   settle_in_ms: number | null;
   due: number;
   payment_blocker: string | null;
@@ -147,17 +120,12 @@ export interface StaffView {
   mat_down: string[];
 }
 
-/** 公共料金の払込票 1 枚ごとの内容（同じ事業者でもまとめない） */
 export interface BillRow {
-  /** 明細番号（確認のチェックの宛先） */
   line_id: number;
   code: string;
-  /** 事業者（電気料金など） */
   name: string;
   amount: number;
-  /** 払込票のバーコード番号（便宜的に作ったもの） */
   slip_no: string;
-  /** 店員が事業者・金額・バーコード番号を確かめた（チェックを入れた） */
   checked: boolean;
 }
 
@@ -170,7 +138,6 @@ export interface CustomerView {
   total: number;
   taxes: TaxTotal[];
   inserted: number;
-  /** 無操作で支払いが確定するまでの残りミリ秒（現金が足りているときだけ） */
   settle_in_ms: number | null;
   due: number;
   point_card: boolean;
@@ -188,17 +155,10 @@ export interface CustomerView {
 
 export interface RegisterView {
   id: number;
-  /** 今、画面を操作できる側（もう一方は表示だけ） */
-  /** 操作できる側が片方に限られているなら、その側（null なら両方の画面が操作できる） */
   active_side: Side | null;
-  /** 買い物点数の上限 */
   max_items: number;
-  /** 有人モードで、グレーの画面にタッチして操作を引き継げる */
-  /** レジ本体の呼び出しランプ（店員が来るまで点灯） */
   lamp: boolean;
-  /** 店員が来ていない呼び出しの放置時間（ms） */
   call_waiting_ms: number | null;
-  /** 鳴動の音量 0〜1（放置が長いほど大きい） */
   ring_volume: number;
   tobacco_asked: boolean;
   mode: Mode;
@@ -209,26 +169,20 @@ export interface RegisterView {
   outlet: number;
   outlet_detail: [number, number][];
   menu: { screen: MenuScreen; exchange_to: number } | null;
-  /** レジ休止中（スタッフバーコードで再開） */
   paused: boolean;
   staff: StaffView;
   customer: CustomerView;
-  /** 開いている電子マネーの手続き（チャージ・残高確認） */
   emoney: { kind: "menu" | "charge" | "inquiry"; inserted: number; balance: number | null } | null;
-  /** 電子マネーの残高が足りないとき、その残高 */
   emoney_short: number | null;
   emoney_partial: number | null;
   emoney_partial_ok: boolean;
-  /** このお会計で電子マネーから払った額 */
   prepaid: number;
   prepaid_method: string | null;
   cash_only: number;
   cashless_due: number;
   unavailable: Unavailable[];
   last_receipt: Receipt | null;
-  /** 公共料金の決済の後、払込票のお渡し待ち（枚数）。店員の「お渡し済」で消える */
   bill_handover: number | null;
-  /** 代金引換の決済の後、荷物の引き渡し待ち（荷物の番号） */
   pickup_handover: string | null;
 }
 
@@ -242,7 +196,6 @@ export interface AgeRule {
   legal: boolean;
 }
 
-/** 税率ごとの対象額（税込）と内税額 */
 export interface TaxTotal {
   rate_bp: number;
   rate: string;
@@ -275,7 +228,6 @@ export interface Snapshot {
   catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string }[];
   tax: TaxView;
   categories: [string, string][];
-  /** 財布の電子マネーの残高 */
   emoney_balance: number;
 }
 

@@ -1,13 +1,5 @@
-//! 宅配便（荷物を送る）の料金。
-//!
-//! 現実の受付と同じく、荷物の三辺の合計と重さから取り扱いサイズを決め、
-//! 届け先の郵便番号から地域を引いて、サイズと地域で料金が決まる。
-//! 料金表はシミュレーター用の見本（発送するお店は関東にあるものとする）。
-
 use serde::Serialize;
 
-/// 取り扱いサイズ（サイズ, 三辺の合計の上限 cm, 重さの上限 g）。小さい順。
-/// 受け付けられるのは三辺の合計 200cm 以内、かつ重さ 30kg 以内（ユーザー 2026-10-30）
 pub const SIZES: [(u32, u32, u32); 8] = [
     (60, 60, 2_000),
     (80, 80, 5_000),
@@ -19,11 +11,9 @@ pub const SIZES: [(u32, u32, u32); 8] = [
     (200, 200, 30_000),
 ];
 
-/// 受け付けられる上限（三辺の合計 cm・重さ g）
 const MAX_CM: u32 = SIZES[SIZES.len() - 1].1;
 const MAX_G: u32 = SIZES[SIZES.len() - 1].2;
 
-/// 上限を超えたときの案内。何 cm・何 kg まで受け付けるかが分かるように数字で示す
 fn too_long() -> String {
     format!("{MAX_CM}cm を超える荷物は受け付けられません")
 }
@@ -31,7 +21,6 @@ fn too_heavy() -> String {
     format!("{}kg を超える荷物は受け付けられません", MAX_G / 1000)
 }
 
-/// 一段階目：三辺の合計がいちばん大きいサイズに収まるか
 pub fn check_length(sum_cm: u32) -> Result<(), String> {
     if sum_cm == 0 {
         return Err("長さを入力してください".into());
@@ -42,7 +31,6 @@ pub fn check_length(sum_cm: u32) -> Result<(), String> {
     Ok(())
 }
 
-/// 三辺の合計と重さの両方が収まる、いちばん小さいサイズ
 pub fn size_for(sum_cm: u32, weight_g: u32) -> Result<u32, String> {
     if sum_cm == 0 || weight_g == 0 {
         return Err("重さを入力してください".into());
@@ -60,7 +48,6 @@ pub fn size_for(sum_cm: u32, weight_g: u32) -> Result<u32, String> {
         })
 }
 
-/// 届け先の地域（関東から遠いほど料金が上がる）
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum Region {
     Hokkaido,
@@ -95,7 +82,6 @@ impl Region {
         }
     }
 
-    /// 関東（発送するお店）からの遠さの段階
     fn tier(self) -> u32 {
         match self {
             Region::Kanto | Region::Shinetsu => 0,
@@ -108,7 +94,6 @@ impl Region {
     }
 }
 
-/// 郵便番号（「123-4567」でも「1234567」でもよい）を 7 桁の数字にそろえる
 pub fn normalize_postal(s: &str) -> Result<String, String> {
     let d: String = s
         .chars()
@@ -125,7 +110,6 @@ pub fn normalize_postal(s: &str) -> Result<String, String> {
     }
 }
 
-/// 郵便番号の上 2 桁から地域を引く（都道府県ごとの番号の割り当てに沿う）
 pub fn region(postal: &str) -> Result<Region, String> {
     let d = normalize_postal(postal)?;
     let n: u32 = d[..2].parse().unwrap_or(0);
@@ -146,7 +130,6 @@ pub fn region(postal: &str) -> Result<Region, String> {
     })
 }
 
-/// サイズと届け先の地域で決まる料金（税込・円）
 pub fn fee(size: u32, region: Region) -> u32 {
     let (base, step) = match size {
         60 => (940, 110),
@@ -161,41 +144,28 @@ pub fn fee(size: u32, region: Region) -> u32 {
     base + step * region.tier()
 }
 
-/// 受付中・受付済みの荷物の内容（明細ごと）
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct Parcel {
-    /// 三辺の合計（cm）と重さ（g）。サイズを決めたときに入る
     pub sum_cm: u32,
     pub weight_g: u32,
-    /// 取り扱いサイズ（未決定なら None）
     pub size: Option<u32>,
-    /// 届け先の郵便番号（7 桁）と地域。郵便番号を決めると料金が確定する
     pub postal: Option<String>,
     pub region: Option<&'static str>,
-    /// 伝票の番号（12 桁を 4 桁ずつ区切る）。登録済みの荷物を取り消すときは、この伝票のバーコードを読む
     pub slip: String,
-    /// 着払い（料金はお届け先で受け取るので、レジでは 0 円）
     pub collect: bool,
-    /// 料金（郵便番号を決めると入る）。着払いでも案内のために持つ
     pub fee: u32,
 }
 
-/// 荷物を受取る：お預かりしている荷物の番号（お客様の受取用バーコードから引く）と、
-/// 保管場所から持ってきた荷物のバーコードを読んで番号が合ったか
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Pickup {
     pub no: String,
-    /// 代金引換の金額（円）。荷物が「有り」と決まったら明細の金額になり、会計で受け取る
     pub amount: u32,
     pub matched: bool,
-    /// 直前に読んだ、番号の違う荷物（店員側の画面に「お渡しできません」と出す）
     pub wrong: Option<String>,
-    /// 保管場所に荷物が見つからなかった（シミュレーターでは店員が「無し」を選ぶ）
     pub missing: bool,
 }
 
 impl Pickup {
-    /// 荷物のバーコードの番号がお預かりの番号と合うか（区切りの「-」は見ない）
     pub fn matches(&self, scanned: &str) -> bool {
         let digits = |s: &str| s.chars().filter(char::is_ascii_digit).collect::<String>();
         digits(&self.no) == digits(scanned)
@@ -211,7 +181,6 @@ mod tests {
         assert_eq!(size_for(55, 1_500), Ok(60));
         assert_eq!(size_for(60, 2_000), Ok(60));
         assert_eq!(size_for(61, 1_000), Ok(80));
-        // 小さくても重ければ重さで決まる
         assert_eq!(size_for(50, 9_000), Ok(100));
         assert_eq!(size_for(161, 1_000), Ok(180));
         assert_eq!(size_for(100, 26_000), Ok(180));

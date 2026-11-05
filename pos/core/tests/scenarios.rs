@@ -1,5 +1,3 @@
-//! 新型レジで報告された問題と、壁打ちで決めた仕様を、シナリオで検証する。
-
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{Command, FfState, LineKind, RegisterView, Store};
@@ -7,15 +5,11 @@ use serde_json::{json, Value};
 
 const BREAD: &str = "4900000000011";
 const BEER: &str = "4900000000103";
-/// 店舗ルールの初期値（20 歳）が付いている商品
 const LIGHTER: &str = "4900000000134";
-/// 年確ルールのない商品。店舗ルールで 18 歳にする例に使う
-/// 年確ルールのない商品（オーナーが店舗ルールを付ける例に使う）
 const SANDWICH: &str = "4900000000028";
 const TEA: &str = "4900000000035";
 const PARCEL: &str = "2100000000014";
 const PARCEL_COLLECT: &str = "2100000000045";
-/// 荷物を受取る
 const RECEIVE: &str = "2100000000038";
 const BILL: &str = "2100000000021";
 const WATER_BILL: &str = "2100000000043";
@@ -42,7 +36,6 @@ fn reg(s: &Store, id: u8) -> RegisterView {
         .unwrap()
 }
 
-/// その画面でボタンが押せるか。両画面に同じボタンが並び、押せるのは操作側の画面だけ
 fn allowed(v: &RegisterView, side: Side, a: Action) -> bool {
     v.active_side.is_none_or(|s| s == side)
         && v.staff
@@ -60,13 +53,10 @@ fn scan(s: &mut Store, r: u8, side: &str, code: &str) {
     );
 }
 
-/// 名札（スタッフ001）を読んでログインし、店員画面にタッチして操作を引き継ぐ。
-/// ログイン中は有人モード（ログイン直後はお客様画面が操作側）
 fn login(s: &mut Store, r: u8) {
     login_as(s, r, "ST001");
 }
 
-/// スタッフ側の画面から店舗メニューを開く（自動釣銭機の入金・出金ボックスもスタッフ側）
 fn open_staff_menu(s: &mut Store, r: u8) {
     ok(
         s,
@@ -79,7 +69,6 @@ fn login_as(s: &mut Store, r: u8, badge: &str) {
     ok(s, json!({"type":"claim","register":r,"side":"staff"}));
 }
 
-/// 年確で店員が「しない」を選ぶ（店員の判断で年確が済む。お客様のボタンは挟まない）
 fn no_id_check(s: &mut Store, r: u8) {
     ok(
         s,
@@ -87,7 +76,6 @@ fn no_id_check(s: &mut Store, r: u8) {
     );
 }
 
-/// 会計ボタンの後のポイントカードの最終確認（ポイントカードなしで進む）。操作側の画面で行う
 fn confirm_point(s: &mut Store, r: u8) {
     let side = match reg(s, r).active_side {
         Some(Side::Customer) => "customer",
@@ -107,7 +95,6 @@ fn advance(s: &mut Store, ms: u64) {
     }
 }
 
-/// 会計画面までは、どのバーコードも順番の縛りなく受け付ける。
 #[test]
 fn any_barcode_is_accepted_in_any_order() {
     let mut s = Store::new(1, 2, 1);
@@ -117,7 +104,6 @@ fn any_barcode_is_accepted_in_any_order() {
     scan(&mut s, 1, "staff", "2000000000015");
     scan(&mut s, 1, "customer", BREAD);
     let v = reg(&s, 1);
-    // 間にレジ袋をはさんだパンは、前のパンの行にまとめない
     assert_eq!(v.staff.lines.len(), 3);
     assert_eq!(v.staff.total, 160 * 2 + 3);
     assert!(v.customer.point_card);
@@ -128,7 +114,6 @@ fn any_barcode_is_accepted_in_any_order() {
     .is_err());
 }
 
-/// 会計画面で読んだら登録画面に戻って追加し、投入済みの現金は残る。
 #[test]
 fn scanning_on_payment_screen_returns_to_registering() {
     let mut s = Store::new(1, 2, 1);
@@ -161,7 +146,6 @@ fn scanning_on_payment_screen_returns_to_registering() {
     assert_eq!(v.last_receipt.as_ref().unwrap().change_total, 600 - 320);
 }
 
-/// 問題7：年確は会計ボタンの時点だけ。年確が済むまで決済できない。
 #[test]
 fn age_check_happens_at_checkout_and_blocks_payment() {
     let mut s = Store::new(1, 2, 1);
@@ -178,19 +162,15 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
     );
     let v = reg(&s, 1);
     assert!(v.staff.age_choice_pending);
-    // 年確が先。ポイントカードの最終確認は年確が済むまで出さない
     assert!(!v.staff.point_pending);
     assert!(run(
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":1000,"count":1})
     )
     .is_err());
-    // 店員が「しない」を選ぶと、年確はそこで済む（お客様のボタンは挟まない）
     no_id_check(&mut s, 1);
     assert!(!reg(&s, 1).staff.age_choice_pending);
-    // 年確が済んでから、ポイントカードの最終確認
     confirm_point(&mut s, 1);
-    // 同じ取引で戻って追加しても、再確認はしない
     scan(&mut s, 1, "staff", BEER);
     ok(
         &mut s,
@@ -204,7 +184,6 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
     );
 }
 
-/// セミセルフでは年確が店員呼び出しになり、店員が来るまでお客様は確認できない。
 #[test]
 fn semi_self_age_check_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -223,19 +202,15 @@ fn semi_self_age_check_calls_staff() {
         Side::Customer,
         Action::ChooseAgeCheck
     ));
-    // 係員を待つ間、お客様には身分証の準備を案内する（年齢つき）
     assert_eq!(reg(&s, 2).customer.age_wait, Some(20));
     scan(&mut s, 2, "staff", "ST002");
-    // 有人モードになったら案内は消え、店員が年確をするか選ぶ
     assert_eq!(reg(&s, 2).customer.age_wait, None);
     no_id_check(&mut s, 2);
-    // 名札を読んだので有人モード。モードはログアウトか 5 分の無操作でだけ戻る
     assert_eq!(reg(&s, 2).mode, Mode::Attended);
     assert_eq!(reg(&s, 2).staff.state, StaffState::Ready);
     assert!(s.snapshot().calls.is_empty());
 }
 
-/// 年確の呼び出し中（会計画面）でも、FF ボタンはサービス・たばこと同じく押せる
 #[test]
 fn ff_button_works_while_age_check_call_is_open() {
     let mut s = Store::new(1, 2, 1);
@@ -257,7 +232,6 @@ fn ff_button_works_while_age_check_call_is_open() {
         .any(|c| c.register == 2 && c.kind == CallKind::FastFood));
 }
 
-/// 店舗ルール：オーナーだけが追加でき、法令ルールは外せない。
 #[test]
 fn only_owner_changes_age_rules() {
     let mut s = Store::new(1, 2, 1);
@@ -283,7 +257,6 @@ fn only_owner_changes_age_rules() {
     assert_eq!(s.snapshot().age_rules.history.len(), 1);
 }
 
-/// 問題3・5：有人モードのお客様は流れを変えられず、店員はどのモードでも操作できる。
 #[test]
 fn customer_cannot_take_over_attended_register() {
     let mut s = Store::new(1, 2, 1);
@@ -311,7 +284,6 @@ fn customer_cannot_take_over_attended_register() {
     assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
 }
 
-/// FF：セミセルフの FF ボタンで呼び出し → 名札でログイン（有人）して登録 → お渡し → お客様の受取確認。
 #[test]
 fn fast_food_flow_in_semi_self_mode() {
     let mut s = Store::new(1, 2, 1);
@@ -335,13 +307,11 @@ fn fast_food_flow_in_semi_self_mode() {
         .is_err(),
         "sold out"
     );
-    // 店員が操作している間、お客様画面は操作できない（排他）
     assert!(run(
         &mut s,
         json!({"type":"checkout","register":2,"side":"customer"})
     )
     .is_err());
-    // FF のお渡し確認にチェックを入れるまで、会計に進めない
     let e = run(
         &mut s,
         json!({"type":"checkout","register":2,"side":"staff"}),
@@ -356,7 +326,6 @@ fn fast_food_flow_in_semi_self_mode() {
         .unwrap()
         .line
         .id;
-    // お渡し数が注文数（2個）と合わなければ NG：お渡し前のままで、会計に進めない
     ok(
         &mut s,
         json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":1}),
@@ -376,7 +345,6 @@ fn fast_food_flow_in_semi_self_mode() {
         json!({"type":"checkout","register":2,"side":"staff"}),
     );
     confirm_point(&mut s, 2);
-    // 会計画面では照合し直せない
     assert!(run(
         &mut s,
         json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2})
@@ -387,7 +355,6 @@ fn fast_food_flow_in_semi_self_mode() {
         Mode::Attended,
         "badge keeps the register attended"
     );
-    // 有人モードなので支払方法は店員が選ぶ
     assert!(run(
         &mut s,
         json!({"type":"select_payment","register":2,"side":"customer","method":"emoney"})
@@ -401,8 +368,6 @@ fn fast_food_flow_in_semi_self_mode() {
     assert_eq!(reg(&s, 2).last_receipt.unwrap().total, 160 + 440);
 }
 
-/// 荷物を受取る：受取用バーコードを読むと係員を呼び、ログインした係員の画面にお預かりの番号が出る。
-/// 保管場所の荷物のバーコードを読んで番号が合えば、サインをもらって引き渡し、取引を終える（一件ずつ）
 #[test]
 fn pickup_matches_the_parcel_then_hands_it_over() {
     let mut s = Store::new(1, 2, 1);
@@ -412,7 +377,6 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Service));
-    // 二件目の受け取りも、ほかの商品も一緒には扱わない
     for code in [RECEIVE, BREAD, PARCEL] {
         assert!(run(
             &mut s,
@@ -428,7 +392,6 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
         .clone()
         .expect("お預かりの番号")
         .no;
-    // 金額は受取用バーコードを読んだときからお客様に見えている
     let amount = reg(&s, 2).staff.lines[0]
         .line
         .pickup
@@ -437,7 +400,6 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
         .amount;
     assert!(amount > 0);
     assert_eq!(reg(&s, 2).customer.total, amount);
-    // 照合の前は引き渡せず、金額の入力もできない。会計もできない
     assert!(run(&mut s, json!({"type":"pickup_handover","register":2})).is_err());
     let id = reg(&s, 2).staff.lines[0].line.id;
     assert!(run(
@@ -446,7 +408,6 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     )
     .is_err());
     assert!(!allowed(&reg(&s, 2), Side::Staff, Action::Checkout));
-    // 別の荷物（番号違い）は照合で止まる。お客様側の画面では読まない
     let other = if no.starts_with('9') {
         "PK000000000000"
     } else {
@@ -473,7 +434,6 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     scan(&mut s, 2, "staff", &right);
     let pk = reg(&s, 2).staff.lines[0].line.pickup.clone().unwrap();
     assert!(pk.matched && pk.wrong.is_none());
-    // 照合が済むと代金引換の金額が明細に付き、お客様側にも合計として出る。会計の前には引き渡せない
     let v = reg(&s, 2);
     assert!(pk.amount >= 1_000);
     assert_eq!(v.customer.total, pk.amount);
@@ -482,7 +442,6 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
         &mut s,
         json!({"type":"checkout","register":2,"side":"staff"}),
     );
-    // 代金引換はポイント付与の対象外なので、ポイントカードの確認は出ない
     assert!(!reg(&s, 2).staff.point_pending);
     ok(
         &mut s,
@@ -495,7 +454,6 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     ok(&mut s, json!({"type":"finish_insert","register":2}));
     let v = reg(&s, 2);
     assert_eq!(v.last_receipt.as_ref().map(|r| r.total), Some(pk.amount));
-    // 決済の後、サインをもらって引き渡す
     assert_eq!(v.pickup_handover.as_deref(), Some(pk.no.as_str()));
     ok(&mut s, json!({"type":"pickup_handover","register":2}));
     let v = reg(&s, 2);
@@ -505,13 +463,9 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Service && c.register == 2));
-    // 引き渡しの後は、続けてお買い物ができる
     scan(&mut s, 2, "staff", BREAD);
 }
 
-/// シミュレーターでは、荷物のバーコードを読む代わりに「有り」「無し」の二択で進められる。
-/// 「無し」なら引き渡さずにお受け取りを終え、「探し直す」で照合の前に戻る。
-/// 「有り」の後は探し直さず、明細も取り消せない（受け取らないなら取引中止）
 #[test]
 fn pickup_can_be_decided_by_found_or_missing() {
     let mut s = Store::new(1, 2, 1);
@@ -528,7 +482,6 @@ fn pickup_can_be_decided_by_found_or_missing() {
         json!({"type":"pickup_found","register":2,"found":null}),
     );
     assert!(!pk(&s).missing && !pk(&s).matched);
-    // 無しならお受け取りを終える（別の取引で、もう一度読んでから有りにする）
     ok(
         &mut s,
         json!({"type":"pickup_found","register":2,"found":false}),
@@ -567,8 +520,6 @@ fn pending_parcel(s: &Store, r: u8) -> u32 {
         .expect("受付中の荷物")
 }
 
-/// 荷物を送る：着払いはレジで 0 円。登録済みの宅配便は、伝票のバーコードを読んで取り消す
-/// （明細の取り消しボタンでは取り消せない。お客様側では読まない）
 #[test]
 fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     let mut s = Store::new(1, 2, 1);
@@ -586,7 +537,6 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     let pc = |s: &Store, i: usize| reg(s, 2).staff.lines[i].line.parcel.clone().unwrap();
     assert!(pc(&s, 0).collect && pc(&s, 0).fee == 940);
     assert_eq!(reg(&s, 2).customer.total, 0);
-    // 次の荷物は同じ着払いで受け付ける
     ok(
         &mut s,
         json!({"type":"parcel_next","register":2,"more":true}),
@@ -603,13 +553,11 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     assert!(pc(&s, 1).collect);
     let slip = pc(&s, 0).slip.replace('-', "");
     assert_eq!(slip.len(), 12);
-    // 明細の取り消しボタンでは取り消せない
     assert!(run(
         &mut s,
         json!({"type":"remove_line","register":2,"side":"staff","line_id":id})
     )
     .is_err());
-    // お客様側では読まない。違う伝票でも取り消さない
     assert!(run(
         &mut s,
         json!({"type":"scan","register":2,"side":"customer","code":format!("PS{slip}")})
@@ -629,8 +577,6 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     assert_eq!(v.staff.lines[0].line.id, id2);
 }
 
-/// 荷物を送る：サイズは二段階（三辺の合計 → 重さ）で決める。「戻る」は一段階ずつ引き返し、
-/// 三辺の合計から戻るとその荷物の受付をやめる（受付済みの荷物があれば「次の荷物はありますか」に戻る）
 #[test]
 fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     let mut s = Store::new(1, 2, 1);
@@ -659,7 +605,6 @@ fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
         &mut s,
         json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
     );
-    // 郵便番号 → 重さ → 三辺の合計 と一段階ずつ戻る
     ok(
         &mut s,
         json!({"type":"parcel_back","register":2,"line_id":id}),
@@ -671,14 +616,12 @@ fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
         json!({"type":"parcel_back","register":2,"line_id":id}),
     );
     assert_eq!(parcel(&s, id).unwrap().sum_cm, 0);
-    // 三辺の合計から戻ると、この荷物の受付をやめて登録画面に戻る
     ok(
         &mut s,
         json!({"type":"parcel_back","register":2,"line_id":id}),
     );
     assert!(reg(&s, 2).staff.lines.is_empty());
     assert!(!reg(&s, 2).staff.parcel_ask);
-    // 二個目で戻ると「次の荷物はありますか」に戻る
     scan(&mut s, 2, "customer", PARCEL);
     let id = pending_parcel(&s, 2);
     ok(
@@ -703,8 +646,6 @@ fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     assert!(v.staff.parcel_ask);
 }
 
-/// 荷物を送る：伝票を読むと係員を呼び、係員がサイズ（三辺の合計・重さ）→ 郵便番号の順に決めると料金が決まる。
-/// 次の荷物が「ある」ならもう一度サイズから、「ない」なら会計に進める（支払方法の制限なし）
 #[test]
 fn parcel_fee_comes_from_size_and_postal_code() {
     let mut s = Store::new(1, 2, 1);
@@ -716,19 +657,16 @@ fn parcel_fee_comes_from_size_and_postal_code() {
         .any(|c| c.kind == CallKind::Service));
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
-    // 金額の直接入力はできない
     assert!(run(
         &mut s,
         json!({"type":"complete_service","register":2,"line_id":id,"amount":1200})
     )
     .is_err());
-    // サイズを決める前に郵便番号は決められない
     assert!(run(
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"100-0001"})
     )
     .is_err());
-    // 三辺の合計 200cm・重さ 30kg を超えると受け付けない（上限は数字で案内する）
     let err = run(
         &mut s,
         json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":201,"weight_g":3000}),
@@ -755,7 +693,6 @@ fn parcel_fee_comes_from_size_and_postal_code() {
     assert_eq!(v.customer.total, 940);
     assert!(v.staff.parcel_ask && v.customer.parcel_ask);
     assert!(!allowed(&v, Side::Staff, Action::Checkout));
-    // 次の荷物がある：もう一つ受付する
     ok(
         &mut s,
         json!({"type":"parcel_next","register":2,"more":true}),
@@ -770,7 +707,6 @@ fn parcel_fee_comes_from_size_and_postal_code() {
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id2,"postal":"530-0001"}),
     );
-    // 80 サイズ・関西あて
     assert_eq!(reg(&s, 2).customer.total, 940 + 1230 + 240);
     ok(
         &mut s,
@@ -779,7 +715,6 @@ fn parcel_fee_comes_from_size_and_postal_code() {
     let v = reg(&s, 2);
     assert!(!v.staff.parcel_ask);
     assert!(allowed(&v, Side::Staff, Action::Checkout));
-    // ポイントカードを読んでも、宅配便はポイント付与の対象外（会計時のポイントカードの確認も出ない）
     scan(&mut s, 2, "staff", "PC12345678");
     ok(
         &mut s,
@@ -799,7 +734,6 @@ fn parcel_fee_comes_from_size_and_postal_code() {
     assert_eq!(reg(&s, 2).last_receipt.map(|r| r.points), Some(0));
 }
 
-/// 宅配便だけの会計では、ポイントカードの確認を出さない
 #[test]
 fn parcel_skips_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -825,7 +759,6 @@ fn parcel_skips_point_card_check() {
     assert!(!reg(&s, 2).staff.point_pending);
 }
 
-/// 荷物の発送は、ほかの商品と一緒に会計できない（荷物どうしは一緒に会計できる）
 #[test]
 fn parcel_cannot_be_mixed_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
@@ -839,7 +772,6 @@ fn parcel_cannot_be_mixed_with_other_goods() {
     scan(&mut s, 2, "customer", PARCEL);
     scan(&mut s, 2, "customer", PARCEL);
     assert_eq!(reg(&s, 2).customer.lines.len(), 2);
-    // 係員が受付をするまで会計できない
     assert!(run(
         &mut s,
         json!({"type":"checkout","register":2,"side":"customer"})
@@ -857,7 +789,6 @@ fn parcel_cannot_be_mixed_with_other_goods() {
     .is_err());
 }
 
-/// 問題6：出金はスタッフ側の店舗メニューに入ったときだけでき、記録が残る。
 #[test]
 fn cash_out_only_inside_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
@@ -868,7 +799,6 @@ fn cash_out_only_inside_the_store_menu() {
         "店舗メニューの外では出金できない"
     );
     open_staff_menu(&mut s, 1);
-    // お金を抜く操作は、メニューの中でも操作のたびに店舗パスワードが要る
     assert!(run(
         &mut s,
         json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000})
@@ -884,7 +814,6 @@ fn cash_out_only_inside_the_store_menu() {
     let a = s.snapshot().audit;
     assert_eq!(a.len(), 2);
     assert_eq!(a[1].staff, "スタッフ001");
-    // 未ログインのレジでは出金できない
     assert!(run(
         &mut s,
         json!({"type":"cash_out","register":2,"kind":"refund","amount":100,"password":"7777"})
@@ -892,7 +821,6 @@ fn cash_out_only_inside_the_store_menu() {
     .is_err());
 }
 
-/// 店舗メニューはスタッフ側の画面だけ。ログインしたスタッフがパスワードなしで開く
 #[test]
 fn store_menu_opens_only_on_the_staff_side() {
     let mut s = Store::new(1, 2, 1);
@@ -908,7 +836,6 @@ fn store_menu_opens_only_on_the_staff_side() {
     assert!(reg(&s, 1).menu.is_none());
 }
 
-/// 問題8：呼び出しは発生したレジだけに出て、ほかのレジには出ない。
 #[test]
 fn calls_stay_on_originating_register() {
     let mut s = Store::new(1, 4, 2);
@@ -918,15 +845,12 @@ fn calls_stay_on_originating_register() {
     assert_eq!(snap.registers[1].staff.calls.len(), 1);
     assert!(snap.registers[0].staff.calls.is_empty());
     assert!(snap.registers[2].staff.calls.is_empty());
-    // 後から来たレジ4を先に片付けても、レジ2は残る
     login_as(&mut s, 4, "ST002");
     let snap = s.snapshot();
     assert_eq!(snap.calls.len(), 1);
     assert_eq!(snap.calls[0].register, 2);
 }
 
-/// 問題10：通信ロスがあっても再送で MAT は鳴り、不通は検知される。
-/// MAT は呼び鈴：ボタンに触れている間だけ鳴り、離せば止む。鳴らし直しはしない。
 #[test]
 fn mat_rings_despite_loss_and_reports_link_down() {
     let mut s = Store::new(7, 2, 1);
@@ -942,7 +866,6 @@ fn mat_rings_despite_loss_and_reports_link_down() {
     advance(&mut s, 8_000);
     let snap = s.snapshot();
     assert!(!snap.mats[0].buzzing, "stops once released");
-    // 呼び出しは開いたままでも、鳴らし直さない
     let before = snap.mats[0].rings;
     advance(&mut s, 60_000);
     assert_eq!(s.snapshot().mats[0].rings, before);
@@ -962,7 +885,6 @@ fn mat_rings_despite_loss_and_reports_link_down() {
     );
 }
 
-/// お客様画面には分類や年確対象の情報を出さない（店員画面にだけ出す）。
 #[test]
 fn customer_view_hides_staff_only_information() {
     let mut s = Store::new(1, 2, 1);
@@ -976,7 +898,6 @@ fn customer_view_hides_staff_only_information() {
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
 }
 
-/// 画面の操作は排他：セミセルフ（名札なし）はお客様画面、有人（名札あり）は店員画面が操作する。
 #[test]
 fn staff_and_customer_screens_are_exclusive() {
     let mut s = Store::new(1, 2, 1);
@@ -994,7 +915,6 @@ fn staff_and_customer_screens_are_exclusive() {
         &mut s,
         json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
     );
-    // 店員が名札を読むと有人モードになり、支払い中でも両方の画面が操作できる
     scan(&mut s, 1, "staff", "ST002");
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::Attended);
@@ -1003,14 +923,12 @@ fn staff_and_customer_screens_are_exclusive() {
         &mut s,
         json!({"type":"back_to_registering","register":1,"side":"staff"}),
     );
-    // 店員側が触れている一瞬は、お客様側からの操作が利かない
     assert_eq!(reg(&s, 1).active_side, Some(Side::Staff));
     assert!(run(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"})
     )
     .is_err());
-    // ログアウトするとセミセルフに戻り、お客様が続きを操作する
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
@@ -1022,7 +940,6 @@ fn staff_and_customer_screens_are_exclusive() {
     confirm_point(&mut s, 1);
 }
 
-/// 年確ルールは売り場のどの商品にも個別に付けられる（オーナーのみ、法令は外せない）。
 #[test]
 fn owner_sets_age_rule_per_product() {
     let mut s = Store::new(1, 2, 1);
@@ -1030,10 +947,8 @@ fn owner_sets_age_rule_per_product() {
     assert!(run(&mut s, set("001", "1111", SANDWICH, Some(20))).is_err());
     ok(&mut s, set("000", "9999", SANDWICH, Some(20)));
     ok(&mut s, set("000", "9999", LIGHTER, None));
-    // 酒・たばこは法令どおりで変更不可
     assert!(run(&mut s, set("000", "9999", BEER, None)).is_err());
     assert!(run(&mut s, set("000", "9999", BEER, Some(25))).is_err());
-    // どの商品にも個別に設定できる
     ok(&mut s, set("000", "9999", TEA, Some(18)));
     let cat = s.snapshot().catalog;
     let age = |c: &str| cat.iter().find(|p| p.code == c).unwrap().age;
@@ -1043,7 +958,6 @@ fn owner_sets_age_rule_per_product() {
     assert_eq!(age(TEA), Some(18));
 }
 
-/// 運用モードは名札で決まる。手で有人／セミセルフは選べず、セルフは機能 OFF。
 #[test]
 fn mode_follows_staff_badge() {
     let mut s = Store::new(1, 2, 1);
@@ -1058,7 +972,6 @@ fn mode_follows_staff_badge() {
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
 }
 
-/// セミセルフでは、お客様は FF を登録できない（FF ボタンで係員を呼ぶ）。
 #[test]
 fn customer_cannot_register_ff_in_semi_self() {
     let mut s = Store::new(1, 2, 1);
@@ -1070,14 +983,11 @@ fn customer_cannot_register_ff_in_semi_self() {
     ok(&mut s, json!({"type":"ff_button","register":2}));
 }
 
-/// 名札でログインした有人モードも、5 分間操作がなければログアウトしてセミセルフに戻る。
-/// 商品を登録していても、5 分間操作がなければ取引を中止して戻る（取引の保留機能は持たない）。
 #[test]
 fn idle_register_returns_to_semi_self() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 2);
     advance(&mut s, 4 * 60_000);
-    // 途中で操作があれば数え直す
     scan(&mut s, 2, "staff", BREAD);
     ok(&mut s, json!({"type":"void_transaction","register":2}));
     advance(&mut s, 4 * 60_000);
@@ -1087,7 +997,6 @@ fn idle_register_returns_to_semi_self() {
     assert_eq!(v.mode, Mode::SemiSelf);
     assert_eq!(v.staff.state, StaffState::Absent);
     assert!(v.idle_revert_in.is_none());
-    // 取引中でも 5 分間操作がなければ、取引を中止してセミセルフに戻る。入れたお金は出金ボックスへ
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
     ok(
@@ -1111,7 +1020,6 @@ fn idle_register_returns_to_semi_self() {
     assert!(v.customer.lines.is_empty());
     assert_eq!(v.customer.inserted, 0);
     assert_eq!(v.outlet, 100);
-    // セミセルフで登録したまま離れた取引も、5 分で中止する
     scan(&mut s, 2, "customer", BREAD);
     assert!(reg(&s, 2).idle_voids);
     advance(&mut s, 5 * 60_000 + 1_000);
@@ -1119,12 +1027,10 @@ fn idle_register_returns_to_semi_self() {
     assert!(reg(&s, 2).idle_revert_in.is_none());
 }
 
-/// 店舗メニュー（お客様側）：お金を入れる操作も抜く操作も、メニューに入ればパスワード不要。どちらも記録が残る。
 #[test]
 fn cash_in_and_out_from_the_customer_side_menu() {
     let mut s = Store::new(1, 2, 1);
     let cin = json!({"type":"cash_in","register":1,"kind":"deposit","amount":3000});
-    // 名札でログインした有人モードでだけ使える
     assert!(run(&mut s, cin.clone()).is_err());
     login(&mut s, 1);
     assert!(
@@ -1146,7 +1052,6 @@ fn cash_in_and_out_from_the_customer_side_menu() {
     assert_eq!(reg(&s, 1).staff.drawer_total, before);
     let ops: Vec<_> = s.snapshot().audit.iter().map(|a| a.operation).collect();
     assert_eq!(ops, vec!["取引外入金", "釣銭補充", "釣銭機回収"]);
-    // 取引中は入出金できない
     scan(&mut s, 1, "staff", BREAD);
     assert!(run(
         &mut s,
@@ -1155,22 +1060,18 @@ fn cash_in_and_out_from_the_customer_side_menu() {
     .is_err());
 }
 
-/// 投入口と排出口：投入口に金額を入れて支払い、おつりは排出口に出て取り出すまで残る。
 #[test]
 fn inlet_pays_and_change_waits_in_outlet() {
     let mut s = Store::new(1, 2, 1);
-    // セミセルフは現金を使えない（入金ボックスはスタッフ側の画面）
     scan(&mut s, 1, "customer", BREAD);
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
     login(&mut s, 1);
-    // お会計前は受け付けない
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     confirm_point(&mut s, 1);
-    // 入れたお金は積み上がり、Enter で投入を終えると決済する
     ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
     assert!(
         run(&mut s, json!({"type":"finish_insert","register":1})).is_err(),
@@ -1188,9 +1089,6 @@ fn inlet_pays_and_change_waits_in_outlet() {
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.outlet, 1100 - 160);
-    // 「ありがとうございました」は 3 秒で消え、新しいお客様の待ち受けに戻る。
-    // ただし排出口に釣り銭が残っている間は、取り出されるまで戻らない。
-    // 「ありがとうございました」の 3 秒は、釣り銭を取り出したときから数える
     assert!(v.last_receipt.is_some());
     let at = v.last_receipt.as_ref().unwrap().at;
     s.tick(at + 5000);
@@ -1204,8 +1102,6 @@ fn inlet_pays_and_change_waits_in_outlet() {
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
 }
 
-/// 店舗メニューはスタッフ側の画面に一画面ずつ出す。
-/// 入金・両替はスタッフ側の入金ボックス、出金と両替のお金は出金ボックスを使う。
 #[test]
 fn store_menu_uses_inlet_and_outlet() {
     let mut s = Store::new(1, 2, 1);
@@ -1219,12 +1115,10 @@ fn store_menu_uses_inlet_and_outlet() {
     open_staff_menu(&mut s, 1);
     let v = reg(&s, 1);
     assert_eq!(v.active_side, Some(Side::Staff));
-    // 取引外入金：投入口に入れた金額が入金になる
     ok(&mut s, open("deposit"));
     let before = reg(&s, 1).staff.drawer_total;
     ok(&mut s, json!({"type":"insert","register":1,"amount":2000}));
     assert_eq!(reg(&s, 1).staff.drawer_total, before + 2000);
-    // 自動釣銭機：一万円を千円札に両替して排出口へ
     ok(
         &mut s,
         json!({"type":"open_menu","register":1,"side":"staff","screen":"changer","exchange_to":1000}),
@@ -1235,14 +1129,12 @@ fn store_menu_uses_inlet_and_outlet() {
     assert_eq!(v.outlet_detail, vec![(1000, 10)]);
     assert_eq!(v.staff.drawer_total, before + 2000);
     ok(&mut s, json!({"type":"take_outlet","register":1}));
-    // 緊急出金：お金は排出口に出る
     ok(&mut s, open("emergency"));
     ok(
         &mut s,
         json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"}),
     );
     assert_eq!(reg(&s, 1).outlet, 5000);
-    // 閉じると両方の画面に戻る（触れている一瞬が過ぎれば）。ログアウトでもメニューは閉じる
     ok(
         &mut s,
         json!({"type":"open_menu","register":1,"side":"staff","screen":null}),
@@ -1262,8 +1154,6 @@ fn store_menu_uses_inlet_and_outlet() {
     assert!(reg(&s, 1).menu.is_none());
 }
 
-/// 有人モード：どちらも触れていなければ、FF はどちらの画面からも登録できる。
-/// 触れている一瞬だけ、もう一方の画面からの操作が利かない。
 #[test]
 fn attended_screens_lock_only_while_touched() {
     let mut s = Store::new(1, 2, 1);
@@ -1273,13 +1163,11 @@ fn attended_screens_lock_only_while_touched() {
     assert_eq!(v.active_side, None);
     assert!(allowed(&v, Side::Customer, Action::RegisterFf));
     assert!(allowed(&v, Side::Staff, Action::RegisterFf));
-    // お客様画面から FF を登録（係員がお渡しする）
     ok(
         &mut s,
         json!({"type":"register_ff","register":1,"side":"customer","code":"FF01","qty":1}),
     );
     assert!(reg(&s, 1).staff.calls.is_empty());
-    // お客様画面に触れた一瞬は、店員画面から操作できない
     assert_eq!(reg(&s, 1).active_side, Some(Side::Customer));
     let e = run(&mut s, json!({"type":"claim","register":1,"side":"staff"})).unwrap_err();
     assert!(e.contains("操作中"), "{e}");
@@ -1288,26 +1176,22 @@ fn attended_screens_lock_only_while_touched() {
         json!({"type":"register_ff","register":1,"side":"staff","code":"FF02","qty":1})
     )
     .is_err());
-    // 一瞬が過ぎれば、両方の画面に戻る
     advance(&mut s, 1_000);
     assert_eq!(reg(&s, 1).active_side, None);
     ok(
         &mut s,
         json!({"type":"register_ff","register":1,"side":"staff","code":"FF02","qty":1}),
     );
-    // 2 品ともお渡し確認のチェック前で、会計に進めない
     let v = reg(&s, 1);
     assert_eq!(v.staff.lines.len(), 2);
     assert!(!allowed(&v, Side::Staff, Action::Checkout));
     assert!(allowed(&v, Side::Staff, Action::CheckFf));
     let ids: Vec<u32> = v.staff.lines.iter().map(|l| l.line.id).collect();
     let check = |id: u32, side: &str| json!({"type":"check_ff","register":1,"side":side,"line_id":id,"handed":1});
-    // 店員が触れた直後は、お客様画面からはチェックできない
     assert!(run(&mut s, check(ids[0], "customer")).is_err());
     ok(&mut s, check(ids[0], "staff"));
     assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
     advance(&mut s, 1_000);
-    // お渡しの確認はスタッフ側の画面だけ（お客様側では確認できない）
     assert!(run(&mut s, check(ids[1], "customer")).is_err());
     ok(&mut s, check(ids[1], "staff"));
     advance(&mut s, 1_000);
@@ -1319,8 +1203,6 @@ fn attended_screens_lock_only_while_touched() {
     confirm_point(&mut s, 1);
 }
 
-/// 呼び出したレジはランプで知らせる。順番待ちはなく、後から呼んだレジもすぐ点く。
-/// 店員が来るまで点きっぱなしで、来れば消える。
 #[test]
 fn called_register_lamp_lights_at_once_until_staff_arrives() {
     let mut s = Store::new(1, 2, 1);
@@ -1349,7 +1231,6 @@ fn called_register_lamp_lights_at_once_until_staff_arrives() {
     assert!(reg(&s, 2).lamp);
 }
 
-/// 財布のクレジットカードで払う。選んだ支払方法と違うカードをかざしても通らない。
 #[test]
 fn wallet_card_must_match_chosen_method() {
     let mut s = Store::new(1, 2, 1);
@@ -1378,7 +1259,6 @@ fn wallet_card_must_match_chosen_method() {
     assert_eq!(rc.method, "クレジットカード");
 }
 
-/// 放置された呼び出しほど大きく鳴る。先に呼んだレジのほうが大きい。
 #[test]
 fn neglected_calls_ring_louder() {
     use janus_pos_core::store::{ring_volume, RING_FULL_MS, RING_MIN};
@@ -1407,8 +1287,6 @@ fn neglected_calls_ring_louder() {
     assert_eq!(reg(&s, 1).ring_volume, 0.0);
 }
 
-/// セミセルフ画面の FF・サービス・たばこボタンは店員呼び出しのショートカット。
-/// 代行収納・宅配便のバーコードを直接読んでも呼び出しになる。ランプは店員が来るまで点く。
 #[test]
 fn shortcut_buttons_call_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -1431,30 +1309,23 @@ fn shortcut_buttons_call_staff() {
             && k.contains(&CallKind::FastFood)
     );
     assert!(reg(&s, 1).lamp);
-    // 呼び出しは開いたまま（店員が来るまでランプが点く）
     ok(&mut s, json!({"type":"release_call","register":1}));
     advance(&mut s, 60_000);
     assert_eq!(kinds(&s, 1).len(), 3);
-    // 宅配便のバーコードを直接読むと、サービスの呼び出しになる
     scan(&mut s, 2, "customer", PARCEL);
     assert!(kinds(&s, 2).contains(&CallKind::Service));
-    // 店員が来ると、呼び出しはすべて解除される（ログアウトしても復活しない）
     login(&mut s, 1);
     assert!(kinds(&s, 1).is_empty());
-    // 買い物がないままログアウトしても、呼び出し（ランプ）は復活しない
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert!(kinds(&s, 1).is_empty());
     assert!(!reg(&s, 1).lamp);
     login(&mut s, 1);
-    // 有人モードでは、店員が仲間に SOS を出すのに使う。Bell は鳴るが、呼び出しの記録は増えない
     ok(&mut s, json!({"type":"call_staff","register":1}));
     advance(&mut s, 1_000);
     assert!(s.snapshot().mats[0].buzzing, "SOS rings the bell");
     assert!(kinds(&s, 1).is_empty());
 }
 
-/// スタッフがログインしていないとき（顧客操作モード）も、スタッフ側のベルで仲間に応援を頼める。
-/// Bell は鳴るが、呼び出しの記録は作らない（スタッフ側に通知画面を出さない）
 #[test]
 fn staff_bell_calls_colleagues_without_call_screen() {
     let mut s = Store::new(1, 2, 1);
@@ -1466,8 +1337,6 @@ fn staff_bell_calls_colleagues_without_call_screen() {
     ok(&mut s, json!({"type":"release_call","register":1}));
 }
 
-/// 呼び出しボタンは触れている間だけ MAT を鳴らす。短く押して「押した」電文が失われても、
-/// 押した回数が届いた時点で必ず鳴る（押したのに鳴らない、をなくす）。
 #[test]
 fn call_button_rings_only_while_held_and_every_press_rings() {
     for seed in 1..20u64 {
@@ -1483,7 +1352,6 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
                 &mut s,
                 json!({"type":"call_staff","register":1,"topic":topic}),
             );
-            // ちょんと押してすぐ離す
             advance(&mut s, 50);
             ok(&mut s, json!({"type":"release_call","register":1}));
             advance(&mut s, 30_000);
@@ -1502,7 +1370,6 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
                 "delivery is acknowledged"
             );
         }
-        // FF ボタンも同じ（ショートカット）
         ok(&mut s, json!({"type":"ff_button","register":2}));
         advance(&mut s, 20_000);
         assert!(s.snapshot().mats[0].buzzing, "held FF keeps ringing");
@@ -1512,7 +1379,6 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
     }
 }
 
-/// 有人モードにしたあと（お客様画面が操作側のままでも）、ログアウトでセミセルフに戻れる。
 #[test]
 fn logout_returns_to_semi_self_even_while_customer_screen_holds() {
     let mut s = Store::new(1, 2, 1);
@@ -1521,7 +1387,6 @@ fn logout_returns_to_semi_self_even_while_customer_screen_holds() {
     assert_eq!(reg(&s, 1).active_side, None);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
-    // 取引の途中（FF 登録済み）でも戻れる
     scan(&mut s, 1, "staff", "ST001");
     ok(
         &mut s,
@@ -1531,8 +1396,6 @@ fn logout_returns_to_semi_self_even_while_customer_screen_holds() {
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
 }
 
-/// 有人モードでお客様画面から FF を登録し、お渡しチェックを入れて会計できる。
-/// 会計ボタンの後はポイントカードの最終確認があり、それが済むと支払方法を選べる。
 #[test]
 fn checkout_from_held_customer_screen_then_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -1555,13 +1418,11 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     let v = reg(&s, 1);
     assert_eq!(v.customer.phase, Phase::Paying);
     assert!(v.customer.point_pending);
-    // 確認が済むまで支払方法は選べない
     assert!(run(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"customer","method":"cash"})
     )
     .is_err());
-    // 確認中にポイントカードを読めば、そのまま確認済み（登録画面には戻らない）
     scan(&mut s, 1, "customer", "PC12345678");
     let v = reg(&s, 1);
     assert_eq!(v.customer.phase, Phase::Paying);
@@ -1574,7 +1435,6 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 220);
 
-    // ポイントカードを先に読んでいれば、確認は済んでいる
     scan(&mut s, 1, "customer", "PC12345678");
     ok(
         &mut s,
@@ -1593,8 +1453,6 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     assert!(!reg(&s, 1).customer.point_pending);
 }
 
-/// 店員側・お客様側の区別はない。有人モードでは操作側の画面なら取引中止もできる。
-/// 年確の「する／しない」は店員側の画面にだけ効く。
 #[test]
 fn either_screen_can_operate_except_age_confirmation() {
     let mut s = Store::new(1, 2, 1);
@@ -1618,12 +1476,9 @@ fn either_screen_can_operate_except_age_confirmation() {
     )
     .is_err());
     no_id_check(&mut s, 1);
-    // 取引中止もお客様側の画面から（操作側なので）できる
     ok(&mut s, json!({"type":"void_transaction","register":1}));
 }
 
-/// 有人モードで店員が年確を「しない」を選ぶと、年確はそこで済む。
-/// お客様側の画面に年確のボタンは出さず、そのままポイントカードの最終確認へ進む。
 #[test]
 fn staff_skipping_the_age_check_needs_no_customer_button() {
     let mut s = Store::new(1, 2, 1);
@@ -1641,7 +1496,6 @@ fn staff_skipping_the_age_check_needs_no_customer_button() {
     assert_eq!(reg(&s, 1).staff.payment_blocker, None);
 }
 
-/// 店員が払込票の種類ごとの金額を確かめ、チェックを入れる（false で外す）
 fn check_bill(s: &mut Store, r: u8, line_id: u32, checked: bool) {
     ok(
         s,
@@ -1649,16 +1503,10 @@ fn check_bill(s: &mut Store, r: u8, line_id: u32, checked: bool) {
     );
 }
 
-/// 払込票の明細番号（読み取った順）
 fn bill_ids(s: &Store, r: u8) -> Vec<u32> {
     reg(s, r).staff.bills.iter().map(|b| b.line_id).collect()
 }
 
-/// 公共料金の支払い：払込票は普通の商品と同じに読み取り、会計ボタンの後に店員が払込票の内容を
-/// 一枚ずつ事業者・金額を確かめてチェックを入れる（店員側の画面だけ。同じ事業者でもまとめない）。
-/// すべて確認するまで支払いに進めない。
-/// 現金のみで、ポイントの確認・年確はない。決済の後は、店員が収納印を押して「お渡し済」を押すまで
-/// お客様に払込票・レシート・お釣りの受け取りを案内する
 #[test]
 fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     let mut s = Store::new(1, 2, 1);
@@ -1684,7 +1532,6 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
             ("電気料金", 5_000)
         ]
     );
-    // 払込票ごとに便宜的なバーコード番号（16 桁を 4 桁ずつ）。同じ事業者でも別の番号
     let nos: Vec<_> = v.staff.bills.iter().map(|b| b.slip_no.clone()).collect();
     for no in &nos {
         assert_eq!(no.len(), 19, "{no}");
@@ -1702,7 +1549,6 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     )
     .unwrap_err();
     assert!(e.contains("スタッフ側"), "{e}");
-    // チェックは外せる（外せば未確認に戻る）
     check_bill(&mut s, 1, ids[0], true);
     let v = reg(&s, 1);
     assert!(v.staff.bills[0].checked);
@@ -1736,7 +1582,6 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     let r = v.last_receipt.unwrap();
     assert_eq!((r.total, r.method, r.points), (17_000, "現金", 0));
     assert_eq!(v.bill_handover, Some(4));
-    // お釣りを取り出しても、お渡し済を押すまで案内は残る
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     advance(&mut s, 10_000);
     assert!(reg(&s, 1).last_receipt.is_some());
@@ -1754,8 +1599,6 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     assert!(reg(&s, 1).last_receipt.is_none());
 }
 
-/// セミセルフでは、会計ボタンで係員を呼ぶ（呼び出しは「公共料金」と枚数）。係員がログインして
-/// 払込票の金額を確認するまで、お客様は支払いに進めない
 #[test]
 fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
     let mut s = Store::new(1, 2, 1);
@@ -1782,7 +1625,6 @@ fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
     login(&mut s, 1);
     assert_eq!(reg(&s, 1).mode, Mode::Attended);
     let ids = bill_ids(&s, 1);
-    // 呼び出しは店員のログインで解除される（伝票の確認そのものは続く）
     assert!(s.snapshot().calls.is_empty());
     check_bill(&mut s, 1, ids[0], true);
     check_bill(&mut s, 1, ids[1], true);
@@ -1790,12 +1632,10 @@ fn semi_self_bill_checkout_calls_staff_to_check_the_slips() {
     ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).bill_handover, Some(2));
-    // 次のお買い物が始まれば、お渡しは済んだものとする
     scan(&mut s, 1, "staff", BREAD);
     assert_eq!(reg(&s, 1).bill_handover, None);
 }
 
-/// 公共料金の払込票は、ほかの商品と一緒に登録できない（どちらを先に読んでも、FF も）
 #[test]
 fn utility_bills_cannot_share_a_transaction_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
@@ -1822,8 +1662,6 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
     assert_eq!(reg(&s, 1).staff.lines.len(), 1);
 }
 
-/// 登録した払込票は明細ごとには取り消せない（有人でもセミセルフでも）。
-/// 払えないときは取引中止で最初からやり直す
 #[test]
 fn registered_bill_slips_cannot_be_removed_only_voided() {
     let mut s = Store::new(1, 2, 1);
@@ -1849,8 +1687,6 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
     assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
-/// ポイントはポイント付与の対象商品の分だけに使える（付く商品＝使える商品）。
-/// FF・サンドイッチ・たばこなら、ポイントで払うのはたばこ以外。残りのたばこはほかの支払方法で払う
 #[test]
 fn points_pay_only_for_point_eligible_goods() {
     let mut s = Store::new(1, 2, 1);
@@ -1884,7 +1720,6 @@ fn points_pay_only_for_point_eligible_goods() {
     let v = reg(&s, 1);
     assert_eq!(v.prepaid, sand);
     assert_eq!(v.staff.due, tob);
-    // 残りのたばこは、ポイント以外の手段で払う
     assert!(run(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"})
@@ -1900,10 +1735,8 @@ fn points_pay_only_for_point_eligible_goods() {
     );
     let r = reg(&s, 1).last_receipt.expect("決済済み");
     assert_eq!(r.method, "ポイント利用・クレジットカード");
-    // ポイントで払った分にもポイントは付く対象だが、付与は対象商品（サンドイッチ）の分だけ
     assert_eq!(r.points, sand / 100);
 
-    // たばこだけならポイントは使えない
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "staff", "PC12345678");
@@ -1919,7 +1752,6 @@ fn points_pay_only_for_point_eligible_goods() {
         .any(|u| u.method == PaymentMethod::Points));
 }
 
-/// セミセルフで支払方法に現金を選ぶとスタッフ呼び出し（カードが通らず現金で払いたい場合）。選び直せば片付く
 #[test]
 fn semi_self_cash_choice_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -1942,10 +1774,8 @@ fn semi_self_cash_choice_calls_staff() {
     assert!(reg(&s, 1).staff.calls.is_empty());
 }
 
-/// 切手は現金のみ（非課税）。ほかの商品と一緒に買えるが、キャッシュレスで払えるのは切手を除いた分だけ
 #[test]
 fn stamps_are_paid_in_cash_even_with_other_items() {
-    // セミセルフ（キャッシュレス専用）：切手は会計ボタンでスタッフを呼び、現金はスタッフが有人モードで預かる
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);
     scan(&mut s, 1, "customer", STAMP);
@@ -1966,18 +1796,15 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
     )
     .is_err());
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":500})).is_err());
-    // スタッフがログインすると呼び出しは片付き、有人モードで現金を預かる
     login(&mut s, 1);
     assert!(reg(&s, 1).staff.calls.is_empty());
 
-    // 切手だけならキャッシュレスは選べない
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", STAMP);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
-    // 切手はポイント付与の対象外なので、切手だけの会計ではポイントカードの確認を出さない
     for m in ["emoney", "qr", "credit", "points"] {
         assert!(
             run(
@@ -1994,7 +1821,6 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
         "非課税"
     );
 
-    // パンと切手：電子マネーで払うのはパンの分だけ、切手は現金で
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
@@ -2022,7 +1848,6 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
     assert_eq!(v.outlet, 390);
     assert_eq!(v.last_receipt.unwrap().method, "電子マネー・現金");
 
-    // 取引中止なら電子マネーで払った分は残高に戻る
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
@@ -2044,7 +1869,6 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
     assert_eq!(emoney_balance(&s), 1_000);
 }
 
-/// 買い物点数は 10 点まで（数量の合計）。上限を超える商品は登録されず、FF も同じ。
 #[test]
 fn shopping_is_limited_to_ten_items() {
     let mut s = Store::new(1, 2, 1);
@@ -2066,7 +1890,6 @@ fn shopping_is_limited_to_ten_items() {
     )
     .unwrap_err();
     assert!(e.contains("10点"), "{e}");
-    // 取り消せば、また登録できる
     let id = reg(&s, 1).staff.lines[0].line.id;
     advance(&mut s, 1_000);
     ok(
@@ -2076,7 +1899,6 @@ fn shopping_is_limited_to_ten_items() {
     scan(&mut s, 1, "customer", BREAD);
 }
 
-/// 取引中止・ログアウトは店舗メニューから行い、済んだらメニューは閉じる。ロックはない。
 #[test]
 fn void_and_logout_from_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
@@ -2092,13 +1914,9 @@ fn void_and_logout_from_the_store_menu() {
     assert_eq!(reg(&s, 1).mode, Mode::SemiSelf);
 }
 
-/// 年確：年確商品があれば、まず店員が「年齢確認をする／しない」を選ぶ。
-/// 「する」なら身分証の生年月日を入力し、年齢に届かない年確商品は買い物から取り除いて
-/// 回収する商品と個数を店員に示す（店舗判断で 18 歳以上にしたライターは買えるが酒は買えない等）。
 #[test]
 fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let mut s = Store::new(1, 2, 1);
-    // 店舗判断でライターを 18 歳以上にしておく
     ok(
         &mut s,
         json!({"type":"set_product_age","owner_id":"000","password":"9999","code":LIGHTER,"min_age":18}),
@@ -2116,7 +1934,6 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let v = reg(&s, 1);
     assert!(v.staff.age_choice_pending);
     let birth = |b: &str| json!({"type":"check_id","register":1,"birth":b,"today":"2026-10-19"});
-    // 選ぶ前は入力できない。お客様側の画面からは選べない
     assert!(run(&mut s, birth("20070501")).is_err());
     assert!(run(
         &mut s,
@@ -2132,7 +1949,6 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
     assert!(run(&mut s, birth("20270101")).is_err());
-    // 19 歳：ライター（18）は買えるが、アルコール（20）は買えない
     let msg = run(&mut s, birth("20070501")).unwrap().unwrap();
     assert!(msg.contains("19歳") && msg.contains("アルコール"), "{msg}");
     let v = reg(&s, 1);
@@ -2158,18 +1974,14 @@ fn age_counts_the_birthday() {
     assert_eq!(age_on("20061019", "2026-10-19"), Ok(20));
     assert_eq!(age_on("20061020", "2026-10-19"), Ok(19));
     assert_eq!(age_on("19821002", "2026-10-19"), Ok(44));
-    // 西暦 8 桁だけ。存在しない日付や和暦は読まない
     for bad in ["2006/10/19", "20070231", "570102", "S57.10.2", "2006101"] {
         assert!(age_on(bad, "2026-10-19").is_err(), "{bad}");
     }
 }
 
-/// 引換券・割引券は商品より先に読んでもよい。対象商品が登録されたときに値引きし、
-/// 対象商品がなければ「対象商品待ち」のまま決済の邪魔はしない。
 #[test]
 fn coupons_apply_whenever_the_target_is_registered() {
     let mut s = Store::new(1, 2, 1);
-    // 商品より先にクーポン
     scan(&mut s, 1, "customer", "CP0001");
     let v = reg(&s, 1);
     assert_eq!(v.customer.coupons.len(), 1);
@@ -2179,22 +1991,18 @@ fn coupons_apply_whenever_the_target_is_registered() {
     let v = reg(&s, 1);
     assert_eq!(v.customer.coupons[0].discount, Some(150));
     assert_eq!(v.customer.total, 0);
-    // 同じクーポンを 2 枚目も使える。対象商品 1 個につき 1 枚
     scan(&mut s, 1, "customer", "CP0001");
     assert_eq!(reg(&s, 1).customer.coupons[1].discount, None);
     scan(&mut s, 1, "customer", TEA);
     let v = reg(&s, 1);
     assert_eq!(v.customer.coupons[1].discount, Some(150));
     assert_eq!(v.customer.total, 0);
-    // 商品の後にクーポン（割引券）。3 本目のソフトドリンクは定価
     scan(&mut s, 1, "customer", SANDWICH);
     scan(&mut s, 1, "customer", TEA);
     scan(&mut s, 1, "customer", "CP0002");
     let v = reg(&s, 1);
     assert_eq!(v.customer.total, 150 + 320 - 50);
-    // クーポンは買い物点数に数えない
     assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 4);
-    // クーポンを使ったまま会計できる
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
@@ -2211,7 +2019,6 @@ fn coupons_apply_whenever_the_target_is_registered() {
 #[test]
 fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     let mut s = Store::new(1, 2, 1);
-    // ソフトドリンクの引換券のつもりで、別の商品をレジに通した
     scan(&mut s, 1, "customer", "CP0001");
     scan(&mut s, 1, "customer", "4900000000028");
     ok(
@@ -2219,7 +2026,6 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     confirm_point(&mut s, 1);
-    // 両方の画面に注意を出し、決済できない
     let v = reg(&s, 1);
     assert!(v.staff.coupon_unmatched && v.customer.coupon_unmatched);
     assert!(v
@@ -2232,7 +2038,6 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
         json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
     );
     assert!(run(&mut s, json!({"type":"tap_emoney","register":1})).is_err());
-    // お会計中でもクーポンを取り消せる。取り消したクーポンは返却の案内に載る
     let id = reg(&s, 1).customer.coupons[0].id;
     ok(
         &mut s,
@@ -2248,8 +2053,6 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 320);
 }
 
-/// 同じ商品は、続けて読んだときだけ一番上の行に足す。間に別の商品をはさんだら新しい行にし、
-/// 前に登録した行を一番上に積みなおさない（個数を変える人が前の分を覚えていなくて済む）。
 #[test]
 fn same_item_merges_only_when_scanned_in_a_row() {
     let mut s = Store::new(1, 2, 1);
@@ -2266,7 +2069,6 @@ fn same_item_merges_only_when_scanned_in_a_row() {
     assert_eq!(rows, [("パン", 3), ("サンドイッチ", 1), ("パン", 2)]);
 }
 
-/// 明細の個数を手で変えられる。変えた行の並びは変わらず（数量の − ＋ を続けて押せるように）、点数の上限も守る。
 #[test]
 fn staff_or_customer_changes_a_line_quantity() {
     let mut s = Store::new(1, 2, 1);
@@ -2288,7 +2090,6 @@ fn staff_or_customer_changes_a_line_quantity() {
     assert_eq!(reg(&s, 1).customer.total, 160 + 320);
 }
 
-/// クーポンと明細の番号は重ならない（取消・変更の対象を取り違えない）。
 #[test]
 fn coupon_and_line_ids_never_collide() {
     let mut s = Store::new(1, 2, 1);
@@ -2305,7 +2106,6 @@ fn coupon_and_line_ids_never_collide() {
     assert_eq!(ids.len(), n);
 }
 
-/// 決済手段に「ポイント利用」がある。店員が選び、ポイントカード・アプリを入金ボックスにかざすと決済になる。
 #[test]
 fn points_can_pay_once_staff_chooses_them() {
     let mut s = Store::new(1, 2, 1);
@@ -2315,9 +2115,7 @@ fn points_can_pay_once_staff_chooses_them() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    // ポイント利用にはポイントカードが要る（読まずに選ぶとポイントカードの確認に差し戻す）
     scan(&mut s, 1, "staff", "PC12345678");
-    // 選ぶ前にかざしても決済にならない
     assert!(run(
         &mut s,
         json!({"type":"tap_emoney","register":1,"method":"points"})
@@ -2327,7 +2125,6 @@ fn points_can_pay_once_staff_chooses_them() {
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
     );
-    // 選んだ手段と違うものをかざしても決済にならない
     assert!(run(
         &mut s,
         json!({"type":"tap_emoney","register":1,"method":"emoney"})
@@ -2340,8 +2137,6 @@ fn points_can_pay_once_staff_chooses_them() {
     assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
-/// 決済手段でポイント利用を選んでも、ポイントカードが読まれていなければポイントカードの確認に差し戻す。
-/// 読めばポイント利用のまま支払いへ。読まずに「スキップ」ならポイント利用は取り消す。
 #[test]
 fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -2357,14 +2152,12 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     let v = reg(&s, 1);
     assert!(v.staff.point_pending && v.customer.point_pending);
     assert_eq!(v.staff.method, Some(PaymentMethod::Points));
-    // 読めばポイント利用のまま支払いへ
     scan(&mut s, 1, "staff", "PC12345678");
     let v = reg(&s, 1);
     assert!(!v.staff.point_pending);
     assert_eq!(v.staff.phase, Phase::Paying);
     assert_eq!(v.staff.method, Some(PaymentMethod::Points));
 
-    // 別の会計：差し戻しでスキップすれば、ポイント利用は取り消す
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
@@ -2380,8 +2173,6 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     assert_eq!(v.staff.method, None);
 }
 
-/// Bell は据え付けの呼び鈴・検品端末・ストアコンピューター。検品端末とストアコンピューターは
-/// 設定で呼び鈴機能を OFF にでき、OFF の端末は鳴らず不通の警告も出さない。据え付けは OFF にできない。
 #[test]
 fn handheld_and_store_computer_bells_can_be_turned_off() {
     let mut s = Store::new(1, 2, 3);
@@ -2396,16 +2187,13 @@ fn handheld_and_store_computer_bells_can_be_turned_off() {
     assert!(snap.mats[0].buzzing);
     assert!(!snap.mats[1].buzzing && !snap.mats[2].buzzing);
     assert!(!snap.mats[1].bell_on);
-    // OFF の端末は不通として警告しない
     advance(&mut s, 8_000);
     assert!(reg(&s, 1).staff.mat_down.is_empty());
-    // ON に戻すと、押されている間は鳴る
     ok(&mut s, json!({"type":"set_bell_on","mat":2,"on":true}));
     advance(&mut s, 1_000);
     assert!(s.snapshot().mats[2].buzzing);
 }
 
-/// たばこボタンで呼ばれた店員がログインすると、たばこを登録するまで tobacco_asked が立つ（Item のたばこを点滅させる）。
 #[test]
 fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
     let mut s = Store::new(1, 2, 1);
@@ -2420,14 +2208,10 @@ fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
     assert!(reg(&s, 1).tobacco_asked);
     scan(&mut s, 1, "staff", "4900000000127");
     assert!(!reg(&s, 1).tobacco_asked);
-    // ボタンを使わずにログインしただけなら立たない
     login(&mut s, 2);
     assert!(!reg(&s, 2).tobacco_asked);
 }
 
-/// 釣り銭を取り忘れたまま一定時間でお客様画面に案内、さらにたつと店員呼び出し（釣銭忘れ）。
-/// 有人モードは 30 秒・1 分、セミセルフは 1 分・2 分。
-/// 残っている間は無操作でセミセルフに戻るカウントダウンを止め、取り出すと続きから再開する。
 #[test]
 fn change_left_in_the_outlet_reminds_then_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -2481,13 +2265,10 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     );
 }
 
-/// 販売個数の上限：オーナーが商品ごとに「1 回のお会計で何点まで」を決める。
-/// 上限を超える登録（スキャン・個数の変更）は受け付けない。
 #[test]
 fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
     let mut s = Store::new(1, 2, 1);
     let limit = |pw: &str, n: Option<u32>| json!({"type":"set_sale_limit","owner_id":"000","password":pw,"code":TEA,"limit":n});
-    // オーナーのパスワードでなければ変えられない
     assert!(run(&mut s, limit("0000", Some(2))).is_err());
     ok(&mut s, limit("9999", Some(2)));
     let item = s
@@ -2505,7 +2286,6 @@ fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
     )
     .unwrap_err();
     assert!(e.contains("2点まで"), "{e}");
-    // ほかの商品は買える。個数の変更でも上限を超えられない
     scan(&mut s, 1, "customer", BREAD);
     let id = reg(&s, 1)
         .customer
@@ -2519,7 +2299,6 @@ fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
     assert!(run(&mut s, set(3)).is_err());
     ok(&mut s, set(1));
     ok(&mut s, set(2));
-    // 上限を外せば、また買える
     ok(&mut s, limit("9999", None));
     scan(&mut s, 1, "customer", TEA);
     assert!(s
@@ -2530,8 +2309,6 @@ fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
         .any(|h| h.change.contains("2点まで → 制限なし")));
 }
 
-/// 税率設定：税率は区分のデータで持ち、法改正で税率が変わってもオーナーが区分を変えるだけで済む。
-/// 登録済みの明細は登録した時点の税率のまま。税率ごとに 1 回だけ端数処理する
 #[test]
 fn tax_rates_are_data_and_owner_only() {
     let mut s = Store::new(1, 2, 1);
@@ -2544,7 +2321,6 @@ fn tax_rates_are_data_and_owner_only() {
             .collect::<Vec<_>>(),
         vec![("8%", 0, 0), ("10%", 248, 22)]
     );
-    // 店員は変えられない
     assert!(run(
         &mut s,
         json!({"type":"set_tax_rate","owner_id":"001","password":"1111","class_id":"standard","rate_bp":1200})
@@ -2554,14 +2330,12 @@ fn tax_rates_are_data_and_owner_only() {
         &mut s,
         json!({"type":"set_tax_rate","owner_id":"000","password":"9999","class_id":"standard","rate_bp":1200}),
     );
-    // 登録済みのアルコールは 10% のまま、あとから登録した分は 12%
     scan(&mut s, 1, "staff", TEA);
     scan(&mut s, 1, "staff", BEER);
     let t = reg(&s, 1).staff.taxes;
     let rates: Vec<&str> = t.iter().map(|x| x.rate.as_str()).collect();
     assert_eq!(rates, vec!["8%", "10%", "12%"]);
     assert_eq!(t[2].tax, 248 * 1200 / 11200);
-    // ゼロ税率は 0% から変えられない。インボイスの端数処理を四捨五入に
     assert!(run(
         &mut s,
         json!({"type":"set_tax_rate","owner_id":"000","password":"9999","class_id":"zero","rate_bp":500})
@@ -2576,7 +2350,6 @@ fn tax_rates_are_data_and_owner_only() {
     assert_eq!(s.snapshot().age_rules.history.len(), 2);
 }
 
-/// 商品ごとに税区分を付け替えられる。代行収納（お支払い）は初めから消費税の対象外
 #[test]
 fn product_tax_class_can_be_changed() {
     let mut s = Store::new(1, 2, 1);
@@ -2612,8 +2385,6 @@ fn emoney_balance(s: &Store) -> u32 {
     s.snapshot().emoney_balance
 }
 
-/// セミセルフのお買い物の途中に電子マネーの扇形を押すと、スタッフを呼ぶ。
-/// スタッフがログインすると呼び出しは片付き、有人モードで手続きできる
 #[test]
 fn semi_self_emoney_fan_calls_staff_while_shopping() {
     let mut s = Store::new(1, 2, 1);
@@ -2636,8 +2407,6 @@ fn semi_self_emoney_fan_calls_staff_while_shopping() {
     );
 }
 
-/// 「電子マネー」ボタンでチャージか残高確認を選ぶ。残高確認はかざすと残高が出る。
-/// セミセルフではお買い物の途中にチャージ・残高確認はできない
 #[test]
 fn emoney_inquiry_shows_the_balance() {
     let mut s = Store::new(1, 2, 1);
@@ -2669,7 +2438,6 @@ fn emoney_inquiry_shows_the_balance() {
         );
     }
 
-    // 残高確認だけの取引
     let mut s = Store::new(1, 2, 1);
     ok(
         &mut s,
@@ -2688,11 +2456,9 @@ fn emoney_inquiry_shows_the_balance() {
     assert!(reg(&s, 1).emoney.is_none());
 }
 
-/// チャージ：紙幣だけを入れてかざす。上限 20,000 円。やめると紙幣は排出口に戻る
 #[test]
 fn emoney_charge_takes_bills_up_to_the_limit() {
     let mut s = Store::new(1, 2, 1);
-    // セミセルフでチャージを選ぶとスタッフ呼び出し（残高照会は呼ばない）
     ok(
         &mut s,
         json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),
@@ -2709,7 +2475,6 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
     let v = reg(&s, 1);
     assert!(v.emoney.is_none());
     assert!(v.staff.calls.iter().any(|c| c.label == "電子マネー"));
-    // チャージの現金はスタッフが有人モードで預かる
     login(&mut s, 1);
     assert!(reg(&s, 1).staff.calls.is_empty());
     advance(&mut s, 1_000);
@@ -2756,7 +2521,6 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
     assert_eq!(emoney_balance(&s), 16_000);
 }
 
-/// 残高不足の会計に進めるまで（7 個 × 160 円 = 1,120 円、残高 1,000 円）
 fn short_checkout(s: &mut Store) {
     short_checkout_on(s, "customer");
 }
@@ -2784,11 +2548,8 @@ fn short_checkout_on(s: &mut Store, side: &str) {
     );
 }
 
-/// 残高不足は「使うのをやめる（他の決済）」「残りを現金で払う」に分かれる。
-/// 「チャージする」は有人モードだけ（セミセルフはお買い物の途中にチャージしない）
 #[test]
 fn emoney_short_offers_three_choices() {
-    // やめる：支払方法の選び直しへ
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     ok(
@@ -2800,7 +2561,6 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.customer.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
-    // セミセルフは現金を使えないので、残りを現金で払う道はない（有人モードだけ）
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     assert!(run(
@@ -2809,7 +2569,6 @@ fn emoney_short_offers_three_choices() {
     )
     .is_err());
 
-    // 不足分を現金で：案内を確認してから電子マネーをかざして残高を引き出し、残り 120 円を現金で
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     short_checkout_on(&mut s, "staff");
@@ -2858,7 +2617,6 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.outlet, 880);
     assert_eq!(v.last_receipt.unwrap().method, "電子マネー・現金");
 
-    // 案内を見て、やめることもできる（何も引き落とされない）
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     short_checkout_on(&mut s, "staff");
@@ -2875,7 +2633,6 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(v.customer.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
-    // セミセルフではチャージを選べない
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     assert!(
@@ -2888,7 +2645,6 @@ fn emoney_short_offers_three_choices() {
     );
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
 
-    // 有人モードのチャージ：入れてかざし、もう一度かざして払う
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     short_checkout_on(&mut s, "staff");
@@ -2910,7 +2666,6 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(emoney_balance(&s), 880);
 }
 
-/// 取引中止はセミセルフのお客様もできる。入れたお金は出金ボックスに戻り、電子マネーで払った分は残高に戻る
 #[test]
 fn customer_voids_and_money_comes_back() {
     let mut s = Store::new(1, 2, 1);
@@ -2924,7 +2679,6 @@ fn customer_voids_and_money_comes_back() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
     confirm_point(&mut s, 1);
-    // セミセルフは現金を入れられない（電子マネーなどキャッシュレス専用）
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":100})).is_err());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     let v = reg(&s, 1);
@@ -2932,8 +2686,6 @@ fn customer_voids_and_money_comes_back() {
     assert_eq!(v.outlet, 0);
 }
 
-/// 店員側・お客様側どちらの店舗メニューにも「ログアウト」と「レジ休止中」がある（お客様側はパスワードで入った後）。
-/// ログアウトでセミセルフに戻る。休止中はスタッフバーコードを読むまでどの操作も受け付けない。
 #[test]
 fn logout_and_pause_from_either_store_menu() {
     let mut s = Store::new(1, 2, 1);
@@ -2943,7 +2695,6 @@ fn logout_and_pause_from_either_store_menu() {
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SemiSelf);
     assert!(v.menu.is_none());
-    // 取引中は休止できない
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
     assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
@@ -2954,14 +2705,12 @@ fn logout_and_pause_from_either_store_menu() {
     assert!(v.paused);
     assert_eq!(v.mode, Mode::SemiSelf);
     assert!(v.menu.is_none());
-    // 休止中はお客様が読んでも、呼び出しボタンを押しても受け付けない
     assert!(run(
         &mut s,
         json!({"type":"scan","register":1,"side":"customer","code":BREAD})
     )
     .is_err());
     assert!(run(&mut s, json!({"type":"call_staff","register":1})).is_err());
-    // 店員側の店舗メニューからも休止できる。スタッフバーコードで再開して有人モードになる
     scan(&mut s, 1, "staff", "ST001");
     let v = reg(&s, 1);
     assert!(!v.paused);
@@ -2974,7 +2723,6 @@ fn logout_and_pause_from_either_store_menu() {
     assert!(reg(&s, 1).paused);
 }
 
-/// お渡し済みの FF の数量を増やすとお渡し前に戻り、減らす・取り消すと店員側に回収の案内が出る
 #[test]
 fn changing_handed_ff_rewinds_or_asks_to_collect() {
     let mut s = Store::new(1, 2, 1);
@@ -2990,7 +2738,6 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
         json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":2}),
     );
     advance(&mut s, 1_000);
-    // 増やすとお渡し前に戻り、照合し直すまで会計に進めない
     ok(
         &mut s,
         json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
@@ -3004,7 +2751,6 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
     ));
     assert!(!allowed(&v, Side::Staff, Action::Checkout));
     advance(&mut s, 1_000);
-    // 照合するのは追加分（3 − 2 = 1）だけ。全数の 3 では合わない
     ok(
         &mut s,
         json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":3}),
@@ -3020,7 +2766,6 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
         json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
     );
     advance(&mut s, 1_000);
-    // 減らすと回収の案内（お渡し済みのまま）
     ok(
         &mut s,
         json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":2}),
@@ -3036,7 +2781,6 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
     assert_eq!(v.staff.ff_collect[0].qty, 1);
     ok(&mut s, json!({"type":"dismiss_ff_collect","register":1}));
     assert!(reg(&s, 1).staff.ff_collect.is_empty());
-    // 取り消しても回収の案内
     advance(&mut s, 1_000);
     ok(
         &mut s,
@@ -3045,8 +2789,6 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
     assert_eq!(reg(&s, 1).staff.ff_collect[0].qty, 2);
 }
 
-/// 宅配便・公共料金・切手・たばこはポイント付与の対象外。付与は対象商品の金額だけから計算し、
-/// 対象商品のない会計ではポイントカードの確認を出さない
 #[test]
 fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     let mut s = Store::new(1, 2, 1);
@@ -3078,7 +2820,6 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.map(|r| r.points), Some(bread / 100));
 
-    // 切手だけの会計では、ポイントカードの確認を出さない
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "staff", STAMP);
@@ -3089,8 +2830,6 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     assert!(!reg(&s, 1).staff.point_pending);
 }
 
-/// FF のお渡しはスタッフが責任をもつ：スタッフの照合だけで会計に進め、お客様側の確認操作はない。
-/// 個数を増やしたときも、増えた分をスタッフが照合するだけ
 #[test]
 fn staff_alone_is_responsible_for_ff_handover() {
     let mut s = Store::new(1, 1, 1);
@@ -3108,7 +2847,6 @@ fn staff_alone_is_responsible_for_ff_handover() {
     );
     advance(&mut s, 1_000);
     assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
-    // 個数を増やすと、増えた分（1 個）だけをスタッフが照合する。お客様側の確認はない
     ok(
         &mut s,
         json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
@@ -3123,7 +2861,6 @@ fn staff_alone_is_responsible_for_ff_handover() {
     assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
 }
 
-/// 最後の投入から 30 秒入れなければ投入おわり。支払方法の選択画面でも、投入すれば現金に移る。
 #[test]
 fn thirty_seconds_without_insert_means_done_inserting() {
     let mut s = Store::new(1, 2, 1);
@@ -3142,7 +2879,6 @@ fn thirty_seconds_without_insert_means_done_inserting() {
         Some(PaymentMethod::Cash),
         "inserting skips the method choice"
     );
-    // 足りないうちは、時間が経っても確定しない
     s.tick(1000 + 31_000);
     assert!(reg(&s, 1).last_receipt.is_none());
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
@@ -3154,8 +2890,6 @@ fn thirty_seconds_without_insert_means_done_inserting() {
     assert_eq!(v.outlet, 1100 - 160);
 }
 
-/// FF のお渡し確認はスタッフの責任。スタッフがログアウトしたセミセルフでは、
-/// 顧客側の画面からも（スタッフ側の画面からも）確認できない
 #[test]
 fn ff_handover_cannot_be_confirmed_after_staff_logs_out() {
     let mut s = Store::new(1, 2, 1);
@@ -3183,4 +2917,54 @@ fn ff_handover_cannot_be_confirmed_after_staff_logs_out() {
             state: FfState::Waiting
         }
     ));
+}
+
+fn same_after_reload(s: &Store) -> Store {
+    let saved = s.save_json();
+    let back = Store::load_json(&saved).unwrap_or_else(|e| panic!("load failed: {e}"));
+    assert_eq!(
+        serde_json::to_value(s.snapshot()).unwrap(),
+        serde_json::to_value(back.snapshot()).unwrap()
+    );
+    assert_eq!(saved, back.save_json());
+    back
+}
+
+#[test]
+fn saved_state_restores_every_register() {
+    let mut s = Store::new(7, 2, 3);
+    let set = json!({"type":"set_product_age","owner_id":"000","password":"9999","code":SANDWICH,"min_age":20});
+    ok(&mut s, set);
+    scan(&mut s, 2, "customer", BEER);
+    scan(&mut s, 2, "customer", TEA);
+    ok(&mut s, json!({"type":"checkout","register":2,"side":"customer"}));
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "staff", SANDWICH);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    advance(&mut s, 1500);
+    let mut back = same_after_reload(&s);
+
+    for st in [&mut s, &mut back] {
+        no_id_check(st, 1);
+        confirm_point(st, 1);
+        ok(st, json!({"type":"insert","register":1,"amount":1000}));
+        ok(st, json!({"type":"finish_insert","register":1}));
+        advance(st, 3000);
+    }
+    assert_eq!(
+        serde_json::to_value(s.snapshot()).unwrap(),
+        serde_json::to_value(back.snapshot()).unwrap(),
+        "restored store keeps running the same way"
+    );
+    same_after_reload(&back);
+}
+
+#[test]
+fn broken_or_old_saved_state_is_refused() {
+    assert!(Store::load_json("{").is_err());
+    let s = Store::new(1, 2, 1);
+    let mut v: Value = serde_json::from_str(&s.save_json()).unwrap();
+    v["schema"] = json!(0);
+    assert!(Store::load_json(&v.to_string()).is_err());
 }

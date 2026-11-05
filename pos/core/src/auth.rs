@@ -1,15 +1,3 @@
-//! 従業員と認証（問題6への対策）。
-//!
-//! - ログインはスタッフバーコードを読むだけ（繁用操作なので手数を増やさない）。
-//! - 店舗メニューでお金を抜く操作（返品返金・経費支出・緊急出金・途中集金・釣銭機回収）は、
-//!   ログイン中であっても **操作のたびに** 店舗パスワードを求める。
-//!   お金を入れる操作（取引外入金・釣銭補充）と両替はパスワード不要。
-//!   店舗パスワードはログインとは別物で、店舗共通の 1 つ。記録には
-//!   ログイン中のスタッフ名が残るので、防犯カメラと合わせて操作者を追える。
-//! - 年確ルールの変更はオーナーのみ。オーナー本人のパスワードで再認証する。
-//! - 権限は画面の表示・非表示ではなく、コアが操作ごとに判定する。
-//! - パスワードの連続失敗は一時ロックする。
-
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -24,11 +12,9 @@ pub struct StaffAccount {
     pub id: &'static str,
     pub name: &'static str,
     pub role: Role,
-    /// オーナーの再認証用パスワード（シミュレーター用の固定値。実機ではハッシュで保持する）
     password: &'static str,
 }
 
-/// 名札には本名を出さず、店員番号で呼ぶ（つきまといなどから店員を守る）。000 はオーナー専用の番号
 pub const ACCOUNTS: &[StaffAccount] = &[
     StaffAccount {
         id: "000",
@@ -50,7 +36,6 @@ pub const ACCOUNTS: &[StaffAccount] = &[
     },
 ];
 
-/// 店舗パスワード（お金を抜く操作の確認用。シミュレーター用の固定値。実機ではハッシュで保持する）
 const STORE_PASSWORD: &str = "7777";
 
 pub const MAX_FAILURES: u32 = 3;
@@ -60,10 +45,10 @@ pub fn account(id: &str) -> Option<&'static StaffAccount> {
     ACCOUNTS.iter().find(|a| a.id == id)
 }
 
-#[derive(Clone, Debug, Default)]
-struct Guard {
-    failures: u32,
-    locked_until: u64,
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub(crate) struct Guard {
+    pub(crate) failures: u32,
+    pub(crate) locked_until: u64,
 }
 
 impl Guard {
@@ -94,8 +79,8 @@ impl Guard {
 
 #[derive(Clone, Debug, Default)]
 pub struct Authenticator {
-    owner: Guard,
-    store: Guard,
+    pub(crate) owner: Guard,
+    pub(crate) store: Guard,
 }
 
 fn constant_time_eq(a: &str, b: &str) -> bool {
@@ -113,7 +98,6 @@ impl Authenticator {
         self.owner.check(ok, now)
     }
 
-    /// お金を抜く操作の店舗パスワード
     pub fn verify_store(&mut self, password: &str, now: u64) -> Result<(), String> {
         if password.is_empty() {
             return Err("店舗パスワードを入力してください".into());

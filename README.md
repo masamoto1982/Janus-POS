@@ -5,6 +5,8 @@
 - `pos/core` … Rust で書いた決定的なコア（wasm-bindgen で Web UI に公開）
 - `pos/web` … TypeScript + Vite の Web UI（店員画面・客側画面・呼び鈴）
 
+仕様は [docs/spec.md](docs/spec.md)。
+
 ## 開発
 
 ```sh

@@ -1,19 +1,3 @@
-//! 現金と釣銭機。
-//!
-//! このシミュレーターでは、釣銭の排出タイミング（紙幣ユニットと硬貨ユニットの
-//! 動作差）は扱わない。釣銭は精算と同時に、紙幣と硬貨をまとめて渡したものとする。
-//!
-//! 実機向けの設計方針（問題11・12。ソースコードに残すよう求められたもの）：
-//!
-//! - 紙幣ユニットと硬貨ユニットは並列に動かしてよいが、どちらも取り出し口の
-//!   手前（ステージング）までしか払い出さない。**両方の準備がそろってから
-//!   取り出し口を開け、紙幣と硬貨を一度に提示する。** 先に出たほうだけを
-//!   取って立ち去る「釣銭取り忘れ」を防ぐため。
-//! - 紙幣は取り出し口で保持したまま提示する。保持を検知できないときは放出せず、
-//!   回収して再排出する（紙幣がまき散らされるのを防ぐ）。
-//! - 提示後しばらく取られなければお客様画面で促し、さらに続けばそのレジで
-//!   店員呼び出しにする。
-
 use serde::Serialize;
 
 pub const BILLS: &[u32] = &[10_000, 5_000, 2_000, 1_000];
@@ -27,8 +11,7 @@ pub fn is_valid_denomination(d: u32) -> bool {
     is_bill(d) || COINS.contains(&d)
 }
 
-/// 金種別の枚数（金額の大きい順）
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
 pub struct Cash(pub Vec<(u32, u32)>);
 
 impl Cash {
@@ -48,7 +31,6 @@ impl Cash {
         }
     }
 
-    /// 金額を大きい金種から順に崩したもの（二千円札は使わない）。投入口に入れたお金のシミュレーション用
     pub fn from_amount(amount: u32) -> Cash {
         let mut c = Cash::default();
         let mut rest = amount;
@@ -96,12 +78,10 @@ impl Default for Drawer {
 }
 
 impl Drawer {
-    /// 入金：金額を大きい金種から順に入れたものとして在高に足す（シミュレーション）
     pub fn put(&mut self, amount: u32) {
         self.cash.merge(&Cash::from_amount(amount));
     }
 
-    /// 両替：金種 `d` を `n` 枚取り出す（足りなければ Err）
     pub fn take_exact(&mut self, d: u32, n: u32) -> Result<Cash, String> {
         let e = self
             .cash
@@ -116,8 +96,6 @@ impl Drawer {
         Ok(out)
     }
 
-    /// 在高から `amount` を取り出す。`for_change` のときは一万円札・二千円札を使わない。
-    /// ちょうど取り出せなければ在高は変えずに Err。
     pub fn take(&mut self, amount: u32, for_change: bool) -> Result<Cash, String> {
         let mut rest = amount;
         let mut out = Cash::default();

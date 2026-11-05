@@ -229,7 +229,8 @@ button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong);
 }
 button:not(:disabled):active, .pressed { transform: translate(1px, 2px); }
-.guide-btn.on, button.seg.on, .method-list .seg.on {
+.guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }
+button.seg.on, .method-list .seg.on {
   font-weight: 700; text-decoration: underline; text-underline-offset: 2px;
 }
 /* タブ（FFのタブ・モバイルの画面切替）。タブの並びは下の線に載り、選ばれた積極タブ（濃い背景・白文字）と
@@ -517,6 +518,8 @@ body.dragging .drop-hint { display: inline; }
 .screen-head .emoney-head:not(:disabled) { filter: url(#ramp); }
 .screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
+/* 案内ボタンで出すガイダンスは青文字（濃いグレーを青のランプで青にする） */
+.screen .welcome .guide { filter: url(#ramp); }
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
 .screen.inactive [data-region] select, .screen.inactive [data-region] summary {

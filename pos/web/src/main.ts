@@ -128,25 +128,6 @@ function start(): void {
   render();
 }
 
-const CALL_FULL_MS = 60_000;
-/** 呼び出しの待ち時間の色（OKLCH）。緑と赤は補色で直接つなぐと濁るので、黄緑・黄・橙を挟む。
- *  元の指定：#44CE1B → #BBDB44 → #F7E379 → #F2A134 → #E51F1F */
-const CALL_STOPS: [number, number, number][] = [
-  [0.7474, 0.2337, 140.3],
-  [0.8406, 0.1752, 120.7],
-  [0.9107, 0.1287, 98.8],
-  [0.772, 0.1508, 69.1],
-  [0.5893, 0.2271, 27.9],
-];
-/** 待ち時間の割合 t（0〜1）を色の段の間で OKLCH 補間する */
-export function callColor(t: number): string {
-  const x = Math.max(0, Math.min(1, t)) * (CALL_STOPS.length - 1);
-  const i = Math.min(CALL_STOPS.length - 2, Math.floor(x));
-  const f = x - i;
-  const [a, b] = [CALL_STOPS[i], CALL_STOPS[i + 1]];
-  const v = a.map((n, k) => n + (b[k] - n) * f);
-  return `oklch(${v[0].toFixed(4)} ${v[1].toFixed(4)} ${v[2].toFixed(1)})`;
-}
 
 function buildSkeleton(): void {
   const regs = snap.registers
@@ -374,17 +355,13 @@ function render(): void {
       const acc = r.staff.state === "absent" ? undefined : snap.accounts.find((a) => a.name === r.staff.name);
       sel.value = acc?.barcode ?? "";
     }
-    const waitMs = r.lamp ? (r.call_waiting_ms ?? 0) : 0;
-    const t = Math.min(1, waitMs / CALL_FULL_MS);
     for (const side of ["staff", "customer"] as const) {
       const head = app.querySelector<HTMLElement>(`[data-region="head-${r.id}-${side}"]`);
       if (!head) continue;
       head.classList.toggle("calling", r.lamp);
       if (r.lamp) {
-        head.style.setProperty("--call-c", callColor(t));
-        head.title = `呼び出し中（${Math.floor(waitMs / 1000)}秒）`;
+        head.title = "呼び出し中";
       } else {
-        head.style.removeProperty("--call-c");
         head.removeAttribute("title");
       }
     }

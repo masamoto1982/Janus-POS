@@ -1712,11 +1712,20 @@ impl Store {
                 if r.txn.inserted.total() > 0 && method != PaymentMethod::Cash {
                     return Err("現金が投入済みです\n現金でお支払いください".into());
                 }
+                let self_op = r.mode == Mode::SelfOperated;
+                // 支払方法のボタンは待ち受けの案内ボタンと同じ挙動：選択中のボタンをもう一度押すと選択を外す
+                // （セルフ操作モードの「現金」は店員呼び出しなので外さない）
+                if r.txn.method == Some(method)
+                    && r.txn.inserted.total() == 0
+                    && !(self_op && method == PaymentMethod::Cash)
+                {
+                    r.txn.method = None;
+                    return done(format!("{}の選択を外しました", method.label()));
+                }
                 if let Some(why) = r.txn.method_refusal(method) {
                     return Err(why.into());
                 }
                 r.txn.method = Some(method);
-                let self_op = r.mode == Mode::SelfOperated;
                 let no_cash_goods = r.txn.cash_only() == 0;
                 if self_op {
                     if method == PaymentMethod::Cash {

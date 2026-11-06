@@ -3027,3 +3027,25 @@ fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
     assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
 }
+
+#[test]
+fn pressing_the_chosen_payment_method_again_clears_it() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    let pick = json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"});
+    ok(&mut s, pick.clone());
+    assert_eq!(reg(&s, 1).staff.method, Some(PaymentMethod::Emoney));
+    ok(&mut s, pick);
+    assert_eq!(reg(&s, 1).staff.method, None);
+    let e = run(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    )
+    .unwrap_err();
+    assert!(!e.is_empty());
+}

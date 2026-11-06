@@ -669,24 +669,24 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
     </div>`;
 }
 
-const EMONEY_HEAD_LABEL = `<span>電子マネー</span><span>チャージ 残高照会</span>`;
+const EMONEY_HEAD_LABEL = "電子マネーのチャージ・残高確認";
 
 function emoneyHead(r: RegisterView, side: Side): string {
   if (r.paused) return "";
   const staffOperated = r.mode === "staff_operated";
   const v = staffOperated ? r.staff : r.customer;
   const own: Side = staffOperated ? "staff" : "customer";
-  const label = `<button type="button" class="emoney-head neg" disabled aria-disabled="true" title="電子マネーのチャージ・残高照会">${EMONEY_HEAD_LABEL}</button>`;
+  const label = `<button type="button" class="emoney-link" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">${EMONEY_HEAD_LABEL}</button>`;
   if (side !== own) return label;
   const shopping = !staffOperated && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
   if (shopping) {
     const st = find(r.customer.actions, "call_staff");
     const cmd = { type: "call_staff", register: r.id, topic: "emoney" };
-    return `<button type="button" class="emoney-head neg" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
+    return `<button type="button" class="emoney-link" data-hold="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "スタッフを呼んで手続きします（押している間鳴ります）" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
   }
   const st = find(v.actions, "emoney");
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
-  return `<button type="button" class="emoney-head neg" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高照会" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
+  return `<button type="button" class="emoney-link" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
 }
 
 export const voidAsk = new Map<number, Side>();

@@ -977,7 +977,7 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
       ? ""
       : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
   const mode = r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
-  return `<span class="head-l"><time class="clock">${clockText(now)}</time>${mode}</span><span class="head-r">${emoneyHead(r, side)}${bell}</span>`;
+  return `<span class="head-l"><time class="clock">${clockText(now)}</time>${mode}</span><span class="head-c">${bell}</span><span class="head-r">${emoneyHead(r, side)}</span>`;
 }
 
 export const FF_TABS = [

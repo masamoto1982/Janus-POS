@@ -2968,3 +2968,40 @@ fn broken_or_old_saved_state_is_refused() {
     v["schema"] = json!(0);
     assert!(Store::load_json(&v.to_string()).is_err());
 }
+
+#[test]
+fn ff_stock_is_shown_as_three_levels_and_out_of_stock_can_be_reserved() {
+    use janus_pos_core::store::StockLevel;
+    let mut s = Store::new(1, 1, 1);
+    let level = |s: &Store, code: &str| {
+        s.snapshot()
+            .ff_stock
+            .iter()
+            .find(|f| f.code == code)
+            .unwrap()
+            .level
+    };
+    assert_eq!(level(&s, "FF03"), StockLevel::Plenty);
+    assert_eq!(level(&s, "FF02"), StockLevel::Low);
+    assert_eq!(level(&s, "FF04"), StockLevel::Out);
+    login_as(&mut s, 1, "ST001");
+    let e = run(
+        &mut s,
+        json!({"type":"register_ff","register":1,"code":"FF04","qty":1}),
+    )
+    .unwrap_err();
+    assert!(e.contains("欠品") && !e.contains("残り"), "{e}");
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"code":"FF04","qty":1,"force":true}),
+    );
+    assert_eq!(level(&s, "FF04"), StockLevel::Out);
+    assert_eq!(reg(&s, 1).staff.lines.len(), 1);
+    for _ in 0..2 {
+        ok(
+            &mut s,
+            json!({"type":"register_ff","register":1,"code":"FF02","qty":1}),
+        );
+    }
+    assert_eq!(level(&s, "FF02"), StockLevel::Out);
+}

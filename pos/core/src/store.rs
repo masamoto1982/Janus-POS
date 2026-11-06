@@ -166,6 +166,8 @@ pub enum Command {
         side: Side,
         code: String,
         qty: u32,
+        #[serde(default)]
+        force: bool,
     },
     FfButton {
         register: u8,
@@ -1379,7 +1381,8 @@ impl Store {
                 side,
                 code,
                 qty,
-            } => self.register_ff(register, side, &code, qty),
+                force,
+            } => self.register_ff(register, side, &code, qty, force),
             C::FfButton { register } => {
                 self.check_active(register, Action::FfButton)?;
                 self.call(register, CallKind::FastFood, "FF のご注文");
@@ -2350,7 +2353,7 @@ impl Store {
                     .find(|(c, _)| *c == code)
                     .ok_or("在庫がありません")?;
                 if stock.1 < qty - old {
-                    return Err(format!("{name}は在庫が足りません（残り {}）", stock.1));
+                    return Err(format!("{name}{FF_OUT}"));
                 }
                 stock.1 -= qty - old;
             } else if !received {
@@ -2652,6 +2655,7 @@ impl Store {
         side: Side,
         code: &str,
         qty: u32,
+        force: bool,
     ) -> Result<Outcome, String> {
         self.check(register, side, Action::RegisterFf)?;
         if self.reg(register).is_some_and(|r| r.txn.bill_slips() > 0) {
@@ -2683,10 +2687,11 @@ impl Store {
             .iter_mut()
             .find(|(c, _)| *c == code)
             .ok_or("在庫がありません")?;
-        if stock.1 < qty {
-            return Err(format!("{}は在庫が足りません（残り {}）", p.name, stock.1));
+        let reserved = stock.1 < qty;
+        if reserved && !force {
+            return Err(format!("{}{FF_OUT}", p.name));
         }
-        stock.1 -= qty;
+        stock.1 = stock.1.saturating_sub(qty);
         let tax = self.tax_for(p.code);
         let now = self.now;
         let r = self.reg_mut(register)?;
@@ -2706,8 +2711,9 @@ impl Store {
         );
         self.calls.resolve(register, CallKind::FastFood, now);
         done(format!(
-            "{} ×{qty} を登録しました\nお渡ししたらチェックを入れてください",
-            p.name
+            "{} ×{qty} を{}しました\nお渡ししたらチェックを入れてください",
+            p.name,
+            if reserved { "予約注文として登録" } else { "登録" }
         ))
     }
 
@@ -3289,7 +3295,7 @@ impl Store {
                     code: p.code,
                     name: p.name,
                     price: p.price,
-                    stock,
+                    level: StockLevel::of(stock),
                     tab,
                     tab_label: tab.label(),
                 })
@@ -3705,12 +3711,33 @@ pub struct AgeRulesView {
     pub history: Vec<crate::age_rules::RuleChange>,
 }
 
+pub const FF_LOW_STOCK: u32 = 2;
+const FF_OUT: &str = "は欠品です（FF ボタンの長押しで予約注文として登録できます）";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StockLevel {
+    Plenty,
+    Low,
+    Out,
+}
+
+impl StockLevel {
+    pub fn of(stock: u32) -> Self {
+        match stock {
+            0 => Self::Out,
+            n if n <= FF_LOW_STOCK => Self::Low,
+            _ => Self::Plenty,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct FfMenuItem {
     pub code: &'static str,
     pub name: &'static str,
     pub price: u32,
-    pub stock: u32,
+    pub level: StockLevel,
     pub tab: FfTab,
     pub tab_label: &'static str,
 }

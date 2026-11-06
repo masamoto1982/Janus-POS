@@ -189,8 +189,10 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります\n対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
-const SELF_OP_CASH_ONLY_GOODS: Denial = "切手・お支払いは現金のみです\nスタッフがお預かりします";
-const SELF_OP_NO_CASH: Denial = "セルフレジでは現金を使えません\nキャッシュレスでお支払いください";
+const SELF_OP_CASH_ONLY_GOODS: Denial =
+    "切手・お支払いは現金のみです\nスタッフがお預かりします";
+const SELF_OP_NO_CASH: Denial =
+    "セルフレジでは現金を使えません\nキャッシュレスでお支払いください";
 const SELF_OP_CASH_CHOSEN: Denial = "現金はスタッフがお預かりします\nスタッフをお呼びしました";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません\nどうするか選んでください";
 

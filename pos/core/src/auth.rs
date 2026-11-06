@@ -111,6 +111,7 @@ impl Authenticator {
 mod tests {
     use super::*;
 
+
     #[test]
     fn crew_cannot_reauthenticate_as_owner() {
         let mut a = Authenticator::default();
@@ -125,10 +126,7 @@ mod tests {
         for _ in 0..MAX_FAILURES {
             assert!(a.verify_store("0000", 0).is_err());
         }
-        assert!(
-            a.verify_store("7777", 1).is_err(),
-            "ロック中は正しくても通さない"
-        );
+        assert!(a.verify_store("7777", 1).is_err(), "ロック中は正しくても通さない");
         assert!(a.verify_store("7777", LOCKOUT_MS).is_ok());
     }
 }

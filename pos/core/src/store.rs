@@ -653,6 +653,9 @@ struct Txn {
     ff_collect: Vec<(&'static str, u32)>,
     method: Option<PaymentMethod>,
     point_checked: bool,
+    /// 「ポイントカードなし」を選んだ。確認は一度の取引で一度きりなので、
+    /// 登録画面や決済選択に引き返しても再び尋ねない（カードはいつでも読める）
+    point_declined: bool,
     inserted: Cash,
     inserted_at: u64,
     customer_turn: bool,
@@ -2086,6 +2089,7 @@ impl Store {
                 self.check(register, side, Action::ConfirmPointCard)?;
                 let t = &mut self.reg_mut(register)?.txn;
                 t.point_checked = true;
+                t.point_declined = true;
                 if t.method == Some(PaymentMethod::Points) {
                     t.method = None;
                 }
@@ -2469,10 +2473,16 @@ impl Store {
         r.bill_handover = None;
         r.pickup_handover = None;
         if let Scanned::PointCard(no) = &scanned {
-            if r.txn.paying && !r.txn.point_checked {
+            // 決済が終わるまではいつでも付与できる。支払い中に読んでも登録画面へは戻さない
+            if r.txn.paying {
+                let asked = !r.txn.point_checked;
                 r.txn.point_card = Some(no.clone());
                 r.txn.point_checked = true;
-                return done("ポイントカードを読みました\nお支払い方法を選んでください");
+                return done(if asked && r.txn.method.is_none() {
+                    "ポイントカードを読みました\nお支払い方法を選んでください"
+                } else {
+                    "ポイントカードを読みました"
+                });
             }
         }
         if let Scanned::Product(p) = &scanned {
@@ -2797,6 +2807,7 @@ impl Store {
             r.txn.age_method = None;
         }
         r.txn.point_checked = r.txn.point_card.is_some()
+            || r.txn.point_declined
             || r.txn.bill_slips() > 0
             || !r.txn.lines.iter().any(Line::earns_points);
         r.txn.customer_turn = r.mode == Mode::SelfOperated;

@@ -136,7 +136,7 @@ fn scanning_on_payment_screen_returns_to_registering() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
+    assert!(!reg(&s, 1).staff.point_pending);
     ok(
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":500,"count":1}),
@@ -176,7 +176,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
+    assert!(!reg(&s, 1).staff.point_pending, "point card asked once per txn");
     assert!(!reg(&s, 1).staff.age_choice_pending);
     ok(
         &mut s,
@@ -937,7 +937,7 @@ fn staff_and_customer_screens_are_exclusive() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),
     );
-    confirm_point(&mut s, 1);
+    assert!(!reg(&s, 1).customer.point_pending);
 }
 
 #[test]
@@ -3048,4 +3048,46 @@ fn pressing_the_chosen_payment_method_again_clears_it() {
     )
     .unwrap_err();
     assert!(!e.is_empty());
+}
+
+#[test]
+fn point_card_is_asked_once_but_can_be_read_until_paid() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    assert!(reg(&s, 1).staff.point_pending);
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"qr"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    let v = reg(&s, 1);
+    assert!(!v.staff.point_pending, "declined once: never asked again");
+    assert!(v.staff.point_card.is_none());
+    scan(&mut s, 1, "customer", "PC12345678");
+    let v = reg(&s, 1);
+    assert_eq!(
+        v.staff.phase,
+        Phase::Paying,
+        "reading the card keeps the payment screen"
+    );
+    assert!(v.staff.point_card.is_some());
+    ok(
+        &mut s,
+        json!({"type":"insert_cash","register":1,"denomination":500,"count":1}),
+    );
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.map(|r| r.points), Some(160 / 100));
 }

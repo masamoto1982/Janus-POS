@@ -3005,3 +3005,25 @@ fn ff_stock_is_shown_as_three_levels_and_out_of_stock_can_be_reserved() {
     }
     assert_eq!(level(&s, "FF02"), StockLevel::Out);
 }
+
+#[test]
+fn back_after_inserting_cash_returns_it_and_reopens_methods() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    login(&mut s, 1);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
+    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
+    let v = reg(&s, 1);
+    assert_eq!(v.outlet, 1000, "unsettled cash goes to the outlet");
+    assert_eq!(v.staff.inserted, 0);
+    assert_eq!(v.staff.method, None, "back to choosing a method");
+    assert_eq!(v.staff.phase, Phase::Paying, "stays on the payment screen");
+    assert!(v.last_receipt.is_none());
+    advance(&mut s, 40_000);
+    assert!(reg(&s, 1).last_receipt.is_none(), "nothing settles itself");
+    ok(&mut s, json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}));
+    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
+    assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
+}

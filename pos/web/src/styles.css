@@ -203,13 +203,13 @@ button { touch-action: manipulation; }
 .reg-top .yen { font-size: inherit; font-weight: 400; }
 .reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
-.reg-top .void > button, .reg-top .action > button { width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; white-space: nowrap; }
+.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; white-space: nowrap; }
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
   .reg-top .mid { --sum-h: 26px; }
   .reg-top .total, .reg-top .count b { font-size: 22px; }
   .reg-top .sum { font-size: 13px; }
-  .reg-top .void > button, .reg-top .action > button { font-size: 13px; padding: 4px 2px; }
+  .reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { font-size: 13px; padding: 4px 2px; }
 }
 .reg-top .count .full { margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }

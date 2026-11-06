@@ -762,7 +762,7 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r)}
+        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r)}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -946,6 +946,10 @@ function emoneyScreen(r: RegisterView, side: Side): string {
 function prepaidNote(r: RegisterView, due: number): string {
   const rest = r.cashless_due ? "のお支払い方法をお選びください" : "を現金で";
   return `<p>${esc(r.prepaid_method ?? "")}で ${yen(r.prepaid)} お支払い済み、残り <b>${yen(due)}</b> ${rest}</p>`;
+}
+
+function cashBackNote(side: Side, amount: number): string {
+  return side === "staff" ? `<p>現金 <b>${yen(amount)}</b> を出金ボックスからお返しください</p>` : `<p>現金 <b>${yen(amount)}</b> をお返しします</p>`;
 }
 
 function cashOnlyNote(r: RegisterView): string {

@@ -1685,6 +1685,15 @@ impl Store {
             C::BackToRegistering { register, side } => {
                 self.check(register, side, Action::BackToRegistering)?;
                 let r = self.reg_mut(register)?;
+                if r.txn.inserted.total() > 0 {
+                    let cash = std::mem::take(&mut r.txn.inserted);
+                    let back = cash.total();
+                    r.outlet.merge(&cash);
+                    r.txn.method = None;
+                    return done(format!(
+                        "お支払い方法を選び直します\n{back}円を出金ボックスから取り出してください"
+                    ));
+                }
                 if r.txn.prepaid > 0 {
                     return Err("一部お支払い済みです\n残りをお支払いください".into());
                 }

@@ -147,7 +147,7 @@ button { touch-action: manipulation; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 .screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; height: 51px;
-  padding: 0 calc(8px + max(0px, (100% - 16px - 3 * var(--btn-w) - 2 * var(--gap)) / 4)); border-bottom: 1px solid var(--border); }
+  padding: 0 calc(8px + max(0px, (100% - 16px - 3 * var(--btn-w) - 2 * var(--gap)) / 4)); border-bottom: 1px solid var(--border); background: var(--head-bg); }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; }
@@ -428,7 +428,7 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .bell-area .toast.show { display: block; }
 :root { --call-lo: oklch(0.93 0.08 155); --call-hi: oklch(0.90 0.09 25); }
 .screen-head.calling { animation: head-call 1s steps(1) infinite; }
-@keyframes head-call { 0% { background: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo)); } 50% { background: transparent; } }
+@keyframes head-call { 0% { background: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo)); } 50% { background: var(--head-bg); } }
 @media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo)); } }
 
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
@@ -525,8 +525,7 @@ body.dragging .drop-hint { display: inline; }
 }
 .screen :is(button, input, select, summary) { filter: grayscale(1); }
 .screen.operable [data-region] :is(button, input, select, summary),
-.staff-screen [data-region] .staff-only button,
-.screen-head .emoney-head:not(:disabled) { filter: url(#ramp); }
+.staff-screen [data-region] .staff-only button { filter: url(#ramp); }
 .screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
 /* ボタン操作で出すガイダンス（案内ボタン・支払方法の選択）は青文字（濃いグレーを青のランプで青にする） */
@@ -598,8 +597,16 @@ body.dragging .drop-hint { display: inline; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; }
 .money-io-cust > *, .money-io-boxes > * { min-width: 0; }
-.emoney-head { min-height: 0; height: 28px; padding: 0 8px; display: inline-flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 10px; line-height: 1.15; white-space: nowrap; cursor: pointer; }
-.emoney-head.pressing { transform: translate(1px, 2px); }
+/* 電子マネーのチャージ・残高確認は財布の管理＝商取引とは別の操作空間。ヘッダー右端（グラデーションの暗い側）に白文字のリンクで置く */
+.screen .screen-head[data-region] .emoney-link { min-height: 0; height: auto; padding: 2px 0; border: 0; border-radius: 0; background: transparent; color: var(--link-ink, oklch(1 0 0));
+  font-size: 11px; font-weight: 600; line-height: 1.3; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; filter: none; text-shadow: 0 0 2px oklch(0 0 0 / 0.25); }
+.screen .screen-head[data-region] .emoney-link:disabled { background: transparent !important; color: var(--link-ink, oklch(1 0 0)) !important; filter: none !important; text-decoration: none; cursor: default; }
+.emoney-link.pressing { transform: translate(1px, 2px); }
+/* 呼び出し中はヘッダーが淡い単色になる瞬間があるので、その間だけリンクを濃い文字にする */
+.screen .screen-head.calling[data-region] .emoney-link { animation: head-call-ink 1s steps(1) infinite; }
+@keyframes head-call-ink { 0% { --link-ink: var(--ink); text-shadow: none; } 50% { --link-ink: oklch(1 0 0); } }
+@media (prefers-reduced-motion: reduce) { .screen .screen-head.calling[data-region] .emoney-link { animation: none; --link-ink: var(--ink); text-shadow: none; } }
+@media (max-width: 760px) { .screen .screen-head[data-region] .emoney-link { font-size: 10px; } }
 .mode-title { display: inline-block; padding: 1px 12px; font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
 .mode-title.staff-operated { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
 .mode-title:is(.self-operated, .store-menu) { background: oklch(1 0 0); color: var(--msg-strong); border: 1px solid var(--msg-strong); }
@@ -670,8 +677,12 @@ body.dragging .drop-hint { display: inline; }
 
 
 .screen { --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
-  --guide-bg: radial-gradient(circle farthest-corner at 50% 50%, var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark); }
-.screen.operable { --sky: oklch(0.80 0.09 230); --glow: color-mix(in oklab, var(--cust-bg) 88%, var(--sky)); --dark: color-mix(in oklab, var(--cust-bg) 55%, var(--sky)); }
+  --guide-bg: radial-gradient(circle farthest-corner at 50% 50%, var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark);
+  /* レジ画面ヘッダーは左ほど明るいグラデーション。右端は白文字のリンクが読める濃さまで落とす */
+  --head-deep: color-mix(in oklch, var(--cust-bg) 52%, var(--ink));
+  --head-bg: linear-gradient(90deg, var(--glow) 0%, var(--dark) 45%, var(--head-deep) 100%) var(--dark); }
+.screen.operable { --sky: oklch(0.80 0.09 230); --glow: color-mix(in oklab, var(--cust-bg) 88%, var(--sky)); --dark: color-mix(in oklab, var(--cust-bg) 55%, var(--sky));
+  --head-deep: oklch(0.58 0.12 235); }
 .scan-welcome, .staff-operated-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; background: var(--guide-bg); }
 .confirm { isolation: isolate; }
 .confirm::before { content: ""; position: absolute; inset: -8px -12px; z-index: -1; background: var(--guide-bg); pointer-events: none; }

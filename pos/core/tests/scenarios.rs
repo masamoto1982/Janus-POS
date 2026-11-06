@@ -793,7 +793,8 @@ fn parcel_cannot_be_mixed_with_other_goods() {
 fn cash_out_only_inside_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    let co = json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"});
+    let co =
+        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"});
     assert!(
         run(&mut s, co.clone()).is_err(),
         "店舗メニューの外では出金できない"
@@ -825,14 +826,20 @@ fn cash_out_only_inside_the_store_menu() {
 fn store_menu_opens_only_on_the_staff_side() {
     let mut s = Store::new(1, 2, 1);
     let open = json!({"type":"open_menu","register":1,"screen":"top"});
-    assert!(run(&mut s, open.clone()).is_err(), "ログインしたスタッフだけ");
+    assert!(
+        run(&mut s, open.clone()).is_err(),
+        "ログインしたスタッフだけ"
+    );
     login(&mut s, 1);
     advance(&mut s, 1_000);
     ok(&mut s, open);
     let v = reg(&s, 1);
     assert!(v.menu.is_some());
     assert_eq!(v.active_side, Some(Side::Staff));
-    ok(&mut s, json!({"type":"open_menu","register":1,"screen":null}));
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":null}),
+    );
     assert!(reg(&s, 1).menu.is_none());
 }
 
@@ -1096,7 +1103,10 @@ fn inlet_pays_and_change_waits_in_outlet() {
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).outlet, 0);
     s.tick(at + 7999);
-    assert!(reg(&s, 1).last_receipt.is_some(), "thanks shows 3 s after the change is taken");
+    assert!(
+        reg(&s, 1).last_receipt.is_some(),
+        "thanks shows 3 s after the change is taken"
+    );
     s.tick(at + 8000);
     assert!(reg(&s, 1).last_receipt.is_none());
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
@@ -1330,10 +1340,16 @@ fn shortcut_buttons_call_staff() {
 fn staff_bell_calls_colleagues_without_call_screen() {
     let mut s = Store::new(1, 2, 1);
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
-    ok(&mut s, json!({"type":"call_staff","register":1,"topic":"sos"}));
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"sos"}),
+    );
     advance(&mut s, 1_000);
     assert!(s.snapshot().bells[0].buzzing, "SOS rings the bell");
-    assert!(reg(&s, 1).staff.calls.is_empty(), "no call record, so no call screen");
+    assert!(
+        reg(&s, 1).staff.calls.is_empty(),
+        "no call record, so no call screen"
+    );
     ok(&mut s, json!({"type":"release_call","register":1}));
 }
 
@@ -2234,12 +2250,19 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     assert!(!reg(&s, 1).change_left);
     advance(&mut s, 21_000);
     let v = reg(&s, 1);
-    assert!(v.change_left, "staff_operated, 30 seconds: remind the customer");
+    assert!(
+        v.change_left,
+        "staff_operated, 30 seconds: remind the customer"
+    );
     assert!(v.staff.calls.is_empty());
     assert_eq!(v.idle_revert_in, Some(frozen), "countdown is paused");
     advance(&mut s, 30_000);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.calls.len(), 1, "staff_operated, 1 minute: call staff");
+    assert_eq!(
+        v.staff.calls.len(),
+        1,
+        "staff_operated, 1 minute: call staff"
+    );
     assert_eq!(v.staff.calls[0].label, "釣銭忘れ");
     assert!(
         reg(&s, 1).last_receipt.is_some(),
@@ -2937,11 +2960,17 @@ fn saved_state_restores_every_register() {
     ok(&mut s, set);
     scan(&mut s, 2, "customer", BEER);
     scan(&mut s, 2, "customer", TEA);
-    ok(&mut s, json!({"type":"checkout","register":2,"side":"customer"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"customer"}),
+    );
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "staff", SANDWICH);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
     advance(&mut s, 1500);
     let mut back = same_after_reload(&s);
 
@@ -3011,10 +3040,16 @@ fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);
     login(&mut s, 1);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
     confirm_point(&mut s, 1);
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
-    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+    );
     let v = reg(&s, 1);
     assert_eq!(v.outlet, 1000, "unsettled cash goes to the outlet");
     assert_eq!(v.staff.inserted, 0);
@@ -3023,7 +3058,35 @@ fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     assert!(v.last_receipt.is_none());
     advance(&mut s, 40_000);
     assert!(reg(&s, 1).last_receipt.is_none(), "nothing settles itself");
-    ok(&mut s, json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}));
-    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+    );
     assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
+}
+
+#[test]
+fn pressing_the_chosen_payment_method_again_clears_it() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    let pick = json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"});
+    ok(&mut s, pick.clone());
+    assert_eq!(reg(&s, 1).staff.method, Some(PaymentMethod::Emoney));
+    ok(&mut s, pick);
+    assert_eq!(reg(&s, 1).staff.method, None);
+    let e = run(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    )
+    .unwrap_err();
+    assert!(!e.is_empty());
 }

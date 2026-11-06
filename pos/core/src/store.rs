@@ -6,12 +6,12 @@ use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
     StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
+use crate::bell::{Bell, BellSignal};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
 use crate::catalog::{
     self, Category, Coupon, FfTab, Product, Scanned, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
-use crate::bell::{BellSignal, Bell};
 use crate::parcel::{self, Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
@@ -492,9 +492,7 @@ impl Command {
                 topic: Some(CallTopic::Sos),
                 ..
             } => None,
-            C::FfButton { .. } | C::CallStaff { .. } => {
-                Some(Side::Customer)
-            }
+            C::FfButton { .. } | C::CallStaff { .. } => Some(Side::Customer),
             C::CashOut { .. } | C::CashIn { .. } => Some(Side::Staff),
             C::OpenMenu { .. } => Some(Side::Staff),
             C::CompleteService { .. }
@@ -543,13 +541,8 @@ pub enum FfState {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LineKind {
     Item,
-    Ff {
-        state: FfState,
-    },
-    Service {
-        done: bool,
-        confirm_pending: bool,
-    },
+    Ff { state: FfState },
+    Service { done: bool, confirm_pending: bool },
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1130,25 +1123,23 @@ impl Store {
         let registers = registers.clamp(1, MAX_REGISTERS);
         let bells = bells.clamp(1, MAX_BELLS);
         let regs = (1..=registers)
-            .map(|id| {
-                Register {
-                    id,
-                    mode: Mode::SelfOperated,
-                    staff: None,
-                    txn: Txn::default(),
-                    drawer: Drawer::default(),
-                    last_receipt: None,
-                    bill_handover: None,
-                    pickup_handover: None,
-                    last_op: 0,
-                    outlet: Cash::default(),
-                    outlet_since: None,
-                    menu: None,
-                    paused: false,
-                    touch: None,
-                    pressing: false,
-                    emoney: None,
-                }
+            .map(|id| Register {
+                id,
+                mode: Mode::SelfOperated,
+                staff: None,
+                txn: Txn::default(),
+                drawer: Drawer::default(),
+                last_receipt: None,
+                bill_handover: None,
+                pickup_handover: None,
+                last_op: 0,
+                outlet: Cash::default(),
+                outlet_since: None,
+                menu: None,
+                paused: false,
+                touch: None,
+                pressing: false,
+                emoney: None,
             })
             .collect();
         Store {
@@ -1712,16 +1703,29 @@ impl Store {
                 if r.txn.inserted.total() > 0 && method != PaymentMethod::Cash {
                     return Err("現金が投入済みです\n現金でお支払いください".into());
                 }
+                let self_op = r.mode == Mode::SelfOperated;
+                // 支払方法のボタンは待ち受けの案内ボタンと同じ挙動：選択中のボタンをもう一度押すと選択を外す
+                // （セルフ操作モードの「現金」は店員呼び出しなので外さない）
+                if r.txn.method == Some(method)
+                    && r.txn.inserted.total() == 0
+                    && !(self_op && method == PaymentMethod::Cash)
+                {
+                    r.txn.method = None;
+                    return done(format!("{}の選択を外しました", method.label()));
+                }
                 if let Some(why) = r.txn.method_refusal(method) {
                     return Err(why.into());
                 }
                 r.txn.method = Some(method);
-                let self_op = r.mode == Mode::SelfOperated;
                 let no_cash_goods = r.txn.cash_only() == 0;
                 if self_op {
                     if method == PaymentMethod::Cash {
-                        self.calls
-                            .raise(register, CallKind::CashOnly, self.now, "現金でのお支払い");
+                        self.calls.raise(
+                            register,
+                            CallKind::CashOnly,
+                            self.now,
+                            "現金でのお支払い",
+                        );
                         return done("スタッフをお呼びしました\n現金はスタッフがお預かりします");
                     }
                     if no_cash_goods {
@@ -2435,7 +2439,9 @@ impl Store {
                 self.calls.resolve(register, k, now);
             }
             return done(match was {
-                _ if resumed => format!("{}さんがレジを再開しました（スタッフ操作モード）", acc.name),
+                _ if resumed => {
+                    format!("{}さんがレジを再開しました（スタッフ操作モード）", acc.name)
+                }
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),
                 _ => format!("{}さんがログインしました（スタッフ操作モード）", acc.name),
             });
@@ -2722,7 +2728,11 @@ impl Store {
         done(format!(
             "{} ×{qty} を{}しました\nお渡ししたらチェックを入れてください",
             p.name,
-            if reserved { "予約注文として登録" } else { "登録" }
+            if reserved {
+                "予約注文として登録"
+            } else {
+                "登録"
+            }
         ))
     }
 

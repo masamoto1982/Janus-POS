@@ -234,8 +234,14 @@ button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
 }
 button:not(:disabled):active, .pressed { transform: translate(1px, 2px); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }
-button.seg.on, .method-list .seg.on {
+button.seg.on {
   font-weight: 700; text-decoration: underline; text-underline-offset: 2px;
+}
+/* 支払方法のボタンは画面遷移を伴わず案内を出すだけの第三のボタン。待ち受けの案内ボタンと同じ形：
+   角の丸みが強く、選択中は濃い背景・白文字・枠線なし。もう一度押すと選択を外す */
+.method-row button, .method-list .seg { border-radius: 999px; }
+.method-row button.seg.on, .method-list .seg.on {
+  background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; text-decoration: none;
 }
 /* タブ（FFのタブ・モバイルの画面切替）。タブの並びは下の線に載り、選ばれた積極タブ（濃い背景・白文字）と
    選ばれていない消極タブ（濃い枠線・濃い文字・背景なし）の二種類。上の角だけ丸く、下は線に付く。押しても位置はズレない */
@@ -254,7 +260,7 @@ button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { padding: 4px 10px; }
-.method-list .seg { border-radius: 8px; padding: 4px 10px; }
+.method-list .seg { padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: var(--gap); }
 

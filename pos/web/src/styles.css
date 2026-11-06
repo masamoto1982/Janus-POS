@@ -146,10 +146,11 @@ button { touch-action: manipulation; }
 .screen-cap::after { content: ""; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 .screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
-.screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; height: 51px;
+.screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; height: 51px;
   padding: 0 calc(8px + max(0px, (100% - 16px - 3 * var(--btn-w) - 2 * var(--gap)) / 4)); border-bottom: 1px solid var(--border); }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.screen-head .head-c { justify-self: center; display: flex; align-items: center; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }
 .screen-head .clock { font-size: 11px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 4 1 0; min-height: 0; display: flex; flex-direction: column; }

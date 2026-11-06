@@ -1014,14 +1014,11 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   ).join("");
   const grid = items
     .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
-    .map((f) =>
-      btn(
-        `${f.name}`,
-        { type: "register_ff", register: reg, side, code: f.code, qty: 1 },
-        f.stock > 0 ? can : { action: "register_ff", allowed: false, reason: "売り切れです" },
-        `ff-item ${f.stock > 0 ? "" : "soldout"}`,
-      ).replace("</button>", `<small>${f.stock > 0 ? (r.mode === "staff_operated" ? `残${f.stock}` : yen(f.price)) : "売り切れ"}</small></button>`),
-    )
+    .map((f) => {
+      const cmd: Command = { type: "register_ff", register: reg, side, code: f.code, qty: 1 };
+      if (f.level !== "out" || !can.allowed) return btn(f.name, cmd, can, `ff-item ${f.level}`);
+      return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${esc(f.name)}</button>`;
+    })
     .join("");
   const arrows =
     pages > 1

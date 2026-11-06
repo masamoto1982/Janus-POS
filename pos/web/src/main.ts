@@ -111,6 +111,7 @@ function start(): void {
   });
   wireSwipe();
   wireMenuSwipe();
+  wireForceRegister();
   rulesDlg().addEventListener("close", lockRules);
   rulesDlg()
     .querySelector("[data-owner-auth]")
@@ -1025,6 +1026,33 @@ function cancelLongPress(): void {
 }
 
 const MENU_SWIPE_PX = 40;
+function wireForceRegister(): void {
+  let hold: { timer: number; x: number; y: number; id: number } | null = null;
+  const cancel = () => {
+    if (hold) clearTimeout(hold.timer);
+    hold = null;
+  };
+  app.addEventListener("pointerdown", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-ffforce]");
+    if (!b || e.button !== 0) return;
+    cancel();
+    const cmd = b.dataset.ffforce!;
+    const timer = window.setTimeout(() => {
+      hold = null;
+      send(JSON.parse(cmd) as Command);
+    }, LONG_PRESS_MS);
+    hold = { timer, x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (hold && e.pointerId === hold.id && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 10) cancel();
+  });
+  for (const ev of ["pointerup", "pointercancel"] as const) window.addEventListener(ev, cancel);
+  window.addEventListener("blur", cancel);
+  app.addEventListener("contextmenu", (e) => {
+    if ((e.target as Element).closest("[data-ffforce]")) e.preventDefault();
+  });
+}
+
 function wireMenuSwipe(): void {
   let start: { reg: number; x: number; y: number; id: number } | null = null;
   app.addEventListener("pointerdown", (e) => {
@@ -1062,6 +1090,7 @@ function wireSwipe(): void {
   app.addEventListener("pointerdown", (e) => {
     if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
     const t = e.target as Element;
+    if (t.closest("[data-ffforce]")) return;
     const inlet = t.closest<HTMLElement>("[data-inlet], [data-terminal]");
     const screen = t.closest(".screen-head, .screen-items") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;

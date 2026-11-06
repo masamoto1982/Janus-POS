@@ -156,6 +156,7 @@ button { touch-action: manipulation; }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
 .screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
+.screen-items:has(> .ff-tabs) { gap: 3px; }
 .screen { --muted: var(--msg-weak); --gap: 8px; }
 .screen .big, .screen .guide { color: var(--msg-strong); }
 .screen .muted, .welcome p:not(.guide), .pair-note p, .thanks > div:not(.big) { color: var(--msg-weak); }
@@ -166,7 +167,7 @@ button { touch-action: manipulation; }
 .screen :is(.point-screen, .paybox, .welcome, .thanks, .ffv-screen) :is(p:not([class]), p.muted, p.guide, p.lead, p.fine),
 .screen .thanks > div:not(.big) { font-size: var(--msg-small); }
 .parcel-error { color: var(--danger); font-size: 14px; font-weight: 700; margin: 0; }
-.ff-tabs { flex: none; }
+.ff-tabs { flex: none; margin-top: 5px; }
 .ff-tab { padding: 2px 4px; font-size: 11px; }
 .ff-page { flex: 1; min-height: 0; display: flex; gap: var(--gap); }
 .ff-arrows { flex: none; width: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--gap); }

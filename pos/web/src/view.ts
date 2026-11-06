@@ -669,14 +669,14 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
     </div>`;
 }
 
-const EMONEY_HEAD_LABEL = `<span>電子マネーの</span><span>チャージ・残高確認</span>`;
+const EMONEY_HEAD_LABEL = `<span>電子マネー</span><span>チャージ 残高照会</span>`;
 
 function emoneyHead(r: RegisterView, side: Side): string {
   if (r.paused) return "";
   const staffOperated = r.mode === "staff_operated";
   const v = staffOperated ? r.staff : r.customer;
   const own: Side = staffOperated ? "staff" : "customer";
-  const label = `<button type="button" class="emoney-head neg" disabled aria-disabled="true" title="電子マネーのチャージ・残高確認">${EMONEY_HEAD_LABEL}</button>`;
+  const label = `<button type="button" class="emoney-head neg" disabled aria-disabled="true" title="電子マネーのチャージ・残高照会">${EMONEY_HEAD_LABEL}</button>`;
   if (side !== own) return label;
   const shopping = !staffOperated && (v.lines.length > 0 || v.coupons.length > 0 || v.returned.length > 0);
   if (shopping) {
@@ -686,7 +686,7 @@ function emoneyHead(r: RegisterView, side: Side): string {
   }
   const st = find(v.actions, "emoney");
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
-  return `<button type="button" class="emoney-head neg" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高確認" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
+  return `<button type="button" class="emoney-head neg" data-cmd="${esc(JSON.stringify(cmd))}" title="${esc(st.allowed ? "電子マネーのチャージ・残高照会" : (st.reason ?? ""))}"${st.allowed ? "" : " disabled"}>${EMONEY_HEAD_LABEL}</button>`;
 }
 
 export const voidAsk = new Map<number, Side>();

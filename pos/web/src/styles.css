@@ -588,7 +588,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; }
 .money-io-cust > *, .money-io-boxes > * { min-width: 0; }
-.emoney-head { min-height: 0; height: 28px; padding: 0 8px; display: inline-flex; flex-direction: column; justify-content: center; align-items: flex-start; font-size: 10px; line-height: 1.15; white-space: nowrap; cursor: pointer; }
+.emoney-head { min-height: 0; height: 28px; padding: 0 8px; display: inline-flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-size: 10px; line-height: 1.15; white-space: nowrap; cursor: pointer; }
 .emoney-head.pressing { transform: translate(1px, 2px); }
 .mode-title { display: inline-block; padding: 1px 12px; font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
 .mode-title.staff-operated { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }

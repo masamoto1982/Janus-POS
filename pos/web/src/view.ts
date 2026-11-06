@@ -1045,19 +1045,15 @@ const MENU_LABEL: Record<MenuScreen, string> = {
   ff_fresh: "FF鮮度管理",
 };
 
-const MENU_ITEMS: { screen: MenuScreen; cash: boolean }[] = [
-  { screen: "refund", cash: true },
-  { screen: "emergency", cash: true },
-  { screen: "deposit", cash: true },
-  { screen: "expense", cash: true },
-  { screen: "changer", cash: true },
-  { screen: "journal", cash: false },
-  { screen: "waste", cash: false },
-  { screen: "ff_fresh", cash: false },
-];
+const MENU_ITEMS: MenuScreen[] = ["refund", "emergency", "deposit", "expense", "changer", "journal", "waste", "ff_fresh"];
 
 export function storeMenuUsable(r: RegisterView): boolean {
-  return r.mode === "staff_operated" && r.staff.state === "ready" && !r.paused;
+  return r.mode === "staff_operated" && r.staff.state === "ready" && !r.paused && (r.menu !== null || !inTransaction(r));
+}
+
+/** 取引中（明細・クーポンがある、または電子マネーの手続き中）は店舗メニューを開けない */
+function inTransaction(r: RegisterView): boolean {
+  return r.staff.lines.length > 0 || r.staff.coupons.length > 0 || r.staff.phase === "paying" || r.emoney !== null;
 }
 
 export function storeMenu(r: RegisterView): string {
@@ -1066,13 +1062,12 @@ export function storeMenu(r: RegisterView): string {
   const m = r.menu!;
   const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
   const head = (title: string) => `<div class="menu-head"><b>${esc(title)}</b></div>`;
-  const busy: ActionState | undefined = v.lines.length > 0 ? { action: "open_menu", allowed: false, reason: "取引中は使えません" } : undefined;
   const screen = (body: string) => `<div class="menu-screen">${body}${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
       return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
         <div class="menu-list">${MENU_ITEMS
-          .map((k) => btn(MENU_LABEL[k.screen], go(k.screen), k.cash ? busy : undefined, "menu-item"))
+          .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>
         <div class="menu-list">
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}

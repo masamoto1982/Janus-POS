@@ -441,7 +441,7 @@ export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
 function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false): string {
   if (!st.allowed) return `${l.qty}`;
-  if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b></span>`;
+  if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b><i class="qty-pad" aria-hidden="true"></i></span>`;
   const step = (d: number): Command => ({ type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + d });
   const minus = l.qty <= 1 ? btn("削除", remove, st, "small neg") : btn("−", step(-1), st, "small neg");
   const e = qtyEntry.get(`${reg}:${side}`);

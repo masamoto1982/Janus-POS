@@ -631,10 +631,12 @@ body.dragging .drop-hint { display: inline; }
 .lines tr.flash td { animation: line-flash .9s ease-out; }
 @media (prefers-reduced-motion: reduce) { .lines tr.flash td { animation: none; background: var(--flash); } }
 
-.qty-step { display: flex; align-items: center; justify-content: flex-end; gap: var(--gap); white-space: nowrap; }
+/* 数量フォームのある明細：見出し「数量」・数字・入力欄を列の中央に揃える（−・入力欄・＋は同じ幅なので入力欄が列の中心） */
+.lines.cols3:has(.qty-step) :is(th, td):nth-child(2) { text-align: center; }
+.qty-step { display: flex; align-items: center; justify-content: center; gap: var(--gap); white-space: nowrap; }
 .screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 2px; font-size: 11px; }
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: 13px; }
-.qty-fixed { min-width: 1.4em; text-align: center; }
+.qty-fixed, .qty-pad { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); min-width: 0; text-align: center; }
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, oklch(0 0 0) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 18px oklch(0 0 0 / .25); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--msg-strong); }

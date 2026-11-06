@@ -234,13 +234,8 @@ button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
 }
 button:not(:disabled):active, .pressed { transform: translate(1px, 2px); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }
-button.seg.on {
+button.seg.on, .method-list .seg.on {
   font-weight: 700; text-decoration: underline; text-underline-offset: 2px;
-}
-/* 支払方法のボタンは待ち受けの案内ボタンと同じ形：角の丸みが強く、選択中は濃い背景・白文字・枠線なし */
-.method-row button, .method-list .seg { border-radius: 999px; }
-.method-row button.seg.on, .method-list .seg.on {
-  background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; text-decoration: none;
 }
 /* タブ（FFのタブ・モバイルの画面切替）。タブの並びは下の線に載り、選ばれた積極タブ（濃い背景・白文字）と
    選ばれていない消極タブ（濃い枠線・濃い文字・背景なし）の二種類。上の角だけ丸く、下は線に付く。押しても位置はズレない */
@@ -259,7 +254,7 @@ button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { padding: 4px 10px; }
-.method-list .seg { padding: 4px 10px; }
+.method-list .seg { border-radius: 8px; padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: var(--gap); }
 
@@ -308,11 +303,7 @@ details summary h3 { display: inline; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: 8px; }
 .guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: 11px; padding: 0 2px; border-radius: 999px; white-space: nowrap; }
-/* ボタン操作時の案内（案内ボタン・「付与する」などで出るガイダンス）は案内ボタンと同じ角の丸みが強い枠に入れる */
-.screen p.guide {
-  display: inline-block; box-sizing: border-box; align-self: center; max-width: 100%; margin: 8px auto 0; padding: 4px 12px;
-  border: 1.5px solid var(--msg-strong); border-radius: 999px; font-weight: 700; line-height: 1.4;
-}
+.welcome .guide { margin-top: 8px; font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-weight: 700; }
 .mirror { margin-top: 18px; }
@@ -531,7 +522,7 @@ body.dragging .drop-hint { display: inline; }
 .screen-head .emoney-head:not(:disabled) { filter: url(#ramp); }
 .screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
-/* 案内ボタンで出すガイダンスは青文字（濃いグレーを青のランプで青にする） */
+/* ボタン操作で出すガイダンス（案内ボタン・支払方法の選択）は青文字（濃いグレーを青のランプで青にする） */
 .screen p.guide { filter: url(#ramp); }
 .banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,

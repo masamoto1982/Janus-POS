@@ -429,7 +429,7 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 :root { --call-lo: oklch(0.80 0.13 155); --call-hi: oklch(0.72 0.15 25); }
 /* 呼び出しの点滅・変色はヘッダー中央の濃い部分（呼び鈴のまわり）だけで行い、呼び鈴から来ていることを表す。周辺は明るいまま */
 .screen-head.calling { --call-c: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo));
-  --head-call-bg: radial-gradient(ellipse 50% 160% at 50% 50%, var(--call-c) 0%, color-mix(in oklab, var(--call-c) 60%, var(--glow)) 35%, var(--glow) 100%) var(--glow);
+  --head-call-bg: radial-gradient(ellipse 50% 160% at 50% 50%, var(--call-c) 0%, color-mix(in oklab, var(--call-c) 60%, transparent) 35%, transparent 100%);
   animation: head-call 1s steps(1) infinite; }
 @keyframes head-call { 0% { background: var(--head-call-bg); } 50% { background: var(--head-bg); } }
 @media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: var(--head-call-bg); } }
@@ -679,8 +679,8 @@ body.dragging .drop-hint { display: inline; }
 
 .screen { --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
   --guide-bg: radial-gradient(circle farthest-corner at 50% 50%, var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark);
-  /* レジ画面ヘッダーは待ち受けの逆で、中心（呼び鈴のまわり）ほど濃く周辺ほど明るいグラデーション */
-  --head-bg: radial-gradient(ellipse 50% 160% at 50% 50%, var(--dark) 0%, var(--dark) 15%, var(--glow) 100%) var(--glow); }
+  /* レジ画面ヘッダーの背景は普段は無色。呼び出し中だけ中心（呼び鈴のまわり）が濃く色づいて点滅する */
+  --head-bg: transparent; }
 .screen.operable { --sky: oklch(0.80 0.09 230); --glow: color-mix(in oklab, var(--cust-bg) 88%, var(--sky)); --dark: color-mix(in oklab, var(--cust-bg) 55%, var(--sky)); }
 .scan-welcome, .staff-operated-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; background: var(--guide-bg); }
 .confirm { isolation: isolate; }

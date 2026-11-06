@@ -69,19 +69,6 @@ pub enum MenuScreen {
     FfFresh,
 }
 
-impl MenuScreen {
-    fn moves_cash(self) -> bool {
-        matches!(
-            self,
-            MenuScreen::Refund
-                | MenuScreen::Emergency
-                | MenuScreen::Deposit
-                | MenuScreen::Expense
-                | MenuScreen::Changer
-        )
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Menu {
     pub screen: MenuScreen,
@@ -3121,7 +3108,7 @@ impl Store {
             return Ok(Outcome::default());
         };
         let r = self.reg_mut(register)?;
-        if screen.moves_cash() && !r.txn.lines.is_empty() {
+        if !r.idle() {
             return Err("取引中は店舗メニューを開けません".into());
         }
         let to = exchange_to

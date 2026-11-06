@@ -1900,15 +1900,20 @@ fn shopping_is_limited_to_ten_items() {
 }
 
 #[test]
-fn void_and_logout_from_the_store_menu() {
+fn store_menu_cannot_open_during_a_transaction() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "customer", BREAD);
     let top = json!({"type":"open_menu","register":1,"screen":"top"});
-    ok(&mut s, top.clone());
+    assert!(run(&mut s, top.clone()).is_err(), "取引中は開けない");
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    assert!(run(&mut s, top.clone()).is_err(), "会計中も開けない");
     ok(&mut s, json!({"type":"void_transaction","register":1}));
-    let v = reg(&s, 1);
-    assert!(v.menu.is_none() && v.staff.lines.is_empty());
+    assert!(reg(&s, 1).menu.is_none());
     ok(&mut s, top);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);

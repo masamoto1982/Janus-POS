@@ -426,13 +426,10 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .bell-area h2 { margin: 0; }
 .bell-area .toast { position: static; margin-top: 8px; display: none; }
 .bell-area .toast.show { display: block; }
-:root { --call-lo: oklch(0.80 0.13 155); --call-hi: oklch(0.72 0.15 25); }
-/* 呼び出しの点滅・変色はヘッダー中央の濃い部分（呼び鈴のまわり）だけで行い、呼び鈴から来ていることを表す。周辺は明るいまま */
-.screen-head.calling { --call-c: color-mix(in oklch, var(--call-hi) var(--call-t, 0%), var(--call-lo));
-  --head-call-bg: radial-gradient(ellipse 50% 160% at 50% 50%, var(--call-c) 0%, color-mix(in oklab, var(--call-c) 60%, transparent) 35%, transparent 100%);
-  animation: head-call 1s steps(1) infinite; }
-@keyframes head-call { 0% { background: var(--head-call-bg); } 50% { background: var(--head-bg); } }
-@media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: var(--head-call-bg); } }
+/* 呼び出し中はヘッダー中央（呼び鈴のまわり）が色づき、周辺へ消えていく。点滅はしない。
+   待ち時間は色味だけで表す：緑→黄緑→黄→橙→赤（--call-c は main.ts の callColor が OKLCH で補間して入れる） */
+.screen-head.calling { background: radial-gradient(ellipse 50% 160% at 50% 50%, var(--call-c, oklch(0.7474 0.2337 140.3)) 0%,
+  color-mix(in oklab, var(--call-c, oklch(0.7474 0.2337 140.3)) 60%, transparent) 35%, transparent 100%); }
 
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
 @media (max-width: 900px) { .right-col { position: static; max-height: none; } }

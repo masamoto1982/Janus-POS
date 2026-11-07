@@ -1687,9 +1687,16 @@ impl Store {
                 if r.txn.prepaid > 0 {
                     return Err("一部お支払い済みです\n残りをお支払いください".into());
                 }
+                // セルフ操作モードで「現金」（店員呼び出し）を選んだあと引き返したら、呼び出しも取り下げる
+                let undo_cash_call = r.mode == Mode::SelfOperated
+                    && r.txn.method == Some(PaymentMethod::Cash)
+                    && r.txn.cash_only() == 0;
                 r.txn.paying = false;
                 r.txn.method = None;
                 r.txn.customer_turn = false;
+                if undo_cash_call {
+                    self.calls.resolve(register, CallKind::CashOnly, self.now);
+                }
                 done("登録画面に戻りました")
             }
             C::SelectPayment {

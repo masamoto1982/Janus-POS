@@ -655,6 +655,16 @@ const GUIDES: [GuideKind, string, string][] = [
 
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
 
+/** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。左に言語切り替え、右に電子マネー（チャージ・残高照会） */
+function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, ro: boolean): string {
+  const big = (main: string, sub: string, attrs: string) =>
+    `<button type="button" class="band-btn${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : attrs}><b>${main}</b><small>${sub}</small></button>`;
+  const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
+  const lang = big("言語", "Language", ` data-lang="${r.id}:${side}" title="言語の切り替え（準備中）"`);
+  const money = big("電子マネー", "チャージ・残高照会", ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
+  return `<div class="reg-top welcome-band"><span class="void">${lang}</span><span class="mid"></span><span class="action">${money}</span></div>`;
+}
+
 export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:${side}`);
@@ -714,7 +724,7 @@ function staffOperatedWelcome(r: RegisterView, notice: string, side: Side): stri
       `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
-  return `${notice}<div class="welcome staff-operated-welcome"><div class="big">${head}</div><p>${sub}</p>
+  return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}${notice}<div class="welcome staff-operated-welcome"><div class="big">${head}</div><p>${sub}</p>
       <div class="guide-row">${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
@@ -1125,7 +1135,7 @@ export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.
   );
 
   if (!c.lines.length && !c.coupons.length) voidAsk.delete(reg);
-  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${top}${notice}${welcome(r, side, a("emoney"))}`;
+  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${welcomeBand(r, side, a("emoney"), false)}${notice}${welcome(r, side, a("emoney"))}`;
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));

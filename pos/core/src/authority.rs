@@ -192,8 +192,8 @@ const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認し
 const SELF_OP_CASH_ONLY_GOODS: Denial =
     "切手・お支払いは現金のみです\nスタッフがお預かりします";
 const SELF_OP_NO_CASH: Denial =
-    "セルフレジでは現金を使えません\nキャッシュレスでお支払いください";
-const SELF_OP_CASH_CHOSEN: Denial = "現金はスタッフがお預かりします\nスタッフをお呼びしました";
+    "セルフレジでは現金を使えません\n現金はスタッフがお預かりいたします";
+const SELF_OP_CASH_CHOSEN: Denial = "現金はスタッフがお預かりいたします\nスタッフをお呼びしました";
 const EMONEY_SHORT: Denial = "電子マネーの残高が足りません\nどうするか選んでください";
 
 fn emoney(c: &Context) -> Result<(), Denial> {

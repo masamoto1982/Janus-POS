@@ -1721,7 +1721,7 @@ impl Store {
                     if method == PaymentMethod::Cash {
                         self.calls
                             .raise(register, CallKind::CashOnly, self.now, "現金でのお支払い");
-                        return done("スタッフをお呼びしました\n現金はスタッフがお預かりします");
+                        return done("スタッフをお呼びしました\n現金はスタッフがお預かりいたします");
                     }
                     if no_cash_goods {
                         self.calls.resolve(register, CallKind::CashOnly, self.now);

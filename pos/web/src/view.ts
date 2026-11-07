@@ -361,7 +361,6 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 const INSERT_DONE_MS = 30_000;
 
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false): string {
-  if (selfOperated && method === "cash") return `<p class="guide">現金はスタッフがお預かりいたします</p>`;
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   if (method && method !== "cash" && cashlessDue < due)
     return `<p class="guide">${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
@@ -576,6 +575,13 @@ function cashOnlyWait(): string {
   return `<div class="point-screen">
       <div class="big">切手は現金のみのお取り扱いです</div>
       <p>スタッフをお呼びしました<br>そのままお待ちください</p>
+    </div>`;
+}
+
+function cashCallWait(): string {
+  return `<div class="point-screen">
+      <div class="big">現金は店員がお預かりいたします</div>
+      <p>店員が向かっています</p>
     </div>`;
 }
 
@@ -1154,6 +1160,8 @@ export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : billPayCard(slips, true));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   if (c.phase === "paying" && r.cash_only) return screen(cashOnlyWait());
+  // セルフ操作モードで「現金」を選ぶと店員呼び出し、お客様側は支払方法の選択から案内画面に切り替わる
+  if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",

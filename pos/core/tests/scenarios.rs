@@ -1775,6 +1775,27 @@ fn self_operated_cash_choice_calls_staff() {
 }
 
 #[test]
+fn self_operated_back_from_cash_choice_withdraws_the_call() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
+    );
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "現金"));
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"customer"}),
+    );
+    assert!(reg(&s, 1).staff.calls.is_empty());
+}
+
+#[test]
 fn stamps_are_paid_in_cash_even_with_other_items() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);

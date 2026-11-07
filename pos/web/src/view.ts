@@ -655,7 +655,7 @@ const GUIDES: [GuideKind, string, string][] = [
 
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
 
-/** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。左＝言語切り替え、中央＝呼び鈴（大きめ）、右＝電子マネー（チャージ・残高照会）
+/** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。呼び鈴（大きめ）を中央に、左に言語切り替え、右に電子マネー（チャージ・残高照会）を寄せる
  *  言語切り替えは押した側の画面だけを切り替える（中身は今後作り込む）。セルフ操作モードのスタッフ側は操作不可。
  *  電子マネーはスタッフ操作モードのお客様側では表示のみ。商品登録が始まると呼び鈴はヘッダーに戻る */
 function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, emoneyRo: boolean): string {
@@ -666,7 +666,7 @@ function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, emoneyRo:
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
   const lang = big("lang-btn", "Language", "言語", langRo, ` data-lang="${r.id}:${side}" title="この画面の言語を切り替える（準備中）"`);
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
-  return `<div class="reg-top welcome-band"><span class="void">${lang}</span><span class="mid">${bellBtn(r, side)}</span><span class="action">${money}</span></div>`;
+  return `<div class="reg-top welcome-band"><div class="band-row">${lang}<span class="bell-slot">${bellBtn(r, side)}</span>${money}</div></div>`;
 }
 
 export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {

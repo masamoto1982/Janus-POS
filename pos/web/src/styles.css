@@ -676,8 +676,6 @@ body.dragging .drop-hint { display: inline; }
   --head-bg: transparent; }
 .screen.operable { --sky: oklch(0.80 0.09 230); --glow: color-mix(in oklab, var(--cust-bg) 88%, var(--sky)); --dark: color-mix(in oklab, var(--cust-bg) 55%, var(--sky)); }
 .scan-welcome, .staff-operated-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; background: var(--guide-bg); }
-.confirm { isolation: isolate; }
-.confirm::before { content: ""; position: absolute; inset: -8px -12px; z-index: -1; background: var(--guide-bg); pointer-events: none; }
 .hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
 .hover-tip[hidden] { display: none; }
 

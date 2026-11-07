@@ -145,17 +145,24 @@ button { touch-action: manipulation; }
 .screen-cap { font-size: 11px; letter-spacing: .08em; color: var(--muted); margin: 0 0 3px 2px; }
 .screen-cap::after { content: ""; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
-.screen { position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: clamp(340px, calc((100vh - 380px) / 2), 480px); display: flex; flex-direction: column; }
-.screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; height: 51px;
+/* レジ画面の縦幅は三段の積み上げで決める（いずれも上下の枠線1pxずつを含む）
+   一段目＝ヘッダー41px（稼働モード24px＋上下8px＋下線1px）
+   二段目＝待ち受けの帯／合計の帯65px（大ボタン48px＋上下8px＋下線1px）
+   三段目＝画面の内幅を黄金比（1.618）で割った高さ。横:縦＝黄金長方形
+   四段目＝FF・サービス・たばこの段64px */
+.screen-wrap { container-type: inline-size; }
+.screen { --head-h: 41px; --band-h: 65px; --items-h: 64px; --tier3-h: calc((100cqi - 2px) / 1.618);
+  position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: calc(2px + var(--head-h) + var(--band-h) + var(--tier3-h) + var(--items-h)); display: flex; flex-direction: column; }
+.screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; height: var(--head-h);
   padding: 0 calc(8px + max(0px, (100% - 16px - 3 * var(--btn-w) - 2 * var(--gap)) / 4)); border-bottom: 1px solid var(--border); background: var(--head-bg); }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }
 .screen-head .clock { font-size: 11px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
-.screen-body { position: relative; flex: 4 1 0; min-height: 0; display: flex; flex-direction: column; }
+.screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
-.screen-items { flex: 1 1 0; min-height: 0; overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }
+.screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
 .screen-items:has(> .ff-tabs) { gap: 3px; }
 .screen { --muted: var(--msg-weak); --gap: 8px; }
@@ -204,13 +211,12 @@ button { touch-action: manipulation; }
 .reg-top .yen { font-size: inherit; font-weight: 400; }
 .reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
-.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; white-space: nowrap; }
+.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { width: var(--btn-md-w); max-width: 100%; height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
   .reg-top .mid { --sum-h: 26px; }
   .reg-top .total, .reg-top .count b { font-size: 22px; }
   .reg-top .sum { font-size: 13px; }
-  .reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { font-size: 13px; padding: 4px 2px; }
 }
 .reg-top .count .full { margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
@@ -601,7 +607,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; }
 .money-io-cust > *, .money-io-boxes > * { min-width: 0; }
-.mode-title { display: inline-block; padding: 1px 12px; font-size: 14px; font-weight: 700; line-height: 1.4; white-space: nowrap; }
+.mode-title { display: inline-flex; align-items: center; height: 24px; padding: 0 12px; font-size: 14px; font-weight: 700; line-height: 1; white-space: nowrap; }
 .mode-title.staff-operated { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
 .mode-title:is(.self-operated, .store-menu) { background: oklch(1 0 0); color: var(--msg-strong); border: 1px solid var(--msg-strong); }
 .money-io .inlet, .money-io .outlet, .money-io .terminal {
@@ -707,7 +713,6 @@ body.dragging .drop-hint { display: inline; }
   .screens::-webkit-scrollbar { display: none; }
   .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
   .screen-cap { display: none; }
-  .screen { height: clamp(280px, 46vh, 420px); }
   .screen, [data-inlet], [data-terminal] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .money-io { margin-top: 6px; }
   .money-io.face-staff .money-io-cust, .money-io.face-customer .money-io-staff { display: none; }

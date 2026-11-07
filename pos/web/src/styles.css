@@ -735,11 +735,18 @@ body.dragging .drop-hint { display: inline; }
 .bell-btn.pressing { transform: translate(1px, 2px); }
 .bell-btn:disabled { opacity: .45; }
 
-/* 待ち受けの帯：会計ボタンを含む帯と同じ縦幅（大ボタン48px＋上下8px＝64px）。左＝言語切り替え、右＝電子マネー */
+/* 待ち受けの帯：会計ボタンを含む帯と同じ縦幅（大ボタン48px＋上下8px＝64px）。背景なし。
+   左＝言語切り替え、中央＝呼び鈴（大きめ）、右＝電子マネー。ボタンはどちらも消極 */
 .screen-main:has(> .welcome-band) { display: flex; flex-direction: column; }
-.screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; }
+.screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; background: none; }
 .welcome-band ~ :is(.scan-welcome, .staff-operated-welcome) { flex: 1 0 auto; min-height: 0; margin-top: 0; }
 .welcome-band .band-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 2px 6px; line-height: 1.2; white-space: nowrap; }
 .welcome-band .band-btn b { font-size: 13px; }
 .welcome-band .band-btn small { font-size: 10px; }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }
+/* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードのお客様側）でも押せる＝青 */
+.screen [data-region] .welcome-band .lang-btn:not(.mirror-only) { filter: url(#ramp); }
+.screen.inactive [data-region] .welcome-band .lang-btn:not(.mirror-only) { pointer-events: auto; }
+/* 呼び鈴は待ち受けでは帯の中央に大きめに出し、商品登録が始まるとヘッダーに戻る */
+.welcome-band .bell-btn { width: var(--btn-h); height: var(--btn-h); font-size: 26px; }
+.screen:has(.welcome-band .bell-btn) .screen-head .bell-btn { display: none; }

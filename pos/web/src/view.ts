@@ -655,14 +655,18 @@ const GUIDES: [GuideKind, string, string][] = [
 
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
 
-/** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。左に言語切り替え、右に電子マネー（チャージ・残高照会） */
-function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, ro: boolean): string {
-  const big = (main: string, sub: string, attrs: string) =>
-    `<button type="button" class="band-btn${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : attrs}><b>${main}</b><small>${sub}</small></button>`;
+/** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。左＝言語切り替え、中央＝呼び鈴（大きめ）、右＝電子マネー（チャージ・残高照会）
+ *  言語切り替えは押した側の画面だけを切り替える（中身は今後作り込む）。セルフ操作モードのスタッフ側は操作不可。
+ *  電子マネーはスタッフ操作モードのお客様側では表示のみ。商品登録が始まると呼び鈴はヘッダーに戻る */
+function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, emoneyRo: boolean): string {
+  const mirror = ' tabindex="-1" aria-disabled="true"';
+  const big = (cls: string, main: string, sub: string, ro: boolean, attrs: string) =>
+    `<button type="button" class="band-btn neg ${cls}${ro ? " mirror-only" : ""}"${ro ? mirror : attrs}><b>${main}</b><small>${sub}</small></button>`;
+  const langRo = r.mode === "self_operated" && side === "staff";
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
-  const lang = big("言語", "Language", ` data-lang="${r.id}:${side}" title="言語の切り替え（準備中）"`);
-  const money = big("電子マネー", "チャージ・残高照会", ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
-  return `<div class="reg-top welcome-band"><span class="void">${lang}</span><span class="mid"></span><span class="action">${money}</span></div>`;
+  const lang = big("lang-btn", "Language", "言語", langRo, ` data-lang="${r.id}:${side}" title="この画面の言語を切り替える（準備中）"`);
+  const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
+  return `<div class="reg-top welcome-band"><span class="void">${lang}</span><span class="mid">${bellBtn(r, side)}</span><span class="action">${money}</span></div>`;
 }
 
 export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {
@@ -957,7 +961,8 @@ export function clockText(d: Date): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${WEEKDAY[d.getDay()]}曜日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function screenHead(r: RegisterView, now: Date, side: Side): string {
+/** 呼び鈴。スタッフ側は応援を呼ぶ（SOS）、お客様側はスタッフを呼ぶ。スタッフ操作モードのお客様側には出さない */
+function bellBtn(r: RegisterView, side: Side): string {
   const call = find(r.customer.actions, "call_staff");
   const sos = side === "staff";
   const tip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
@@ -966,6 +971,11 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
     !sos && r.mode === "staff_operated"
       ? ""
       : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
+  return bell;
+}
+
+export function screenHead(r: RegisterView, now: Date, side: Side): string {
+  const bell = bellBtn(r, side);
   const mode = r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
   return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock">${clockText(now)}</time></span>`;
 }

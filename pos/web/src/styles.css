@@ -740,7 +740,13 @@ body.dragging .drop-hint { display: inline; }
 .screen-main:has(> .welcome-band) { display: flex; flex-direction: column; }
 .screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; background: none; }
 .welcome-band ~ :is(.scan-welcome, .staff-operated-welcome) { flex: 1 0 auto; min-height: 0; margin-top: 0; }
-.welcome-band .band-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 2px 6px; line-height: 1.2; white-space: nowrap; }
+/* 両ボタンは呼び鈴に寄せ、間の余白は顧客操作モードの FF とサービスの間と同じにする。
+   その行（.call-row）は帯より幅が 8px 狭く、大ボタン3つを gap 8px で space-evenly に並べるので、
+   余白＝(帯の内幅 + 8px − 大ボタン3つ − 8px×2) ÷ 4 + 8px。ボタンが縮むほど狭いときは 8px */
+.screen-main > .welcome-band { display: block; }
+.welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: max(var(--gap), (100cqi + 8px - 3 * var(--btn-w) - 2 * var(--gap)) / 4 + var(--gap)); }
+.welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--btn-h); height: var(--btn-h); }
+.welcome-band .band-btn { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 2px 6px; line-height: 1.2; white-space: nowrap; }
 .welcome-band .band-btn b { font-size: 13px; }
 .welcome-band .band-btn small { font-size: 10px; }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }

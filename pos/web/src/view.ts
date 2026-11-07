@@ -361,12 +361,13 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 const INSERT_DONE_MS = 30_000;
 
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false): string {
+  if (selfOperated && method === "cash") return `<p class="guide">現金はスタッフがお預かりいたします</p>`;
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   if (method && method !== "cash" && cashlessDue < due)
     return `<p class="guide">${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
   if (method === "points") return `<p class="guide">Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
   if (method && method !== "cash") return `<p class="guide">Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
-  if (selfOperated) return `<p>キャッシュレスでお支払いください<br>お支払い方法を選んでください</p>`;
+  if (selfOperated) return "";
   if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
   if (inserted) return staff ? `<p>${sec}秒の無操作で、お支払いを確定します</p>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
@@ -1162,7 +1163,8 @@ export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.
   if (c.phase === "paying" && c.point_pending) return screen(pointCheck(reg, side, a("confirm_point_card")));
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying")
-    return screen(`<div class="paybox center">
+    return screen(`<div class="paybox pay-stage">
+        <div class="big">お支払い方法を選択してください</div>
         ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true)}
       </div>${cashCorner(reg, side, c.method, a("select_payment"))}`);
   if (ffVerifyOpen(reg, side, c.lines))

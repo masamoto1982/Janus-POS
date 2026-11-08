@@ -165,16 +165,16 @@ button { touch-action: manipulation; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
 .screen-items:has(> .ff-tabs) { gap: 3px; }
-.screen { --muted: var(--msg-weak); --gap: 8px; }
-.screen .big, .screen .guide { color: var(--msg-strong); }
-.screen .muted, .welcome p:not(.guide), .pair-note p, .thanks > div:not(.big) { color: var(--msg-weak); }
-.parcel-wait p.lead { color: var(--msg-strong); }
-.screen { --msg-big: 18px; --msg-small: 13px; }
-.screen .big { font-size: var(--msg-big); font-weight: 700; line-height: 1.35; margin-bottom: 0; }
-.screen .muted,
-.screen :is(.point-screen, .paybox, .welcome, .thanks, .ffv-screen) :is(p:not([class]), p.muted, p.guide, p.lead, p.fine),
-.screen .thanks > div:not(.big) { font-size: var(--msg-small); }
-.parcel-error { color: var(--danger); font-size: 14px; font-weight: 700; margin: 0; }
+/* 大きなテキストと小さなテキスト（アプリ全体で共通、待ち受け画面が基準。web の msg()）
+   大きなテキスト＝濃いグレー・18px・太字、小さなテキスト＝薄いグレー・13px。大きなテキストは必ず小さなテキストより上に、4px 空けて置く
+   対象外：青文字の案内（.guide）、呼び出し画面の理由、数字の強調（荷物番号・残高・枚数） */
+.screen { --muted: var(--msg-weak); --gap: 8px; --msg-big: 18px; --msg-small: 13px; }
+.screen .big { color: var(--msg-strong); font-size: var(--msg-big); font-weight: 700; line-height: 1.35; margin-bottom: 0; }
+.screen .guide { color: var(--msg-strong); font-size: var(--msg-small); }
+.screen .msg { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; text-align: center; }
+.screen .msg > p.small { margin: 0; }
+.screen .muted, .screen p.small, .screen :is(.point-screen, .paybox) p:not([class]) { color: var(--msg-weak); font-size: var(--msg-small); font-weight: 400; }
+.parcel-error { color: var(--danger); font-weight: 700; }
 .ff-tabs { flex: none; margin-top: 5px; }
 .ff-tab { padding: 2px 4px; font-size: 11px; }
 .ff-page { flex: 1; min-height: 0; display: flex; gap: var(--gap); }
@@ -360,7 +360,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .confirm:has(> .back-foot), .confirm:has(> .skip-foot) { padding-bottom: calc(var(--btn-md-h) + 4px); }
 .confirm:has(> .back-foot) > .point-screen { padding-top: 2px; padding-bottom: 2px; gap: 8px; }
 .confirm:has(> .back-foot) > .point-screen .big { margin-bottom: 0; }
-.confirm:has(> .back-foot) > .point-screen.emoney-screen .big { margin-bottom: 16px; }
+.confirm:has(> .back-foot) > .point-screen.emoney-screen > .msg { margin-bottom: 16px; }
 .confirm:has(> .back-foot) { gap: 4px; }
 .confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
 .confirm:has(> .back-foot) > .paybox p { margin: 2px 0 0; }
@@ -560,10 +560,8 @@ body.dragging .drop-hint { display: inline; }
 .parcel-fields button.pad-field { width: 84px; height: auto; min-height: 1.6em; font-size: 18px; padding: 6px 8px; }
 .parcel-entry button.parcel-post { justify-content: center; height: auto; min-height: 1.6em; width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
-.parcel-size { margin: 0; font-size: 15px; }
 .parcel-no { margin-right: 8px; padding: 1px 8px; border: 1.5px solid var(--msg-strong); border-radius: 999px; font-size: 14px; }
-.parcel-fee { margin: 0; font-size: 15px; }
-.parcel-fee b { margin-left: 8px; font-size: 22px; }
+.parcel-fee { margin-left: 8px; }
 .id-entry button.birth-field { justify-content: center; height: auto; min-height: 1.5em; width: 370px; max-width: 100%; box-sizing: border-box; text-align: center; font-size: 20px; padding: 10px 12px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 370px; }
 .collect-list label { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; cursor: pointer; text-align: left; }
@@ -668,8 +666,7 @@ body.dragging .drop-hint { display: inline; }
 .emoney-choices.row > * { white-space: nowrap; }
 .emoney-choices.row.pair { display: flex; flex-direction: row; justify-content: center; width: auto; margin-bottom: 0; }
 .emoney-choices.row.pair > button { white-space: pre-line; line-height: 1.25; font-size: 14px; }
-.emoney-screen .big + .muted { margin-top: -14px; }
-.emoney-screen .emoney-balance { font-size: 28px; font-variant-numeric: tabular-nums; }
+.emoney-screen .emoney-balance { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
 
 .void-btn { white-space: nowrap; }
 .staff-head { gap: 8px; }

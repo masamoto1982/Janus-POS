@@ -114,7 +114,7 @@ const METHODS = ["cash", "emoney", "qr", "credit", "points"] as const;
 type Side = "staff" | "customer";
 
 function thanks(): string {
-  return `<div class="thanks"><div class="big">ありがとうございました</div><div>お忘れ物にご注意ください</div></div>`;
+  return `<div class="thanks">${msg("ありがとうございました", "お忘れ物にご注意ください")}</div>`;
 }
 
 function changeDue(side: Side, amount: number): string {
@@ -170,8 +170,7 @@ function pickupStep(reg: number, p: Pickup, st: ActionState): string {
 function pickupHandover(reg: number, side: Side, no: string): string {
   if (side === "customer")
     return `<div class="point-screen pickup-step">
-      <div class="big">受け取りのサインをお願いします</div>
-      <p>レシートとお釣りをお受け取りください</p>
+      ${msg("受け取りのサインをお願いします", "レシートとお釣りをお受け取りください")}
     </div>`;
   return `<div class="point-screen pickup-step">
       <p class="pickup-no">${esc(no)}</p>
@@ -193,7 +192,7 @@ export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
 export const parcelError = new Map<number, string>();
 const parcelErr = (reg: number): string => {
   const e = parcelError.get(reg);
-  return e ? `<p class="parcel-error" role="alert">${esc(e)}</p>` : "";
+  return e ? `<span class="parcel-error" role="alert">${esc(e)}</span>` : "";
 };
 
 function parcelNote(reg: number, l: StaffLine): string {
@@ -208,9 +207,7 @@ function parcelNote(reg: number, l: StaffLine): string {
 
 function parcelWait(): string {
   return `<div class="point-screen pair-note parcel-wait">
-      <div class="big">スタッフがお伺いします</div>
-      <p class="lead">伝票を貼り付けてお待ちください</p>
-      <p class="fine">伝票の貼り付け、梱包はお客様責となります</p>
+      ${msg("スタッフがお伺いします", "伝票を貼り付けてお待ちください<br>伝票の貼り付け、梱包はお客様責となります")}
     </div>`;
 }
 
@@ -223,23 +220,20 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
     padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`);
   if (!p.size && !p.sum_cm) {
     return `<div class="point-screen parcel-entry">
-        <div class="big">${no}取り扱いサイズを決定してください</div>
-        ${parcelErr(reg) || `<p class="parcel-size">三辺の長さの合計を入力してください</p>`}
+        ${msg(`${no}取り扱いサイズを決定してください`, parcelErr(reg) || "三辺の長さの合計を入力してください")}
         <div class="parcel-fields"><label>長さ${field("pcm", "", "荷物の三辺の合計（cm）")}<span>cm</span></label></div>
         <div class="point-choices"><button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
       </div>${back()}`;
   }
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
-        <div class="big">${no}取り扱いサイズを決定してください</div>
-        ${parcelErr(reg) || `<p class="parcel-size">重量を入力してください</p>`}
+        ${msg(`${no}取り扱いサイズを決定してください`, parcelErr(reg) || "重量を入力してください")}
         <div class="parcel-fields"><label>重さ${field("pkg", "", "荷物の重さ（kg）")}<span>kg</span></label></div>
         <div class="point-choices"><button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}" data-cm="${p.sum_cm}"${off}>決定</button></div>
       </div>${back()}`;
   }
   return `<div class="point-screen parcel-entry">
-      <div class="big">${no}お届け先の郵便番号を入力してください</div>
-      ${parcelErr(reg)}
+      ${msg(`${no}お届け先の郵便番号を入力してください`, parcelErr(reg))}
       ${field("post", "例 100-0001", "お届け先の郵便番号（7桁）")}
       <div class="point-choices">
         <button class="primary" data-form="parcel-postal" data-reg="${reg}" data-line="${l.id}"${off}>決定</button>
@@ -252,8 +246,7 @@ function parcelAsk(reg: number, lines: StaffLine[], st: ActionState): string {
   const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
   const p = last?.parcel;
   return `<div class="point-screen parcel-ask">
-      ${p && last ? `<p class="parcel-fee">${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b>${p.collect ? "着払い" : yen(last.amount)}</b></p>` : ""}
-      <div class="big">次の荷物はありますか？</div>
+      ${msg("次の荷物はありますか？", p && last ? `${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b class="parcel-fee">${p.collect ? "着払い" : yen(last.amount)}</b>` : "")}
       <div class="point-choices">
         ${btn("ある", { type: "parcel_next", register: reg, more: true }, st)}
         ${btn("ない", { type: "parcel_next", register: reg, more: false }, st, "primary")}
@@ -328,32 +321,36 @@ export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: 
 
 export function billPayCard(count: number, selfOperated = false): string {
   return `<div class="point-screen bill-pay">
-      <div class="big">公共料金${billN(count)}を受け付けます</div>
-      <p>${selfOperated ? "現金はスタッフがお預かりします<br>スタッフをお呼びください" : "現金でお支払いください"}</p>
+      ${msg(`公共料金${billN(count)}を受け付けます`, selfOperated ? "現金はスタッフがお預かりします<br>スタッフをお呼びください" : "現金でお支払いください")}
     </div>`;
 }
 
 export function billHandover(reg: number, side: Side, count: number, st: ActionState): string {
   if (side === "customer")
     return `<div class="point-screen bill-done">
-      <div class="big">公共料金${billN(count)}　支払いが完了しました</div>
-      <p>払込票とレシート、お釣りをお受け取りください</p>
+      ${msg(`公共料金${billN(count)}　支払いが完了しました`, "払込票とレシート、お釣りをお受け取りください")}
     </div>`;
   return `<div class="point-screen bill-done">
-      <div class="big">公共料金${billN(count)}</div>
-      <p>払込票に収納印を押してお渡しください</p>
+      ${msg(`公共料金${billN(count)}`, "払込票に収納印を押してお渡しください")}
       <div class="point-choices">${btn("お渡し済", { type: "hand_over_bills", register: reg, side }, st, "primary")}</div>
     </div>`;
 }
 
 function billNote(count: number, sub: string): string {
-  return `<div class="point-screen pair-note"><div class="big">公共料金${billN(count)}</div><p>${esc(sub)}</p></div>`;
+  return `<div class="point-screen pair-note">${msg(`公共料金${billN(count)}`, esc(sub))}</div>`;
 }
 
 const confirm = (body: string): string => `<div class="confirm">${body}</div>`;
 
+/** 大きなテキストと小さなテキスト（アプリ全体で共通、待ち受け画面が基準）
+ *  大きなテキスト＝濃いグレー・太字、小さなテキスト＝薄いグレー。大きなテキストは必ず小さなテキストより上に置く
+ *  引数は HTML（呼び出し側でエスケープする） */
+export function msg(big: string, small = ""): string {
+  return `<div class="msg"><div class="big">${big}</div>${small ? `<p class="small">${small}</p>` : ""}</div>`;
+}
+
 function pairNote(head: string, sub = ""): string {
-  return `<div class="point-screen pair-note"><div class="big">${esc(head)}</div>${sub ? `<p>${esc(sub)}</p>` : ""}</div>`;
+  return `<div class="point-screen pair-note">${msg(esc(head), esc(sub))}</div>`;
 }
 
 const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
@@ -573,22 +570,19 @@ export function callScreen(r: RegisterView, now: number): string {
 
 function cashOnlyWait(): string {
   return `<div class="point-screen">
-      <div class="big">切手は現金のみのお取り扱いです</div>
-      <p>スタッフをお呼びしました<br>そのままお待ちください</p>
+      ${msg("切手は現金のみのお取り扱いです", "スタッフをお呼びしました<br>そのままお待ちください")}
     </div>`;
 }
 
 function cashCallWait(): string {
   return `<div class="point-screen">
-      <div class="big">現金は店員がお預かりいたします</div>
-      <p>店員が向かっています</p>
+      ${msg("現金は店員がお預かりいたします", "店員が向かっています")}
     </div>`;
 }
 
 function ageWait(age: number): string {
   return `<div class="point-screen">
-      <div class="big">年齢確認が必要な商品が含まれています</div>
-      <p>${age}歳前後のお客様は身分証をご準備ください</p>
+      ${msg("年齢確認が必要な商品が含まれています", `${age}歳前後のお客様は身分証をご準備ください`)}
     </div>`;
 }
 
@@ -632,7 +626,7 @@ export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: Ac
     side === "staff"
       ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください<br>対象商品を登録するか、クーポンを取り消すまで決済できません"]
       : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください<br>対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
-  return `<div class="card coupon-card"><b>${head}</b><p>${body}</p><ul class="coupon-list">${list}</ul></div>`;
+  return `<div class="card coupon-card">${msg(head, body)}<ul class="coupon-list">${list}</ul></div>`;
 }
 
 export function returnedCard(reg: number, side: Side, returned: Returned[], done: boolean): string {
@@ -645,7 +639,7 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
         ? "適用先のなかったクーポンをお返しします"
         : "取り消したクーポンをお返しします";
   const label = side === "staff" ? "返却しました" : "受け取りました";
-  return `<div class="card coupon-card returned"><div class="id-head"><b>${head}</b>${
+  return `<div class="card coupon-card returned"><div class="id-head">${msg(head)}${
     done ? btn(label, { type: "dismiss_returned", register: reg }, undefined, "small") : ""
   }</div><ul class="coupon-list">${list}</ul></div>`;
 }
@@ -681,8 +675,7 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
   const on = scanGuide.get(`${reg}:${side}`);
   const guide = GUIDES.find(([k]) => k === on);
   return `<div class="welcome${emoney ? " scan-welcome" : ""}">
-      <div class="big">バーコードをスキャンしてください</div>
-      <p>すべてのバーコードを受け付けます</p>
+      ${msg("バーコードをスキャンしてください", "すべてのバーコードを受け付けます")}
       <div class="guide-row">${GUIDES.map(
         ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
       ).join("")}</div>
@@ -710,8 +703,7 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
     .map((s) => `<br>${s}`)
     .join("");
   return `<div class="point-screen void-screen">
-      <div class="big">取引を中止しますか？</div>
-      <p>登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}</p>
+      ${msg("取引を中止しますか？", `登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}`)}
       <div class="void-choices">
         ${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}
       </div>
@@ -735,7 +727,7 @@ function staffOperatedWelcome(r: RegisterView, notice: string, side: Side): stri
       `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
-  return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}${notice}<div class="welcome staff-operated-welcome"><div class="big">${head}</div><p>${sub}</p>
+  return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}${notice}<div class="welcome staff-operated-welcome">${msg(head, sub)}
       <div class="guide-row">${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
@@ -880,9 +872,10 @@ export function itemCount(lines: { qty: number }[]): number {
 
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
   if (r.paused)
-    return confirm(`<div class="point-screen paused-screen"><div class="big">レジ休止中</div><p>${
-      side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します"
-    }</p></div>`);
+    return confirm(`<div class="point-screen paused-screen">${msg(
+      "レジ休止中",
+      side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します",
+    )}</div>`);
   if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   const notice = callNotice(r, snap.now, side);
   if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return notice + confirm(emoneyScreen(r, side));
@@ -899,14 +892,14 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     const rest = Math.max(0, r.staff.due - r.emoney_partial);
     const st = find(actions, "resolve_emoney_short");
     const go = (label: string, c: string, cls: string) => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
-    const note = `<p>電子マネーの残高 <b>${yen(r.emoney_partial)}</b> を引き出し、残り <b>${yen(rest)}</b> を現金でお支払いいただきます</p>`;
+    const note = `電子マネーの残高 <b>${yen(r.emoney_partial)}</b> を引き出し、残り <b>${yen(rest)}</b> を現金でお支払いいただきます`;
     if (!r.emoney_partial_ok)
       return `<div class="point-screen emoney-screen">
-          <div class="big">お支払い方法の確認</div>${note}
+          ${msg("お支払い方法の確認", note)}
           ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}${go("確認しました", "cash_confirmed", "primary")}</div>`}
         </div>`;
     return `<div class="point-screen emoney-screen">
-        <div class="big">電子マネーを決済端末にかざしてください</div>${note}
+        ${msg("電子マネーを決済端末にかざしてください", note)}
         ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}</div>`}
       </div>`;
   }
@@ -920,8 +913,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
            <div class="emoney-foot">${choice("他の決済を使う", "cancel", "skip")}</div>`
         : `<div class="emoney-choices">${choice("他の決済を使う", "cancel", "primary")}</div>`;
     return `<div class="point-screen emoney-screen">
-        <div class="big">電子マネーの残高が足りません</div>
-        <p>不足額 <b>${yen(short)}</b></p>
+        ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
         ${ro ? "" : buttons}
       </div>`;
   }
@@ -929,18 +921,16 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   if (e.kind === "menu") {
     const go = (label: string, kind: string) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
     return `<div class="point-screen emoney-screen">
-        <div class="big">電子マネー</div>
-        <p class="muted">選択してください</p>
+        ${msg("電子マネー", "選択してください")}
         ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>`}
       </div>${close("バック")}`;
   }
   if (e.kind === "inquiry")
     return e.balance === null
       ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを決済端末にかざしてください</div></div>${close("バック")}`
-      : `<div class="point-screen emoney-screen"><p>電子マネーの残高</p><div class="big emoney-balance">${yen(e.balance)}</div>${close("閉じる")}</div>`;
+      : `<div class="point-screen emoney-screen">${msg(`電子マネーの残高<span class="emoney-balance">${yen(e.balance)}</span>`)}${close("閉じる")}</div>`;
   return `<div class="point-screen emoney-screen">
-      <div class="big">チャージする紙幣を入れてください</div>
-      <p>${e.inserted ? "入れおわったら、電子マネーを決済端末にかざしてください" : "入金ボックスに入れます<br>1,000円札から使えます（残高は 20,000円まで）"}</p>
+      ${msg("チャージする紙幣を入れてください", e.inserted ? "入れおわったら、電子マネーを決済端末にかざしてください" : "入金ボックスに入れます<br>1,000円札から使えます（残高は 20,000円まで）")}
     </div>${close("バック")}`;
 }
 
@@ -1068,11 +1058,11 @@ export function storeMenu(r: RegisterView): string {
   const reg = r.id;
   const m = r.menu!;
   const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
-  const head = (title: string) => `<div class="menu-head"><b>${esc(title)}</b></div>`;
+  const head = (title: string) => `<div class="menu-head"><b class="big">${esc(title)}</b></div>`;
   const screen = (body: string) => `<div class="menu-screen">${body}${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-head"><b>店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
+      return `<div class="menu-head"><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
         <div class="menu-list">${MENU_ITEMS
           .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>
@@ -1102,7 +1092,7 @@ export function storeMenu(r: RegisterView): string {
     }
     case "deposit":
       return screen(`${head(MENU_LABEL.deposit)}
-        <p>入金する金額を下の<b>「入金」ボックス</b>に入れて Enter を押してください</p>
+        <p class="muted">入金する金額を下の<b>「入金」ボックス</b>に入れて Enter を押してください</p>
         <p class="muted">記録は担当者名つきで残ります</p>`);
     case "changer": {
       const have = (d: number) => v.drawer.find(([x]) => x === d)?.[1] ?? 0;
@@ -1111,7 +1101,7 @@ export function storeMenu(r: RegisterView): string {
         .join("");
       return screen(`${head(MENU_LABEL.changer)}
         <div class="row wrap">受け取る金種 ${segs}</div>
-        <p>両替する金額を<b>「入金」ボックス</b>に入れて Enter を押してください<br>同じ額を ${m.exchange_to.toLocaleString()}円 で<b>「出金」ボックス</b>に出します</p>
+        <p class="muted">両替する金額を<b>「入金」ボックス</b>に入れて Enter を押してください<br>同じ額を ${m.exchange_to.toLocaleString()}円 で<b>「出金」ボックス</b>に出します</p>
         <p class="muted">釣銭機の ${m.exchange_to.toLocaleString()}円：残り ${have(m.exchange_to)} 枚　在高 ${yen(v.drawer_total)}</p>`);
     }
   }

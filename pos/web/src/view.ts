@@ -704,9 +704,7 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
     .join("");
   return `<div class="point-screen void-screen">
       ${msg("取引を中止しますか？", `登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}`)}
-      <div class="void-choices">
-        ${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}
-      </div>
+      <div class="point-choices">${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}</div>
     </div>
     <div class="back-foot"><button type="button" class="md ghost back-btn" data-void-cancel="${reg}">バック</button></div>`;
 }
@@ -887,48 +885,47 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   const ro = r.mode === "staff_operated" && side === "customer";
   const actions = r.mode === "self_operated" ? r.customer.actions : r.staff.actions;
   const close = (label: string) =>
-    ro ? "" : label === "バック" ? backCorner({ type: "close_emoney", register: reg, side }, find(actions, "emoney")) : `<div class="screen-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "skip")}</div>`;
+    ro ? "" : `<div class="back-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "md ghost back-btn")}</div>`;
   if (r.emoney_partial !== null) {
     const rest = Math.max(0, r.staff.due - r.emoney_partial);
     const st = find(actions, "resolve_emoney_short");
     const go = (label: string, c: string, cls: string) => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
+    const other = ro ? "" : `<div class="back-foot">${go("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`;
     const note = `電子マネーの残高 <b>${yen(r.emoney_partial)}</b> を引き出し、残り <b>${yen(rest)}</b> を現金でお支払いいただきます`;
     if (!r.emoney_partial_ok)
       return `<div class="point-screen emoney-screen">
           ${msg("お支払い方法の確認", note)}
-          ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}${go("確認しました", "cash_confirmed", "primary")}</div>`}
-        </div>`;
+          ${ro ? "" : `<div class="point-choices">${go("確認しました", "cash_confirmed", "primary")}</div>`}
+        </div>${other}`;
     return `<div class="point-screen emoney-screen">
         ${msg("電子マネーを決済端末にかざしてください", note)}
-        ${ro ? "" : `<div class="emoney-foot">${go("他の決済を使う", "cancel", "skip")}</div>`}
-      </div>`;
+      </div>${other}`;
   }
   if (r.emoney_short !== null) {
     const st = find(actions, "resolve_emoney_short");
     const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     const short = Math.max(0, r.staff.due - r.emoney_short);
-    const buttons =
-      r.mode === "staff_operated"
-        ? `<div class="emoney-choices row pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>
-           <div class="emoney-foot">${choice("他の決済を使う", "cancel", "skip")}</div>`
-        : `<div class="emoney-choices">${choice("他の決済を使う", "cancel", "primary")}</div>`;
+    const staffOp = r.mode === "staff_operated";
+    const buttons = staffOp
+      ? `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`
+      : `<div class="point-choices">${choice("他の決済を使う", "cancel", "primary")}</div>`;
     return `<div class="point-screen emoney-screen">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
         ${ro ? "" : buttons}
-      </div>`;
+      </div>${ro || !staffOp ? "" : `<div class="back-foot">${choice("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`}`;
   }
   const e = r.emoney!;
   if (e.kind === "menu") {
     const go = (label: string, kind: string) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
     return `<div class="point-screen emoney-screen">
         ${msg("電子マネー", "選択してください")}
-        ${ro ? "" : `<div class="emoney-choices row">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>`}
+        ${ro ? "" : `<div class="point-choices">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>`}
       </div>${close("バック")}`;
   }
   if (e.kind === "inquiry")
     return e.balance === null
       ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを決済端末にかざしてください</div></div>${close("バック")}`
-      : `<div class="point-screen emoney-screen">${msg(`電子マネーの残高<span class="emoney-balance">${yen(e.balance)}</span>`)}${close("閉じる")}</div>`;
+      : `<div class="point-screen emoney-screen">${msg(`電子マネーの残高<span class="emoney-balance">${yen(e.balance)}</span>`)}</div>${close("閉じる")}`;
   return `<div class="point-screen emoney-screen">
       ${msg("チャージする紙幣を入れてください", e.inserted ? "入れおわったら、電子マネーを決済端末にかざしてください" : "入金ボックスに入れます<br>1,000円札から使えます（残高は 20,000円まで）")}
     </div>${close("バック")}`;

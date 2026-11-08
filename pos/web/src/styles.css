@@ -301,7 +301,10 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 .staff-head .tax-note { margin-left: auto; }
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }
 .screen-main > .reg-top, .screen-main > .banner { flex: none; }
-.confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: var(--gap); }
+/* 確認・案内画面の配置（アプリ全体で共通）
+   上から 大きなテキスト→小さなテキスト（4px）→ボタン（16px）を一つのまとまりにし、領域の上下左右の中央へ
+   バックなど引き返すボタンは左下の角、スキップなど先へ進む補助ボタンは右下の角。角のボタンの有無でまとまりの位置が変わらないよう、上下に同じ余白を取る */
+.confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 16px; padding-block: calc(var(--btn-md-h) + 4px); }
 .confirm > * { max-width: 100%; }
 .confirm .row { justify-content: center; }
 .confirm .paybox { border: none; }
@@ -321,7 +324,7 @@ details summary h3 { display: inline; }
 .big { font-weight: 700; }
 .mirror { margin-top: 18px; }
 .card { border-radius: 10px; padding: 12px; margin: 8px 0; text-align: center; }
-.point-screen { text-align: center; padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.point-screen { text-align: center; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .point-choices { display: flex; gap: var(--gap); flex-wrap: nowrap; justify-content: center; max-width: 100%; }
 .point-services { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .point-service { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; }
@@ -351,25 +354,19 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 8px 0 0; }
 .ffv-foot.end { justify-content: flex-end; }
 .ff-return-list { list-style: none; margin: 0 0 auto; padding: 0; font-size: 15px; }
-.emoney-screen:has(> .emoney-foot) { align-self: stretch; flex: 1 0 auto; }
-.emoney-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
-.point-screen:has(> .screen-foot) { align-self: stretch; flex: 1 0 auto; }
-.point-screen:has(> .screen-foot) > :first-child, .emoney-screen:has(> .emoney-foot) > :first-child { margin-top: auto; }
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
 .confirm { position: relative; }
-.confirm:has(> .back-foot), .confirm:has(> .skip-foot) { padding-bottom: calc(var(--btn-md-h) + 4px); }
-.confirm:has(> .back-foot) > .point-screen { padding-top: 2px; padding-bottom: 2px; gap: 8px; }
-.confirm:has(> .back-foot) > .point-screen .big { margin-bottom: 0; }
-.confirm:has(> .back-foot) > .point-screen.emoney-screen > .msg { margin-bottom: 16px; }
-.confirm:has(> .back-foot) { gap: 4px; }
-.confirm:has(> .back-foot) > .paybox { margin: 0; padding: 0; }
-.confirm:has(> .back-foot) > .paybox p { margin: 2px 0 0; }
+.confirm:has(> .ffv-screen) { padding-top: 0; }
+.confirm:has(> .ffv-screen):not(:has(> :is(.back-foot, .skip-foot))) { padding-bottom: 0; }
+.confirm > .paybox { display: flex; flex-direction: column; align-items: center; gap: 16px; margin: 0; padding: 0; }
+.confirm > .paybox > :is(p, .row) { margin: 0; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
 .skip-foot { position: absolute; right: 0; bottom: 0; }
 .confirm button.skip.md, button.skip.md { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
 .menu-screen { display: flex; flex-direction: column; min-height: 100%; }
 .qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
 .confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
+.confirm button.back-btn.wide, button.back-btn.wide { width: auto; min-width: var(--btn-md-w); padding: 0 8px; }
 .change { font-size: 18px; margin: 8px 0; }
 
 .toast {
@@ -554,7 +551,6 @@ body.dragging .drop-hint { display: inline; }
 .id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
 .id-head button { min-width: 64px; }
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
-.parcel-entry, .parcel-ask, .pickup-step, .parcel-wait { padding: 12px; gap: 8px; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
 .parcel-fields button.pad-field { width: 84px; height: auto; min-height: 1.6em; font-size: 18px; padding: 6px 8px; }
@@ -661,16 +657,11 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
 .qty-pop-foot button { flex: 1; height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
 
-.emoney-choices { display: flex; flex-direction: column; gap: var(--gap); align-items: center; width: min(100%, 280px); margin: 0 auto; }
-.emoney-choices.row { display: grid; grid-template-columns: 1fr 1fr; width: 280px; max-width: 100%; margin-bottom: 8px; }
-.emoney-choices.row > * { white-space: nowrap; }
-.emoney-choices.row.pair { display: flex; flex-direction: row; justify-content: center; width: auto; margin-bottom: 0; }
-.emoney-choices.row.pair > button { white-space: pre-line; line-height: 1.25; font-size: 14px; }
+.point-choices.pair > button { white-space: pre-line; line-height: 1.25; }
 .emoney-screen .emoney-balance { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
 
 .void-btn { white-space: nowrap; }
 .staff-head { gap: 8px; }
-.void-choices { display: flex; gap: var(--gap); justify-content: center; flex-wrap: wrap; }
 
 
 .screen { --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));

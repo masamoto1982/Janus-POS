@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LANG, langOf, loadLangs, saveLangs, toggleLang, trCore, trText } from "./i18n";
+import { DEFAULT_LANG, langOf, resetLangs, toggleLang, trCore, trText } from "./i18n";
 
 describe("screen language", () => {
-  it("defaults to English and switches only the pressed side", () => {
-    loadLangs(null);
-    expect(DEFAULT_LANG).toBe("en");
-    expect(toggleLang(1, "customer")).toBe("ja");
-    expect(langOf(1, "customer")).toBe("ja");
-    expect(langOf(1, "staff")).toBe("en");
-    expect(langOf(2, "customer")).toBe("en");
-    const saved = saveLangs();
-    loadLangs(saved);
-    expect(langOf(1, "customer")).toBe("ja");
+  it("defaults to Japanese, switches only the pressed side, and resets per register", () => {
+    expect(DEFAULT_LANG).toBe("ja");
     expect(toggleLang(1, "customer")).toBe("en");
+    expect(langOf(1, "customer")).toBe("en");
+    expect(langOf(1, "staff")).toBe("ja");
+    expect(langOf(2, "customer")).toBe("ja");
+    toggleLang(2, "staff");
+    resetLangs(1);
+    expect(langOf(1, "customer")).toBe("ja");
+    expect(langOf(2, "staff")).toBe("en");
+    resetLangs(2);
   });
 
   it("translates fixed and variable phrases", () => {

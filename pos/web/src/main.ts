@@ -1,9 +1,9 @@
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { Command, Side, Snapshot } from "./types";
+import type { Command, RegisterView, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
-import { type Lang, LANG_KEY, langOf, loadLangs, localize, saveLangs, toggleLang, trText } from "./i18n";
+import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
 import {
   esc,
   FF_TABS,
@@ -94,30 +94,12 @@ function save(): void {
 function forget(): void {
   try {
     localStorage.removeItem(SAVE_KEY);
-    localStorage.removeItem(LANG_KEY);
-  } catch {
-    return;
-  }
-}
-
-function restoreLangs(): void {
-  try {
-    loadLangs(localStorage.getItem(LANG_KEY));
-  } catch {
-    loadLangs(null);
-  }
-}
-
-function persistLangs(): void {
-  try {
-    localStorage.setItem(LANG_KEY, saveLangs());
   } catch {
     return;
   }
 }
 
 function start(): void {
-  restoreLangs();
   sim = restore() ?? new PosSimulator(Date.now() & 0xffff, 2, 3);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
@@ -364,6 +346,22 @@ function trackFlashes(): void {
   }
 }
 
+const busyRegs = new Set<number>();
+
+function inTransaction(r: RegisterView): boolean {
+  const v = r.staff;
+  return (
+    v.lines.length > 0 ||
+    v.coupons.length > 0 ||
+    v.returned.length > 0 ||
+    v.confiscated.length > 0 ||
+    v.ff_collect.length > 0 ||
+    r.last_receipt !== null ||
+    r.bill_handover !== null ||
+    r.pickup_handover !== null
+  );
+}
+
 function render(): void {
   trackFlashes();
   for (const reg of movedRegs) {
@@ -371,6 +369,10 @@ function render(): void {
   }
   movedRegs.clear();
   for (const r of snap.registers) {
+    const busy = inTransaction(r);
+    if (busyRegs.has(r.id) && !busy) resetLangs(r.id);
+    if (busy) busyRegs.add(r.id);
+    else busyRegs.delete(r.id);
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);
     if (sel && document.activeElement !== sel) {
       const acc = r.staff.state === "absent" ? undefined : snap.accounts.find((a) => a.name === r.staff.name);
@@ -839,7 +841,6 @@ app.addEventListener("click", (e) => {
   if (b.dataset.lang) {
     const [reg, side] = b.dataset.lang.split(":");
     toggleLang(Number(reg), side);
-    persistLangs();
     return frame();
   }
   if (b.dataset.guide) {

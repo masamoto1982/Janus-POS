@@ -3,6 +3,7 @@ import type { Command, Side, Snapshot } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
+import { type Lang, LANG_KEY, langOf, loadLangs, localize, saveLangs, toggleLang, trText } from "./i18n";
 import {
   esc,
   FF_TABS,
@@ -93,12 +94,30 @@ function save(): void {
 function forget(): void {
   try {
     localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(LANG_KEY);
+  } catch {
+    return;
+  }
+}
+
+function restoreLangs(): void {
+  try {
+    loadLangs(localStorage.getItem(LANG_KEY));
+  } catch {
+    loadLangs(null);
+  }
+}
+
+function persistLangs(): void {
+  try {
+    localStorage.setItem(LANG_KEY, saveLangs());
   } catch {
     return;
   }
 }
 
 function start(): void {
+  restoreLangs();
   sim = restore() ?? new PosSimulator(Date.now() & 0xffff, 2, 3);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
@@ -285,10 +304,12 @@ function rampFilter(): string {
     </svg>`;
 }
 
-function setRegion(name: string, html: string): void {
+function setRegion(name: string, raw: string, lang: Lang = "ja"): void {
   const el = app.querySelector(`[data-region="${name}"]`);
-  if (!el || cache.get(el) === html) return;
-  cache.set(el, html);
+  const stamp = `${lang}\u0000${raw}`;
+  if (!el || cache.get(el) === stamp) return;
+  cache.set(el, stamp);
+  const html = localize(raw, lang);
   const values = new Map<string, string>();
   el.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-key]").forEach((i) => values.set(i.dataset.key!, i.value));
   const active = document.activeElement as HTMLInputElement | null;
@@ -359,8 +380,10 @@ function render(): void {
       const head = app.querySelector<HTMLElement>(`[data-region="head-${r.id}-${side}"]`);
       if (!head) continue;
       head.classList.toggle("calling", r.lamp);
+      const lang = langOf(r.id, side);
+      app.querySelector(`[data-drop="${r.id}:${side}"]`)?.setAttribute("lang", lang);
       if (r.lamp) {
-        head.title = "呼び出し中";
+        head.title = lang === "en" ? trText("呼び出し中") : "呼び出し中";
       } else {
         head.removeAttribute("title");
       }
@@ -377,15 +400,16 @@ function render(): void {
       app.querySelector(`[data-swipe-to="${r.id}:${side}"]`)?.classList.toggle("operable", operable);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);
-      setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side));
-      setRegion(`items-${r.id}-${side}`, items);
+      const lang = langOf(r.id, side);
+      setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side), lang);
+      setRegion(`items-${r.id}-${side}`, items, lang);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       if (side === "staff" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {
         padValue.delete(padValueKey(r.id, "mamt"));
         padValue.delete(padValueKey(r.id, "mpw"));
       }
-      setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side));
+      setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side), lang);
       el?.classList.toggle("no-items", !items);
     }
     const face: Side = r.menu ? "staff" : r.mode === "staff_operated" ? "staff" : "customer";
@@ -406,8 +430,8 @@ function render(): void {
     );
     const staffMain = sharedScreen(r, snap, "staff");
     const custMain = sharedScreen(r, snap, "customer");
-    setRegion(`staff-${r.id}`, staffMain);
-    setRegion(`cust-${r.id}`, custMain);
+    setRegion(`staff-${r.id}`, staffMain, langOf(r.id, "staff"));
+    setRegion(`cust-${r.id}`, custMain, langOf(r.id, "customer"));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -810,6 +834,12 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.voidCancel) {
     voidAsk.delete(Number(b.dataset.voidCancel));
+    return frame();
+  }
+  if (b.dataset.lang) {
+    const [reg, side] = b.dataset.lang.split(":");
+    toggleLang(Number(reg), side);
+    persistLangs();
     return frame();
   }
   if (b.dataset.guide) {

@@ -657,15 +657,15 @@ const GUIDES: [GuideKind, string, string][] = [
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
 
 /** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。呼び鈴（大きめ）を中央に、左に言語切り替え、右に電子マネー（チャージ・残高照会）を寄せる
- *  言語切り替えは押した側の画面だけを切り替える（中身は今後作り込む）。セルフ操作モードのスタッフ側は操作不可。
+ *  言語切り替えは押した側の画面だけを切り替える（日本語・英語、標準は英語）。セルフ操作モードのスタッフ側は操作不可。
  *  電子マネーはスタッフ操作モードのお客様側では表示のみ。商品登録が始まると呼び鈴はヘッダーに戻る */
 function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, emoneyRo: boolean): string {
   const mirror = ' tabindex="-1" aria-disabled="true"';
   const big = (cls: string, main: string, sub: string, ro: boolean, attrs: string) =>
-    `<button type="button" class="band-btn neg ${cls}${ro ? " mirror-only" : ""}"${ro ? mirror : attrs}><b>${main}</b><small>${sub}</small></button>`;
+    `<button type="button" class="band-btn neg ${cls}${ro ? " mirror-only" : ""}"${cls === "lang-btn" ? " data-i18n-skip" : ""}${ro ? mirror : attrs}><b>${main}</b><small>${sub}</small></button>`;
   const langRo = r.mode === "self_operated" && side === "staff";
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
-  const lang = big("lang-btn", "Language", "言語", langRo, ` data-lang="${r.id}:${side}" title="この画面の言語を切り替える（準備中）"`);
+  const lang = big("lang-btn", "Language", "言語", langRo, ` data-lang="${r.id}:${side}" title="この画面の言語を切り替える／Switch this screen's language"`);
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
   return `<div class="reg-top welcome-band"><div class="band-row">${lang}<span class="bell-slot">${bellBtn(r, side)}</span>${money}</div></div>`;
 }

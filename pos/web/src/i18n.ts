@@ -1,7 +1,6 @@
 
 export type Lang = "ja" | "en";
-export const DEFAULT_LANG: Lang = "en";
-export const LANG_KEY = "janus-pos-lang";
+export const DEFAULT_LANG: Lang = "ja";
 
 const langs = new Map<string, Lang>();
 
@@ -15,19 +14,9 @@ export function toggleLang(reg: number, side: string): Lang {
   return next;
 }
 
-export function loadLangs(saved: string | null): void {
-  langs.clear();
-  if (!saved) return;
-  try {
-    const obj = JSON.parse(saved) as Record<string, unknown>;
-    for (const [k, v] of Object.entries(obj)) if (v === "ja" || v === "en") langs.set(k, v);
-  } catch {
-    return;
-  }
-}
-
-export function saveLangs(): string {
-  return JSON.stringify(Object.fromEntries(langs));
+export function resetLangs(reg: number): void {
+  langs.delete(`${reg}:staff`);
+  langs.delete(`${reg}:customer`);
 }
 
 const JP = /[　-ヿ一-鿿！-～]/;

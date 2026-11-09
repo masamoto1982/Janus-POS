@@ -407,7 +407,10 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .bell-id { font-weight: 600; }
 .bell-state { font-size: 12px; color: var(--muted); }
 .bell-unit.buzz { border-color: var(--call); background: var(--call-bg); }
-.bell-unit.off { opacity: .5; }
+/* 呼び鈴機能が OFF・不通の端末は、操作不可の部品と同じグレーアウト（薄いグレーの塗り・グレーの文字、絵文字も無彩色） */
+.bell-unit.off { background: var(--off-bg); color: var(--off-ink); border-color: var(--line); }
+.bell-unit.off .bell-icon { filter: grayscale(1); opacity: .6; }
+.bell-unit.off .bell-state { color: var(--off-ink); }
 .bell-area .bell-open { margin-left: auto; }
 .bell-settings { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .bell-setting { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; }
@@ -488,6 +491,10 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: var(--btn-h); height: var(--btn-h); padding: 0; align-items: center; justify-content: center; text-align: center; }
 .item.coin .item-name { font-size: 11px; white-space: nowrap; }
 .item.pay { background: var(--pay-bg); border-color: var(--border); }
+/* 扱えない Item（スタッフ不在のときのたばこ・切手）は、レジ画面の操作不可の部品と同じグレーアウト */
+.item.off, .item.off:hover { background: var(--off-bg); color: var(--off-ink); border-color: var(--line); cursor: not-allowed; }
+.item.off .item-sub, .item.off .item-sub b { color: var(--off-ink); }
+.item.off:active { transform: none; }
 .wallet-cards { margin-top: 4px; }
 .items.uniform .item, .wallet-cards .item, .item.bill { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); justify-content: center; align-items: center; text-align: center; }
 .items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
@@ -738,9 +745,18 @@ body.dragging .drop-hint { display: inline; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
 
 .staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }
-.bell-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: 15px; line-height: 1; background: var(--panel); border: 1px solid var(--border); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+/* 呼び鈴：操作可能部品の青でベルを描き、背景は注意喚起の黄（小さな面なのでアクセントの黄）。押せないときはグレー。
+   ヘッダーの呼び出し中の黄（--call-soft、淡い黄の点滅）と重なっても、青い縁取りと濃い黄で見分けがつく */
+:root { --bell-bg: oklch(0.92 0.17 100); --bell-ink: oklch(0.44 0.11 245); --bell-ring: oklch(0.625 0.15 245); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bell-bg: oklch(0.86 0.16 98); } }
+:root[data-theme="dark"] { --bell-bg: oklch(0.86 0.16 98); }
+.bell-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.screen .bell-btn, .screen .bell-btn:disabled { filter: none !important; opacity: 1 !important; }
+.screen .bell-btn:not(:disabled) { background: var(--bell-bg); color: var(--bell-ink); border: 1.5px solid var(--bell-ring); }
+.screen .bell-btn.calling:not(:disabled) { background: var(--off-bg); color: var(--off-ink); border-color: var(--border); }
+.screen .bell-btn:disabled { background: var(--off-bg) !important; color: var(--off-ink) !important; border: 1.5px solid var(--border); }
+.bell-btn .bell-svg { width: 62%; height: 62%; display: block; }
 .bell-btn.pressing { transform: translate(1px, 2px); }
-.bell-btn:disabled { opacity: .45; }
 
 /* 待ち受けの帯：会計ボタンを含む帯と同じ縦幅（大ボタン48px＋上下8px＝64px）。背景なし。
    左＝言語切り替え、中央＝呼び鈴（大きめ）、右＝電子マネー。ボタンはどちらも消極 */
@@ -761,7 +777,7 @@ body.dragging .drop-hint { display: inline; }
 .screen [data-region] .welcome-band .lang-btn:not(.mirror-only) { filter: url(#ramp); }
 .screen.inactive [data-region] .welcome-band .lang-btn:not(.mirror-only) { pointer-events: auto; }
 /* 呼び鈴は待ち受けでは帯の中央に大きめに出し、商品登録が始まるとヘッダーに戻る */
-.welcome-band .bell-btn { width: var(--btn-h); height: var(--btn-h); font-size: 26px; }
+.welcome-band .bell-btn { width: var(--btn-h); height: var(--btn-h); }
 .screen:has(.welcome-band .bell-btn) .screen-head .bell-btn { display: none; }
 
 /* 稼働モードの背景色：スタッフ操作モード＝ピンク、セルフ操作モード＝ミント（グレー・青・黄と P/D/T 型でも区別できる淡い色）。

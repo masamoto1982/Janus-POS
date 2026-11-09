@@ -947,6 +947,9 @@ export function clockText(d: Date): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${WEEKDAY[d.getDay()]}曜日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** 呼び鈴の絵（色は CSS の currentColor：押せるときは青、押せないときはグレー） */
+const BELL_SVG = `<svg class="bell-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.5a1.5 1.5 0 0 0-1.5 1.5v.6A6.5 6.5 0 0 0 5.5 11v4.2L3.8 17.4a.9.9 0 0 0 .7 1.5h15a.9.9 0 0 0 .7-1.5l-1.7-2.2V11a6.5 6.5 0 0 0-5-6.4V4A1.5 1.5 0 0 0 12 2.5Zm-2.6 17.6a2.6 2.6 0 0 0 5.2 0Z"/></svg>`;
+
 /** 呼び鈴。スタッフ側は応援を呼ぶ（SOS）、お客様側はスタッフを呼ぶ。スタッフ操作モードのお客様側には出さない */
 function bellBtn(r: RegisterView, side: Side): string {
   const call = find(r.customer.actions, "call_staff");
@@ -960,7 +963,7 @@ function bellBtn(r: RegisterView, side: Side): string {
   const bell =
     !sos && r.mode === "staff_operated"
       ? ""
-      : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(title)}"${ok ? "" : " disabled"}>🔔</button>`;
+      : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(title)}"${ok ? "" : " disabled"}>${BELL_SVG}</button>`;
   return bell;
 }
 
@@ -1194,8 +1197,9 @@ const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" }
 export function bellPanel(s: Snapshot): string {
   return s.bells
     .map(
-      (m) => `<div class="bell-unit ${m.buzzing ? "buzz" : ""} ${m.bell_on ? "" : "off"}">
-        <span class="bell-icon">${BELL_ICON[m.kind]}</span><span class="bell-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="bell-state">呼び鈴OFF</span>` : m.buzzing ? `<span class="bell-state">鳴動中</span>` : ""}
+      // 呼び鈴機能が OFF、または不通の端末は鳴らない＝操作不可の部品と同じグレーアウト
+      (m) => `<div class="bell-unit ${m.buzzing ? "buzz" : ""} ${m.bell_on && !m.offline ? "" : "off"}">
+        <span class="bell-icon">${BELL_ICON[m.kind]}</span><span class="bell-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="bell-state">呼び鈴OFF</span>` : m.offline ? `<span class="bell-state">不通</span>` : m.buzzing ? `<span class="bell-state">鳴動中</span>` : ""}
       </div>`,
     )
     .join("");
@@ -1360,18 +1364,23 @@ const HINT_PAY = "支払方法を選んでから、決済端末にドラッグ�
 const HINT_EMONEY = "決済端末にドラッグ＆ドロップ";
 
 function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCAN): string {
+  if (cls.split(" ").includes("off"))
+    return `<button type="button" class="item ${cls}" aria-disabled="true" title="${esc(hint)}" aria-label="${esc(name)}（${esc(hint)}）">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
   return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ、${esc(hint)}">
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
-/** スタッフ操作モードでのみ Item エリアに並べるカテゴリ（たばこ・切手） */
+/** スタッフがログインしているレジ（スタッフ操作モード）でだけ扱えるカテゴリ（たばこ・切手）。
+ *  どのレジにもスタッフがいないあいだは Item エリアでグレーアウトし、ドラッグできない */
 const STAFF_ONLY_SHELF = ["tobacco", "stamp"];
+const STAFF_ONLY_OFF = "スタッフがログインしているレジでのみ扱えます";
 
 export function shelfPanel(s: Snapshot, extra = ""): string {
   const staffOperated = s.registers.some((r) => r.mode === "staff_operated");
   const asked = s.registers.some((r) => r.tobacco_asked);
   return SHELVES.map((g) => {
-    const items = s.catalog.filter(g.match).filter((p) => !STAFF_ONLY_SHELF.includes(p.category) || staffOperated);
+    const items = s.catalog.filter(g.match);
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
@@ -1380,12 +1389,14 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
           :
             PARCEL_CODES.includes(p.code)
             ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
-            : item(
-              p.code,
-              p.name,
-              `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
-              p.category === "tobacco" && asked ? "call-blink" : "",
-            ),
+            : STAFF_ONLY_SHELF.includes(p.category) && !staffOperated
+              ? item(p.code, p.name, `${yen(p.price)}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`, "off", STAFF_ONLY_OFF)
+              : item(
+                p.code,
+                p.name,
+                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
+                p.category === "tobacco" && asked ? "call-blink" : "",
+              ),
       )
       .join("")}</div></div>`;
   }).join("") + extra + slipShelf(s);

@@ -821,7 +821,7 @@ document.addEventListener(
   "pointerdown",
   (e) => {
     const b = (e.target as Element | null)?.closest<HTMLButtonElement>("button");
-    if (b && !b.disabled) beepPress();
+    if (b && !b.disabled && !b.matches(".item.off")) beepPress();
   },
   { capture: true },
 );

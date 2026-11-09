@@ -305,7 +305,7 @@ fn fast_food_flow_in_self_operated_mode() {
     assert!(
         run(
             &mut s,
-            json!({"type":"register_ff","register":2,"code":"FF04","qty":1})
+            json!({"type":"register_ff","register":2,"code":"FF23","qty":1})
         )
         .is_err(),
         "sold out"
@@ -3028,7 +3028,7 @@ fn broken_or_old_saved_state_is_refused() {
 }
 
 #[test]
-fn ff_stock_is_shown_as_three_levels_and_out_of_stock_can_be_reserved() {
+fn ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved() {
     use janus_pos_core::store::StockLevel;
     let mut s = Store::new(1, 1, 1);
     let level = |s: &Store, code: &str| {
@@ -3039,29 +3039,44 @@ fn ff_stock_is_shown_as_three_levels_and_out_of_stock_can_be_reserved() {
             .unwrap()
             .level
     };
+    assert_eq!(level(&s, "FF31"), StockLevel::MadeToOrder);
+    assert_eq!(level(&s, "FF51"), StockLevel::MadeToOrder);
     assert_eq!(level(&s, "FF03"), StockLevel::Plenty);
-    assert_eq!(level(&s, "FF02"), StockLevel::Low);
-    assert_eq!(level(&s, "FF04"), StockLevel::Out);
+    assert_eq!(level(&s, "FF62"), StockLevel::Low);
+    assert_eq!(level(&s, "FF23"), StockLevel::Out);
+    assert_eq!(level(&s, "FF24"), StockLevel::Out);
     login_as(&mut s, 1, "ST001");
     let e = run(
         &mut s,
-        json!({"type":"register_ff","register":1,"code":"FF04","qty":1}),
+        json!({"type":"register_ff","register":1,"code":"FF63","qty":1}),
     )
     .unwrap_err();
     assert!(e.contains("欠品") && !e.contains("残り"), "{e}");
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"code":"FF04","qty":1,"force":true}),
+        json!({"type":"register_ff","register":1,"code":"FF63","qty":1,"force":true}),
     );
-    assert_eq!(level(&s, "FF04"), StockLevel::Out);
+    assert_eq!(level(&s, "FF63"), StockLevel::Out);
     assert_eq!(reg(&s, 1).staff.lines.len(), 1);
-    for _ in 0..2 {
+    for _ in 0..3 {
         ok(
             &mut s,
-            json!({"type":"register_ff","register":1,"code":"FF02","qty":1}),
+            json!({"type":"register_ff","register":1,"code":"FF62","qty":1}),
         );
     }
-    assert_eq!(level(&s, "FF02"), StockLevel::Out);
+    assert_eq!(level(&s, "FF62"), StockLevel::Out);
+    // 豊富（二桁）から一つ減ると希薄（一桁）になる
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"code":"FF61","qty":1}),
+    );
+    assert_eq!(level(&s, "FF61"), StockLevel::Low);
+    // 作り置きの無い商品は何杯でも登録でき、表示は変わらない
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"code":"FF31","qty":5}),
+    );
+    assert_eq!(level(&s, "FF31"), StockLevel::MadeToOrder);
 }
 
 #[test]

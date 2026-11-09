@@ -224,7 +224,7 @@ export interface Snapshot {
   call_history: { id: number; register: number; label: string; created_at: number; resolved_at: number }[];
   age_rules: { rules: AgeRule[]; history: { at: number; by: string; change: string }[] };
   audit: { at: number; register: number; staff: string; operation: string; amount: number; result: string }[];
-  ff_stock: { code: string; name: string; price: number; level: "plenty" | "low" | "out"; tab: string; tab_label: string }[];
+  ff_stock: { code: string; name: string; price: number; level: "made_to_order" | "plenty" | "low" | "out"; tab: string; tab_label: string }[];
   bell_loss: number;
   accounts: { id: string; barcode: string; name: string; role: string }[];
   catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string }[];

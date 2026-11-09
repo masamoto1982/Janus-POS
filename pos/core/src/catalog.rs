@@ -177,9 +177,13 @@ pub const CATALOG: &[Product] = &[
     p("FF62", "あんまん", 160, Reduced8, FastFood),
     p("FF63", "カレーまん", 190, Reduced8, FastFood),
     p("FF71", "大根", 100, Reduced8, FastFood),
+    p("FF72", "白滝", 90, Reduced8, FastFood),
     p("FF73", "厚揚げ", 120, Reduced8, FastFood),
     p("FF74", "煮卵", 100, Reduced8, FastFood),
-    p("FF75", "牛筋", 150, Reduced8, FastFood),
+    p("FF76", "ちくわ", 100, Reduced8, FastFood),
+    p("FF77", "ごぼう巻き", 120, Reduced8, FastFood),
+    p("FF78", "ウィンナー", 130, Reduced8, FastFood),
+    p("FF79", "結び昆布", 90, Reduced8, FastFood),
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,45 +234,58 @@ pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF62", FfTab::Bun),
     ("FF63", FfTab::Bun),
     ("FF71", FfTab::Oden),
-    ("FF73", FfTab::Oden),
     ("FF74", FfTab::Oden),
-    ("FF75", FfTab::Oden),
+    ("FF73", FfTab::Oden),
+    ("FF72", FfTab::Oden),
+    ("FF76", FfTab::Oden),
+    ("FF77", FfTab::Oden),
+    ("FF78", FfTab::Oden),
+    ("FF79", FfTab::Oden),
 ];
 
 pub fn find(code: &str) -> Option<&'static Product> {
     CATALOG.iter().find(|p| p.code == code)
 }
 
-pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
-    ("FF01", 3),
-    ("FF02", 2),
-    ("FF03", 4),
-    ("FF04", 0),
-    ("FF21", 6),
-    ("FF22", 6),
-    ("FF23", 3),
-    ("FF24", 4),
-    ("FF31", 99),
-    ("FF32", 99),
-    ("FF33", 99),
-    ("FF34", 99),
-    ("FF35", 99),
-    ("FF36", 99),
-    ("FF37", 99),
-    ("FF39", 99),
-    ("FF51", 20),
-    ("FF52", 20),
-    ("FF53", 20),
-    ("FF54", 20),
-    ("FF05", 5),
-    ("FF61", 3),
-    ("FF62", 4),
-    ("FF63", 3),
-    ("FF71", 10),
-    ("FF73", 10),
-    ("FF74", 10),
-    ("FF75", 10),
+/// 作り置きの概念が無い FF（注文を受けてから作る・注ぐ）。在庫を持たず、ボタンはいつも積極
+pub const FF_MADE_TO_ORDER: &[&str] = &[
+    "FF31", "FF32", "FF33", "FF34", "FF35", "FF36", "FF37", "FF39", "FF51", "FF52", "FF53", "FF54",
 ];
+
+/// 作り置きのある FF の初期在庫（二桁＝豊富、一桁＝希薄、0＝無し）。
+/// 売れ筋は浅い階層に置くのが実務の常なので、1ページ目を豊富・2ページ目を希薄にしている
+/// （Janus-POS の仕組みが決めることではない。並べ替えはストアコンピューターで行う）
+pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
+    // フライヤー 1ページ目：豊富
+    ("FF01", 12),
+    ("FF02", 10),
+    ("FF03", 15),
+    ("FF04", 11),
+    // フライヤー 2ページ目：希薄・無し
+    ("FF21", 6),
+    ("FF22", 4),
+    ("FF23", 0),
+    ("FF24", 0),
+    // 中華まん
+    ("FF05", 12),
+    ("FF61", 10),
+    ("FF62", 3),
+    ("FF63", 0),
+    // おでん 1ページ目：豊富
+    ("FF71", 20),
+    ("FF74", 14),
+    ("FF73", 12),
+    ("FF72", 10),
+    // おでん 2ページ目：希薄・無し
+    ("FF76", 5),
+    ("FF77", 3),
+    ("FF78", 4),
+    ("FF79", 0),
+];
+
+pub fn is_made_to_order(code: &str) -> bool {
+    FF_MADE_TO_ORDER.contains(&code)
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Scanned {
@@ -358,7 +375,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ff_tabs_fit_one_page_except_fryer_and_drinks() {
+    fn ff_tabs_fit_one_page_except_fryer_drinks_and_oden() {
         for tab in [
             FfTab::Fried,
             FfTab::Drink,
@@ -369,7 +386,7 @@ mod tests {
             let n = FF_MENU.iter().filter(|(_, t)| *t == tab).count();
             assert_eq!(
                 n,
-                if matches!(tab, FfTab::Drink | FfTab::Fried) {
+                if matches!(tab, FfTab::Drink | FfTab::Fried | FfTab::Oden) {
                     8
                 } else {
                     4
@@ -379,7 +396,8 @@ mod tests {
         }
         for (code, _) in FF_MENU {
             assert!(
-                find(code).is_some() && INITIAL_FF_STOCK.iter().any(|(c, _)| c == code),
+                find(code).is_some()
+                    && (INITIAL_FF_STOCK.iter().any(|(c, _)| c == code) != is_made_to_order(code)),
                 "{code}"
             );
         }
@@ -399,7 +417,7 @@ mod tests {
         for p in CATALOG.iter().filter(|p| p.category == Category::FastFood) {
             assert!(FF_MENU.iter().any(|(c, _)| *c == p.code), "{}", p.code);
             assert!(
-                INITIAL_FF_STOCK.iter().any(|(c, _)| *c == p.code),
+                INITIAL_FF_STOCK.iter().any(|(c, _)| *c == p.code) || is_made_to_order(p.code),
                 "{}",
                 p.code
             );

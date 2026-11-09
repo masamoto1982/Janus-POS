@@ -2434,7 +2434,7 @@ impl Store {
         if qty > old {
             self.check_limit(register, code, qty - old)?;
         }
-        if matches!(kind, LineKind::Ff { .. }) {
+        if matches!(kind, LineKind::Ff { .. }) && !catalog::is_made_to_order(code) {
             if qty > old {
                 let stock = self
                     .ff_stock
@@ -2779,16 +2779,19 @@ impl Store {
             return Err(ITEMS_FULL.into());
         }
         self.check_limit(register, code, qty)?;
-        let stock = self
-            .ff_stock
-            .iter_mut()
-            .find(|(c, _)| *c == code)
-            .ok_or("在庫がありません")?;
-        let reserved = stock.1 < qty;
-        if reserved && !force {
-            return Err(format!("{}{FF_OUT}", p.name));
+        let mut reserved = false;
+        if !catalog::is_made_to_order(code) {
+            let stock = self
+                .ff_stock
+                .iter_mut()
+                .find(|(c, _)| *c == code)
+                .ok_or("在庫がありません")?;
+            reserved = stock.1 < qty;
+            if reserved && !force {
+                return Err(format!("{}{FF_OUT}", p.name));
+            }
+            stock.1 = stock.1.saturating_sub(qty);
         }
-        stock.1 = stock.1.saturating_sub(qty);
         let tax = self.tax_for(p.code);
         let now = self.now;
         let r = self.reg_mut(register)?;
@@ -3388,12 +3391,16 @@ impl Store {
             .iter()
             .filter_map(|&(code, tab)| {
                 let p = catalog::find(code)?;
-                let stock = self.ff_stock.iter().find(|(c, _)| *c == code)?.1;
+                let level = if catalog::is_made_to_order(code) {
+                    StockLevel::MadeToOrder
+                } else {
+                    StockLevel::of(self.ff_stock.iter().find(|(c, _)| *c == code)?.1)
+                };
                 Some(FfMenuItem {
                     code: p.code,
                     name: p.name,
                     price: p.price,
-                    level: StockLevel::of(stock),
+                    level,
                     tab,
                     tab_label: tab.label(),
                 })
@@ -3815,12 +3822,15 @@ pub struct AgeRulesView {
     pub history: Vec<crate::age_rules::RuleChange>,
 }
 
-pub const FF_LOW_STOCK: u32 = 2;
+/// 作り置きがこの数（二桁）以上なら豊富、1〜9 は希薄
+pub const FF_PLENTY_STOCK: u32 = 10;
 const FF_OUT: &str = "は欠品です（FF ボタンの長押しで予約注文として登録できます）";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StockLevel {
+    /// 作り置きの概念が無い（注文を受けてから作る）
+    MadeToOrder,
     Plenty,
     Low,
     Out,
@@ -3830,7 +3840,7 @@ impl StockLevel {
     pub fn of(stock: u32) -> Self {
         match stock {
             0 => Self::Out,
-            n if n <= FF_LOW_STOCK => Self::Low,
+            n if n < FF_PLENTY_STOCK => Self::Low,
             _ => Self::Plenty,
         }
     }

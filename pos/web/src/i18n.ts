@@ -88,6 +88,15 @@ const DICT: Record<string, string> = {
   "お手数ですが、ほかのレジをご利用ください": "Sorry, please use another register",
   スタッフバーコードを読むと再開します: "Scan a staff barcode to reopen",
 
+  // サイネージ（スタッフ操作モードのお客様側の最下段）
+  お知らせ: "Notice",
+  "揚げ物 2個目半額": "Fried food: second item half price",
+  "11月30日まで・フライヤーの全商品": "Until Nov 30, all fryer items",
+  電話で電子マネーの購入を求められたら詐欺です: "If a caller asks you to buy e-money, it is a scam",
+  ご心配なときはスタッフにお声がけください: "If you are worried, please talk to our staff",
+  "中華まん 全品10円引き": "Steamed buns: 10 yen off every bun",
+  "肉まん・ピザまん・あんまん・カレーまん": "Pork, pizza, red bean and curry buns",
+
   // 登録画面
   会計: "Pay",
   お会計: "Pay",

@@ -983,7 +983,21 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
-export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side): string {
+/** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・サービス・たばこの段と同じ位置・高さ）に流すサイネージ。
+ *  セール情報や詐欺防止の呼びかけを順番に表示する（シミュレーターの見本）。最下段を両モードで揃え、モード切り替え時の画面の変化を抑える */
+export const SIGNAGE: readonly (readonly [string, string])[] = [
+  ["揚げ物 2個目半額", "11月30日まで・フライヤーの全商品"],
+  ["電話で電子マネーの購入を求められたら詐欺です", "ご心配なときはスタッフにお声がけください"],
+  ["中華まん 全品10円引き", "肉まん・ピザまん・あんまん・カレーまん"],
+];
+export const SIGNAGE_MS = 8000;
+
+export function signage(now = Date.now()): string {
+  const [big, small] = SIGNAGE[Math.floor(now / SIGNAGE_MS) % SIGNAGE.length];
+  return `<div class="signage" aria-label="お知らせ">${msg(esc(big), esc(small))}</div>`;
+}
+
+export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now()): string {
   const reg = r.id;
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (r.mode === "self_operated") {
@@ -996,7 +1010,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }
-  if (r.mode === "staff_operated" && side === "customer") return "";
+  if (r.mode === "staff_operated" && side === "customer") return signage(now);
   if (r.mode === "staff_operated" && r.staff.phase === "paying") return "";
   if (r.mode === "staff_operated" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
   if (r.mode === "staff_operated" && r.staff.lines.some((l) => l.parcel || l.pickup)) return "";

@@ -227,7 +227,7 @@ function buildSkeleton(): void {
     </dialog>
     <dialog class="rules-dlg bell-dlg" id="bell-dlg" aria-labelledby="bell-title">
       <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
-      <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます<br>OFF の端末は鳴らず、不通の警告も出しません<br>据え付け端末は常に ON です</p>
+      <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます<br>OFF の端末は鳴らず、不通かどうかの判定にも含めません<br>据え付け端末は常に ON です</p>
       <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
     <dialog class="rules-dlg picker-dlg" id="picker-dlg" aria-labelledby="picker-title">
@@ -687,6 +687,16 @@ app.addEventListener("change", (e) => {
   if (sel.dataset.bellOn) {
     const box = sel as unknown as HTMLInputElement;
     if (!send({ type: "set_bell_on", bell: Number(box.dataset.bellOn), on: box.checked })) box.checked = !box.checked;
+    return;
+  }
+  if (sel.dataset.bellOffline) {
+    const box = sel as unknown as HTMLInputElement;
+    if (!send({ type: "set_bell_offline", bell: Number(box.dataset.bellOffline), offline: box.checked })) box.checked = !box.checked;
+    return;
+  }
+  if (sel.hasAttribute("data-emergency-demo")) {
+    const box = sel as unknown as HTMLInputElement;
+    if (!send({ type: "set_emergency_demo", on: box.checked })) box.checked = !box.checked;
     return;
   }
   if (sel.dataset.ffcheck) {

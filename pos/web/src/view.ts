@@ -111,6 +111,12 @@ function thanks(): string {
   return `<div class="thanks">${msg("ありがとうございました", "お忘れ物にご注意ください")}</div>`;
 }
 
+// 釣り銭の取り忘れ：お釣りを受け取るべき人はもうそこにいないかもしれないので、お釣り・お礼の案内を両画面ともこれに置き換える
+// 大きなテキストは警告の赤、背景はやわらかい黄色（小さなテキストを足すときはオレンジ）
+function changeLeft(): string {
+  return `<div class="confirm change-alert">${msg("釣り銭が残っています")}</div>`;
+}
+
 function changeDue(side: Side, amount: number): string {
   const msg = side === "staff" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
   return `<div class="thanks"><div class="big">${msg}</div></div>`;
@@ -513,23 +519,18 @@ const CALL_SHORT: Record<string, string> = {
   emoney: "電子マネー",
 };
 
-export function callNotice(r: RegisterView, _now: number, side: Side): string {
-  const v = r.staff;
-  const ageOnScreen = r.mode === "staff_operated" && (v.age_choice_pending || v.id_pending);
-  const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
-  if (side === "customer") {
-    const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
-    return (
-      change +
-      (r.mode === "staff_operated" && r.customer.staff_called && (!ageOnScreen || calls.length)
-        ? `<div class="banner call">スタッフが向かっています</div>`
-        : "")
-    );
-  }
-  const warn = v.bell_down.length
-    ? `<div class="banner danger">${esc(v.bell_down.join("・"))} 不通：呼び出しが届きません</div>`
-    : "";
-  return warn;
+/** 呼び鈴が不通（セルフ操作モード）：呼び出しが届かないので、お客様に店員へ直接声をかけてもらう */
+function bellDeadScreen(): string {
+  return confirm(msg("呼び出し端末が動作していません", "お手数ですが、店員に直接お声かけください"));
+}
+
+/** エマージェンシーモード：セルフ操作モードで呼び鈴にスタッフが応答しない（3分以上、または3分以内に10回以上）
+ * 両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。スタッフがログインすると解除 */
+function emergencyScreen(): string {
+  return `<div class="confirm change-alert emergency">${msg(
+    "スタッフの応答がありません",
+    "事件または事故の可能性があります<br>ご自身の安全を確保の上、通報をお願いいたします",
+  )}<p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p></div>`;
 }
 
 function elapsed(calls: { kind: string; created_at: number }[], now: number, before: string, after = ""): string {
@@ -541,13 +542,10 @@ function elapsed(calls: { kind: string; created_at: number }[], now: number, bef
 
 export function callScreen(r: RegisterView, now: number): string {
   const v = r.staff;
-  const warn = v.bell_down.length
-    ? `<div class="banner danger">${esc(v.bell_down.join("・"))} 不通：呼び出しが届きません</div>`
-    : "";
   const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
   const details = [...new Set(v.calls.filter((c) => c.kind !== "bill").map((c) => c.detail).filter(Boolean))];
   const bill = v.calls.find((c) => c.kind === "bill");
-  return `<div class="call-screen">${warn}
+  return `<div class="call-screen">
       <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
       ${bill ? `<p class="bill-call"><span class="bill-n">${esc(bill.detail)}</span></p>` : ""}
       ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
@@ -613,7 +611,7 @@ export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: Ac
     side === "staff"
       ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください<br>対象商品を登録するか、クーポンを取り消すまで決済できません"]
       : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください<br>対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
-  return `<div class="card coupon-card">${msg(head, body)}<ul class="coupon-list">${list}</ul></div>`;
+  return `<div class="point-screen coupon-screen">${msg(head, body)}<ul class="coupon-list">${list}</ul></div>`;
 }
 
 export function returnedCard(reg: number, side: Side, returned: Returned[], done: boolean): string {
@@ -626,9 +624,9 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
         ? "適用先のなかったクーポンをお返しします"
         : "取り消したクーポンをお返しします";
   const label = side === "staff" ? "返却しました" : "受け取りました";
-  return `<div class="card coupon-card returned"><div class="id-head">${msg(head)}${
-    done ? btn(label, { type: "dismiss_returned", register: reg }, undefined, "small") : ""
-  }</div><ul class="coupon-list">${list}</ul></div>`;
+  return `<div class="point-screen coupon-screen">${msg(head)}<ul class="coupon-list">${list}</ul>${
+    done ? `<div class="point-choices">${btn(label, { type: "dismiss_returned", register: reg }, undefined, "primary")}</div>` : ""
+  }</div>`;
 }
 
 export const scanGuide = new Map<string, GuideKind>();
@@ -702,7 +700,7 @@ const STAFF_OP_GUIDES: [GuideKind, string, string][] = [
   ["bill", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
 ];
 
-function staffOperatedWelcome(r: RegisterView, notice: string, side: Side): string {
+function staffOperatedWelcome(r: RegisterView, side: Side): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:staff`);
   const ro = side === "customer";
@@ -712,22 +710,22 @@ function staffOperatedWelcome(r: RegisterView, notice: string, side: Side): stri
       `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
-  return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}${notice}<div class="welcome staff-operated-welcome">${msg(head, sub)}
+  return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}<div class="welcome staff-operated-welcome">${msg(head, sub)}
       <div class="guide-row">${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
 
-export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "staff"): string {
-  if (r.menu) return notice + (side === "staff" ? storeMenu(r) : confirm(pairNote("休止中", "空いているレジをお使い下さい")));
+export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "staff"): string {
+  if (r.menu) return side === "staff" ? storeMenu(r) : confirm(pairNote("休止中", "空いているレジをお使い下さい"));
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
-  if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.pickup_handover && !v.lines.length) return notice + confirm(pickupHandover(reg, side, r.pickup_handover));
-  if (r.last_receipt && !v.lines.length) return notice + confirm(r.outlet ? changeDue(side, r.outlet) : thanks());
+  if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
+  if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks()));
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
-  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, notice, side);
+  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
   const ro = side === "customer";
   const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
@@ -768,7 +766,7 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
       : agePending
         ? backCorner({ type: "early_age_check", register: reg, side: "staff", start: false }, a("early_age_check"))
         : "";
-  const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
+  const screen = (body: string) => `${top}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
   if (!paying && pickup && !pickup.matched)
@@ -806,7 +804,7 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
   if (!ro && !paying && ffVerifyOpen(reg, side, v.lines))
     return screen(ffVerifyScreen(reg, side, v.lines, false));
   closeFfVerify(reg, side);
-  return `${top}${notice}
+  return `${top}
     <div class="staff-head">
       <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
@@ -870,10 +868,11 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
       "レジ休止中",
       side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します",
     )}</div>`);
+  if (r.emergency) return emergencyScreen();
   if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
-  const notice = callNotice(r, snap.now, side);
-  if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return notice + confirm(emoneyScreen(r, side));
-  return r.mode === "staff_operated" ? staffOperatedScreen(r, notice, side) : selfOperatedScreen(r, notice, side);
+  if (r.mode === "self_operated" && side === "customer" && r.bell_dead && r.staff.calls.length) return bellDeadScreen();
+  if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return confirm(emoneyScreen(r, side));
+  return r.mode === "staff_operated" ? staffOperatedScreen(r, side) : selfOperatedScreen(r, side);
 }
 
 function emoneyScreen(r: RegisterView, side: Side): string {
@@ -957,10 +956,14 @@ function bellBtn(r: RegisterView, side: Side): string {
   const sos = side === "staff";
   const tip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
   const cmd = sos ? { type: "call_staff", register: r.id, topic: "sos" } : { type: "call_staff", register: r.id };
+  // 呼び鈴が不通ならグレーアウト。セルフ操作モードのお客様側だけは押せるままにし、押すと店員へ直接声をかける案内を出す
+  const dead = r.bell_dead && (sos || r.mode === "staff_operated");
+  const ok = call.allowed && !dead;
+  const title = dead ? "呼び出し端末が動作していません" : call.allowed ? tip : (call.reason ?? "");
   const bell =
     !sos && r.mode === "staff_operated"
       ? ""
-      : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(call.allowed ? tip : (call.reason ?? ""))}"${call.allowed ? "" : " disabled"}>🔔</button>`;
+      : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(title)}"${ok ? "" : " disabled"}>🔔</button>`;
   return bell;
 }
 
@@ -1100,12 +1103,12 @@ export function storeMenu(r: RegisterView): string {
   }
 }
 
-export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.active_side ?? "customer"): string {
+export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "customer"): string {
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
-  if (r.bill_handover && !c.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.last_receipt && !c.lines.length) return notice + confirm(thanks());
+  if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks()));
 
   const lineRows = c.lines.map((l): Row => {
       const tags = [serviceFlag(l), ageFlag(l)].filter(Boolean);
@@ -1130,9 +1133,9 @@ export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.
   );
 
   if (!c.lines.length && !c.coupons.length) voidAsk.delete(reg);
-  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${welcomeBand(r, side, a("emoney"), false)}${notice}${welcome(r, side, a("emoney"))}`;
+  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
-  const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
+  const screen = (body: string) => `${top}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
   const slips = c.bills.length;
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : billPayCard(slips, true));
@@ -1156,7 +1159,7 @@ export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));
   closeFfVerify(reg, side);
-  return `${top}${notice}
+  return `${top}
     <div class="staff-head">${taxNote(c)}</div>
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">数量</th><th class="num">小計</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
@@ -1174,13 +1177,23 @@ export function bellPanel(s: Snapshot): string {
 }
 
 export function bellSettings(s: Snapshot): string {
-  return s.bells
+  const rows = s.bells
     .map((m, i) =>
       m.kind === "fixed"
         ? `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" checked disabled aria-label="${esc(m.id)}の呼び鈴機能" /><span class="muted">常に ON</span></label>`
         : `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" data-bell-on="${i}"${m.bell_on ? " checked" : ""} aria-label="${esc(m.id)}の呼び鈴機能" /><span>${m.bell_on ? "ON" : "OFF"}</span></label>`,
     )
     .join("");
+  const down = s.bells
+    .map(
+      (m, i) =>
+        `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" data-bell-offline="${i}"${m.offline ? " checked" : ""} aria-label="${esc(m.id)}を不通にする" /><span>${m.offline ? "不通" : "通常"}</span></label>`,
+    )
+    .join("");
+  const sos = `<label class="bell-setting"><span>エマージェンシーモードを試す</span><input type="checkbox" data-emergency-demo${s.emergency_demo ? " checked" : ""} aria-label="エマージェンシーモードを試す" /><span>${s.emergency_demo ? "ON" : "OFF"}</span></label>`;
+  return `${rows}
+    <h3 class="bell-sub">不通を試す</h3><p class="muted">不通にした端末には呼び出しが届きません<br>ON の端末がすべて不通になると、スタッフ操作モードでは呼び鈴がグレーアウトし、セルフ操作モードではお客様に店員へ直接声をかけていただく案内を出します</p>${down}
+    <h3 class="bell-sub">エマージェンシーモード</h3><p class="muted">セルフ操作モードで、呼び出しに3分以上応答がない、または3分以内に10回以上呼び鈴が鳴らされると、両画面に通報をお願いする案内を出します<br>スタッフがログインすると解除されます<br>ON にすると、セルフ操作モードのレジで今すぐ試せます</p>${sos}`;
 }
 
 const AGE_CHOICES = [15, 18, 20];

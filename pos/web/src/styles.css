@@ -296,9 +296,20 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 .call-screen .banner { align-self: stretch; }
 .call-screen .call-reason { font-size: 44px; font-weight: 800; line-height: 1.2; }
 .call-screen p { margin: 0; font-size: 16px; }
-.banner.info { background: var(--line); }
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
-.banner.warn { background: var(--warn-bg); color: var(--warn); }
+/* 釣り銭の取り忘れ（両画面）：お釣り・お礼の案内を置き換える案内画面。大きなテキスト＝警告の赤、背景＝やわらかい黄色（領域いっぱい）
+   画面の色変数はグレーに置き換わるので、色はここで直接 OKLCH で持つ
+   小さなテキストを足すときはオレンジ --alert-note */
+:root { --alert-bg: oklch(0.96 0.07 98); --alert-ink: oklch(0.53 0.2 29); --alert-note: oklch(0.58 0.15 55); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --alert-bg: oklch(0.34 0.06 95); --alert-ink: oklch(0.74 0.16 29); --alert-note: oklch(0.78 0.13 65); } }
+:root[data-theme="dark"] { --alert-bg: oklch(0.34 0.06 95); --alert-ink: oklch(0.74 0.16 29); --alert-note: oklch(0.78 0.13 65); }
+.screen .confirm.change-alert { margin: -8px -12px; background: var(--alert-bg); }
+.screen .change-alert .big { color: var(--alert-ink); }
+.screen .change-alert p.small { color: var(--alert-note); }
+/* エマージェンシーモード：通報先の番号は数字の強調（赤・大きく） */
+.screen .sos-tel { display: flex; gap: 24px; justify-content: center; margin: 0; color: var(--alert-ink); font-size: var(--msg-big); font-weight: 700; }
+.screen .sos-tel b { font-size: 32px; font-variant-numeric: tabular-nums; }
+.bell-sub { margin: 16px 0 4px; font-size: 14px; }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
@@ -544,7 +555,6 @@ body.dragging .drop-hint { display: inline; }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
 /* ボタン操作で出すガイダンス（案内ボタン・支払方法の選択）は青文字（濃いグレーを青のランプで青にする） */
 .screen p.guide { filter: url(#ramp); }
-.banner.watch { background: var(--line); color: var(--ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
 .screen.inactive [data-region] select, .screen.inactive [data-region] summary {
   pointer-events: none;
@@ -554,9 +564,6 @@ body.dragging .drop-hint { display: inline; }
   opacity: 1 !important; filter: grayscale(1) !important; background: var(--off-bg) !important; color: var(--off-ink) !important; border-color: var(--border);
 }
 .screen .guide-btn:disabled { background: transparent !important; }
-.id-card { background: var(--warn-bg); color: var(--warn); padding: 8px; }
-.id-head { display: flex; align-items: center; gap: 8px; justify-content: center; font-size: 15px; }
-.id-head button { min-width: 64px; }
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
@@ -569,8 +576,6 @@ body.dragging .drop-hint { display: inline; }
 .collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 370px; }
 .collect-list label { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 15px; cursor: pointer; text-align: left; }
 .collect-list input { width: 20px; height: 20px; cursor: pointer; }
-.id-card p { margin: 4px 0 0; font-size: 11px; }
-.id-card.refused { background: var(--danger-bg); color: var(--danger); }
 
 .mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }
 .mirror { background: var(--cust-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
@@ -636,10 +641,7 @@ body.dragging .drop-hint { display: inline; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; }
 
-.coupon-card { border: 2px solid var(--border); background: var(--danger-bg); padding: 8px; font-size: 13px; }
-.coupon-card p { margin: 4px 0; }
-.coupon-card.returned { border-style: dashed; }
-.coupon-list { margin: 4px 0 0; padding-left: 20px; }
+.coupon-list { margin: 0; padding: 0; list-style: none; color: var(--msg-strong); font-size: var(--msg-small); }
 .coupon-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 @keyframes line-flash { from { background: var(--flash); } to { background: transparent; } }

@@ -3260,3 +3260,59 @@ fn early_age_check_can_be_cancelled_and_covers_checkout() {
         "checked early, not asked again"
     );
 }
+
+fn ring(s: &mut Store, r: u8) {
+    ok(s, json!({"type":"call_staff","register":r}));
+    advance(s, 200);
+    ok(s, json!({"type":"release_call","register":r}));
+    advance(s, 200);
+}
+
+#[test]
+fn emergency_after_ten_rings_within_three_minutes() {
+    let mut s = Store::new(1, 1, 1);
+    advance(&mut s, 2_000);
+    assert!(!reg(&s, 1).bell_dead);
+    for _ in 0..9 {
+        ring(&mut s, 1);
+    }
+    assert!(!reg(&s, 1).emergency);
+    ring(&mut s, 1);
+    assert!(reg(&s, 1).emergency);
+    login(&mut s, 1);
+    assert!(!reg(&s, 1).emergency);
+}
+
+#[test]
+fn emergency_when_a_call_goes_unanswered_for_three_minutes() {
+    let mut s = Store::new(1, 1, 1);
+    advance(&mut s, 2_000);
+    ring(&mut s, 1);
+    advance(&mut s, 170_000);
+    assert!(!reg(&s, 1).emergency);
+    advance(&mut s, 10_000);
+    assert!(reg(&s, 1).emergency);
+}
+
+#[test]
+fn no_emergency_while_the_bell_cannot_reach_anyone() {
+    let mut s = Store::new(1, 1, 1);
+    ok(&mut s, json!({"type":"set_bell_offline","bell":0,"offline":true}));
+    advance(&mut s, 20_000);
+    assert!(reg(&s, 1).bell_dead);
+    for _ in 0..10 {
+        ring(&mut s, 1);
+    }
+    assert!(!reg(&s, 1).emergency);
+}
+
+#[test]
+fn emergency_demo_only_in_self_operated_mode() {
+    let mut s = Store::new(1, 2, 1);
+    ok(&mut s, json!({"type":"set_emergency_demo","on":true}));
+    login(&mut s, 2);
+    assert!(reg(&s, 1).emergency);
+    assert!(!reg(&s, 2).emergency);
+    ok(&mut s, json!({"type":"set_emergency_demo","on":false}));
+    assert!(!reg(&s, 1).emergency);
+}

@@ -333,7 +333,7 @@ details summary h3 { display: inline; }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
    （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
-   フラグの行の「削除」「＋」は白枠・白文字の消極ボタン */
+*/
 .lines tr.flagged > td { background: var(--flag-row); }
 .flag {
   box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
@@ -341,7 +341,8 @@ details summary h3 { display: inline; }
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-radius: 8px;
 }
 button.flag { cursor: pointer; }
-.lines tr.flagged .qty-step button.neg { color: oklch(1 0 0); border-color: oklch(1 0 0); }
+/* 明細の「削除」「−」「＋」は、行の色に左右されないよう入金ボックスと同じグレー（青くしない） */
+.screen .qty-step button.neg, .screen .qty-step button.neg:disabled { color: var(--msg-strong); border-color: var(--msg-strong); filter: grayscale(1) !important; }
 .ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; text-align: center; }
 .ffv-screen .lines.ffv { margin-bottom: auto; }
 .ffv-screen .lines.ffv td, .ffv-screen .lines.ffv th { padding-top: 1px; padding-bottom: 1px; }

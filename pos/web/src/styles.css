@@ -771,6 +771,11 @@ body.dragging .drop-hint { display: inline; }
   --mode-self-bg: oklch(0.30 0.04 150); --mode-self-deep: oklch(0.38 0.06 150); --alert-deep: oklch(0.42 0.08 95); }
 :root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
 :root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
+/* セルフ操作モードのスタッフ側（操作できない側）はモードの色ではなくグレーの段でグレーアウトする */
+:root { --off-light: color-mix(in oklch, oklch(0.8699 0 0) 45%, oklch(1 0 0)); --off-deep: oklch(0.8699 0 0); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --off-light: oklch(0.26 0 0); --off-deep: oklch(0.3052 0 0); } }
+:root[data-theme="dark"] { --off-light: oklch(0.26 0 0); --off-deep: oklch(0.3052 0 0); }
+:root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--off-light); --tier-deep: var(--off-deep); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 商品が登録された行を一瞬だけ染めるエフェクトも、濃いめの段と同じモードの色 */
 :root .screen:is(.mode-staff, .mode-self) { --flash: var(--tier-deep); }

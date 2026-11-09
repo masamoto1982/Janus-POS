@@ -9,10 +9,10 @@ use super::{
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
 use crate::auth::{self, Authenticator, Guard};
 use crate::authority::{Mode, PaymentMethod, Side};
+use crate::bell::{Bell, BellSignal, Packet};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{Cash, Drawer};
 use crate::catalog::{self, COUPONS};
-use crate::bell::{BellSignal, Bell, Packet};
 use crate::parcel::{Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
@@ -163,6 +163,10 @@ struct SavedTxn {
     returned: Vec<(String, bool)>,
     age_method: Option<AgeMethod>,
     verified_age: Option<u8>,
+    #[serde(default)]
+    age_lines: Vec<u32>,
+    #[serde(default)]
+    age_early: bool,
     confiscated: Vec<(String, u32)>,
     ff_collect: Vec<(String, u32)>,
     method: Option<PaymentMethod>,
@@ -285,10 +289,20 @@ impl SavedTxn {
             paying: t.paying,
             point_card: t.point_card.clone(),
             required_age: t.required_age,
-            coupons: t.coupons.iter().map(|&(id, c)| (id, c.code.to_string())).collect(),
-            returned: t.returned.iter().map(|&(n, u)| (n.to_string(), u)).collect(),
+            coupons: t
+                .coupons
+                .iter()
+                .map(|&(id, c)| (id, c.code.to_string()))
+                .collect(),
+            returned: t
+                .returned
+                .iter()
+                .map(|&(n, u)| (n.to_string(), u))
+                .collect(),
             age_method: t.age_method,
             verified_age: t.verified_age,
+            age_lines: t.age_lines.clone(),
+            age_early: t.age_early,
             confiscated: named(&t.confiscated),
             ff_collect: named(&t.ff_collect),
             method: t.method,
@@ -330,9 +344,15 @@ impl SavedTxn {
             point_card: self.point_card,
             required_age: self.required_age,
             coupons,
-            returned: self.returned.into_iter().map(|(n, u)| (leak(n), u)).collect(),
+            returned: self
+                .returned
+                .into_iter()
+                .map(|(n, u)| (leak(n), u))
+                .collect(),
             age_method: self.age_method,
             verified_age: self.verified_age,
+            age_lines: self.age_lines,
+            age_early: self.age_early,
             confiscated: unnamed(self.confiscated),
             ff_collect: unnamed(self.ff_collect),
             method: self.method,

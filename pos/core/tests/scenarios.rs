@@ -176,7 +176,10 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    assert!(!reg(&s, 1).staff.point_pending, "point card asked once per txn");
+    assert!(
+        !reg(&s, 1).staff.point_pending,
+        "point card asked once per txn"
+    );
     assert!(!reg(&s, 1).staff.age_choice_pending);
     ok(
         &mut s,
@@ -793,7 +796,8 @@ fn parcel_cannot_be_mixed_with_other_goods() {
 fn cash_out_only_inside_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    let co = json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"});
+    let co =
+        json!({"type":"cash_out","register":1,"kind":"emergency","amount":5000,"password":"7777"});
     assert!(
         run(&mut s, co.clone()).is_err(),
         "店舗メニューの外では出金できない"
@@ -825,14 +829,20 @@ fn cash_out_only_inside_the_store_menu() {
 fn store_menu_opens_only_on_the_staff_side() {
     let mut s = Store::new(1, 2, 1);
     let open = json!({"type":"open_menu","register":1,"screen":"top"});
-    assert!(run(&mut s, open.clone()).is_err(), "ログインしたスタッフだけ");
+    assert!(
+        run(&mut s, open.clone()).is_err(),
+        "ログインしたスタッフだけ"
+    );
     login(&mut s, 1);
     advance(&mut s, 1_000);
     ok(&mut s, open);
     let v = reg(&s, 1);
     assert!(v.menu.is_some());
     assert_eq!(v.active_side, Some(Side::Staff));
-    ok(&mut s, json!({"type":"open_menu","register":1,"screen":null}));
+    ok(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":null}),
+    );
     assert!(reg(&s, 1).menu.is_none());
 }
 
@@ -1096,7 +1106,10 @@ fn inlet_pays_and_change_waits_in_outlet() {
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).outlet, 0);
     s.tick(at + 7999);
-    assert!(reg(&s, 1).last_receipt.is_some(), "thanks shows 3 s after the change is taken");
+    assert!(
+        reg(&s, 1).last_receipt.is_some(),
+        "thanks shows 3 s after the change is taken"
+    );
     s.tick(at + 8000);
     assert!(reg(&s, 1).last_receipt.is_none());
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
@@ -1330,10 +1343,16 @@ fn shortcut_buttons_call_staff() {
 fn staff_bell_calls_colleagues_without_call_screen() {
     let mut s = Store::new(1, 2, 1);
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
-    ok(&mut s, json!({"type":"call_staff","register":1,"topic":"sos"}));
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"sos"}),
+    );
     advance(&mut s, 1_000);
     assert!(s.snapshot().bells[0].buzzing, "SOS rings the bell");
-    assert!(reg(&s, 1).staff.calls.is_empty(), "no call record, so no call screen");
+    assert!(
+        reg(&s, 1).staff.calls.is_empty(),
+        "no call record, so no call screen"
+    );
     ok(&mut s, json!({"type":"release_call","register":1}));
 }
 
@@ -2260,12 +2279,19 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     assert!(!reg(&s, 1).change_left);
     advance(&mut s, 21_000);
     let v = reg(&s, 1);
-    assert!(v.change_left, "staff_operated, 30 seconds: remind the customer");
+    assert!(
+        v.change_left,
+        "staff_operated, 30 seconds: remind the customer"
+    );
     assert!(v.staff.calls.is_empty());
     assert_eq!(v.idle_revert_in, Some(frozen), "countdown is paused");
     advance(&mut s, 30_000);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.calls.len(), 1, "staff_operated, 1 minute: call staff");
+    assert_eq!(
+        v.staff.calls.len(),
+        1,
+        "staff_operated, 1 minute: call staff"
+    );
     assert_eq!(v.staff.calls[0].label, "釣銭忘れ");
     assert!(
         reg(&s, 1).last_receipt.is_some(),
@@ -2963,11 +2989,17 @@ fn saved_state_restores_every_register() {
     ok(&mut s, set);
     scan(&mut s, 2, "customer", BEER);
     scan(&mut s, 2, "customer", TEA);
-    ok(&mut s, json!({"type":"checkout","register":2,"side":"customer"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"customer"}),
+    );
     login(&mut s, 1);
     scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "staff", SANDWICH);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
     advance(&mut s, 1500);
     let mut back = same_after_reload(&s);
 
@@ -3037,10 +3069,16 @@ fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", BREAD);
     login(&mut s, 1);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
     confirm_point(&mut s, 1);
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
-    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+    );
     let v = reg(&s, 1);
     assert_eq!(v.outlet, 1000, "unsettled cash goes to the outlet");
     assert_eq!(v.staff.inserted, 0);
@@ -3049,8 +3087,14 @@ fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     assert!(v.last_receipt.is_none());
     advance(&mut s, 40_000);
     assert!(reg(&s, 1).last_receipt.is_none(), "nothing settles itself");
-    ok(&mut s, json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}));
-    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+    );
     assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
 }
 
@@ -3116,4 +3160,88 @@ fn point_card_is_asked_once_but_can_be_read_until_paid() {
     );
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.map(|r| r.points), Some(160 / 100));
+}
+
+#[test]
+fn staff_can_check_age_early_and_new_age_goods_need_it_again() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "staff", BREAD);
+    assert!(allowed(&reg(&s, 1), Side::Staff, Action::EarlyAgeCheck));
+    assert!(run(
+        &mut s,
+        json!({"type":"early_age_check","register":1,"side":"customer","start":true})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.phase, Phase::Registering);
+    assert!(v.staff.age_choice_pending);
+    assert_eq!(v.staff.required_age, Some(20));
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"id_check":true}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"check_id","register":1,"birth":"20100101","today":"2026-11-09"}),
+    );
+    let v = reg(&s, 1);
+    assert!(!v.staff.age_early);
+    assert_eq!(v.staff.lines.len(), 1, "beer is removed early");
+    assert!(!allowed(&v, Side::Staff, Action::EarlyAgeCheck));
+
+    scan(&mut s, 1, "staff", LIGHTER);
+    let v = reg(&s, 1);
+    assert!(
+        !v.staff
+            .lines
+            .iter()
+            .find(|l| l.age.is_some())
+            .unwrap()
+            .age_checked
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    assert!(
+        reg(&s, 1).staff.age_choice_pending,
+        "a lighter added after the check needs the check again"
+    );
+}
+
+#[test]
+fn early_age_check_can_be_cancelled_and_covers_checkout() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BEER);
+    ok(
+        &mut s,
+        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"early_age_check","register":1,"side":"staff","start":false}),
+    );
+    assert!(!reg(&s, 1).staff.age_choice_pending);
+    ok(
+        &mut s,
+        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+    );
+    no_id_check(&mut s, 1);
+    let v = reg(&s, 1);
+    assert!(v.staff.lines[0].age_checked);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    assert!(
+        !reg(&s, 1).staff.age_choice_pending,
+        "checked early, not asked again"
+    );
 }

@@ -396,9 +396,16 @@ function taxNote(v: { taxes: TaxTotal[] }): string {
   return `<span class="muted tax-note">内税 ${v.taxes.map((t) => `${esc(t.rate)} ${yen(t.tax)}`).join(" / ")}</span>`;
 }
 
-function warnTags(l: { age: number | null; limit: number | null; cash_only?: boolean }): string {
+function warnTags(l: { age: number | null; age_checked?: boolean; limit: number | null; cash_only?: boolean }, ageCheck?: Command, st?: ActionState): string {
+  const age = !l.age
+    ? ""
+    : l.age_checked
+      ? `<span class="tag ok">年確済</span>`
+      : ageCheck && st?.allowed
+        ? btn(`年確${l.age}`, ageCheck, st, "ff-btn age-start")
+        : `<span class="tag age">年確${l.age}</span>`;
   return [
-    l.age ? `<span class="tag age">年確${l.age}</span>` : "",
+    age,
     l.limit ? `<span class="tag age">限定${l.limit}</span>` : "",
     l.cash_only ? `<span class="tag age">現金のみ</span>` : "",
   ].filter(Boolean).join(" ");
@@ -411,7 +418,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   if (l.kind === "service" && l.parcel) tags.push(parcelTag(l.parcel, l.done));
   else if (l.pickup) tags.push(pickupTag(l.pickup));
   else if (l.kind === "service" && !isBill(l)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
-  tags.push(warnTags(l));
+  tags.push(ro ? warnTags(l) : warnTags(l, { type: "early_age_check", register: reg, side: "staff", start: true }, find(v.actions, "early_age_check")));
   const remove = find(v.actions, "remove_line");
   let svc = "";
   if (l.kind === "service" && !l.done && !ro && !l.parcel && !l.pickup) {
@@ -746,7 +753,7 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
   const paying = v.phase === "paying";
 
   const pointPending = paying && v.point_pending;
-  const agePending = paying && (v.age_choice_pending || v.id_pending);
+  const agePending = (paying || v.age_early) && (v.age_choice_pending || v.id_pending);
   const payStage = paying && !pointPending && !agePending;
   const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
   const pay = payStage
@@ -771,7 +778,13 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
     !!v.point_card,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
   );
-  const back = paying && !ro ? backFoot(reg, side, a("back_to_registering")) : "";
+  const back = ro
+    ? ""
+    : paying
+      ? backFoot(reg, side, a("back_to_registering"))
+      : agePending
+        ? backCorner({ type: "early_age_check", register: reg, side: "staff", start: false }, a("early_age_check"))
+        : "";
   const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   const pickup = v.lines.find((l) => l.pickup)?.pickup;

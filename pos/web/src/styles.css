@@ -3,15 +3,10 @@
   --btn-sm-w: 56px; --btn-sm-h: 26px;
   --btn-md-w: 64px; --btn-md-h: 34px;
   --gap: 6px;
-  --caution-bg: color-mix(in oklch, var(--ac-yellow) 22%, white);
-  --caution-ink: color-mix(in oklch, var(--ac-orange) 55%, black);
-  --caution-line: var(--ac-orange);
-  --safe-bg: color-mix(in oklch, var(--base-lime) 45%, white);
-  --safe-ink: color-mix(in oklch, var(--ac-green) 70%, black);
-  --safe-line: var(--ac-green);
-  --flag-orange-ink: oklch(0.4772 0.113 59); --flag-orange-bg: oklch(0.9348 0.0518 74);
-  --flag-green-ink: oklch(0.4583 0.104 154); --flag-green-bg: oklch(0.9352 0.0347 156);
-  --caution-solid: color-mix(in oklch, var(--ac-orange) 68%, black);
+  /* フラグ：背景なし・枠線と文字は同じ色で、白地で読める（コントラスト4.5）ぎりぎりの濃さ。注意＝オレンジ、済み＝緑、その他＝グレー */
+  --flag-caution: oklch(0.575 0.13 59); --flag-safe: oklch(0.55 0.12 154); --flag-plain: oklch(0.565 0 0);
+  /* 阻害因子のある明細の行（淡いオレンジ） */
+  --flag-row: color-mix(in oklch, oklch(0.68 0.14 50) 28%, white);
   --base-pink: oklch(0.883 0.063 32);
   --base-cream: oklch(0.975 0.149 109);
   --base-lime: oklch(0.914 0.180 118);
@@ -181,7 +176,7 @@ button { touch-action: manipulation; }
 .ff-arrows { flex: none; width: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--gap); }
 .ff-arrow { flex: 1; max-height: 48%; padding: 0; font-size: 9px; }
 .ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: var(--gap); }
-.ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 1px 3px; font-size: 10px; line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
+.ff-item { border-radius: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 1px 3px; font-size: 10px; line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
 .screen [data-region] button.ff-item.out {
   background: var(--off-bg); color: var(--off-ink); border: 1.5px solid var(--border); filter: grayscale(1);
   cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
@@ -220,7 +215,6 @@ button { touch-action: manipulation; }
 }
 .reg-top .count .full { margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
-.screen-main .lines .tag { font-size: 10px; }
 .screen-main .lines button { font-size: 11px; padding: 1px 8px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
 .total { font-size: 20px; }
@@ -279,10 +273,14 @@ input::placeholder { color: var(--line); opacity: 1; }
 button.pad-field .placeholder { color: var(--line); font-weight: 400; }
 button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }
-.tag.warn { background: var(--caution-bg); color: var(--caution-ink); border: 1px solid var(--caution-line); border-radius: 0; }
-.tag.ok { background: var(--safe-bg); color: var(--safe-ink); border: 1px solid var(--safe-line); border-radius: 0; }
-.screen button.tag, .screen button.tag:disabled, .ff-btn, .screen button.ff-btn:disabled { filter: none !important; }
+.tag {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
+  font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: transparent; border: 1.5px solid var(--flag-plain); border-radius: 0; color: var(--flag-plain);
+}
+.tag.warn, .tag.age { border-color: var(--flag-caution); color: var(--flag-caution); }
+.tag.ok { border-color: var(--flag-safe); color: var(--flag-safe); }
+.screen button.tag, .screen button.tag:disabled { filter: none !important; }
 .warn { color: var(--warn); }
 .ok { color: var(--ok); }
 .muted { color: var(--muted); }
@@ -333,14 +331,18 @@ details summary h3 { display: inline; }
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
-.tag.age { background: var(--flag-orange-bg); border: none; border-radius: 0; color: var(--flag-orange-ink); font-weight: 700; }
-.ff-done { background: var(--flag-green-bg); color: var(--flag-green-ink); font-weight: 700; }
-.screen-main .lines .tag.age, .tag.age, .ff-done, .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; line-height: 1; white-space: nowrap; }
-.ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; border: none; border-radius: 4px; color: oklch(1 0 0); }
-.ff-btn.ff-waiting { background: var(--caution-solid); }
-button.ff-btn.ff-verify { cursor: pointer; }
-button.ff-btn.ff-verify:disabled { cursor: not-allowed; opacity: .35; }
-span.ff-btn { cursor: default; }
+/* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
+   （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
+*/
+.lines tr.flagged > td { background: var(--flag-row); }
+.flag {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
+  font: inherit; font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-radius: 8px;
+}
+button.flag { cursor: pointer; }
+/* 明細の「削除」「−」「＋」は、行の色に左右されないよう入金ボックスと同じグレー（青くしない） */
+.screen .qty-step button.neg, .screen .qty-step button.neg:disabled { color: var(--msg-strong); border-color: var(--msg-strong); filter: grayscale(1) !important; }
 .ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; text-align: center; }
 .ffv-screen .lines.ffv { margin-bottom: auto; }
 .ffv-screen .lines.ffv td, .ffv-screen .lines.ffv th { padding-top: 1px; padding-bottom: 1px; }

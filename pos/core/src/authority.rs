@@ -75,6 +75,7 @@ pub enum Action {
     SelectPayment,
     ConfirmPointCard,
     ChooseAgeCheck,
+    EarlyAgeCheck,
     CheckId,
     CheckBill,
     HandOverBills,
@@ -104,6 +105,7 @@ pub const ACTIONS: &[Action] = &[
     Action::SelectPayment,
     Action::ConfirmPointCard,
     Action::ChooseAgeCheck,
+    Action::EarlyAgeCheck,
     Action::CheckId,
     Action::CheckBill,
     Action::HandOverBills,
@@ -127,6 +129,8 @@ pub struct Context {
     pub has_lines: bool,
     pub age_choice_pending: bool,
     pub id_pending: bool,
+    pub age_unchecked: bool,
+    pub age_early: bool,
     pub ff_waiting: bool,
     pub has_ff: bool,
     pub service_pending: bool,
@@ -189,8 +193,7 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります\n対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
-const SELF_OP_CASH_ONLY_GOODS: Denial =
-    "切手・お支払いは現金のみです\nスタッフがお預かりします";
+const SELF_OP_CASH_ONLY_GOODS: Denial = "切手・お支払いは現金のみです\nスタッフがお預かりします";
 const SELF_OP_NO_CASH: Denial =
     "セルフレジでは現金を使えません\n現金はスタッフがお預かりいたします";
 const SELF_OP_CASH_CHOSEN: Denial = "現金はスタッフがお預かりいたします\nスタッフをお呼びしました";
@@ -221,6 +224,7 @@ pub fn is_staff_only(action: Action) -> bool {
     matches!(
         action,
         Action::ChooseAgeCheck
+            | Action::EarlyAgeCheck
             | Action::CheckId
             | Action::CheckBill
             | Action::HandOverBills
@@ -237,12 +241,23 @@ pub fn fixed_side(action: Action) -> Option<Side> {
 }
 
 fn choose_age_check(c: &Context) -> Result<(), Denial> {
-    require(c.phase == Phase::Paying, "お会計前です")?;
+    require(c.phase == Phase::Paying || c.age_early, "お会計前です")?;
     require(c.age_choice_pending || c.id_pending, "年齢確認は不要です")
 }
 
+fn early_age_check(c: &Context) -> Result<(), Denial> {
+    require(
+        c.phase == Phase::Registering,
+        "お会計中は会計の流れで年齢確認をします",
+    )?;
+    require(
+        c.age_unchecked || c.age_early,
+        "年齢確認の済んでいない商品はありません",
+    )
+}
+
 fn check_id(c: &Context) -> Result<(), Denial> {
-    require(c.phase == Phase::Paying, "お会計前です")?;
+    require(c.phase == Phase::Paying || c.age_early, "お会計前です")?;
     require(!c.age_choice_pending, "先に年齢確認をするか選んでください")?;
     require(c.id_pending, "生年月日の入力は不要です")
 }
@@ -384,6 +399,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         }
         Action::ConfirmPointCard => confirm_point(c),
         Action::ChooseAgeCheck => choose_age_check(c),
+        Action::EarlyAgeCheck => early_age_check(c),
         Action::CheckId => check_id(c),
         Action::CheckBill => check_bill(c),
         Action::HandOverBills => hand_over_bills(c),
@@ -425,8 +441,12 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
             require(!c.point_pending, POINT_UNCONFIRMED)
         }
         Action::ConfirmPointCard => confirm_point(c),
-        Action::ChooseAgeCheck | Action::CheckId => {
-            choose_age_check(c)?;
+        Action::ChooseAgeCheck | Action::CheckId | Action::EarlyAgeCheck => {
+            if action == Action::EarlyAgeCheck {
+                early_age_check(c)?;
+            } else {
+                choose_age_check(c)?;
+            }
             Err("年齢確認はスタッフがログインしてから行います")
         }
         Action::CheckBill => {
@@ -483,6 +503,8 @@ mod tests {
                                             staff: StaffState::Ready,
                                             has_lines,
                                             id_pending: false,
+                                            age_unchecked: false,
+                                            age_early: false,
                                             age_choice_pending: age_choice_pending
                                                 && phase == Phase::Paying,
                                             ff_waiting,

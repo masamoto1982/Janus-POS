@@ -6,12 +6,12 @@ use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
     StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
+use crate::bell::{Bell, BellSignal};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{is_valid_denomination, Cash, Drawer};
 use crate::catalog::{
     self, Category, Coupon, FfTab, Product, Scanned, CATALOG, FF_MENU, INITIAL_FF_STOCK,
 };
-use crate::bell::{BellSignal, Bell};
 use crate::parcel::{self, Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
@@ -239,6 +239,12 @@ pub enum Command {
         side: Side,
         id_check: bool,
     },
+    EarlyAgeCheck {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+        start: bool,
+    },
     CheckId {
         register: u8,
         #[serde(default = "staff_side")]
@@ -430,6 +436,7 @@ impl Command {
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
             | C::ChooseAgeCheck { register, .. }
+            | C::EarlyAgeCheck { register, .. }
             | C::CheckId { register, .. }
             | C::DismissConfiscated { register }
             | C::DismissFfCollect { register }
@@ -479,9 +486,7 @@ impl Command {
                 topic: Some(CallTopic::Sos),
                 ..
             } => None,
-            C::FfButton { .. } | C::CallStaff { .. } => {
-                Some(Side::Customer)
-            }
+            C::FfButton { .. } | C::CallStaff { .. } => Some(Side::Customer),
             C::CashOut { .. } | C::CashIn { .. } => Some(Side::Staff),
             C::OpenMenu { .. } => Some(Side::Staff),
             C::CompleteService { .. }
@@ -530,13 +535,8 @@ pub enum FfState {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LineKind {
     Item,
-    Ff {
-        state: FfState,
-    },
-    Service {
-        done: bool,
-        confirm_pending: bool,
-    },
+    Ff { state: FfState },
+    Service { done: bool, confirm_pending: bool },
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -636,6 +636,10 @@ struct Txn {
     returned: Vec<(&'static str, bool)>,
     age_method: Option<AgeMethod>,
     verified_age: Option<u8>,
+    /// 年齢確認を済ませた時点の年確商品の明細。あとから年確商品が加わったら確認をやり直す
+    age_lines: Vec<u32>,
+    /// スタッフが登録の途中で年齢確認を始めた
+    age_early: bool,
     confiscated: Vec<(&'static str, u32)>,
     ff_collect: Vec<(&'static str, u32)>,
     method: Option<PaymentMethod>,
@@ -824,11 +828,38 @@ impl Txn {
     }
 
     fn age_choice_pending(&self) -> bool {
-        self.paying && !self.age_cleared() && self.age_method.is_none()
+        (self.paying || self.age_early) && !self.age_cleared() && self.age_method.is_none()
     }
 
     fn id_pending(&self) -> bool {
-        self.paying && !self.age_cleared() && self.age_method == Some(AgeMethod::Id)
+        (self.paying || self.age_early)
+            && !self.age_cleared()
+            && self.age_method == Some(AgeMethod::Id)
+    }
+
+    fn age_line_ids(&self, rules: &AgeRules) -> Vec<u32> {
+        self.lines
+            .iter()
+            .filter(|l| rules.age_for(l.code, l.category).is_some())
+            .map(|l| l.id)
+            .collect()
+    }
+
+    fn max_age(&self, rules: &AgeRules) -> Option<u8> {
+        self.lines
+            .iter()
+            .filter_map(|l| rules.age_for(l.code, l.category))
+            .max()
+    }
+
+    fn age_unchecked(&self, rules: &AgeRules) -> bool {
+        self.age_line_ids(rules)
+            .iter()
+            .any(|id| !self.age_lines.contains(id))
+    }
+
+    fn line_age_checked(&self, id: u32) -> bool {
+        self.verified_age.is_some() && self.age_lines.contains(&id)
     }
 
     fn coupon_unmatched(&self) -> bool {
@@ -923,6 +954,10 @@ impl Register {
     fn sync_mode(&mut self) {
         if self.staff_state() != StaffState::Ready {
             self.menu = None;
+            if self.txn.age_early {
+                self.txn.age_early = false;
+                self.txn.age_method = None;
+            }
         }
         self.mode = if self.staff.is_some() {
             Mode::StaffOperated
@@ -964,7 +999,7 @@ impl Register {
         }
     }
 
-    fn context(&self) -> Context {
+    fn context(&self, rules: &AgeRules) -> Context {
         let t = &self.txn;
         Context {
             mode: self.mode,
@@ -977,6 +1012,8 @@ impl Register {
             has_lines: !t.lines.is_empty(),
             age_choice_pending: t.age_choice_pending(),
             id_pending: t.id_pending(),
+            age_unchecked: t.age_unchecked(rules),
+            age_early: t.age_early,
             ff_waiting: t.any_ff(FfState::Waiting),
             has_ff: t
                 .lines
@@ -1120,25 +1157,23 @@ impl Store {
         let registers = registers.clamp(1, MAX_REGISTERS);
         let bells = bells.clamp(1, MAX_BELLS);
         let regs = (1..=registers)
-            .map(|id| {
-                Register {
-                    id,
-                    mode: Mode::SelfOperated,
-                    staff: None,
-                    txn: Txn::default(),
-                    drawer: Drawer::default(),
-                    last_receipt: None,
-                    bill_handover: None,
-                    pickup_handover: None,
-                    last_op: 0,
-                    outlet: Cash::default(),
-                    outlet_since: None,
-                    menu: None,
-                    paused: false,
-                    touch: None,
-                    pressing: false,
-                    emoney: None,
-                }
+            .map(|id| Register {
+                id,
+                mode: Mode::SelfOperated,
+                staff: None,
+                txn: Txn::default(),
+                drawer: Drawer::default(),
+                last_receipt: None,
+                bill_handover: None,
+                pickup_handover: None,
+                last_op: 0,
+                outlet: Cash::default(),
+                outlet_since: None,
+                menu: None,
+                paused: false,
+                touch: None,
+                pressing: false,
+                emoney: None,
             })
             .collect();
         Store {
@@ -1314,7 +1349,7 @@ impl Store {
         let r = self
             .reg(register)
             .ok_or_else(|| format!("レジ{register}はありません"))?;
-        let c = r.context();
+        let c = r.context(&self.age_rules);
         permitted(active_side(&c).unwrap_or(Side::Customer), action, &c).map_err(String::from)
     }
 
@@ -1322,7 +1357,7 @@ impl Store {
         let r = self
             .reg(register)
             .ok_or_else(|| format!("レジ{register}はありません"))?;
-        permitted(side, action, &r.context()).map_err(String::from)
+        permitted(side, action, &r.context(&self.age_rules)).map_err(String::from)
     }
 
     pub fn dispatch(&mut self, cmd: Command) -> Result<Outcome, String> {
@@ -1726,9 +1761,15 @@ impl Store {
                 let no_cash_goods = r.txn.cash_only() == 0;
                 if self_op {
                     if method == PaymentMethod::Cash {
-                        self.calls
-                            .raise(register, CallKind::CashOnly, self.now, "現金でのお支払い");
-                        return done("スタッフをお呼びしました\n現金はスタッフがお預かりいたします");
+                        self.calls.raise(
+                            register,
+                            CallKind::CashOnly,
+                            self.now,
+                            "現金でのお支払い",
+                        );
+                        return done(
+                            "スタッフをお呼びしました\n現金はスタッフがお預かりいたします",
+                        );
                     }
                     if no_cash_goods {
                         self.calls.resolve(register, CallKind::CashOnly, self.now);
@@ -1750,16 +1791,48 @@ impl Store {
             } => {
                 self.check(register, side, Action::ChooseAgeCheck)?;
                 self.calls.resolve(register, CallKind::AgeCheck, self.now);
-                let r = self.reg_mut(register)?;
-                let age = r.txn.required_age.unwrap_or(0);
+                let rules = &self.age_rules;
+                let r = self
+                    .registers
+                    .iter_mut()
+                    .find(|r| r.id == register)
+                    .ok_or("レジがありません")?;
                 if id_check {
                     r.txn.age_method = Some(AgeMethod::Id);
                     done("身分証の生年月日を入力してください")
                 } else {
+                    r.txn.required_age = r.txn.max_age(rules);
+                    let age = r.txn.required_age.unwrap_or(0);
                     r.txn.age_method = Some(AgeMethod::Skip);
                     r.txn.verified_age = r.txn.required_age;
+                    r.txn.age_lines = r.txn.age_line_ids(rules);
+                    r.txn.age_early = false;
                     done(format!("{age}歳以上の年齢確認を省略しました"))
                 }
+            }
+            C::EarlyAgeCheck {
+                register,
+                side,
+                start,
+            } => {
+                self.check(register, side, Action::EarlyAgeCheck)?;
+                let rules = &self.age_rules;
+                let r = self
+                    .registers
+                    .iter_mut()
+                    .find(|r| r.id == register)
+                    .ok_or("レジがありません")?;
+                if !start {
+                    r.txn.age_early = false;
+                    r.txn.age_method = None;
+                    return done("登録画面に戻りました");
+                }
+                let age = r.txn.max_age(rules);
+                r.txn.required_age = age;
+                r.txn.verified_age = None;
+                r.txn.age_method = None;
+                r.txn.age_early = true;
+                done(format!("{}歳以上の年齢確認をします", age.unwrap_or(0)))
             }
             C::CheckId {
                 register,
@@ -2442,7 +2515,9 @@ impl Store {
                 self.calls.resolve(register, k, now);
             }
             return done(match was {
-                _ if resumed => format!("{}さんがレジを再開しました（スタッフ操作モード）", acc.name),
+                _ if resumed => {
+                    format!("{}さんがレジを再開しました（スタッフ操作モード）", acc.name)
+                }
                 _ if took_over => format!("{}さんが操作を引き継ぎました", acc.name),
                 _ => format!("{}さんがログインしました（スタッフ操作モード）", acc.name),
             });
@@ -2735,7 +2810,11 @@ impl Store {
         done(format!(
             "{} ×{qty} を{}しました\nお渡ししたらチェックを入れてください",
             p.name,
-            if reserved { "予約注文として登録" } else { "登録" }
+            if reserved {
+                "予約注文として登録"
+            } else {
+                "登録"
+            }
         ))
     }
 
@@ -2758,12 +2837,9 @@ impl Store {
             keep
         });
         r.txn.verified_age = Some(age);
-        r.txn.required_age = r
-            .txn
-            .lines
-            .iter()
-            .filter_map(|l| rules.age_for(l.code, l.category))
-            .max();
+        r.txn.required_age = r.txn.max_age(rules);
+        r.txn.age_lines = r.txn.age_line_ids(rules);
+        r.txn.age_early = false;
         if r.txn.lines.is_empty() {
             r.txn.paying = false;
             r.txn.method = None;
@@ -2789,14 +2865,13 @@ impl Store {
             .iter_mut()
             .find(|r| r.id == register)
             .ok_or("レジがありません")?;
-        let age = r
-            .txn
-            .lines
-            .iter()
-            .filter_map(|l| rules.age_for(l.code, l.category))
-            .max();
+        let age = r.txn.max_age(rules);
         r.txn.paying = true;
+        r.txn.age_early = false;
         r.txn.required_age = age;
+        if r.txn.age_unchecked(rules) {
+            r.txn.verified_age = None;
+        }
         if !r.txn.age_cleared() {
             r.txn.age_method = None;
         }
@@ -2925,7 +3000,7 @@ impl Store {
 
     fn claim(&mut self, register: u8, side: Side) -> Result<Outcome, String> {
         let r = self.reg(register).ok_or("レジがありません")?;
-        let c = r.context();
+        let c = r.context(&self.age_rules);
         match active_side(&c) {
             Some(s) if s != side => Err(if c.menu_open {
                 "もう一方の画面で店舗メニューを操作中です"
@@ -3327,7 +3402,7 @@ impl Store {
     }
 
     fn register_view(&self, r: &Register) -> RegisterView {
-        let c = r.context();
+        let c = r.context(&self.age_rules);
         let t = &r.txn;
         let taxes = t.taxes(&self.tax.display_rates(), self.tax.rounding);
         let c_side = active_side(&c).unwrap_or(Side::Customer);
@@ -3388,6 +3463,7 @@ impl Store {
                 line: l.clone(),
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
+                age_checked: t.line_age_checked(l.id),
                 limit: self.age_rules.limit_for(l.code),
             })
             .collect();
@@ -3403,6 +3479,7 @@ impl Store {
                 ff_base: l.ff_base,
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
+                age_checked: t.line_age_checked(l.id),
                 limit: self.age_rules.limit_for(l.code),
                 cash_only: l.cash_only,
                 pickup: l.is_pickup(),
@@ -3441,8 +3518,9 @@ impl Store {
                 taxes: taxes.clone(),
                 coupons: coupons.clone(),
                 point_card: t.point_card.clone(),
-                required_age: t.required_age.filter(|_| t.paying),
+                required_age: t.required_age.filter(|_| t.paying || t.age_early),
                 age_choice_pending: c.age_choice_pending,
+                age_early: t.age_early,
                 confiscated: t
                     .confiscated
                     .iter()
@@ -3557,6 +3635,7 @@ pub struct StaffLine {
     pub line: Line,
     pub amount: u32,
     pub age: Option<u8>,
+    pub age_checked: bool,
     pub limit: Option<u32>,
 }
 
@@ -3569,6 +3648,7 @@ pub struct CustomerLine {
     pub ff_base: u32,
     pub amount: u32,
     pub age: Option<u8>,
+    pub age_checked: bool,
     pub limit: Option<u32>,
     pub cash_only: bool,
     pub pickup: bool,
@@ -3590,6 +3670,7 @@ pub struct StaffView {
     pub point_card: Option<String>,
     pub required_age: Option<u8>,
     pub age_choice_pending: bool,
+    pub age_early: bool,
     pub confiscated: Vec<Confiscated>,
     pub ff_collect: Vec<Confiscated>,
     pub coupon_unmatched: bool,

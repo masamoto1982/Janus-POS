@@ -52,18 +52,12 @@ const cashCorner = (reg: number, side: Side, method: string | null, st: ActionSt
 
 const skipCorner = (cmd: Command, a?: ActionState): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "md skip")}</div>`;
 
-const FF_LABEL: Record<FfState, string> = {
-  waiting: "お渡し前",
-  received: "お渡し済",
-};
+const flagSpan = (label: string): string => `<span class="flag">${esc(label)}</span>`;
 
-function ffTag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: ActionState, ro: boolean, labels = FF_LABEL): string {
-  if (l.kind !== "ff" || !l.state) return "";
-  const text = labels[l.state];
-  if (l.state === "received") return `<span class="ff-done">${text}</span>`;
-  if (ro) return "";
+function ffFlag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: ActionState, ro: boolean): string {
+  if (l.kind !== "ff" || l.state !== "waiting" || ro) return "";
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
-  return `<button type="button" class="ff-btn ff-waiting ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>${text}</button>`;
+  return `<button type="button" class="flag ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>お渡し前</button>`;
 }
 
 export const ffVerifying = new Set<string>();
@@ -145,11 +139,6 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
     </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
 }
 
-function pickupTag(p: Pickup): string {
-  if (p.missing) return `<span class="tag warn">見つかりません</span>`;
-  return p.matched ? `<span class="tag ok">照合済</span>` : `<span class="tag warn">照合待ち</span>`;
-}
-
 function pickupStep(reg: number, p: Pickup, st: ActionState): string {
   const found = (v: boolean | null) => ({ type: "pickup_found", register: reg, found: v });
   const end = { type: "pickup_handover", register: reg };
@@ -179,9 +168,16 @@ function pickupHandover(reg: number, side: Side, no: string): string {
     </div>`;
 }
 
-function parcelTag(p: Parcel, done: boolean): string {
-  if (done && p.size && p.region) return `<span class="tag ok">${p.size}サイズ・${esc(p.region)}あて</span>`;
-  return `<span class="tag warn">${p.size ? `${p.size}サイズ・届け先未定` : "受付中"}</span>`;
+function serviceFlag(l: { kind: string; done?: boolean; cash_only: boolean; parcel?: Parcel | boolean; pickup?: Pickup | boolean }): string {
+  if (l.kind !== "service" || l.done) return "";
+  if (l.pickup) return flagSpan(typeof l.pickup === "object" && l.pickup.missing ? "見つかりません" : "照合待ち");
+  if (l.parcel) return flagSpan(typeof l.parcel === "object" && l.parcel.size ? "届け先未定" : "受付中");
+  return flagSpan("受付待ち");
+}
+
+function ageFlag(l: { age: number | null; age_checked?: boolean }, cmd?: Command, st?: ActionState): string {
+  if (!l.age || l.age_checked) return "";
+  return cmd && st?.allowed ? btn(`年確${l.age}`, cmd, st, "flag age-start") : flagSpan(`年確${l.age}`);
 }
 
 export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
@@ -396,22 +392,13 @@ function taxNote(v: { taxes: TaxTotal[] }): string {
   return `<span class="muted tax-note">内税 ${v.taxes.map((t) => `${esc(t.rate)} ${yen(t.tax)}`).join(" / ")}</span>`;
 }
 
-function warnTags(l: { age: number | null; limit: number | null; cash_only?: boolean }): string {
-  return [
-    l.age ? `<span class="tag age">年確${l.age}</span>` : "",
-    l.limit ? `<span class="tag age">限定${l.limit}</span>` : "",
-    l.cash_only ? `<span class="tag age">現金のみ</span>` : "",
-  ].filter(Boolean).join(" ");
-}
-
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
-  const tags: string[] = [];
   const ro = side === "customer";
-  if (l.kind === "ff") tags.push(ffTag(reg, side, l, find(v.actions, "check_ff"), ro));
-  if (l.kind === "service" && l.parcel) tags.push(parcelTag(l.parcel, l.done));
-  else if (l.pickup) tags.push(pickupTag(l.pickup));
-  else if (l.kind === "service" && !isBill(l)) tags.push(`<span class="tag ${l.done ? "ok" : "warn"}">${l.done ? "受付済" : "受付待ち"}</span>`);
-  tags.push(warnTags(l));
+  const tags = [
+    ffFlag(reg, side, l, find(v.actions, "check_ff"), ro),
+    serviceFlag(l),
+    ro ? ageFlag(l) : ageFlag(l, { type: "early_age_check", register: reg, side: "staff", start: true }, find(v.actions, "early_age_check")),
+  ].filter(Boolean);
   const remove = find(v.actions, "remove_line");
   let svc = "";
   if (l.kind === "service" && !l.done && !ro && !l.parcel && !l.pickup) {
@@ -425,7 +412,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
     ro || isBill(l) || l.pickup || l.parcel
       ? `${l.qty}`
       : qtyCell(reg, side, l, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service");
-  return `<tr class="${flash(reg, l.id)}">
+  return `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${qty}</td>
     <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td>
@@ -746,7 +733,7 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
   const paying = v.phase === "paying";
 
   const pointPending = paying && v.point_pending;
-  const agePending = paying && (v.age_choice_pending || v.id_pending);
+  const agePending = (paying || v.age_early) && (v.age_choice_pending || v.id_pending);
   const payStage = paying && !pointPending && !agePending;
   const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
   const pay = payStage
@@ -759,6 +746,7 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
       ? ageStep(reg, v, side, a)
       : "";
 
+  const ffFirst = !paying && v.lines.some((l) => l.kind === "ff" && l.state === "waiting") && a("check_ff").allowed;
   const top = regTop(
     v.total,
     itemCount(v.lines),
@@ -766,12 +754,20 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro || paying
         ? ""
-        : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
+        : ffFirst
+          ? `<button type="button" class="primary" data-ffverify="${reg}:${side}">会計</button>`
+          : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.max_items,
     !!v.point_card,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
   );
-  const back = paying && !ro ? backFoot(reg, side, a("back_to_registering")) : "";
+  const back = ro
+    ? ""
+    : paying
+      ? backFoot(reg, side, a("back_to_registering"))
+      : agePending
+        ? backCorner({ type: "early_age_check", register: reg, side: "staff", start: false }, a("early_age_check"))
+        : "";
   const screen = (body: string) => `${top}${notice}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
@@ -1112,18 +1108,13 @@ export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.
   if (r.last_receipt && !c.lines.length) return notice + confirm(thanks());
 
   const lineRows = c.lines.map((l): Row => {
-      const tag =
-        l.kind === "ff"
-          ? ffTag(reg, side, l, a("check_ff"), true, { waiting: "お受け取り前", received: "お受け取り済" })
-          : l.kind === "service" && !l.done
-            ? `<span class="tag warn">スタッフが受付します</span>`
-            : "";
+      const tags = [serviceFlag(l), ageFlag(l)].filter(Boolean);
       const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
       const qty =
         c.phase === "registering" && !fixedHere
           ? qtyCell(reg, side, l, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service")
           : `${l.qty}`;
-      return [l.touched, `<tr class="${flash(reg, l.id)}"><td>${esc(l.name)} ${[tag, warnTags(l)].filter(Boolean).join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>`];
+      return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(l.name)} ${tags.join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 

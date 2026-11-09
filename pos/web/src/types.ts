@@ -59,12 +59,13 @@ export type StaffLine = LineKind & {
   cash_only: boolean;
   amount: number;
   age: number | null;
+  age_checked: boolean;
   limit: number | null;
   parcel?: Parcel;
   pickup?: Pickup;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; ff_base: number; amount: number; age: number | null; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; ff_base: number; amount: number; age: number | null; age_checked: boolean; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean };
 
 export interface Call {
   id: number;
@@ -99,6 +100,7 @@ export interface StaffView {
   point_card: string | null;
   required_age: number | null;
   age_choice_pending: boolean;
+  age_early: boolean;
   confiscated: { name: string; qty: number }[];
   ff_collect: { name: string; qty: number }[];
   coupon_unmatched: boolean;

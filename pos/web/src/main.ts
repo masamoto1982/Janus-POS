@@ -689,14 +689,9 @@ app.addEventListener("change", (e) => {
     if (!send({ type: "set_bell_on", bell: Number(box.dataset.bellOn), on: box.checked })) box.checked = !box.checked;
     return;
   }
-  if (sel.dataset.bellOffline) {
+  if (sel.hasAttribute("data-bells-offline")) {
     const box = sel as unknown as HTMLInputElement;
-    if (!send({ type: "set_bell_offline", bell: Number(box.dataset.bellOffline), offline: box.checked })) box.checked = !box.checked;
-    return;
-  }
-  if (sel.hasAttribute("data-emergency-demo")) {
-    const box = sel as unknown as HTMLInputElement;
-    if (!send({ type: "set_emergency_demo", on: box.checked })) box.checked = !box.checked;
+    snap.bells.forEach((_, i) => send({ type: "set_bell_offline", bell: i, offline: box.checked }));
     return;
   }
   if (sel.dataset.ffcheck) {

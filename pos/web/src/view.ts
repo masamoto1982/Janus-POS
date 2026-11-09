@@ -524,7 +524,7 @@ function bellDeadScreen(): string {
   return confirm(msg("呼び出し端末が動作していません", "お手数ですが、店員に直接お声かけください"));
 }
 
-/** エマージェンシーモード：セルフ操作モードで呼び鈴にスタッフが応答しない（3分以上、または3分以内に10回以上）
+/** エマージェンシーモード：セルフ操作モードでスタッフがログインしないまま、呼び鈴が3分以上鳴らしっぱなし、または3分以内に10回以上鳴らされた
  * 両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。スタッフがログインすると解除 */
 function emergencyScreen(): string {
   return `<div class="confirm change-alert emergency">${msg(
@@ -1184,16 +1184,10 @@ export function bellSettings(s: Snapshot): string {
         : `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" data-bell-on="${i}"${m.bell_on ? " checked" : ""} aria-label="${esc(m.id)}の呼び鈴機能" /><span>${m.bell_on ? "ON" : "OFF"}</span></label>`,
     )
     .join("");
-  const down = s.bells
-    .map(
-      (m, i) =>
-        `<label class="bell-setting"><span>${BELL_ICON[m.kind]} ${esc(m.id)}</span><input type="checkbox" data-bell-offline="${i}"${m.offline ? " checked" : ""} aria-label="${esc(m.id)}を不通にする" /><span>${m.offline ? "不通" : "通常"}</span></label>`,
-    )
-    .join("");
-  const sos = `<label class="bell-setting"><span>エマージェンシーモードを試す</span><input type="checkbox" data-emergency-demo${s.emergency_demo ? " checked" : ""} aria-label="エマージェンシーモードを試す" /><span>${s.emergency_demo ? "ON" : "OFF"}</span></label>`;
+  const off = s.bells.every((m) => m.offline);
+  const test = `<label class="bell-setting"><span>呼び鈴を不通にする</span><input type="checkbox" data-bells-offline${off ? " checked" : ""} aria-label="呼び鈴を不通にする" /><span>${off ? "不通" : "通常"}</span></label>`;
   return `${rows}
-    <h3 class="bell-sub">不通を試す</h3><p class="muted">不通にした端末には呼び出しが届きません<br>ON の端末がすべて不通になると、スタッフ操作モードでは呼び鈴がグレーアウトし、セルフ操作モードではお客様に店員へ直接声をかけていただく案内を出します</p>${down}
-    <h3 class="bell-sub">エマージェンシーモード</h3><p class="muted">セルフ操作モードで、呼び出しに3分以上応答がない、または3分以内に10回以上呼び鈴が鳴らされると、両画面に通報をお願いする案内を出します<br>スタッフがログインすると解除されます<br>ON にすると、セルフ操作モードのレジで今すぐ試せます</p>${sos}`;
+    <h3 class="bell-sub">エマージェンシーモードの確認</h3><p class="muted">セルフ操作モードで、呼び鈴を3分以上鳴らしっぱなしにする、または3分以内に10回以上鳴らすと、両画面に通報をお願いする案内を出します<br>スタッフがログインすると解除されます<br>呼び鈴を不通にして、スタッフに届かない状況で試せます</p>${test}`;
 }
 
 const AGE_CHOICES = [15, 18, 20];

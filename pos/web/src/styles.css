@@ -5,8 +5,8 @@
   --gap: 6px;
   /* フラグ：背景なし・枠線と文字は同じ色で、白地で読める（コントラスト4.5）ぎりぎりの濃さ。注意＝オレンジ、済み＝緑、その他＝グレー */
   --flag-caution: oklch(0.575 0.13 59); --flag-safe: oklch(0.55 0.12 154); --flag-plain: oklch(0.565 0 0);
-  /* 阻害因子のある明細の行（白枠・白文字の＋ボタンがぎりぎり見える淡いオレンジ） */
-  --flag-row: color-mix(in oklch, oklch(0.68 0.14 50) 50%, white);
+  /* 阻害因子のある明細の行（淡いオレンジ） */
+  --flag-row: color-mix(in oklch, oklch(0.68 0.14 50) 28%, white);
   --base-pink: oklch(0.883 0.063 32);
   --base-cream: oklch(0.975 0.149 109);
   --base-lime: oklch(0.914 0.180 118);

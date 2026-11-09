@@ -435,6 +435,9 @@ function render(): void {
       el?.classList.toggle("inactive", locked);
       const operable = r.active_side !== null ? r.active_side === side : r.mode !== "staff_operated" || side === "staff";
       el?.classList.toggle("operable", operable);
+      el?.classList.toggle("mode-staff", r.mode === "staff_operated");
+      el?.classList.toggle("mode-self", r.mode === "self_operated");
+      el?.classList.toggle("calling", side === "staff" && r.lamp);
       app.querySelector(`[data-swipe-to="${r.id}:${side}"]`)?.classList.toggle("operable", operable);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);

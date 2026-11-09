@@ -292,7 +292,7 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 
 .banner { border-radius: 8px; padding: 8px; margin-bottom: 8px; font-weight: 600; }
 .banner.call { background: var(--call-bg); color: var(--call); }
-.call-screen { box-sizing: border-box; margin: -8px -12px; min-height: calc(100% + 16px); text-align: center; padding: 16px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--call-bg); color: var(--call); }
+.call-screen { box-sizing: border-box; margin: -8px -12px; min-height: calc(100% + 16px); text-align: center; padding: 16px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--call); }
 .call-screen .banner { align-self: stretch; }
 .call-screen .call-reason { font-size: 44px; font-weight: 800; line-height: 1.2; }
 .call-screen p { margin: 0; font-size: 16px; }
@@ -761,3 +761,12 @@ body.dragging .drop-hint { display: inline; }
 /* 呼び鈴は待ち受けでは帯の中央に大きめに出し、商品登録が始まるとヘッダーに戻る */
 .welcome-band .bell-btn { width: var(--btn-h); height: var(--btn-h); font-size: 26px; }
 .screen:has(.welcome-band .bell-btn) .screen-head .bell-btn { display: none; }
+
+/* 稼働モードの背景色：スタッフ操作モード＝ピンク、セルフ操作モード＝ミント（グレー・青・黄と P/D/T 型でも区別できる淡い色）。
+   呼び出し中のスタッフ側画面は、エマージェンシーと同じやわらかい黄色 */
+:root { --mode-staff-bg: oklch(0.93 0.05 330); --mode-self-bg: oklch(0.93 0.06 150); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --mode-staff-bg: oklch(0.32 0.05 330); --mode-self-bg: oklch(0.32 0.05 150); } }
+:root[data-theme="dark"] { --mode-staff-bg: oklch(0.32 0.05 330); --mode-self-bg: oklch(0.32 0.05 150); }
+:root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); }
+:root .screen.mode-self { --cust-bg: var(--mode-self-bg); }
+:root .staff-screen.calling { --cust-bg: var(--alert-bg); }

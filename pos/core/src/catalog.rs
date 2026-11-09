@@ -239,36 +239,34 @@ pub fn find(code: &str) -> Option<&'static Product> {
     CATALOG.iter().find(|p| p.code == code)
 }
 
-pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
-    ("FF01", 3),
-    ("FF02", 2),
-    ("FF03", 4),
-    ("FF04", 0),
-    ("FF21", 6),
-    ("FF22", 6),
-    ("FF23", 3),
-    ("FF24", 4),
-    ("FF31", 99),
-    ("FF32", 99),
-    ("FF33", 99),
-    ("FF34", 99),
-    ("FF35", 99),
-    ("FF36", 99),
-    ("FF37", 99),
-    ("FF39", 99),
-    ("FF51", 20),
-    ("FF52", 20),
-    ("FF53", 20),
-    ("FF54", 20),
-    ("FF05", 5),
-    ("FF61", 3),
-    ("FF62", 4),
-    ("FF63", 3),
-    ("FF71", 10),
-    ("FF73", 10),
-    ("FF74", 10),
-    ("FF75", 10),
+/// 作り置きの概念が無い FF（注文を受けてから作る・注ぐ）。在庫を持たず、ボタンはいつも積極
+pub const FF_MADE_TO_ORDER: &[&str] = &[
+    "FF31", "FF32", "FF33", "FF34", "FF35", "FF36", "FF37", "FF39", "FF51", "FF52", "FF53", "FF54",
 ];
+
+/// 作り置きのある FF の初期在庫（二桁＝豊富、一桁＝希薄、0＝無し）
+pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
+    ("FF01", 12),
+    ("FF02", 2),
+    ("FF03", 15),
+    ("FF04", 0),
+    ("FF21", 10),
+    ("FF22", 6),
+    ("FF23", 4),
+    ("FF24", 11),
+    ("FF05", 10),
+    ("FF61", 3),
+    ("FF62", 12),
+    ("FF63", 0),
+    ("FF71", 20),
+    ("FF73", 14),
+    ("FF74", 5),
+    ("FF75", 8),
+];
+
+pub fn is_made_to_order(code: &str) -> bool {
+    FF_MADE_TO_ORDER.contains(&code)
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Scanned {
@@ -379,7 +377,8 @@ mod tests {
         }
         for (code, _) in FF_MENU {
             assert!(
-                find(code).is_some() && INITIAL_FF_STOCK.iter().any(|(c, _)| c == code),
+                find(code).is_some()
+                    && (INITIAL_FF_STOCK.iter().any(|(c, _)| c == code) != is_made_to_order(code)),
                 "{code}"
             );
         }
@@ -399,7 +398,7 @@ mod tests {
         for p in CATALOG.iter().filter(|p| p.category == Category::FastFood) {
             assert!(FF_MENU.iter().any(|(c, _)| *c == p.code), "{}", p.code);
             assert!(
-                INITIAL_FF_STOCK.iter().any(|(c, _)| *c == p.code),
+                INITIAL_FF_STOCK.iter().any(|(c, _)| *c == p.code) || is_made_to_order(p.code),
                 "{}",
                 p.code
             );

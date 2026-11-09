@@ -117,9 +117,6 @@ function changeLeft(): string {
   return `<div class="confirm change-alert">${msg("釣り銭が残っています")}</div>`;
 }
 
-const afterPay = (r: RegisterView): boolean =>
-  !!r.last_receipt && !(r.mode === "staff_operated" ? r.staff.lines : r.customer.lines).length;
-
 function changeDue(side: Side, amount: number): string {
   const msg = side === "staff" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
   return `<div class="thanks"><div class="big">${msg}</div></div>`;
@@ -526,11 +523,8 @@ export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
   const ageOnScreen = r.mode === "staff_operated" && (v.age_choice_pending || v.id_pending);
   const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
-  // 次のお客様の登録が始まっていてお釣りの案内画面がないときは、同じ警告を帯で出す
-  const change = r.change_left && !afterPay(r) ? `<div class="change-band">${msg("釣り銭が残っています")}</div>` : "";
   if (side === "customer") {
     return (
-      change +
       (r.mode === "staff_operated" && r.customer.staff_called && (!ageOnScreen || calls.length)
         ? `<div class="banner call">スタッフが向かっています</div>`
         : "")
@@ -539,7 +533,7 @@ export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const warn = v.bell_down.length
     ? `<div class="banner danger">${esc(v.bell_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  return change + warn;
+  return warn;
 }
 
 function elapsed(calls: { kind: string; created_at: number }[], now: number, before: string, after = ""): string {
@@ -623,7 +617,7 @@ export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: Ac
     side === "staff"
       ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください<br>対象商品を登録するか、クーポンを取り消すまで決済できません"]
       : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください<br>対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
-  return `<div class="card coupon-card">${msg(head, body)}<ul class="coupon-list">${list}</ul></div>`;
+  return `<div class="point-screen coupon-screen">${msg(head, body)}<ul class="coupon-list">${list}</ul></div>`;
 }
 
 export function returnedCard(reg: number, side: Side, returned: Returned[], done: boolean): string {
@@ -636,9 +630,9 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
         ? "適用先のなかったクーポンをお返しします"
         : "取り消したクーポンをお返しします";
   const label = side === "staff" ? "返却しました" : "受け取りました";
-  return `<div class="card coupon-card returned"><div class="id-head">${msg(head)}${
-    done ? btn(label, { type: "dismiss_returned", register: reg }, undefined, "small") : ""
-  }</div><ul class="coupon-list">${list}</ul></div>`;
+  return `<div class="point-screen coupon-screen">${msg(head)}<ul class="coupon-list">${list}</ul>${
+    done ? `<div class="point-choices">${btn(label, { type: "dismiss_returned", register: reg }, undefined, "primary")}</div>` : ""
+  }</div>`;
 }
 
 export const scanGuide = new Map<string, GuideKind>();

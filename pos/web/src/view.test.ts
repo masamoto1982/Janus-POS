@@ -89,23 +89,7 @@ describe("view helpers", () => {
     expect(customer).toBe("");
   });
 
-  it("warns both screens with a band when change is left while the next customer is registering", () => {
-    const r = {
-      mode: "self_operated",
-      change_left: true,
-      last_receipt: null,
-      staff: { calls: [], bell_down: [], lines: [] },
-      customer: { staff_called: false, lines: [{ id: 1, qty: 1 }] },
-    } as unknown as RegisterView;
-    for (const side of ["staff", "customer"] as const) {
-      const html = callNotice(r, 6000, side);
-      expect(html).toContain('class="change-band"');
-      expect(html).toContain('<div class="big">釣り銭が残っています</div>');
-      expect(html).not.toContain("banner");
-    }
-  });
-
-  it("leaves the band out while the change-left screen replaces the change guide", () => {
+  it("never shows change left as a band over the register screen", () => {
     const r = {
       mode: "staff_operated",
       change_left: true,

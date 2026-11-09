@@ -1341,11 +1341,14 @@ function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCA
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
+/** スタッフ操作モードでのみ Item エリアに並べるカテゴリ（たばこ・切手） */
+const STAFF_ONLY_SHELF = ["tobacco", "stamp"];
+
 export function shelfPanel(s: Snapshot, extra = ""): string {
   const staffOperated = s.registers.some((r) => r.mode === "staff_operated");
   const asked = s.registers.some((r) => r.tobacco_asked);
   return SHELVES.map((g) => {
-    const items = s.catalog.filter(g.match).filter((p) => p.category !== "tobacco" || staffOperated);
+    const items = s.catalog.filter(g.match).filter((p) => !STAFF_ONLY_SHELF.includes(p.category) || staffOperated);
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>

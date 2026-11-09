@@ -447,14 +447,20 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .bell-area h2 { margin: 0; }
 .bell-area .toast { position: static; margin-top: 8px; display: none; }
 .bell-area .toast.show { display: block; }
-/* 呼び出し中はヘッダー中央（呼び鈴のまわり）がやわらかい黄色で一定の速さで点滅する。
+/* 呼び出し中はヘッダー全体が黄色一色で一定の速さで点滅する（グラデーションはモードの色と混ざって濁るので使わない）。
+   エマージェンシーモード中は同じ点滅を赤で。赤は釣り銭警告・エマージェンシーの赤い文字（--alert-ink）と同じ色相で、
+   黄（--call-soft）と並べても浮かない濃さにし、文字は白にする。
    待ち時間で色や速さは変えない（経過時間がお客様にも伝わり、待たされた不満を増やしかねないため） */
-:root { --call-soft: oklch(0.93 0.10 95); }
-.screen-head.calling { --head-call-bg: radial-gradient(ellipse 50% 160% at 50% 50%, var(--call-soft) 0%,
-  color-mix(in oklab, var(--call-soft) 60%, transparent) 35%, transparent 100%);
-  animation: head-call 1s steps(1) infinite; }
+:root { --call-soft: oklch(0.93 0.10 95); --sos-head: oklch(0.6 0.17 29); --sos-head-ink: oklch(1 0 0); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sos-head: oklch(0.5 0.15 29); } }
+:root[data-theme="dark"] { --sos-head: oklch(0.5 0.15 29); }
+.screen-head.calling { --head-call-bg: var(--call-soft); animation: head-call 1s steps(1) infinite; }
+.screen-head.sos { --head-call-bg: var(--sos-head); animation: head-call 1s steps(1) infinite; }
+.screen-head.sos :is(.mode-title, .clock) { animation: sos-ink 1s steps(1) infinite; }
+@keyframes sos-ink { 0% { color: var(--sos-head-ink); } }
 @keyframes head-call { 0% { background: var(--head-call-bg); } 50% { background: var(--head-bg); } }
-@media (prefers-reduced-motion: reduce) { .screen-head.calling { animation: none; background: var(--head-call-bg); } }
+@media (prefers-reduced-motion: reduce) { .screen-head:is(.calling, .sos) { animation: none; background: var(--head-call-bg); }
+  .screen-head.sos :is(.mode-title, .clock) { animation: none; color: var(--sos-head-ink); } }
 
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
 @media (max-width: 900px) { .right-col { position: static; max-height: none; } }
@@ -613,9 +619,8 @@ body.dragging .drop-hint { display: inline; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .money-io-cust { grid-column: 2; min-width: 0; }
 .money-io-cust > *, .money-io-boxes > * { min-width: 0; }
-.mode-title { display: inline-flex; align-items: center; height: 24px; padding: 0 12px; font-size: 14px; font-weight: 700; line-height: 1; white-space: nowrap; }
-.mode-title.staff-operated { background: var(--btn-on); color: var(--btn-on-ink); border: 1px solid var(--btn-on); }
-.mode-title:is(.self-operated, .store-menu) { background: oklch(1 0 0); color: var(--msg-strong); border: 1px solid var(--msg-strong); }
+/* 稼働モード表示は背景も枠線もない、ただのテキスト（濃い背景・白文字は FF 単品ボタンと紛れるため） */
+.mode-title { display: inline-flex; align-items: center; height: 24px; font-size: 14px; font-weight: 700; line-height: 1; white-space: nowrap; color: var(--msg-strong); }
 .money-io .inlet, .money-io .outlet, .money-io .terminal {
   height: 40px; padding: 0 12px; border: var(--frame-w) solid var(--msg-strong); border-radius: 0;
   background: transparent; color: var(--ink); font: inherit; font-size: 16px; text-align: right;
@@ -679,7 +684,7 @@ body.dragging .drop-hint { display: inline; }
 
 
 .screen { --tier-deep: var(--off-bg);
-  /* レジ画面ヘッダーの背景は普段は無色。呼び出し中だけ中心（呼び鈴のまわり）が濃く色づいて点滅する */
+  /* レジ画面ヘッダーの背景は普段は無色（段の色）。呼び出し中は黄、エマージェンシー中は赤で点滅する */
   --head-bg: transparent; }
 .scan-welcome, .staff-operated-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; }
 .hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }

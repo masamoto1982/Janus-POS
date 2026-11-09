@@ -408,7 +408,8 @@ function render(): void {
     for (const side of ["staff", "customer"] as const) {
       const head = app.querySelector<HTMLElement>(`[data-region="head-${r.id}-${side}"]`);
       if (!head) continue;
-      head.classList.toggle("calling", r.lamp);
+      head.classList.toggle("sos", r.emergency);
+      head.classList.toggle("calling", r.lamp && !r.emergency);
       const lang = langOf(r.id, side);
       app.querySelector(`[data-drop="${r.id}:${side}"]`)?.setAttribute("lang", lang);
       if (r.lamp) {

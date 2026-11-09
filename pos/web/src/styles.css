@@ -157,7 +157,7 @@ button { touch-action: manipulation; }
 .screen-head .clock { font-size: 11px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
-.screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--gap); }
+.screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
 .screen-items:has(> .ff-tabs) { gap: 3px; }
 /* 大きなテキストと小さなテキスト（アプリ全体で共通、待ち受け画面が基準。web の msg()）
@@ -200,7 +200,7 @@ button { touch-action: manipulation; }
 .lines td, .lines th { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .num { text-align: right; white-space: nowrap; }
 
-.reg-top { --row: 14px; --sum-h: 34px; position: sticky; top: -8px; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 8px; min-height: var(--btn-h); margin: -8px -12px 8px; padding: 8px 12px; background: var(--guide-bg); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); box-sizing: content-box; }
+.reg-top { --row: 14px; --sum-h: 34px; position: sticky; top: -8px; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 8px; min-height: var(--btn-h); margin: -8px -12px 8px; padding: 8px 12px; background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); box-sizing: content-box; }
 .reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
 .reg-top .total { font-size: 28px; }
 .reg-top .info { height: var(--row); line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 0 14px; font-size: 12px; white-space: nowrap; }
@@ -678,12 +678,10 @@ body.dragging .drop-hint { display: inline; }
 .staff-head { gap: 8px; }
 
 
-.screen { --glow: color-mix(in oklch, var(--cust-bg) 65%, oklch(1 0 0)); --dark: color-mix(in oklch, var(--cust-bg) 78%, var(--ink));
-  --guide-bg: radial-gradient(circle farthest-corner at 50% 50%, var(--glow) 0%, var(--glow) 8%, var(--dark) 100%) var(--dark);
+.screen { --tier-deep: var(--off-bg);
   /* レジ画面ヘッダーの背景は普段は無色。呼び出し中だけ中心（呼び鈴のまわり）が濃く色づいて点滅する */
   --head-bg: transparent; }
-.screen.operable { --sky: oklch(0.80 0.09 230); --glow: color-mix(in oklab, var(--cust-bg) 88%, var(--sky)); --dark: color-mix(in oklab, var(--cust-bg) 55%, var(--sky)); }
-.scan-welcome, .staff-operated-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; background: var(--guide-bg); }
+.scan-welcome, .staff-operated-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; }
 .hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: 12px; font-weight: 500; line-height: 1.5; pointer-events: none; }
 .hover-tip[hidden] { display: none; }
 
@@ -743,7 +741,7 @@ body.dragging .drop-hint { display: inline; }
 /* 待ち受けの帯：会計ボタンを含む帯と同じ縦幅（大ボタン48px＋上下8px＝64px）。背景なし。
    左＝言語切り替え、中央＝呼び鈴（大きめ）、右＝電子マネー。ボタンはどちらも消極 */
 .screen-main:has(> .welcome-band) { display: flex; flex-direction: column; }
-.screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; background: none; }
+.screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; }
 .welcome-band ~ :is(.scan-welcome, .staff-operated-welcome) { flex: 1 0 auto; min-height: 0; margin-top: 0; }
 /* 両ボタンは呼び鈴に寄せ、間の余白は顧客操作モードの FF とサービスの間と同じにする。
    その行（.call-row）は帯より幅が 8px 狭く、大ボタン3つを gap 8px で space-evenly に並べるので、
@@ -763,10 +761,14 @@ body.dragging .drop-hint { display: inline; }
 .screen:has(.welcome-band .bell-btn) .screen-head .bell-btn { display: none; }
 
 /* 稼働モードの背景色：スタッフ操作モード＝ピンク、セルフ操作モード＝ミント（グレー・青・黄と P/D/T 型でも区別できる淡い色）。
-   呼び出し中のスタッフ側画面は、エマージェンシーと同じやわらかい黄色 */
-:root { --mode-staff-bg: oklch(0.93 0.05 330); --mode-self-bg: oklch(0.93 0.06 150); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --mode-staff-bg: oklch(0.32 0.05 330); --mode-self-bg: oklch(0.32 0.05 150); } }
-:root[data-theme="dark"] { --mode-staff-bg: oklch(0.32 0.05 330); --mode-self-bg: oklch(0.32 0.05 150); }
-:root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); }
-:root .screen.mode-self { --cust-bg: var(--mode-self-bg); }
-:root .staff-screen.calling { --cust-bg: var(--alert-bg); }
+   グラデーションは使わず段ごとに塗り分ける：一段目（ヘッダー）と三段目は薄く、二段目（帯）と四段目（FF・サイネージ）は濃いめ。
+   呼び出し中のスタッフ側画面は、エマージェンシーと同じやわらかい黄色を同じ塗り分けで */
+:root { --mode-staff-bg: oklch(0.95 0.035 330); --mode-staff-deep: oklch(0.89 0.07 330);
+  --mode-self-bg: oklch(0.95 0.04 150); --mode-self-deep: oklch(0.89 0.08 150); --alert-deep: oklch(0.91 0.11 98); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --mode-staff-bg: oklch(0.30 0.04 330); --mode-staff-deep: oklch(0.38 0.06 330);
+  --mode-self-bg: oklch(0.30 0.04 150); --mode-self-deep: oklch(0.38 0.06 150); --alert-deep: oklch(0.42 0.08 95); } }
+:root[data-theme="dark"] { --mode-staff-bg: oklch(0.30 0.04 330); --mode-staff-deep: oklch(0.38 0.06 330);
+  --mode-self-bg: oklch(0.30 0.04 150); --mode-self-deep: oklch(0.38 0.06 150); --alert-deep: oklch(0.42 0.08 95); }
+:root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
+:root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
+:root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }

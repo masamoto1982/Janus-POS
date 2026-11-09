@@ -3,14 +3,8 @@
   --btn-sm-w: 56px; --btn-sm-h: 26px;
   --btn-md-w: 64px; --btn-md-h: 34px;
   --gap: 6px;
-  --caution-bg: color-mix(in oklch, var(--ac-yellow) 22%, white);
-  --caution-ink: color-mix(in oklch, var(--ac-orange) 55%, black);
-  --caution-line: var(--ac-orange);
-  --safe-bg: color-mix(in oklch, var(--base-lime) 45%, white);
-  --safe-ink: color-mix(in oklch, var(--ac-green) 70%, black);
-  --safe-line: var(--ac-green);
-  /* 登録画面のフラグ（年確・限定・現金のみ＝オレンジ、お渡し済＝緑）：やや濃いめの背景・白文字（白とのコントラスト4.5以上） */
-  --flag-orange-bg: oklch(0.56 0.13 59); --flag-green-bg: oklch(0.54 0.12 154); --flag-ink: oklch(1 0 0);
+  /* フラグ：背景なし・枠線と文字は同じ色で、白地で読める（コントラスト4.5）ぎりぎりの濃さ。注意＝オレンジ、済み＝緑、その他＝グレー */
+  --flag-caution: oklch(0.575 0.13 59); --flag-safe: oklch(0.55 0.12 154); --flag-plain: oklch(0.565 0 0);
   --base-pink: oklch(0.883 0.063 32);
   --base-cream: oklch(0.975 0.149 109);
   --base-lime: oklch(0.914 0.180 118);
@@ -219,7 +213,6 @@ button { touch-action: manipulation; }
 }
 .reg-top .count .full { margin-left: 8px; padding: 1px 6px; border-radius: 4px; background: var(--reg-top-ink); color: var(--reg-top-bg); font-weight: 700; }
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
-.screen-main .lines .tag { font-size: 10px; }
 .screen-main .lines button { font-size: 11px; padding: 1px 8px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
 .total { font-size: 20px; }
@@ -278,9 +271,13 @@ input::placeholder { color: var(--line); opacity: 1; }
 button.pad-field .placeholder { color: var(--line); font-weight: 400; }
 button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); color: var(--ink); white-space: nowrap; }
-.tag.warn { background: var(--caution-bg); color: var(--caution-ink); border: 1px solid var(--caution-line); border-radius: 0; }
-.tag.ok { background: var(--safe-bg); color: var(--safe-ink); border: 1px solid var(--safe-line); border-radius: 0; }
+.tag, .ff-done {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
+  font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: transparent; border: 1.5px solid var(--flag-plain); border-radius: 0; color: var(--flag-plain);
+}
+.tag.warn, .tag.age { border-color: var(--flag-caution); color: var(--flag-caution); }
+.tag.ok, .ff-done { border-color: var(--flag-safe); color: var(--flag-safe); }
 .screen button.tag, .screen button.tag:disabled { filter: none !important; }
 .warn { color: var(--warn); }
 .ok { color: var(--ok); }
@@ -332,11 +329,8 @@ details summary h3 { display: inline; }
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
-.tag.age { background: var(--flag-orange-bg); border: none; border-radius: 0; color: var(--flag-ink); font-weight: 700; }
-.ff-done { background: var(--flag-green-bg); border: none; border-radius: 0; color: var(--flag-ink); font-weight: 700; }
-.screen-main .lines .tag.age, .tag.age, .ff-done, .ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; line-height: 1; white-space: nowrap; }
 /* FFお渡し前＝標準の積極ボタン（青背景・白文字・枠線なし・弱い角丸）、サイズは小 */
-.ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; border: none; background: var(--btn-on); color: var(--btn-on-ink); }
+.ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; line-height: 1; white-space: nowrap; border: none; background: var(--btn-on); color: var(--btn-on-ink); }
 button.ff-btn.ff-verify { cursor: pointer; }
 button.ff-btn.ff-verify:disabled { cursor: not-allowed; opacity: .35; }
 span.ff-btn { cursor: default; }

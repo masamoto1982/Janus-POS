@@ -410,6 +410,10 @@ pub enum Command {
         bell: usize,
         on: bool,
     },
+    /// Bell の設定から、セルフ操作モードのレジでエマージェンシーモードを試す
+    SetEmergencyDemo {
+        on: bool,
+    },
 }
 
 impl Command {
@@ -948,6 +952,8 @@ struct Register {
     touch: Option<(Side, u64)>,
     pressing: bool,
     emoney: Option<EmoneyTask>,
+    /// 呼び鈴が鳴らされた時刻（エマージェンシーモードの判定用、直近 EMERGENCY_WINDOW_MS 分だけ持つ）
+    press_log: Vec<u64>,
 }
 
 impl Register {
@@ -1067,6 +1073,7 @@ pub struct Store {
     presses: u64,
     receipts: u32,
     emoney_balance: u32,
+    emergency_demo: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1140,6 +1147,11 @@ pub const THANKS_MS: u64 = 3000;
 pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
+/// エマージェンシーモード：セルフ操作モードで呼び鈴が届いているのに、
+/// 呼び出しが EMERGENCY_WINDOW_MS 以上応答されない、または EMERGENCY_WINDOW_MS 以内に EMERGENCY_PRESSES 回以上鳴らされた
+pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
+pub const EMERGENCY_PRESSES: usize = 10;
+
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
 pub const STAFF_OP_CHANGE_REMIND_MS: u64 = 30 * 1000;
@@ -1174,6 +1186,7 @@ impl Store {
                 touch: None,
                 pressing: false,
                 emoney: None,
+                press_log: vec![],
             })
             .collect();
         Store {
@@ -1193,6 +1206,7 @@ impl Store {
             presses: 0,
             receipts: 0,
             emoney_balance: EMONEY_INITIAL,
+            emergency_demo: false,
         }
     }
 
@@ -2338,6 +2352,10 @@ impl Store {
                     if on { "ON" } else { "OFF" }
                 ))
             }
+            C::SetEmergencyDemo { on } => {
+                self.emergency_demo = on;
+                done(if on { "エマージェンシーモードを試しています" } else { "エマージェンシーモードの試しを終えました" })
+            }
             C::SetBellOffline { bell, offline } => {
                 let m = self.bells.get_mut(bell).ok_or("Bell が見つかりません")?;
                 m.offline = offline;
@@ -2393,7 +2411,13 @@ impl Store {
     }
 
     fn press(&mut self, register: u8) -> Result<(), String> {
-        self.reg_mut(register)?.pressing = true;
+        let now = self.now;
+        let r = self.reg_mut(register)?;
+        r.pressing = true;
+        if r.staff.is_none() {
+            r.press_log.retain(|&t| now.saturating_sub(t) < EMERGENCY_WINDOW_MS);
+            r.press_log.push(now);
+        }
         self.presses += 1;
         Ok(())
     }
@@ -2492,6 +2516,7 @@ impl Store {
             let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.customer_turn;
             r.staff = Some(StaffSession { account: acc });
+            r.press_log.clear();
             r.touch = None;
             r.txn.customer_turn = false;
             r.pressing = false;
@@ -3383,6 +3408,7 @@ impl Store {
             },
             categories: Category::ALL.iter().map(|c| (*c, c.label())).collect(),
             emoney_balance: self.emoney_balance,
+            emergency_demo: self.emergency_demo,
         }
     }
 
@@ -3495,8 +3521,26 @@ impl Store {
             })
             .collect();
 
+        let bell_dead = !self.bells.iter().any(|m| m.bell_on && m.link_ok(self.now));
+        let unanswered = calls
+            .iter()
+            .map(|c| c.created_at)
+            .min()
+            .is_some_and(|t0| self.now.saturating_sub(t0) >= EMERGENCY_WINDOW_MS);
+        let rung = r
+            .press_log
+            .iter()
+            .filter(|&&t| self.now.saturating_sub(t) < EMERGENCY_WINDOW_MS)
+            .count()
+            >= EMERGENCY_PRESSES;
+        let emergency = r.mode == Mode::SelfOperated
+            && r.staff.is_none()
+            && (self.emergency_demo || (!bell_dead && (unanswered || rung)));
+
         RegisterView {
             id: r.id,
+            bell_dead,
+            emergency,
             active_side: active_side(&c),
             max_items: MAX_ITEMS,
             lamp: waiting.is_some(),
@@ -3727,6 +3771,10 @@ pub struct CustomerView {
 #[derive(Clone, Debug, Serialize)]
 pub struct RegisterView {
     pub id: u8,
+    /// ON の Bell がどれも通じず、呼び出しが誰にも届かない
+    pub bell_dead: bool,
+    /// エマージェンシーモード（セルフ操作モードで呼び鈴に応答がない）
+    pub emergency: bool,
     pub active_side: Option<Side>,
     pub max_items: u32,
     pub lamp: bool,
@@ -3921,4 +3969,5 @@ pub struct Snapshot {
     pub tax: TaxView,
     pub categories: Vec<(Category, &'static str)>,
     pub emoney_balance: u32,
+    pub emergency_demo: bool,
 }

@@ -306,6 +306,10 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 .screen .confirm.change-alert { margin: -8px -12px; background: var(--alert-bg); }
 .screen .change-alert .big { color: var(--alert-ink); }
 .screen .change-alert p.small { color: var(--alert-note); }
+/* エマージェンシーモード：通報先の番号は数字の強調（赤・大きく） */
+.screen .sos-tel { display: flex; gap: 24px; justify-content: center; margin: 0; color: var(--alert-ink); font-size: var(--msg-big); font-weight: 700; }
+.screen .sos-tel b { font-size: 32px; font-variant-numeric: tabular-nums; }
+.bell-sub { margin: 16px 0 4px; font-size: 14px; }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
 .staff-head .tax-note { margin-left: auto; }

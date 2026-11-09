@@ -168,6 +168,8 @@ export interface RegisterView {
   idle_revert_in: number | null;
   idle_voids: boolean;
   change_left: boolean;
+  bell_dead: boolean;
+  emergency: boolean;
   outlet: number;
   outlet_detail: [number, number][];
   menu: { screen: MenuScreen; exchange_to: number } | null;
@@ -231,6 +233,7 @@ export interface Snapshot {
   tax: TaxView;
   categories: [string, string][];
   emoney_balance: number;
+  emergency_demo: boolean;
 }
 
 export type Command = { type: string; [k: string]: unknown };

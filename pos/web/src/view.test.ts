@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, callNotice, callScreen, esc, itemCount, regTop, sideOf } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, callScreen, esc, itemCount, regTop, sideOf } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -84,31 +84,15 @@ describe("view helpers", () => {
     const staff = callScreen(r, 6000);
     expect(staff).toContain("FF＆煙草");
     expect(staff).toContain("5秒経過");
-    expect(callNotice(r, 6000, "staff")).toBe("");
-    const customer = callNotice(r, 6000, "customer");
-    expect(customer).toBe("");
   });
 
-  it("never shows change left as a band over the register screen", () => {
+  it("puts no bell-down band on the call screen", () => {
     const r = {
-      mode: "staff_operated",
-      change_left: true,
-      last_receipt: { at: 0 },
-      staff: { calls: [], bell_down: [], lines: [] },
-      customer: { staff_called: false, lines: [] },
+      staff: { calls: [{ id: 1, register: 1, kind: "customer_help", label: "呼び出し", created_at: 1000, detail: "" }], bell_down: ["据え付け端末"] },
+      customer: {},
     } as unknown as RegisterView;
-    expect(callNotice(r, 6000, "staff")).toBe("");
-    expect(callNotice(r, 6000, "customer")).toBe("");
-  });
-
-  it("tells the customer that staff are on the way in staff-operated mode", () => {
-    const r = {
-      mode: "staff_operated",
-      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "" }], bell_down: [] },
-      customer: { staff_called: true },
-    } as unknown as RegisterView;
-    expect(callNotice(r, 6000, "customer")).toContain("スタッフが向かっています");
-    expect(callNotice(r, 6000, "staff")).toBe("");
+    expect(callScreen(r, 6000)).not.toContain("不通");
+    expect(callScreen(r, 6000)).not.toContain("banner");
   });
 
   it("shows no elapsed time for an age-check call", () => {
@@ -116,7 +100,6 @@ describe("view helpers", () => {
       staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "20歳以上" }], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
-    expect(callNotice(r, 6000, "staff")).not.toContain("経過");
     expect(callScreen(r, 6000)).toContain("年確");
     expect(callScreen(r, 6000)).not.toContain("経過");
   });

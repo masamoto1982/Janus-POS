@@ -458,6 +458,12 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .screen-head.sos { --head-call-bg: var(--sos-head); animation: head-call 1s steps(1) infinite; }
 .screen-head.sos :is(.mode-title, .clock) { animation: sos-ink 1s steps(1) infinite; }
 @keyframes sos-ink { 0% { color: var(--sos-head-ink); } }
+/* 店舗メニューはスタッフ側ヘッダーの右スワイプで開く（ボタンではない）。開けるときは左1/3に操作可能を示す青のグラデーションを
+   あしらい、隠れたメニューの存在をにおわせる。スワイプで開く部品はこの手法で表す */
+:root { --swipe-hint: oklch(0.7507 0.136 245); }
+.screen-head { position: relative; isolation: isolate; }
+.screen-head.swipe-hint::before { content: ""; position: absolute; inset: 0 auto 0 0; width: calc(100% / 3); z-index: -1; pointer-events: none;
+  background: linear-gradient(to right, var(--swipe-hint), color-mix(in oklch, var(--swipe-hint) 0%, transparent)); }
 @keyframes head-call { 0% { background: var(--head-call-bg); } 50% { background: var(--head-bg); } }
 @media (prefers-reduced-motion: reduce) { .screen-head:is(.calling, .sos) { animation: none; background: var(--head-call-bg); }
   .screen-head.sos :is(.mode-title, .clock) { animation: none; color: var(--sos-head-ink); } }

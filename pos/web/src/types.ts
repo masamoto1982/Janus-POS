@@ -233,7 +233,6 @@ export interface Snapshot {
   tax: TaxView;
   categories: [string, string][];
   emoney_balance: number;
-  emergency_demo: boolean;
 }
 
 export type Command = { type: string; [k: string]: unknown };

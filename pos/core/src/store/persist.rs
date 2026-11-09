@@ -46,8 +46,6 @@ struct Saved {
     audit: Vec<SavedAudit>,
     receipts: u32,
     emoney_balance: u32,
-    #[serde(default)]
-    emergency_demo: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -138,6 +136,8 @@ struct SavedRegister {
     emoney: Option<EmoneyTask>,
     #[serde(default)]
     press_log: Vec<u64>,
+    #[serde(default)]
+    emergency: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -403,6 +403,7 @@ impl SavedRegister {
             touch: r.touch,
             emoney: r.emoney.clone(),
             press_log: r.press_log.clone(),
+            emergency: r.emergency,
         }
     }
 
@@ -442,6 +443,8 @@ impl SavedRegister {
             pressing: false,
             emoney: self.emoney,
             press_log: self.press_log,
+            press_since: None,
+            emergency: self.emergency,
         };
         r.sync_mode();
         Ok(r)
@@ -535,7 +538,6 @@ impl Store {
                 .collect(),
             receipts: self.receipts,
             emoney_balance: self.emoney_balance,
-            emergency_demo: self.emergency_demo,
         };
         serde_json::to_string(&saved).expect("saved state is always serializable")
     }
@@ -653,7 +655,6 @@ impl Store {
             presses: s.presses,
             receipts: s.receipts,
             emoney_balance: s.emoney_balance,
-            emergency_demo: s.emergency_demo,
         })
     }
 }

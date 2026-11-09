@@ -3284,10 +3284,10 @@ fn emergency_after_ten_rings_within_three_minutes() {
 }
 
 #[test]
-fn emergency_when_a_call_goes_unanswered_for_three_minutes() {
+fn emergency_when_the_bell_is_held_for_three_minutes() {
     let mut s = Store::new(1, 1, 1);
     advance(&mut s, 2_000);
-    ring(&mut s, 1);
+    ok(&mut s, json!({"type":"call_staff","register":1}));
     advance(&mut s, 170_000);
     assert!(!reg(&s, 1).emergency);
     advance(&mut s, 10_000);
@@ -3295,7 +3295,16 @@ fn emergency_when_a_call_goes_unanswered_for_three_minutes() {
 }
 
 #[test]
-fn no_emergency_while_the_bell_cannot_reach_anyone() {
+fn a_short_ring_left_unanswered_is_not_an_emergency() {
+    let mut s = Store::new(1, 1, 1);
+    advance(&mut s, 2_000);
+    ring(&mut s, 1);
+    advance(&mut s, 200_000);
+    assert!(!reg(&s, 1).emergency);
+}
+
+#[test]
+fn emergency_also_while_the_bell_cannot_reach_anyone() {
     let mut s = Store::new(1, 1, 1);
     ok(&mut s, json!({"type":"set_bell_offline","bell":0,"offline":true}));
     advance(&mut s, 20_000);
@@ -3303,16 +3312,30 @@ fn no_emergency_while_the_bell_cannot_reach_anyone() {
     for _ in 0..10 {
         ring(&mut s, 1);
     }
+    assert!(reg(&s, 1).emergency);
+}
+
+#[test]
+fn no_emergency_in_staff_operated_mode() {
+    let mut s = Store::new(1, 1, 1);
+    login(&mut s, 1);
+    for _ in 0..10 {
+        ok(&mut s, json!({"type":"call_staff","register":1,"topic":"sos"}));
+        advance(&mut s, 200);
+        ok(&mut s, json!({"type":"release_call","register":1}));
+    }
     assert!(!reg(&s, 1).emergency);
 }
 
 #[test]
-fn emergency_demo_only_in_self_operated_mode() {
-    let mut s = Store::new(1, 2, 1);
-    ok(&mut s, json!({"type":"set_emergency_demo","on":true}));
-    login(&mut s, 2);
+fn emergency_lasts_until_staff_log_in() {
+    let mut s = Store::new(1, 1, 1);
+    for _ in 0..10 {
+        ring(&mut s, 1);
+    }
     assert!(reg(&s, 1).emergency);
-    assert!(!reg(&s, 2).emergency);
-    ok(&mut s, json!({"type":"set_emergency_demo","on":false}));
+    advance(&mut s, 300_000);
+    assert!(reg(&s, 1).emergency);
+    login(&mut s, 1);
     assert!(!reg(&s, 1).emergency);
 }

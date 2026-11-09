@@ -291,11 +291,8 @@ function ffCollectCard(reg: number, v: StaffView): string {
 
 function ffReturnCard(v: StaffView): string {
   if (!v.ff_collect.length) return "";
-  const items = v.ff_collect.map((c) => `<li><b>${esc(c.name)}</b> × ${c.qty}</li>`).join("");
-  return `<div class="ffv-screen ff-return">
-      <div class="big">取り消した FF をお返しください</div>
-      <ul class="ff-return-list">${items}</ul>
-    </div>`;
+  const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}の数量を変更しました</div>`).join("");
+  return `<div class="point-screen pair-note"><div class="msg">${lines}</div></div>`;
 }
 
 

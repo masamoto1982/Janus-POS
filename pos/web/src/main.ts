@@ -367,6 +367,10 @@ function inTransaction(r: RegisterView): boolean {
 /** レジ前に人がいるか（第一待ち受けの解除）。現物はレジ画面のカメラで人を認識する。
  *  シミュレーターでは、マウスならカーソルがレジ画面に重なっている間、タッチなら最後に触れてから PRESENCE_TOUCH_MS の間 */
 const PRESENCE_TOUCH_MS = 30_000;
+/** 第一待ち受けへ戻るまでの猶予。取引が始まってから完了するまでは決して戻らず、
+ *  人がいなくなった（取引が完了した）あとも、この時間だれも来なければ戻る（棚へ商品を取りに行く・連れを待つ間に切り替わらないように） */
+const FIRST_WAIT_AFTER_MS = 30_000;
+const lastBusy = new Map<number, number>();
 const hovering = new Set<number>();
 const touchedAt = new Map<number, number>();
 const present = (reg: number): boolean => hovering.has(reg) || Date.now() - (touchedAt.get(reg) ?? -Infinity) < PRESENCE_TOUCH_MS;
@@ -418,10 +422,12 @@ function render(): void {
         head.removeAttribute("title");
       }
     }
-    // 第一待ち受け：待ち受け中で、レジ前に人がいない（カーソルが重なっていない）とき
+    // 第一待ち受け：取引のない待ち受けで、レジ前に人がいない（カーソルが重なっていない）状態が FIRST_WAIT_AFTER_MS 続いたとき
     let staffMain = sharedScreen(r, snap, "staff");
     let custMain = sharedScreen(r, snap, "customer");
-    const first = isWelcome(staffMain) && isWelcome(custMain) && !present(r.id);
+    const vacant = isWelcome(staffMain) && isWelcome(custMain) && !busy && !r.staff.point_card && !r.customer.point_card;
+    if (!vacant || present(r.id)) lastBusy.set(r.id, Date.now());
+    const first = vacant && Date.now() - (lastBusy.get(r.id) ?? 0) >= FIRST_WAIT_AFTER_MS;
     if (first) {
       staffMain = firstWelcome(r, "staff");
       custMain = firstWelcome(r, "customer");

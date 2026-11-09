@@ -149,7 +149,6 @@ const DICT: Record<string, string> = {
   お渡しの確認: "Confirm hand-over",
   お渡し数: "Handed",
   お受け取り数: "Received",
-  "取り消した FF をお返しください": "Please return the cancelled FF items",
 
   // 取引中止
   "取引を中止しますか？": "Cancel this transaction?",
@@ -529,6 +528,7 @@ const RULES: Rule[] = [
   [/^お届け先の郵便番号を入力してください$/, () => "Enter the destination postal code"],
   [/^受付済み (\d+)個$/, (m) => `${plural(m[1], "parcel")} accepted`],
   [/^(.+)を(\d+)点回収してください$/, (m) => `Take back ${m[2]} × ${t(m[1])}`],
+  [/^(.+)の数量を変更しました$/, (m) => `The quantity of ${t(m[1])} has been changed`],
   [/^(.+)を回収$/, (m) => `Take back ${t(m[1])}`],
   [/^(\d+)枚$/, (m) => plural(m[1], "slip")],
   [/^(.+) (.+)を確認した$/, (m) => `Checked ${t(m[1])} ${yenify(m[2])}`],

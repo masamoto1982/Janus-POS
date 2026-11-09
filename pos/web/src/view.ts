@@ -960,10 +960,13 @@ function bellBtn(r: RegisterView, side: Side): string {
   const dead = r.bell_dead && (sos || r.mode === "staff_operated");
   const ok = call.allowed && !dead;
   const title = dead ? "呼び出し端末が動作していません" : call.allowed ? tip : (call.reason ?? "");
+  // 呼び出し中のお客様側の呼び鈴は、押しても新たな呼び出しにはならないのでグレーで描く。
+  // ただし押せるままにする（鳴らし続け・繰り返しでエマージェンシーモードに入るため）
+  const calling = !sos && r.lamp;
   const bell =
     !sos && r.mode === "staff_operated"
       ? ""
-      : `<button type="button" class="bell-btn" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(title)}"${ok ? "" : " disabled"}>${BELL_SVG}</button>`;
+      : `<button type="button" class="bell-btn${calling ? " calling" : ""}" data-hold="${esc(JSON.stringify(cmd))}" aria-label="${tip}" title="${esc(title)}"${ok ? "" : " disabled"}>${BELL_SVG}</button>`;
   return bell;
 }
 

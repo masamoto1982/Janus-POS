@@ -634,6 +634,11 @@ body.dragging .drop-hint { display: inline; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-staff, .money-io-cust { grid-column: 1; } }
 
+/* スタッフ操作モードのお客様側の最下段＝サイネージ（セール情報・詐欺防止の呼びかけ）。押せる部品は置かない */
+.signage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+/* 第一待ち受け：三段目いっぱいに稼働モードを特大の文字で（有人レジ／セルフレジ） */
+.first-welcome { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 16px; text-align: center; }
+.first-welcome .mode-big { color: var(--msg-strong); font-size: min(16cqi, 96px); font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: var(--gap); }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(1px, 2px); }

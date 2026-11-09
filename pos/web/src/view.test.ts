@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, callScreen, esc, itemCount, regTop, sideOf } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, callScreen, esc, itemCount, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -107,5 +107,12 @@ describe("view helpers", () => {
   it("marks the item count when the limit is reached", () => {
     expect(regTop(100, 9, "", 10)).not.toContain("上限");
     expect(regTop(100, 10, "", 10)).toContain("上限");
+  });
+
+  it("rotates the signage on the attended customer screen's bottom tier", () => {
+    expect(signage(0)).toContain(SIGNAGE[0][0]);
+    expect(signage(SIGNAGE_MS)).toContain(SIGNAGE[1][0]);
+    expect(signage(SIGNAGE_MS * SIGNAGE.length)).toContain(SIGNAGE[0][0]);
+    expect(signage(0)).not.toContain("<button");
   });
 });

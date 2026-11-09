@@ -13,6 +13,8 @@ import {
   flashing,
   type FfUi,
   itemsPanel,
+  firstWelcome,
+  isWelcome,
   qtyPopup,
   padEntry,
   padPopup,
@@ -362,6 +364,31 @@ function inTransaction(r: RegisterView): boolean {
   );
 }
 
+/** レジ前に人がいるか（第一待ち受けの解除）。現物はレジ画面のカメラで人を認識する。
+ *  シミュレーターでは、マウスならカーソルがレジ画面に重なっている間、タッチなら最後に触れてから PRESENCE_TOUCH_MS の間 */
+const PRESENCE_TOUCH_MS = 30_000;
+const hovering = new Set<number>();
+const touchedAt = new Map<number, number>();
+const present = (reg: number): boolean => hovering.has(reg) || Date.now() - (touchedAt.get(reg) ?? -Infinity) < PRESENCE_TOUCH_MS;
+const regOf = (t: EventTarget | null): number | null => {
+  const el = t instanceof Element ? t.closest<HTMLElement>("[data-swipe]") : null;
+  return el ? Number(el.dataset.swipe) : null;
+};
+document.addEventListener("pointerover", (e) => {
+  const reg = regOf(e.target);
+  hovering.clear();
+  if (reg !== null && e.pointerType === "mouse") hovering.add(reg);
+});
+document.addEventListener("pointerdown", (e) => {
+  const reg = regOf(e.target);
+  if (reg !== null && e.pointerType !== "mouse") touchedAt.set(reg, Date.now());
+}, true);
+document.addEventListener("dragenter", (e) => {
+  const reg = regOf(e.target);
+  if (reg !== null) touchedAt.set(reg, Date.now());
+});
+document.documentElement.addEventListener("pointerleave", () => hovering.clear());
+
 function render(): void {
   trackFlashes();
   for (const reg of movedRegs) {
@@ -390,10 +417,19 @@ function render(): void {
         head.removeAttribute("title");
       }
     }
+    // 第一待ち受け：待ち受け中で、レジ前に人がいない（カーソルが重なっていない）とき
+    let staffMain = sharedScreen(r, snap, "staff");
+    let custMain = sharedScreen(r, snap, "customer");
+    const first = isWelcome(staffMain) && isWelcome(custMain) && !present(r.id);
+    if (first) {
+      staffMain = firstWelcome(r, "staff");
+      custMain = firstWelcome(r, "customer");
+    }
+    app.querySelector(`[data-swipe="${r.id}"]`)?.classList.toggle("first-wait", first);
     for (const side of ["staff", "customer"] as const) {
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.staff.phase !== "registering" || !r.staff.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
-      const items = itemsPanel(r, snap, ffUi(r.id), side);
+      const items = itemsPanel(r, snap, ffUi(r.id), side, Date.now(), first);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
@@ -430,8 +466,6 @@ function render(): void {
           : ""
       }`,
     );
-    const staffMain = sharedScreen(r, snap, "staff");
-    const custMain = sharedScreen(r, snap, "customer");
     setRegion(`staff-${r.id}`, staffMain, langOf(r.id, "staff"));
     setRegion(`cust-${r.id}`, custMain, langOf(r.id, "customer"));
     setRegion(

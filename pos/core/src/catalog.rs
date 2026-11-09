@@ -177,9 +177,13 @@ pub const CATALOG: &[Product] = &[
     p("FF62", "あんまん", 160, Reduced8, FastFood),
     p("FF63", "カレーまん", 190, Reduced8, FastFood),
     p("FF71", "大根", 100, Reduced8, FastFood),
+    p("FF72", "白滝", 90, Reduced8, FastFood),
     p("FF73", "厚揚げ", 120, Reduced8, FastFood),
     p("FF74", "煮卵", 100, Reduced8, FastFood),
-    p("FF75", "牛筋", 150, Reduced8, FastFood),
+    p("FF76", "ちくわ", 100, Reduced8, FastFood),
+    p("FF77", "ごぼう巻き", 120, Reduced8, FastFood),
+    p("FF78", "ウィンナー", 130, Reduced8, FastFood),
+    p("FF79", "結び昆布", 90, Reduced8, FastFood),
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -230,9 +234,13 @@ pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF62", FfTab::Bun),
     ("FF63", FfTab::Bun),
     ("FF71", FfTab::Oden),
-    ("FF73", FfTab::Oden),
     ("FF74", FfTab::Oden),
-    ("FF75", FfTab::Oden),
+    ("FF73", FfTab::Oden),
+    ("FF72", FfTab::Oden),
+    ("FF76", FfTab::Oden),
+    ("FF77", FfTab::Oden),
+    ("FF78", FfTab::Oden),
+    ("FF79", FfTab::Oden),
 ];
 
 pub fn find(code: &str) -> Option<&'static Product> {
@@ -244,24 +252,35 @@ pub const FF_MADE_TO_ORDER: &[&str] = &[
     "FF31", "FF32", "FF33", "FF34", "FF35", "FF36", "FF37", "FF39", "FF51", "FF52", "FF53", "FF54",
 ];
 
-/// 作り置きのある FF の初期在庫（二桁＝豊富、一桁＝希薄、0＝無し）
+/// 作り置きのある FF の初期在庫（二桁＝豊富、一桁＝希薄、0＝無し）。
+/// 売れ筋は浅い階層に置くのが実務の常なので、1ページ目を豊富・2ページ目を希薄にしている
+/// （Janus-POS の仕組みが決めることではない。並べ替えはストアコンピューターで行う）
 pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
+    // フライヤー 1ページ目：豊富
     ("FF01", 12),
-    ("FF02", 2),
+    ("FF02", 10),
     ("FF03", 15),
-    ("FF04", 0),
-    ("FF21", 10),
-    ("FF22", 6),
-    ("FF23", 4),
-    ("FF24", 11),
-    ("FF05", 10),
-    ("FF61", 3),
-    ("FF62", 12),
+    ("FF04", 11),
+    // フライヤー 2ページ目：希薄・無し
+    ("FF21", 6),
+    ("FF22", 4),
+    ("FF23", 0),
+    ("FF24", 0),
+    // 中華まん
+    ("FF05", 12),
+    ("FF61", 10),
+    ("FF62", 3),
     ("FF63", 0),
+    // おでん 1ページ目：豊富
     ("FF71", 20),
-    ("FF73", 14),
-    ("FF74", 5),
-    ("FF75", 8),
+    ("FF74", 14),
+    ("FF73", 12),
+    ("FF72", 10),
+    // おでん 2ページ目：希薄・無し
+    ("FF76", 5),
+    ("FF77", 3),
+    ("FF78", 4),
+    ("FF79", 0),
 ];
 
 pub fn is_made_to_order(code: &str) -> bool {
@@ -356,7 +375,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ff_tabs_fit_one_page_except_fryer_and_drinks() {
+    fn ff_tabs_fit_one_page_except_fryer_drinks_and_oden() {
         for tab in [
             FfTab::Fried,
             FfTab::Drink,
@@ -367,7 +386,7 @@ mod tests {
             let n = FF_MENU.iter().filter(|(_, t)| *t == tab).count();
             assert_eq!(
                 n,
-                if matches!(tab, FfTab::Drink | FfTab::Fried) {
+                if matches!(tab, FfTab::Drink | FfTab::Fried | FfTab::Oden) {
                     8
                 } else {
                     4

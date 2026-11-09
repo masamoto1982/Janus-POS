@@ -5,6 +5,8 @@
   --gap: 6px;
   /* フラグ：背景なし・枠線と文字は同じ色で、白地で読める（コントラスト4.5）ぎりぎりの濃さ。注意＝オレンジ、済み＝緑、その他＝グレー */
   --flag-caution: oklch(0.575 0.13 59); --flag-safe: oklch(0.55 0.12 154); --flag-plain: oklch(0.565 0 0);
+  /* 阻害因子のある明細の行（白文字とのコントラスト3以上） */
+  --flag-row: oklch(0.68 0.14 50);
   --base-pink: oklch(0.883 0.063 32);
   --base-cream: oklch(0.975 0.149 109);
   --base-lime: oklch(0.914 0.180 118);
@@ -271,13 +273,13 @@ input::placeholder { color: var(--line); opacity: 1; }
 button.pad-field .placeholder { color: var(--line); font-weight: 400; }
 button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-.tag, .ff-done {
+.tag {
   box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
   font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
   background: transparent; border: 1.5px solid var(--flag-plain); border-radius: 0; color: var(--flag-plain);
 }
 .tag.warn, .tag.age { border-color: var(--flag-caution); color: var(--flag-caution); }
-.tag.ok, .ff-done { border-color: var(--flag-safe); color: var(--flag-safe); }
+.tag.ok { border-color: var(--flag-safe); color: var(--flag-safe); }
 .screen button.tag, .screen button.tag:disabled { filter: none !important; }
 .warn { color: var(--warn); }
 .ok { color: var(--ok); }
@@ -330,10 +332,16 @@ details summary h3 { display: inline; }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
 /* FFお渡し前＝標準の積極ボタン（青背景・白文字・枠線なし・弱い角丸）、サイズは小 */
-.ff-btn { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px; font: inherit; font-size: 11px; font-weight: 600; line-height: 1; white-space: nowrap; border: none; background: var(--btn-on); color: var(--btn-on-ink); }
-button.ff-btn.ff-verify { cursor: pointer; }
-button.ff-btn.ff-verify:disabled { cursor: not-allowed; opacity: .35; }
-span.ff-btn { cursor: default; }
+/* フラグ＝取引の阻害因子。行を警告色に染め、フラグは白文字・白枠・角丸なし。確認や入力を終えると行の色ごと外れる */
+.lines tr.flagged > td { background: var(--flag-row); }
+.flag {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
+  font: inherit; font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap;
+  background: transparent; color: oklch(1 0 0); border: 1.5px solid oklch(1 0 0); border-radius: 0;
+}
+button.flag { cursor: pointer; }
+button.flag:disabled { cursor: not-allowed; opacity: .5; }
+.screen button.flag, .screen button.flag:disabled { filter: none !important; }
 .ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; text-align: center; }
 .ffv-screen .lines.ffv { margin-bottom: auto; }
 .ffv-screen .lines.ffv td, .ffv-screen .lines.ffv th { padding-top: 1px; padding-bottom: 1px; }

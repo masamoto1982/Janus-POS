@@ -997,9 +997,23 @@ export function signage(now = Date.now()): string {
   return `<div class="signage" aria-label="お知らせ">${msg(esc(big), esc(small))}</div>`;
 }
 
-export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now()): string {
+/** 第一待ち受け画面：レジ前に人がいない間の待ち受け。ヘッダーと待ち受けの帯はそのまま、三段目に稼働モードを特大の文字で示し、最下段はサイネージ。
+ *  現物ではレジ画面のカメラがレジ前の人を認識すると解除され（第二待ち受け＝従来の待ち受けへ）、シミュレーターではレジ画面にカーソルが重なると解除される */
+export function firstWelcome(r: RegisterView, side: Side): string {
+  const staffOp = r.mode === "staff_operated";
+  const band = staffOp
+    ? welcomeBand(r, side, find(r.staff.actions, "emoney"), side === "customer")
+    : welcomeBand(r, side, find(r.customer.actions, "emoney"), false);
+  return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
+}
+
+/** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */
+export const isWelcome = (main: string): boolean => main.includes("welcome-band");
+
+export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
+  if (first) return signage(now);
   if (r.mode === "self_operated") {
     const a = (n: string) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>

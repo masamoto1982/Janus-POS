@@ -88,6 +88,9 @@ const DICT: Record<string, string> = {
   "お手数ですが、ほかのレジをご利用ください": "Sorry, please use another register",
   スタッフバーコードを読むと再開します: "Scan a staff barcode to reopen",
 
+  // 第一待ち受け
+  有人レジ: "Staffed",
+  セルフレジ: "Self",
   // サイネージ（スタッフ操作モードのお客様側の最下段）
   お知らせ: "Notice",
   "揚げ物 2個目半額": "Fried food: second item half price",

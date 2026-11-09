@@ -111,6 +111,15 @@ function thanks(): string {
   return `<div class="thanks">${msg("ありがとうございました", "お忘れ物にご注意ください")}</div>`;
 }
 
+// 釣り銭の取り忘れ：お釣りを受け取るべき人はもうそこにいないかもしれないので、お釣り・お礼の案内を両画面ともこれに置き換える
+// 大きなテキストは警告の赤、背景はやわらかい黄色（小さなテキストを足すときはオレンジ）
+function changeLeft(): string {
+  return `<div class="confirm change-alert">${msg("釣り銭が残っています")}</div>`;
+}
+
+const afterPay = (r: RegisterView): boolean =>
+  !!r.last_receipt && !(r.mode === "staff_operated" ? r.staff.lines : r.customer.lines).length;
+
 function changeDue(side: Side, amount: number): string {
   const msg = side === "staff" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
   return `<div class="thanks"><div class="big">${msg}</div></div>`;
@@ -517,8 +526,8 @@ export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
   const ageOnScreen = r.mode === "staff_operated" && (v.age_choice_pending || v.id_pending);
   const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
-  // 釣り銭の取り忘れ：両画面に大きなテキスト（赤）、背景はやわらかい黄色の帯
-  const change = r.change_left ? `<div class="change-alert">${msg("釣り銭が残っています")}</div>` : "";
+  // 次のお客様の登録が始まっていてお釣りの案内画面がないときは、同じ警告を帯で出す
+  const change = r.change_left && !afterPay(r) ? `<div class="change-band">${msg("釣り銭が残っています")}</div>` : "";
   if (side === "customer") {
     return (
       change +
@@ -726,7 +735,7 @@ export function staffOperatedScreen(r: RegisterView, notice = "", side: Side = r
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.pickup_handover && !v.lines.length) return notice + confirm(pickupHandover(reg, side, r.pickup_handover));
-  if (r.last_receipt && !v.lines.length) return notice + confirm(r.outlet ? changeDue(side, r.outlet) : thanks());
+  if (r.last_receipt && !v.lines.length) return notice + (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks()));
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, notice, side);
   const ro = side === "customer";
@@ -1106,7 +1115,7 @@ export function selfOperatedScreen(r: RegisterView, notice = "", side: Side = r.
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return notice + confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.last_receipt && !c.lines.length) return notice + confirm(thanks());
+  if (r.last_receipt && !c.lines.length) return notice + (r.change_left ? changeLeft() : confirm(thanks()));
 
   const lineRows = c.lines.map((l): Row => {
       const tags = [serviceFlag(l), ageFlag(l)].filter(Boolean);

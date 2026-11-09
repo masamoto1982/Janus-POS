@@ -772,3 +772,5 @@ body.dragging .drop-hint { display: inline; }
 :root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
 :root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
+/* 商品が登録された行を一瞬だけ染めるエフェクトも、濃いめの段と同じモードの色 */
+:root .screen:is(.mode-staff, .mode-self) { --flash: var(--tier-deep); }

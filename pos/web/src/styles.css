@@ -298,7 +298,14 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 .call-screen p { margin: 0; font-size: 16px; }
 .banner.info { background: var(--line); }
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
-.banner.warn { background: var(--warn-bg); color: var(--warn); }
+/* 釣り銭の取り忘れ（両画面）：角丸のボックスではなく、全幅の帯に大きなテキスト。文字＝警告の赤、背景＝やわらかい黄色
+   画面の色変数はグレーに置き換わるので、色はここで直接 OKLCH で持つ（小さなテキストを足すときはオレンジ --alert-note） */
+:root { --alert-bg: oklch(0.96 0.07 98); --alert-ink: oklch(0.53 0.2 29); --alert-note: oklch(0.58 0.15 55); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --alert-bg: oklch(0.34 0.06 95); --alert-ink: oklch(0.74 0.16 29); --alert-note: oklch(0.78 0.13 65); } }
+:root[data-theme="dark"] { --alert-bg: oklch(0.34 0.06 95); --alert-ink: oklch(0.74 0.16 29); --alert-note: oklch(0.78 0.13 65); }
+.screen .change-alert { flex: none; display: flex; justify-content: center; margin: 0 -12px 8px; padding: 12px; background: var(--alert-bg); }
+.screen .change-alert .big { color: var(--alert-ink); }
+.screen .change-alert p.small { color: var(--alert-note); }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
 .staff-head .tax-note { margin-left: auto; }

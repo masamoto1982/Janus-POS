@@ -517,8 +517,9 @@ export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const v = r.staff;
   const ageOnScreen = r.mode === "staff_operated" && (v.age_choice_pending || v.id_pending);
   const calls = ageOnScreen ? v.calls.filter((c) => c.kind !== "age_check") : v.calls;
+  // 釣り銭の取り忘れ：両画面に大きなテキスト（赤）、背景はやわらかい黄色の帯
+  const change = r.change_left ? `<div class="change-alert">${msg("釣り銭が残っています")}</div>` : "";
   if (side === "customer") {
-    const change = r.change_left ? `<div class="banner warn">釣り銭が残っています</div>` : "";
     return (
       change +
       (r.mode === "staff_operated" && r.customer.staff_called && (!ageOnScreen || calls.length)
@@ -529,7 +530,7 @@ export function callNotice(r: RegisterView, _now: number, side: Side): string {
   const warn = v.bell_down.length
     ? `<div class="banner danger">${esc(v.bell_down.join("・"))} 不通：呼び出しが届きません</div>`
     : "";
-  return warn;
+  return change + warn;
 }
 
 function elapsed(calls: { kind: string; created_at: number }[], now: number, before: string, after = ""): string {

@@ -89,6 +89,21 @@ describe("view helpers", () => {
     expect(customer).toBe("");
   });
 
+  it("warns both screens in large text when change is left in the tray", () => {
+    const r = {
+      mode: "self_operated",
+      change_left: true,
+      staff: { calls: [], bell_down: [] },
+      customer: { staff_called: false },
+    } as unknown as RegisterView;
+    for (const side of ["staff", "customer"] as const) {
+      const html = callNotice(r, 6000, side);
+      expect(html).toContain('class="change-alert"');
+      expect(html).toContain('<div class="big">釣り銭が残っています</div>');
+      expect(html).not.toContain("banner");
+    }
+  });
+
   it("tells the customer that staff are on the way in staff-operated mode", () => {
     const r = {
       mode: "staff_operated",

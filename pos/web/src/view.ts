@@ -760,7 +760,7 @@ function staffOperatedWelcome(r: RegisterView, side: Side): string {
 }
 
 export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "staff"): string {
-  if (r.menu) return side === "staff" ? storeMenu(r) : confirm(pairNote("休止中", "空いているレジをお使い下さい"));
+  if (r.menu) return side === "staff" ? storeMenu(r) : menuPaused();
   const v = r.staff;
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
@@ -1060,11 +1060,18 @@ export function firstWelcome(r: RegisterView, side: Side): string {
   return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
 }
 
+/** スタッフ側で店舗メニューを開いている間のお客様側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
+ *  帯は高さだけ残して部品は置かず、最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
+export function menuPaused(): string {
+  return `<div class="reg-top welcome-band" aria-hidden="true"></div><div class="first-welcome"><b class="mode-big">休止中</b></div>`;
+}
+
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */
 export const isWelcome = (main: string): boolean => main.includes("welcome-band");
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
+  if (r.menu && side === "customer" && !r.paused) return signage(now);
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {

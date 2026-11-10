@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS } from "./view";
 
 describe("view helpers", () => {
+  it("shows the customer side as closed in the first-wait style while the store menu is open", () => {
+    const html = menuPaused();
+    expect(html).toContain('<b class="mode-big">休止中</b>');
+    expect(html).not.toContain("<button");
+  });
+
   it("escapes HTML", () => {
     expect(esc(`<a href="x">'&`)).toBe("&lt;a href=&quot;x&quot;&gt;&#39;&amp;");
   });

@@ -132,6 +132,10 @@ pub const CATALOG: &[Product] = &[
     p("4910000000014", "新聞", 160, Standard10, Newspaper),
     p("4910000000038", "雑誌", 480, Standard10, Magazine),
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),
+    // コンビニでは比較的高額な品。たくさん買うと合計が税抜 5 万円を超え、レシートに収入印紙が要る
+    p("4900000000158", "たばこカートン", 6000, Standard10, Tobacco),
+    p("4910000000052", "USBメモリ", 1980, Standard10, Daily),
+    p("4910000000069", "化粧品", 2200, Standard10, Daily),
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
     p("4900000000141", "切手", 110, Standard10, Stamp),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),

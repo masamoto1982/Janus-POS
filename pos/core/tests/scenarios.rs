@@ -1581,9 +1581,9 @@ fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
     assert_eq!(reg(&s, 1).bill_handover, Some(1));
 }
 
-/// たくさんの買い物で合計 55,440円（すべて 10%、税抜 50,400円）：たばこ 600円×90（9 カートン）、雑誌 480円×3
+/// たくさんの買い物で合計 56,200円（すべて 10%、税抜 51,091円）：たばこカートン 6,000円×9、化粧品 2,200円×1
 fn big_basket(s: &mut Store, side: &str) {
-    for (code, qty) in [("4900000000127", 90), ("4910000000038", 3)] {
+    for (code, qty) in [("4900000000158", 9), ("4910000000069", 1)] {
         scan(s, 1, side, code);
         let id = reg(s, 1)
             .staff
@@ -1599,7 +1599,7 @@ fn big_basket(s: &mut Store, side: &str) {
             );
         }
     }
-    assert_eq!(reg(s, 1).staff.total, 55_440);
+    assert_eq!(reg(s, 1).staff.total, 56_200);
 }
 
 #[test]
@@ -1613,11 +1613,11 @@ fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
     );
     no_id_check(&mut s, 1);
     confirm_point(&mut s, 1);
-    ok(&mut s, json!({"type":"insert","register":1,"amount":55440}));
+    ok(&mut s, json!({"type":"insert","register":1,"amount":56200}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     let rs = v.receipt_stamp.unwrap();
-    assert_eq!((rs.stamp, rs.base), (200, 50_400));
+    assert_eq!((rs.stamp, rs.base), (200, 51_091));
     advance(&mut s, 10_000);
     assert!(
         reg(&s, 1).last_receipt.is_some(),
@@ -1635,6 +1635,48 @@ fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
     assert_eq!(reg(&s, 1).receipt_stamp, None);
     advance(&mut s, 10_000);
     assert!(reg(&s, 1).last_receipt.is_none());
+}
+
+#[test]
+fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
+    let mut s = Store::new(1, 2, 1);
+    // USBメモリ 1,980円×28＝55,440円（税抜 50,400円）
+    scan(&mut s, 1, "customer", "4910000000052");
+    let id = reg(&s, 1).customer.lines[0].id;
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":28}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"qr"}),
+    );
+    assert_eq!(reg(&s, 1).receipt_stamp.map(|r| r.base), Some(50_400));
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.kind == CallKind::ReceiptStamp));
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"})
+    )
+    .is_err());
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
+    );
+    assert!(s.snapshot().calls.is_empty());
 }
 
 #[test]

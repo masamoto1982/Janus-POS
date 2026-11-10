@@ -707,8 +707,8 @@ body.dragging .drop-hint { display: inline; }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   .left { gap: 8px; }
-  /* 添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す */
-  .call-btn small, .welcome-band .band-btn small { display: none; }
+  /* 最下段の添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す。帯の言語・電子マネーは余裕があるので出す */
+  .call-btn small { display: none; }
   .right-col { display: none; }
   .bell-area { gap: 6px 8px; padding: 8px 44px 8px 10px; }
   .bell-area .bell-open { position: absolute; top: 6px; right: 6px; margin: 0; }

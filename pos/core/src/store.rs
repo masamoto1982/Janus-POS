@@ -134,6 +134,7 @@ enum EmoneyTask {
 #[serde(rename_all = "snake_case")]
 pub enum CallTopic {
     Service,
+    Voucher,
     Tobacco,
     Emoney,
     Sos,
@@ -1358,6 +1359,7 @@ impl Store {
             CallKind::FastFood,
             CallKind::Service,
             CallKind::Tobacco,
+            CallKind::Voucher,
             CallKind::Bill,
             CallKind::Emoney,
             CallKind::CashOnly,
@@ -2170,6 +2172,7 @@ impl Store {
                 }
                 let (kind, detail) = match topic {
                     Some(CallTopic::Service) => (CallKind::Service, "お支払い・荷物"),
+                    Some(CallTopic::Voucher) => (CallKind::Voucher, "ギフトカード・印紙"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
                     Some(CallTopic::Emoney) => (CallKind::Emoney, "チャージ・残高確認"),
                     Some(CallTopic::Sos) => unreachable!(),
@@ -2179,6 +2182,7 @@ impl Store {
                 self.press(register)?;
                 done(match topic {
                     Some(CallTopic::Service) => "スタッフをお呼びしました（サービス）",
+                    Some(CallTopic::Voucher) => "スタッフをお呼びしました（金券）",
                     Some(CallTopic::Tobacco) => "スタッフをお呼びしました（たばこ）",
                     Some(CallTopic::Emoney) => "スタッフをお呼びしました（電子マネー）",
                     Some(CallTopic::Sos) => unreachable!(),
@@ -2548,6 +2552,7 @@ impl Store {
                 self.reg_mut(register)?.txn.tobacco_asked = true;
             }
             self.calls.resolve(register, CallKind::Tobacco, now);
+            self.calls.resolve(register, CallKind::Voucher, now);
             self.calls.resolve(register, CallKind::Emoney, now);
             if !service_pending {
                 self.calls.resolve(register, CallKind::Service, now);
@@ -3227,6 +3232,7 @@ impl Store {
             CallKind::FastFood,
             CallKind::Service,
             CallKind::Tobacco,
+            CallKind::Voucher,
             CallKind::Bill,
             CallKind::Emoney,
             CallKind::CashOnly,

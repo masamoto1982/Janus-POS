@@ -509,6 +509,7 @@ const CALL_SHORT: Record<string, string> = {
   fast_food: "FF",
   tobacco: "煙草",
   service: "サービス",
+  voucher: "金券",
   customer_help: "呼び出し",
   age_check: "年確",
   bill: "公共料金",
@@ -1022,6 +1023,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     return `<div class="call-row">${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("サービス", "お支払い・荷物", { type: "call_staff", register: reg, topic: "service" }, a("call_staff"), "service"),
+      callBtn("金券", "ギフトカード・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;
   }

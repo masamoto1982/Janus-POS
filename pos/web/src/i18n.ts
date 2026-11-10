@@ -253,6 +253,14 @@ const DICT: Record<string, string> = {
   スタッフが払込票を確認しています: "Staff is checking your slips",
   "お客様に受付点数、合計金額をお伝えください": "Tell the customer the number of slips and the total",
   払込票の内容を確認いたします: "Staff will check your slips",
+  印紙貼付前: "Stamp needed",
+  印紙: "Stamp",
+  貼付: "Affixed",
+  収入印紙の貼り付け確認: "Confirm revenue stamps",
+  "領収証に収入印紙を貼り付けたら、一枚ずつチェックを入れてください": "Tick each slip once its receipt has a revenue stamp",
+  スタッフが領収証に収入印紙を貼り付けています: "Staff is affixing revenue stamps to your receipts",
+  スタッフが領収証に収入印紙を貼り付けます: "Staff will affix revenue stamps to your receipts",
+  収入印紙の貼り付けが確認できていません: "Revenue stamps have not been confirmed",
   公共料金: "Utility bills",
 
   // 荷物

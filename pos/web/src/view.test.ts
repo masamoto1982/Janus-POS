@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, callScreen, esc, itemCount, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS } from "./view";
 
 describe("view helpers", () => {
   it("escapes HTML", () => {
@@ -43,9 +43,9 @@ describe("view helpers", () => {
       1,
       "staff",
       [
-        { line_id: 1, code: "2100000000021", name: "電気料金", amount: 5000, slip_no: "9100 1234 5678 9012", checked: true },
-        { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: false },
-        { line_id: 3, code: "2100000000021", name: "電気料金", amount: 5000, slip_no: "9100 5555 6666 7777", checked: false },
+        { line_id: 1, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 1234 5678 9012", checked: true, stamp: 200, stamped: false },
+        { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: false, stamp: 0, stamped: false },
+        { line_id: 3, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 5555 6666 7777", checked: false, stamp: 200, stamped: true },
       ],
       { action: "check_bill", allowed: true, reason: null },
     );
@@ -56,10 +56,24 @@ describe("view helpers", () => {
     expect(html).toContain('type="checkbox" checked data-bill-check="1:staff:1"');
     expect(html).toContain('type="checkbox"  data-bill-check="1:staff:3"');
     expect(html).toContain(`<span class="bill-n">3枚</span>`);
-    expect(html).toContain("合計 13,000円");
+    expect(html).toContain("合計 103,000円");
     const pay = billPayCard(3);
     expect(pay).toContain(`公共料金<span class="bill-n">3枚</span>を受け付けます</div>`);
     expect(pay).toContain("現金でお支払いください</p>");
+  });
+
+  it("lists only the slips that need a revenue stamp and ticks each one", () => {
+    const bills = [
+      { line_id: 1, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 1234 5678 9012", checked: true, stamp: 200, stamped: false },
+      { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: true, stamp: 0, stamped: false },
+    ];
+    const html = stampVerifyScreen(1, "staff", bills, { action: "affix_stamp", allowed: true, reason: null }, true);
+    expect(html).toContain("収入印紙の貼り付け確認");
+    expect(html).not.toContain("ガス料金");
+    expect(html).toContain('data-stamp-check="1:staff:1"');
+    expect(html).toContain(">200円<");
+    expect(html).toContain("data-stampverify-close");
+    expect(html).not.toMatch(/。/);
   });
 
   it("shows the stamp-and-hand-over step after a utility bill payment", () => {

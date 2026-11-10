@@ -200,6 +200,8 @@ struct SavedLine {
     cash_only: bool,
     kind: LineKind,
     slip_no: Option<String>,
+    #[serde(default)]
+    stamped: bool,
     parcel: Option<SavedParcel>,
     pickup: Option<Pickup>,
 }
@@ -238,6 +240,7 @@ impl SavedLine {
             cash_only: l.cash_only,
             kind: l.kind,
             slip_no: l.slip_no.clone(),
+            stamped: l.stamped,
             parcel: l.parcel.as_ref().map(|p| SavedParcel {
                 sum_cm: p.sum_cm,
                 weight_g: p.weight_g,
@@ -268,6 +271,7 @@ impl SavedLine {
             cash_only: self.cash_only,
             kind: self.kind,
             slip_no: self.slip_no,
+            stamped: self.stamped,
             parcel: self.parcel.map(|p| Parcel {
                 sum_cm: p.sum_cm,
                 weight_g: p.weight_g,

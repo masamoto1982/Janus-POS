@@ -1522,6 +1522,51 @@ fn check_bill(s: &mut Store, r: u8, line_id: u32, checked: bool) {
     );
 }
 
+fn affix_stamp(s: &mut Store, r: u8, line_id: u32, affixed: bool) {
+    ok(
+        s,
+        json!({"type":"affix_stamp","register":r,"side":"staff","line_id":line_id,"affixed":affixed}),
+    );
+}
+
+#[test]
+fn revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_then() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BILL);
+    let id = bill_ids(&s, 1)[0];
+    affix_stamp(&mut s, 1, id, true);
+    affix_stamp(&mut s, 1, id, false);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    check_bill(&mut s, 1, id, true);
+    assert!(reg(&s, 1)
+        .staff
+        .payment_blocker
+        .unwrap()
+        .contains("収入印紙"));
+    affix_stamp(&mut s, 1, id, true);
+    assert_eq!(reg(&s, 1).staff.payment_blocker, None);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":50000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    assert_eq!(reg(&s, 1).bill_handover, Some(1));
+}
+
+#[test]
+fn revenue_stamp_waits_for_staff_in_self_operated_mode() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BILL);
+    let id = bill_ids(&s, 1)[0];
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_stamp","register":1,"side":"staff","line_id":id,"affixed":true})
+    )
+    .is_err());
+    assert!(reg(&s, 1).customer.stamp_pending);
+}
+
 fn bill_ids(s: &Store, r: u8) -> Vec<u32> {
     reg(s, r).staff.bills.iter().map(|b| b.line_id).collect()
 }
@@ -1545,10 +1590,10 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     assert_eq!(
         rows,
         [
-            ("電気料金", 5_000),
+            ("電気料金", 50_000),
             ("水道料金", 4_000),
             ("ガス料金", 3_000),
-            ("電気料金", 5_000)
+            ("電気料金", 50_000)
         ]
     );
     let nos: Vec<_> = v.staff.bills.iter().map(|b| b.slip_no.clone()).collect();
@@ -1584,6 +1629,38 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     check_bill(&mut s, 1, ids[3], true);
     let v = reg(&s, 1);
     assert!(!v.staff.bill_unchecked);
+    let stamps: Vec<_> = v.staff.bills.iter().map(|b| b.stamp).collect();
+    assert_eq!(
+        stamps,
+        [200, 0, 0, 200],
+        "5万円以上の払込票だけ収入印紙が要る"
+    );
+    assert!(v.staff.stamp_pending);
+    assert!(v.staff.payment_blocker.unwrap().contains("収入印紙"));
+    assert!(run(
+        &mut s,
+        json!({"type":"insert","register":1,"amount":200000})
+    )
+    .is_err());
+    let e = run(
+        &mut s,
+        json!({"type":"affix_stamp","register":1,"side":"customer","line_id":ids[0],"affixed":true}),
+    )
+    .unwrap_err();
+    assert!(e.contains("スタッフ側"), "{e}");
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"affix_stamp","register":1,"line_id":ids[1],"affixed":true})
+        )
+        .is_err(),
+        "印紙の要らない払込票は確認しない"
+    );
+    affix_stamp(&mut s, 1, ids[0], true);
+    assert!(reg(&s, 1).staff.stamp_pending, "一枚ずつ確認する");
+    affix_stamp(&mut s, 1, ids[3], true);
+    let v = reg(&s, 1);
+    assert!(!v.staff.stamp_pending);
     assert_eq!(v.staff.payment_blocker, None);
     for m in ["credit", "qr", "points"] {
         assert!(
@@ -1595,11 +1672,14 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
             "{m}"
         );
     }
-    ok(&mut s, json!({"type":"insert","register":1,"amount":20000}));
+    ok(
+        &mut s,
+        json!({"type":"insert","register":1,"amount":110000}),
+    );
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     let r = v.last_receipt.unwrap();
-    assert_eq!((r.total, r.method, r.points), (17_000, "現金", 0));
+    assert_eq!((r.total, r.method, r.points), (107_000, "現金", 0));
     assert_eq!(v.bill_handover, Some(4));
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     advance(&mut s, 10_000);
@@ -3306,7 +3386,10 @@ fn a_short_ring_left_unanswered_is_not_an_emergency() {
 #[test]
 fn emergency_also_while_the_bell_cannot_reach_anyone() {
     let mut s = Store::new(1, 1, 1);
-    ok(&mut s, json!({"type":"set_bell_offline","bell":0,"offline":true}));
+    ok(
+        &mut s,
+        json!({"type":"set_bell_offline","bell":0,"offline":true}),
+    );
     advance(&mut s, 20_000);
     assert!(reg(&s, 1).bell_dead);
     for _ in 0..10 {
@@ -3320,7 +3403,10 @@ fn no_emergency_in_staff_operated_mode() {
     let mut s = Store::new(1, 1, 1);
     login(&mut s, 1);
     for _ in 0..10 {
-        ok(&mut s, json!({"type":"call_staff","register":1,"topic":"sos"}));
+        ok(
+            &mut s,
+            json!({"type":"call_staff","register":1,"topic":"sos"}),
+        );
         advance(&mut s, 200);
         ok(&mut s, json!({"type":"release_call","register":1}));
     }

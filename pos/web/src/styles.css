@@ -744,6 +744,9 @@ body.dragging .drop-hint { display: inline; }
 .bill-table th:nth-child(1), .bill-table th:nth-child(2) { width: 22%; }
 .bill-table th:nth-child(3) { width: 40%; }
 .bill-table th:nth-child(4) { width: 16%; }
+.stamp-table th:nth-child(1), .stamp-table th:nth-child(2) { width: 18%; }
+.stamp-table th:nth-child(3) { width: 40%; }
+.stamp-table th:nth-child(4), .stamp-table th:nth-child(5) { width: 12%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
 
 .staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }

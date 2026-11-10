@@ -8,6 +8,7 @@ import {
   esc,
   FF_TABS,
   ffVerifying,
+  stampVerifying,
   ffvInput,
   qtyEntry,
   flashing,
@@ -724,6 +725,11 @@ app.addEventListener("input", (e) => {
     send({ type: "check_bill", register: Number(reg), side, line_id: Number(line), checked: el.checked });
     return;
   }
+  if (el.dataset.stampCheck) {
+    const [reg, side, line] = el.dataset.stampCheck.split(":");
+    send({ type: "affix_stamp", register: Number(reg), side, line_id: Number(line), affixed: el.checked });
+    return;
+  }
 });
 
 app.addEventListener("change", (e) => {
@@ -902,6 +908,16 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.ffverify) {
     ffVerifying.add(b.dataset.ffverify);
+    frame();
+    return;
+  }
+  if (b.dataset.stampverify) {
+    stampVerifying.add(b.dataset.stampverify);
+    frame();
+    return;
+  }
+  if (b.dataset.stampverifyClose) {
+    stampVerifying.delete(b.dataset.stampverifyClose);
     frame();
     return;
   }

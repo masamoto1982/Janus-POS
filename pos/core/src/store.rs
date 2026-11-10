@@ -266,6 +266,13 @@ pub enum Command {
         line_id: u32,
         checked: bool,
     },
+    AffixStamp {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+        line_id: u32,
+        affixed: bool,
+    },
     HandOverBills {
         register: u8,
         #[serde(default = "staff_side")]
@@ -442,6 +449,7 @@ impl Command {
             | C::DismissConfiscated { register }
             | C::DismissFfCollect { register }
             | C::CheckBill { register, .. }
+            | C::AffixStamp { register, .. }
             | C::HandOverBills { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
@@ -478,6 +486,7 @@ impl Command {
             | C::SelectPayment { side, .. }
             | C::ConfirmPointCard { side, .. }
             | C::CheckBill { side, .. }
+            | C::AffixStamp { side, .. }
             | C::HandOverBills { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
@@ -512,6 +521,22 @@ pub struct BillRow {
     pub amount: u32,
     pub slip_no: String,
     pub checked: bool,
+    /// 領収証に貼る収入印紙の額（要らない払込票は 0）
+    pub stamp: u32,
+    /// 収入印紙の貼り付けを確認した
+    pub stamped: bool,
+}
+
+/// 領収証（払込票のお客様控え）に貼る収入印紙の額。受取金額 5 万円以上で要る
+pub fn stamp_duty(amount: u32) -> u32 {
+    match amount {
+        0..=49_999 => 0,
+        50_000..=1_000_000 => 200,
+        1_000_001..=2_000_000 => 400,
+        2_000_001..=3_000_000 => 600,
+        3_000_001..=5_000_000 => 1_000,
+        _ => 2_000,
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -557,6 +582,9 @@ pub struct Line {
     pub kind: LineKind,
     #[serde(skip)]
     pub slip_no: Option<String>,
+    /// 払込票の領収証に収入印紙を貼り付けたのを確認した
+    #[serde(skip)]
+    pub stamped: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parcel: Option<Parcel>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -799,6 +827,20 @@ impl Txn {
         })
     }
 
+    fn needs_stamp(l: &Line) -> bool {
+        l.is_bill() && stamp_duty(l.amount()) > 0
+    }
+
+    fn has_stamps(&self) -> bool {
+        self.lines.iter().any(Self::needs_stamp)
+    }
+
+    fn stamp_pending(&self) -> bool {
+        self.lines
+            .iter()
+            .any(|l| Self::needs_stamp(l) && !l.stamped)
+    }
+
     fn bill_rows(&self) -> Vec<BillRow> {
         self.lines
             .iter()
@@ -816,6 +858,8 @@ impl Txn {
                         ..
                     }
                 ),
+                stamp: stamp_duty(l.amount()),
+                stamped: l.stamped,
             })
             .collect()
     }
@@ -903,6 +947,7 @@ impl Txn {
             cash_only: p.cash_only,
             kind,
             slip_no: None,
+            stamped: false,
             parcel: p.parcel_send.then(|| Parcel {
                 collect: p.parcel_collect,
                 ..Parcel::default()
@@ -1046,6 +1091,8 @@ impl Register {
             parcel_ask: t.parcel_ask,
             has_bills: t.bill_slips() > 0,
             bill_unchecked: t.bill_unchecked(),
+            has_stamps: t.has_stamps(),
+            stamp_pending: t.stamp_pending(),
             bill_handover: self.bill_handover.is_some(),
             point_pending: t.paying
                 && !t.point_checked
@@ -1957,6 +2004,28 @@ impl Store {
                     format!("{name}：確認を外しました")
                 })
             }
+            C::AffixStamp {
+                register,
+                side,
+                line_id,
+                affixed,
+            } => {
+                self.check(register, side, Action::AffixStamp)?;
+                let r = self.reg_mut(register)?;
+                let l = r
+                    .txn
+                    .lines
+                    .iter_mut()
+                    .find(|l| Txn::needs_stamp(l) && l.id == line_id)
+                    .ok_or("収入印紙が必要な払込票が見つかりません")?;
+                l.stamped = affixed;
+                let name = format!("{} {}円", l.name, l.amount());
+                done(if affixed {
+                    format!("{name}：収入印紙の貼り付けを確認しました")
+                } else {
+                    format!("{name}：収入印紙の確認を外しました")
+                })
+            }
             C::HandOverBills { register, side } => {
                 self.check(register, side, Action::HandOverBills)?;
                 let r = self.reg_mut(register)?;
@@ -2439,7 +2508,8 @@ impl Store {
         }
         r.pressing = true;
         if r.staff.is_none() {
-            r.press_log.retain(|&t| now.saturating_sub(t) < EMERGENCY_WINDOW_MS);
+            r.press_log
+                .retain(|&t| now.saturating_sub(t) < EMERGENCY_WINDOW_MS);
             r.press_log.push(now);
         }
         self.presses += 1;
@@ -2941,6 +3011,11 @@ impl Store {
         let slips = r.txn.bill_slips();
         if slips > 0 {
             r.txn.method = Some(PaymentMethod::Cash);
+            if !r.txn.bill_unchecked() && r.txn.stamp_pending() {
+                return done(format!(
+                    "公共料金 {slips}枚：領収証に収入印紙を貼り付けてください"
+                ));
+            }
             if !r.txn.bill_unchecked() {
                 return done(format!("公共料金 {slips}枚：現金でお支払いください"));
             }
@@ -3599,6 +3674,7 @@ impl Store {
                 returned: returned.clone(),
                 bills: t.bill_rows(),
                 bill_unchecked: c.bill_unchecked,
+                stamp_pending: c.stamp_pending,
                 point_pending: c.point_pending,
                 parcel_ask: c.parcel_ask,
                 method: t.method,
@@ -3628,6 +3704,7 @@ impl Store {
                 parcel_ask: c.parcel_ask,
                 bills: t.bill_rows(),
                 bill_unchecked: c.bill_unchecked,
+                stamp_pending: c.stamp_pending,
                 staff_called,
                 age_wait: t
                     .required_age
@@ -3741,6 +3818,7 @@ pub struct StaffView {
     pub id_pending: bool,
     pub bills: Vec<BillRow>,
     pub bill_unchecked: bool,
+    pub stamp_pending: bool,
     pub point_pending: bool,
     pub parcel_ask: bool,
     pub method: Option<PaymentMethod>,
@@ -3772,6 +3850,7 @@ pub struct CustomerView {
     pub parcel_ask: bool,
     pub bills: Vec<BillRow>,
     pub bill_unchecked: bool,
+    pub stamp_pending: bool,
     pub staff_called: bool,
     pub age_wait: Option<u8>,
     pub staff_present: bool,

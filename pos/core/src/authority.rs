@@ -79,6 +79,7 @@ pub enum Action {
     CheckId,
     CheckBill,
     AffixStamp,
+    AffixReceiptStamp,
     HandOverBills,
     InsertCash,
     TapEmoney,
@@ -110,6 +111,7 @@ pub const ACTIONS: &[Action] = &[
     Action::CheckId,
     Action::CheckBill,
     Action::AffixStamp,
+    Action::AffixReceiptStamp,
     Action::HandOverBills,
     Action::InsertCash,
     Action::TapEmoney,
@@ -144,6 +146,8 @@ pub struct Context {
     /// 収入印紙の貼り付けがまだ確認できていない払込票がある
     pub stamp_pending: bool,
     pub bill_handover: bool,
+    /// 決済後、レシートに収入印紙を貼る確認を待っている
+    pub receipt_stamp: bool,
     pub point_pending: bool,
     pub has_coupons: bool,
     pub coupon_unmatched: bool,
@@ -229,6 +233,10 @@ fn affix_stamp(c: &Context) -> Result<(), Denial> {
     require(c.has_stamps, "収入印紙が必要な払込票はありません")
 }
 
+fn affix_receipt_stamp(c: &Context) -> Result<(), Denial> {
+    require(c.receipt_stamp, "収入印紙を貼るレシートはありません")
+}
+
 fn hand_over_bills(c: &Context) -> Result<(), Denial> {
     require(c.bill_handover, "お渡しする払込票はありません")
 }
@@ -241,6 +249,7 @@ pub fn is_staff_only(action: Action) -> bool {
             | Action::CheckId
             | Action::CheckBill
             | Action::AffixStamp
+            | Action::AffixReceiptStamp
             | Action::HandOverBills
             | Action::CheckFf
     )
@@ -312,7 +321,7 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Ok(())
         } else if matches!(action, Action::CheckBill | Action::HandOverBills) {
             Err("払込票の確認・お渡しはスタッフ側の画面で行います")
-        } else if action == Action::AffixStamp {
+        } else if matches!(action, Action::AffixStamp | Action::AffixReceiptStamp) {
             Err("収入印紙の貼り付け確認はスタッフ側の画面で行います")
         } else if action == Action::CheckFf {
             Err("FF のお渡し確認はスタッフ側の画面で行います")
@@ -419,6 +428,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CheckId => check_id(c),
         Action::CheckBill => check_bill(c),
         Action::AffixStamp => affix_stamp(c),
+        Action::AffixReceiptStamp => affix_receipt_stamp(c),
         Action::HandOverBills => hand_over_bills(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
@@ -469,6 +479,10 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CheckBill => {
             check_bill(c)?;
             Err("払込票の確認はスタッフがログインしてから行います")
+        }
+        Action::AffixReceiptStamp => {
+            affix_receipt_stamp(c)?;
+            Err("収入印紙の貼り付け確認はスタッフがログインしてから行います")
         }
         Action::AffixStamp => {
             affix_stamp(c)?;
@@ -537,6 +551,7 @@ mod tests {
                                             has_stamps: false,
                                             stamp_pending: false,
                                             bill_handover: false,
+                                            receipt_stamp: false,
                                             method,
                                         });
                                     }

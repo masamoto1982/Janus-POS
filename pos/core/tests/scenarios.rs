@@ -1581,6 +1581,99 @@ fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
     assert_eq!(reg(&s, 1).bill_handover, Some(1));
 }
 
+const GAME: &str = "4910000000045";
+
+#[test]
+fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", GAME);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":55000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let v = reg(&s, 1);
+    let rs = v.receipt_stamp.unwrap();
+    assert_eq!((rs.stamp, rs.base), (200, 50_000));
+    advance(&mut s, 10_000);
+    assert!(
+        reg(&s, 1).last_receipt.is_some(),
+        "印紙の確認まで取引を閉じない"
+    );
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"customer"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
+    );
+    assert_eq!(reg(&s, 1).receipt_stamp, None);
+    advance(&mut s, 10_000);
+    assert!(reg(&s, 1).last_receipt.is_none());
+}
+
+#[test]
+fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", GAME);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"credit"}),
+    );
+    assert_eq!(reg(&s, 1).receipt_stamp, None);
+}
+
+#[test]
+fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", GAME);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"qr"}),
+    );
+    assert!(reg(&s, 1).receipt_stamp.is_some());
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.kind == CallKind::ReceiptStamp));
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"})
+    )
+    .is_err());
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
+    );
+    assert!(s.snapshot().calls.is_empty());
+}
+
 #[test]
 fn revenue_stamp_waits_for_staff_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);

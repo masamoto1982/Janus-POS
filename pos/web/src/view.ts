@@ -348,6 +348,19 @@ export function stampVerifyScreen(reg: number, side: Side, bills: BillRow[], st:
     </div>`;
 }
 
+// 通常のお買い物：税抜 5 万円以上をクレジットカード以外で受け取ると、レシートに収入印紙が要る。
+// レシートは決済のあとに出るので、確認も決済のあと（お釣り・お礼の案内の前）
+export function receiptStampScreen(reg: number, side: Side, rs: { stamp: number; base: number }, receiptNo: number | undefined, st: ActionState, staffPresent = true): string {
+  if (side === "customer")
+    return `<div class="point-screen pair-note">${staffPresent ? msg("レシートに収入印紙を貼り付けています", "少々お待ちください") : msg("レシートに収入印紙を貼り付けます", "スタッフが向かっています")}</div>`;
+  const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
+  return `<div class="ffv-screen bill-verify stamp-verify">
+      <div class="big">収入印紙の貼り付け確認</div>
+      <table class="lines ffv bill-table receipt-stamp-table"><thead><tr><th>レシート</th><th>金額（税抜）</th><th>印紙</th><th class="bill-tick">貼付</th></tr></thead><tbody><tr><td>No.${receiptNo ?? ""}</td><td>${yen(rs.base)}</td><td>${yen(rs.stamp)}</td><td class="bill-tick"><input type="checkbox" data-receipt-stamp="${reg}:${side}" aria-label="レシートに収入印紙${yen(rs.stamp)}を貼り付けた"${off} /></td></tr></tbody></table>
+      <p class="muted">レシートに収入印紙を貼り付けたら、チェックを入れてください</p>
+    </div>`;
+}
+
 export function billPayCard(count: number, selfOperated = false): string {
   return `<div class="point-screen bill-pay">
       ${msg(`公共料金${billN(count)}を受け付けます`, selfOperated ? "現金はスタッフがお預かりします<br>スタッフをお呼びください" : "現金でお支払いください")}
@@ -546,6 +559,7 @@ const CALL_SHORT: Record<string, string> = {
   bill: "公共料金",
   change_left: "釣銭忘れ",
   emoney: "電子マネー",
+  receipt_stamp: "収入印紙",
 };
 
 /** 呼び鈴が不通（セルフ操作モード）：呼び出しが届かないので、お客様に店員へ直接声をかけてもらう */
@@ -752,6 +766,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
+  if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks()));
   if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
   if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
@@ -1175,6 +1190,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks()));
 
   const lineRows = c.lines.map((l): Row => {
@@ -1386,7 +1402,7 @@ const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(
 const SHELVES: Shelf[] = [
   { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011") },
   { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073", "4900000000066") },
-  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134", "4900000000141") },
+  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000134", "4900000000141", "4910000000045") },
   { label: "サービス", match: (p) => p.category === "service" },
   { label: "オプション", match: (p) => p.category === "bag" },
 ];

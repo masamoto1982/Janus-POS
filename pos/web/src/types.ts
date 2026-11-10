@@ -192,6 +192,8 @@ export interface RegisterView {
   unavailable: Unavailable[];
   last_receipt: Receipt | null;
   bill_handover: number | null;
+  /** 決済後、レシートに収入印紙を貼る確認待ち（stamp＝印紙の額、base＝税抜の受取金額） */
+  receipt_stamp: { stamp: number; base: number } | null;
   pickup_handover: string | null;
 }
 

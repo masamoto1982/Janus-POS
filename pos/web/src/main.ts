@@ -361,6 +361,7 @@ function inTransaction(r: RegisterView): boolean {
     v.ff_collect.length > 0 ||
     r.last_receipt !== null ||
     r.bill_handover !== null ||
+    r.receipt_stamp !== null ||
     r.pickup_handover !== null
   );
 }
@@ -723,6 +724,11 @@ app.addEventListener("input", (e) => {
   if (el.dataset.billCheck) {
     const [reg, side, line] = el.dataset.billCheck.split(":");
     send({ type: "check_bill", register: Number(reg), side, line_id: Number(line), checked: el.checked });
+    return;
+  }
+  if (el.dataset.receiptStamp) {
+    const [reg, side] = el.dataset.receiptStamp.split(":");
+    if (el.checked) send({ type: "affix_receipt_stamp", register: Number(reg), side });
     return;
   }
   if (el.dataset.stampCheck) {

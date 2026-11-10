@@ -266,6 +266,11 @@ pub enum Command {
         line_id: u32,
         checked: bool,
     },
+    AffixReceiptStamp {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+    },
     AffixStamp {
         register: u8,
         #[serde(default = "staff_side")]
@@ -450,6 +455,7 @@ impl Command {
             | C::DismissFfCollect { register }
             | C::CheckBill { register, .. }
             | C::AffixStamp { register, .. }
+            | C::AffixReceiptStamp { register, .. }
             | C::HandOverBills { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
@@ -487,6 +493,7 @@ impl Command {
             | C::ConfirmPointCard { side, .. }
             | C::CheckBill { side, .. }
             | C::AffixStamp { side, .. }
+            | C::AffixReceiptStamp { side, .. }
             | C::HandOverBills { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
@@ -980,6 +987,15 @@ pub struct Receipt {
     pub points: u32,
 }
 
+/// 通常のお買い物でレシート（金銭の受取書）に収入印紙が要るとき。
+/// 税抜の受取金額が 5 万円以上で、クレジットカード払いでないとき
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReceiptStamp {
+    pub stamp: u32,
+    /// 印紙税の判定に使う税抜の金額
+    pub base: u32,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct StaffSession {
     account: &'static auth::StaffAccount,
@@ -995,6 +1011,7 @@ struct Register {
     last_receipt: Option<Receipt>,
     bill_handover: Option<u32>,
     pickup_handover: Option<String>,
+    receipt_stamp: Option<ReceiptStamp>,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -1103,6 +1120,7 @@ impl Register {
             has_stamps: t.has_stamps(),
             stamp_pending: t.stamp_pending(),
             bill_handover: self.bill_handover.is_some(),
+            receipt_stamp: self.receipt_stamp.is_some(),
             point_pending: t.paying
                 && !t.point_checked
                 && !(t.age_choice_pending() || t.id_pending()),
@@ -1250,6 +1268,7 @@ impl Store {
                 last_receipt: None,
                 bill_handover: None,
                 pickup_handover: None,
+                receipt_stamp: None,
                 last_op: 0,
                 outlet: Cash::default(),
                 outlet_since: None,
@@ -1297,6 +1316,7 @@ impl Store {
             if r.outlet.total() == 0
                 && r.bill_handover.is_none()
                 && r.pickup_handover.is_none()
+                && r.receipt_stamp.is_none()
                 && r.last_receipt
                     .as_ref()
                     .is_some_and(|rc| rc.at + THANKS_MS <= now)
@@ -1380,6 +1400,7 @@ impl Store {
                 r.menu = None;
                 r.bill_handover = None;
                 r.pickup_handover = None;
+                r.receipt_stamp = None;
                 r.last_op = now;
             }
         }
@@ -2012,6 +2033,20 @@ impl Store {
                 } else {
                     format!("{name}：確認を外しました")
                 })
+            }
+            C::AffixReceiptStamp { register, side } => {
+                self.check(register, side, Action::AffixReceiptStamp)?;
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                let rs = r
+                    .receipt_stamp
+                    .take()
+                    .ok_or("収入印紙を貼るレシートはありません")?;
+                self.calls.resolve(register, CallKind::ReceiptStamp, now);
+                done(format!(
+                    "レシートに収入印紙 {}円の貼り付けを確認しました",
+                    rs.stamp
+                ))
             }
             C::AffixStamp {
                 register,
@@ -2672,6 +2707,7 @@ impl Store {
         r.last_receipt = None;
         r.bill_handover = None;
         r.pickup_handover = None;
+        r.receipt_stamp = None;
         if let Scanned::PointCard(no) = &scanned {
             // 決済が終わるまではいつでも付与できる。支払い中に読んでも登録画面へは戻さない
             if r.txn.paying {
@@ -3245,6 +3281,8 @@ impl Store {
         self.receipts += 1;
         let no = self.receipts;
         let now = self.now;
+        let rates = self.tax.display_rates();
+        let rounding = self.tax.rounding;
         let r = self.reg_mut(register)?;
         let total = r.txn.total();
         let due = r.txn.due();
@@ -3267,6 +3305,14 @@ impl Store {
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
+        // 払込票は払込票ごとに確認済み。通常のお買い物はレシートの税抜金額で判定する
+        let base = total.saturating_sub(txn.taxes(&rates, rounding).iter().map(|t| t.tax).sum());
+        let credit = method == PaymentMethod::Credit && txn.prepaid == 0;
+        r.receipt_stamp = (slips == 0 && !credit && stamp_duty(base) > 0).then_some(ReceiptStamp {
+            stamp: stamp_duty(base),
+            base,
+        });
+        let stamp_call = r.receipt_stamp.is_some() && r.staff_state() != StaffState::Ready;
         r.pickup_handover = txn
             .lines
             .iter()
@@ -3322,6 +3368,13 @@ impl Store {
             CallKind::CashOnly,
         ] {
             self.calls.resolve(register, k, now);
+        }
+        if stamp_call {
+            self.calls
+                .raise(register, CallKind::ReceiptStamp, now, "レシート");
+            return done(format!(
+                "{msg}\nレシートに収入印紙を貼るためスタッフをお呼びしました"
+            ));
         }
         done(msg)
     }
@@ -3767,6 +3820,7 @@ impl Store {
             last_receipt: r.last_receipt.clone(),
             bill_handover: r.bill_handover,
             pickup_handover: r.pickup_handover.clone(),
+            receipt_stamp: r.receipt_stamp,
         }
     }
 }
@@ -3904,6 +3958,7 @@ pub struct RegisterView {
     pub last_receipt: Option<Receipt>,
     pub bill_handover: Option<u32>,
     pub pickup_handover: Option<String>,
+    pub receipt_stamp: Option<ReceiptStamp>,
 }
 
 #[derive(Clone, Debug, Serialize)]

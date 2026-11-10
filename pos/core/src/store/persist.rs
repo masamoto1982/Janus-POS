@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    bell_name, AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, Receipt, Register,
-    StaffSession, Store, Txn,
+    bell_name, AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, Receipt, ReceiptStamp,
+    Register, StaffSession, Store, Txn,
 };
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
 use crate::auth::{self, Authenticator, Guard};
@@ -127,6 +127,8 @@ struct SavedRegister {
     last_receipt: Option<SavedReceipt>,
     bill_handover: Option<u32>,
     pickup_handover: Option<String>,
+    #[serde(default)]
+    receipt_stamp: Option<ReceiptStamp>,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -399,6 +401,7 @@ impl SavedRegister {
             }),
             bill_handover: r.bill_handover,
             pickup_handover: r.pickup_handover.clone(),
+            receipt_stamp: r.receipt_stamp,
             last_op: r.last_op,
             outlet: r.outlet.clone(),
             outlet_since: r.outlet_since,
@@ -438,6 +441,7 @@ impl SavedRegister {
             }),
             bill_handover: self.bill_handover,
             pickup_handover: self.pickup_handover,
+            receipt_stamp: self.receipt_stamp,
             last_op: self.last_op,
             outlet: self.outlet,
             outlet_since: self.outlet_since,

@@ -747,6 +747,8 @@ body.dragging .drop-hint { display: inline; }
 .stamp-table th:nth-child(1), .stamp-table th:nth-child(2) { width: 18%; }
 .stamp-table th:nth-child(3) { width: 40%; }
 .stamp-table th:nth-child(4), .stamp-table th:nth-child(5) { width: 12%; }
+.receipt-stamp-table th:nth-child(1), .receipt-stamp-table th:nth-child(2) { width: 34%; }
+.receipt-stamp-table th:nth-child(3), .receipt-stamp-table th:nth-child(4) { width: 16%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
 
 .staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }

@@ -3,9 +3,16 @@ import type { RegisterView } from "./types";
 import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS } from "./view";
 
 describe("view helpers", () => {
+  it("keeps the signage out of the language switch", () => {
+    expect(signage(0)).toContain("data-i18n-skip");
+  });
+
   it("shows the customer side as closed in the first-wait style while the store menu is open", () => {
     const html = menuPaused();
     expect(html).toContain('<b class="mode-big">休止中</b>');
+    expect(html).toContain(">Please use another register<");
+    expect(html).toContain("空いているレジをお使いください");
+    expect(html).toContain("data-i18n-skip");
     expect(html).not.toContain("<button");
   });
 

@@ -1037,7 +1037,8 @@ export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
 /** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・サービス・たばこの段と同じ位置・高さ）に流すサイネージ。
- *  セール情報や詐欺防止の呼びかけを順番に表示する（シミュレーターの見本）。最下段を両モードで揃え、モード切り替え時の画面の変化を抑える */
+ *  セール情報や詐欺防止の呼びかけを順番に表示する（シミュレーターの見本）。最下段を両モードで揃え、モード切り替え時の画面の変化を抑える。
+ *  現物では広告を画像で流す想定なので、どのモードでも言語切り替えの対象外（data-i18n-skip） */
 export const SIGNAGE: readonly (readonly [string, string])[] = [
   ["揚げ物 2個目半額", "11月30日まで・フライヤーの全商品"],
   ["電話で電子マネーの購入を求められたら詐欺です", "ご心配なときはスタッフにお声がけください"],
@@ -1047,7 +1048,7 @@ export const SIGNAGE_MS = 8000;
 
 export function signage(now = Date.now()): string {
   const [big, small] = SIGNAGE[Math.floor(now / SIGNAGE_MS) % SIGNAGE.length];
-  return `<div class="signage" aria-label="お知らせ">${msg(esc(big), esc(small))}</div>`;
+  return `<div class="signage" aria-label="お知らせ" data-i18n-skip>${msg(esc(big), esc(small))}</div>`;
 }
 
 /** 第一待ち受け画面：レジ前に人がいない間の待ち受け。ヘッダーと待ち受けの帯はそのまま、三段目に稼働モードを特大の文字で示し、最下段はサイネージ。
@@ -1061,9 +1062,9 @@ export function firstWelcome(r: RegisterView, side: Side): string {
 }
 
 /** スタッフ側で店舗メニューを開いている間のお客様側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
- *  帯は高さだけ残して部品は置かず、最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
+ *  帯には部品を置かず英語の「Please use another register」、「休止中」の下に添え字「空いているレジをお使いください」。言語切り替えの影響を受けない（data-i18n-skip）。最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
 export function menuPaused(): string {
-  return `<div class="reg-top welcome-band" aria-hidden="true"></div><div class="first-welcome"><b class="mode-big">休止中</b></div>`;
+  return `<div class="reg-top welcome-band" data-i18n-skip><div class="band-row">${msg("Please use another register")}</div></div><div class="first-welcome" data-i18n-skip><b class="mode-big">休止中</b><small class="mode-sub">空いているレジをお使いください</small></div>`;
 }
 
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */

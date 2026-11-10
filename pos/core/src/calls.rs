@@ -13,6 +13,7 @@ pub enum CallKind {
     Bill,
     Emoney,
     CashOnly,
+    ReceiptStamp,
 }
 
 impl CallKind {
@@ -28,6 +29,7 @@ impl CallKind {
             CallKind::Bill => "公共料金",
             CallKind::Emoney => "電子マネー",
             CallKind::CashOnly => "現金",
+            CallKind::ReceiptStamp => "収入印紙",
         }
     }
 }

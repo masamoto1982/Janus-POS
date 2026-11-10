@@ -108,6 +108,7 @@ export interface StaffView {
   id_pending: boolean;
   bills: BillRow[];
   bill_unchecked: boolean;
+  stamp_pending: boolean;
   point_pending: boolean;
   parcel_ask: boolean;
   method: Method | null;
@@ -129,6 +130,9 @@ export interface BillRow {
   amount: number;
   slip_no: string;
   checked: boolean;
+  /** 領収証に貼る収入印紙の額（要らない払込票は 0） */
+  stamp: number;
+  stamped: boolean;
 }
 
 export interface CustomerView {
@@ -147,6 +151,7 @@ export interface CustomerView {
   parcel_ask: boolean;
   bills: BillRow[];
   bill_unchecked: boolean;
+  stamp_pending: boolean;
   staff_called: boolean;
   age_wait: number | null;
   staff_present: boolean;
@@ -187,6 +192,8 @@ export interface RegisterView {
   unavailable: Unavailable[];
   last_receipt: Receipt | null;
   bill_handover: number | null;
+  /** 決済後、レシートに収入印紙を貼る確認待ち（stamp＝印紙の額、base＝税抜の受取金額） */
+  receipt_stamp: { stamp: number; base: number } | null;
   pickup_handover: string | null;
 }
 

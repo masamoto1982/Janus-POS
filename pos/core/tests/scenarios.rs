@@ -14,6 +14,7 @@ const RECEIVE: &str = "2100000000038";
 const BILL: &str = "2100000000021";
 const WATER_BILL: &str = "2100000000043";
 const GAS_BILL: &str = "2100000000050";
+const TAX_BILL: &str = "2100000000067";
 const STAMP: &str = "4900000000141";
 const TOBACCO: &str = "4900000000127";
 
@@ -1522,6 +1523,197 @@ fn check_bill(s: &mut Store, r: u8, line_id: u32, checked: bool) {
     );
 }
 
+fn affix_stamp(s: &mut Store, r: u8, line_id: u32, affixed: bool) {
+    ok(
+        s,
+        json!({"type":"affix_stamp","register":r,"side":"staff","line_id":line_id,"affixed":affixed}),
+    );
+}
+
+#[test]
+fn revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_then() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BILL);
+    let id = bill_ids(&s, 1)[0];
+    affix_stamp(&mut s, 1, id, true);
+    affix_stamp(&mut s, 1, id, false);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    check_bill(&mut s, 1, id, true);
+    assert!(reg(&s, 1)
+        .staff
+        .payment_blocker
+        .unwrap()
+        .contains("収入印紙"));
+    affix_stamp(&mut s, 1, id, true);
+    assert_eq!(reg(&s, 1).staff.payment_blocker, None);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":50000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    assert_eq!(reg(&s, 1).bill_handover, Some(1));
+}
+
+#[test]
+fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", TAX_BILL);
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.bills[0].amount, 50_000);
+    assert_eq!(v.staff.bills[0].stamp, 0);
+    assert!(!v.staff.stamp_pending);
+    let id = bill_ids(&s, 1)[0];
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_stamp","register":1,"line_id":id,"affixed":true})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    check_bill(&mut s, 1, id, true);
+    assert_eq!(reg(&s, 1).staff.payment_blocker, None);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":50000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    assert_eq!(reg(&s, 1).bill_handover, Some(1));
+}
+
+/// たくさんの買い物で合計 56,200円（すべて 10%、税抜 51,091円）：たばこカートン 6,000円×9、化粧品 2,200円×1
+fn big_basket(s: &mut Store, side: &str) {
+    for (code, qty) in [("4900000000158", 9), ("4910000000069", 1)] {
+        scan(s, 1, side, code);
+        let id = reg(s, 1)
+            .staff
+            .lines
+            .iter()
+            .map(|l| l.line.id)
+            .max()
+            .unwrap();
+        if qty > 1 {
+            ok(
+                s,
+                json!({"type":"set_qty","register":1,"side":side,"line_id":id,"qty":qty}),
+            );
+        }
+    }
+    assert_eq!(reg(s, 1).staff.total, 56_200);
+}
+
+#[test]
+fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    big_basket(&mut s, "staff");
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    no_id_check(&mut s, 1);
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":56200}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let v = reg(&s, 1);
+    let rs = v.receipt_stamp.unwrap();
+    assert_eq!((rs.stamp, rs.base), (200, 51_091));
+    advance(&mut s, 10_000);
+    assert!(
+        reg(&s, 1).last_receipt.is_some(),
+        "印紙の確認まで取引を閉じない"
+    );
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"customer"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
+    );
+    assert_eq!(reg(&s, 1).receipt_stamp, None);
+    advance(&mut s, 10_000);
+    assert!(reg(&s, 1).last_receipt.is_none());
+}
+
+#[test]
+fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
+    let mut s = Store::new(1, 2, 1);
+    // USBメモリ 1,980円×28＝55,440円（税抜 50,400円）
+    scan(&mut s, 1, "customer", "4910000000052");
+    let id = reg(&s, 1).customer.lines[0].id;
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":28}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"qr"}),
+    );
+    assert_eq!(reg(&s, 1).receipt_stamp.map(|r| r.base), Some(50_400));
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.kind == CallKind::ReceiptStamp));
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"})
+    )
+    .is_err());
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
+    );
+    assert!(s.snapshot().calls.is_empty());
+}
+
+#[test]
+fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    big_basket(&mut s, "staff");
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    no_id_check(&mut s, 1);
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"credit"}),
+    );
+    assert_eq!(reg(&s, 1).receipt_stamp, None);
+}
+
+#[test]
+fn revenue_stamp_waits_for_staff_in_self_operated_mode() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", BILL);
+    let id = bill_ids(&s, 1)[0];
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_stamp","register":1,"side":"staff","line_id":id,"affixed":true})
+    )
+    .is_err());
+    assert!(reg(&s, 1).customer.stamp_pending);
+}
+
 fn bill_ids(s: &Store, r: u8) -> Vec<u32> {
     reg(s, r).staff.bills.iter().map(|b| b.line_id).collect()
 }
@@ -1545,10 +1737,10 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     assert_eq!(
         rows,
         [
-            ("電気料金", 5_000),
+            ("電気料金", 50_000),
             ("水道料金", 4_000),
             ("ガス料金", 3_000),
-            ("電気料金", 5_000)
+            ("電気料金", 50_000)
         ]
     );
     let nos: Vec<_> = v.staff.bills.iter().map(|b| b.slip_no.clone()).collect();
@@ -1584,6 +1776,38 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     check_bill(&mut s, 1, ids[3], true);
     let v = reg(&s, 1);
     assert!(!v.staff.bill_unchecked);
+    let stamps: Vec<_> = v.staff.bills.iter().map(|b| b.stamp).collect();
+    assert_eq!(
+        stamps,
+        [200, 0, 0, 200],
+        "5万円以上の払込票だけ収入印紙が要る"
+    );
+    assert!(v.staff.stamp_pending);
+    assert!(v.staff.payment_blocker.unwrap().contains("収入印紙"));
+    assert!(run(
+        &mut s,
+        json!({"type":"insert","register":1,"amount":200000})
+    )
+    .is_err());
+    let e = run(
+        &mut s,
+        json!({"type":"affix_stamp","register":1,"side":"customer","line_id":ids[0],"affixed":true}),
+    )
+    .unwrap_err();
+    assert!(e.contains("スタッフ側"), "{e}");
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"affix_stamp","register":1,"line_id":ids[1],"affixed":true})
+        )
+        .is_err(),
+        "印紙の要らない払込票は確認しない"
+    );
+    affix_stamp(&mut s, 1, ids[0], true);
+    assert!(reg(&s, 1).staff.stamp_pending, "一枚ずつ確認する");
+    affix_stamp(&mut s, 1, ids[3], true);
+    let v = reg(&s, 1);
+    assert!(!v.staff.stamp_pending);
     assert_eq!(v.staff.payment_blocker, None);
     for m in ["credit", "qr", "points"] {
         assert!(
@@ -1595,11 +1819,14 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
             "{m}"
         );
     }
-    ok(&mut s, json!({"type":"insert","register":1,"amount":20000}));
+    ok(
+        &mut s,
+        json!({"type":"insert","register":1,"amount":110000}),
+    );
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     let r = v.last_receipt.unwrap();
-    assert_eq!((r.total, r.method, r.points), (17_000, "現金", 0));
+    assert_eq!((r.total, r.method, r.points), (107_000, "現金", 0));
     assert_eq!(v.bill_handover, Some(4));
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     advance(&mut s, 10_000);
@@ -1910,31 +2137,40 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
 }
 
 #[test]
-fn shopping_is_limited_to_ten_items() {
+fn shopping_is_limited_to_100_items() {
     let mut s = Store::new(1, 2, 1);
-    for _ in 0..9 {
-        scan(&mut s, 1, "customer", BREAD);
-    }
+    scan(&mut s, 1, "customer", BREAD);
+    let id = reg(&s, 1).customer.lines[0].id;
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":99}),
+    );
     login(&mut s, 1);
     advance(&mut s, 1_000);
     let ff = |qty: u32| json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":qty});
     let e = run(&mut s, ff(2)).unwrap_err();
-    assert!(e.contains("10点"), "{e}");
+    assert!(e.contains("100点"), "{e}");
     ok(&mut s, ff(1));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 10);
+    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 100);
     assert!(!allowed(&v, Side::Staff, Action::RegisterFf));
     let e = run(
         &mut s,
         json!({"type":"scan","register":1,"side":"customer","code":BREAD}),
     )
     .unwrap_err();
-    assert!(e.contains("10点"), "{e}");
-    let id = reg(&s, 1).staff.lines[0].line.id;
+    assert!(e.contains("100点"), "{e}");
+    let ffid = reg(&s, 1)
+        .staff
+        .lines
+        .iter()
+        .map(|l| l.line.id)
+        .max()
+        .unwrap();
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":ffid}),
     );
     scan(&mut s, 1, "customer", BREAD);
 }
@@ -2129,7 +2365,8 @@ fn staff_or_customer_changes_a_line_quantity() {
     let bread = v.customer.lines.iter().find(|l| l.id == id).unwrap();
     assert_eq!(bread.qty, 3);
     assert_eq!(v.customer.total, 160 * 3 + 320);
-    assert!(run(&mut s, set(10)).is_err(), "over the 10-item limit");
+    ok(&mut s, set(99));
+    assert!(run(&mut s, set(100)).is_err(), "over the 100-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
     ok(&mut s, set(1));
     assert_eq!(reg(&s, 1).customer.total, 160 + 320);
@@ -3306,7 +3543,10 @@ fn a_short_ring_left_unanswered_is_not_an_emergency() {
 #[test]
 fn emergency_also_while_the_bell_cannot_reach_anyone() {
     let mut s = Store::new(1, 1, 1);
-    ok(&mut s, json!({"type":"set_bell_offline","bell":0,"offline":true}));
+    ok(
+        &mut s,
+        json!({"type":"set_bell_offline","bell":0,"offline":true}),
+    );
     advance(&mut s, 20_000);
     assert!(reg(&s, 1).bell_dead);
     for _ in 0..10 {
@@ -3320,7 +3560,10 @@ fn no_emergency_in_staff_operated_mode() {
     let mut s = Store::new(1, 1, 1);
     login(&mut s, 1);
     for _ in 0..10 {
-        ok(&mut s, json!({"type":"call_staff","register":1,"topic":"sos"}));
+        ok(
+            &mut s,
+            json!({"type":"call_staff","register":1,"topic":"sos"}),
+        );
         advance(&mut s, 200);
         ok(&mut s, json!({"type":"release_call","register":1}));
     }

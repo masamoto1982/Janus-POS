@@ -266,6 +266,18 @@ pub enum Command {
         line_id: u32,
         checked: bool,
     },
+    AffixReceiptStamp {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+    },
+    AffixStamp {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+        line_id: u32,
+        affixed: bool,
+    },
     HandOverBills {
         register: u8,
         #[serde(default = "staff_side")]
@@ -442,6 +454,8 @@ impl Command {
             | C::DismissConfiscated { register }
             | C::DismissFfCollect { register }
             | C::CheckBill { register, .. }
+            | C::AffixStamp { register, .. }
+            | C::AffixReceiptStamp { register, .. }
             | C::HandOverBills { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
@@ -478,6 +492,8 @@ impl Command {
             | C::SelectPayment { side, .. }
             | C::ConfirmPointCard { side, .. }
             | C::CheckBill { side, .. }
+            | C::AffixStamp { side, .. }
+            | C::AffixReceiptStamp { side, .. }
             | C::HandOverBills { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
@@ -512,6 +528,31 @@ pub struct BillRow {
     pub amount: u32,
     pub slip_no: String,
     pub checked: bool,
+    /// 領収証に貼る収入印紙の額（要らない払込票は 0）
+    pub stamp: u32,
+    /// 収入印紙の貼り付けを確認した
+    pub stamped: bool,
+}
+
+/// 払込票の明細に要る収入印紙の額。税金（公金）の領収証は非課税なので 0
+fn line_stamp(l: &Line) -> u32 {
+    if catalog::find(l.code).is_some_and(|p| p.stamp_exempt) {
+        0
+    } else {
+        stamp_duty(l.amount())
+    }
+}
+
+/// 領収証（払込票のお客様控え）に貼る収入印紙の額。受取金額 5 万円以上で要る
+pub fn stamp_duty(amount: u32) -> u32 {
+    match amount {
+        0..=49_999 => 0,
+        50_000..=1_000_000 => 200,
+        1_000_001..=2_000_000 => 400,
+        2_000_001..=3_000_000 => 600,
+        3_000_001..=5_000_000 => 1_000,
+        _ => 2_000,
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -557,6 +598,9 @@ pub struct Line {
     pub kind: LineKind,
     #[serde(skip)]
     pub slip_no: Option<String>,
+    /// 払込票の領収証に収入印紙を貼り付けたのを確認した
+    #[serde(skip)]
+    pub stamped: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parcel: Option<Parcel>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -799,6 +843,20 @@ impl Txn {
         })
     }
 
+    fn needs_stamp(l: &Line) -> bool {
+        l.is_bill() && line_stamp(l) > 0
+    }
+
+    fn has_stamps(&self) -> bool {
+        self.lines.iter().any(Self::needs_stamp)
+    }
+
+    fn stamp_pending(&self) -> bool {
+        self.lines
+            .iter()
+            .any(|l| Self::needs_stamp(l) && !l.stamped)
+    }
+
     fn bill_rows(&self) -> Vec<BillRow> {
         self.lines
             .iter()
@@ -816,6 +874,8 @@ impl Txn {
                         ..
                     }
                 ),
+                stamp: line_stamp(l),
+                stamped: l.stamped,
             })
             .collect()
     }
@@ -903,6 +963,7 @@ impl Txn {
             cash_only: p.cash_only,
             kind,
             slip_no: None,
+            stamped: false,
             parcel: p.parcel_send.then(|| Parcel {
                 collect: p.parcel_collect,
                 ..Parcel::default()
@@ -926,6 +987,15 @@ pub struct Receipt {
     pub points: u32,
 }
 
+/// 通常のお買い物でレシート（金銭の受取書）に収入印紙が要るとき。
+/// 税抜の受取金額が 5 万円以上で、クレジットカード払いでないとき
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReceiptStamp {
+    pub stamp: u32,
+    /// 印紙税の判定に使う税抜の金額
+    pub base: u32,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct StaffSession {
     account: &'static auth::StaffAccount,
@@ -941,6 +1011,7 @@ struct Register {
     last_receipt: Option<Receipt>,
     bill_handover: Option<u32>,
     pickup_handover: Option<String>,
+    receipt_stamp: Option<ReceiptStamp>,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -1046,7 +1117,10 @@ impl Register {
             parcel_ask: t.parcel_ask,
             has_bills: t.bill_slips() > 0,
             bill_unchecked: t.bill_unchecked(),
+            has_stamps: t.has_stamps(),
+            stamp_pending: t.stamp_pending(),
             bill_handover: self.bill_handover.is_some(),
+            receipt_stamp: self.receipt_stamp.is_some(),
             point_pending: t.paying
                 && !t.point_checked
                 && !(t.age_choice_pending() || t.id_pending()),
@@ -1194,6 +1268,7 @@ impl Store {
                 last_receipt: None,
                 bill_handover: None,
                 pickup_handover: None,
+                receipt_stamp: None,
                 last_op: 0,
                 outlet: Cash::default(),
                 outlet_since: None,
@@ -1241,6 +1316,7 @@ impl Store {
             if r.outlet.total() == 0
                 && r.bill_handover.is_none()
                 && r.pickup_handover.is_none()
+                && r.receipt_stamp.is_none()
                 && r.last_receipt
                     .as_ref()
                     .is_some_and(|rc| rc.at + THANKS_MS <= now)
@@ -1324,6 +1400,7 @@ impl Store {
                 r.menu = None;
                 r.bill_handover = None;
                 r.pickup_handover = None;
+                r.receipt_stamp = None;
                 r.last_op = now;
             }
         }
@@ -1957,6 +2034,42 @@ impl Store {
                     format!("{name}：確認を外しました")
                 })
             }
+            C::AffixReceiptStamp { register, side } => {
+                self.check(register, side, Action::AffixReceiptStamp)?;
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                let rs = r
+                    .receipt_stamp
+                    .take()
+                    .ok_or("収入印紙を貼るレシートはありません")?;
+                self.calls.resolve(register, CallKind::ReceiptStamp, now);
+                done(format!(
+                    "レシートに収入印紙 {}円の貼り付けを確認しました",
+                    rs.stamp
+                ))
+            }
+            C::AffixStamp {
+                register,
+                side,
+                line_id,
+                affixed,
+            } => {
+                self.check(register, side, Action::AffixStamp)?;
+                let r = self.reg_mut(register)?;
+                let l = r
+                    .txn
+                    .lines
+                    .iter_mut()
+                    .find(|l| Txn::needs_stamp(l) && l.id == line_id)
+                    .ok_or("収入印紙が必要な払込票が見つかりません")?;
+                l.stamped = affixed;
+                let name = format!("{} {}円", l.name, l.amount());
+                done(if affixed {
+                    format!("{name}：収入印紙の貼り付けを確認しました")
+                } else {
+                    format!("{name}：収入印紙の確認を外しました")
+                })
+            }
             C::HandOverBills { register, side } => {
                 self.check(register, side, Action::HandOverBills)?;
                 let r = self.reg_mut(register)?;
@@ -2439,7 +2552,8 @@ impl Store {
         }
         r.pressing = true;
         if r.staff.is_none() {
-            r.press_log.retain(|&t| now.saturating_sub(t) < EMERGENCY_WINDOW_MS);
+            r.press_log
+                .retain(|&t| now.saturating_sub(t) < EMERGENCY_WINDOW_MS);
             r.press_log.push(now);
         }
         self.presses += 1;
@@ -2593,6 +2707,7 @@ impl Store {
         r.last_receipt = None;
         r.bill_handover = None;
         r.pickup_handover = None;
+        r.receipt_stamp = None;
         if let Scanned::PointCard(no) = &scanned {
             // 決済が終わるまではいつでも付与できる。支払い中に読んでも登録画面へは戻さない
             if r.txn.paying {
@@ -2941,6 +3056,11 @@ impl Store {
         let slips = r.txn.bill_slips();
         if slips > 0 {
             r.txn.method = Some(PaymentMethod::Cash);
+            if !r.txn.bill_unchecked() && r.txn.stamp_pending() {
+                return done(format!(
+                    "公共料金 {slips}枚：領収証に収入印紙を貼り付けてください"
+                ));
+            }
             if !r.txn.bill_unchecked() {
                 return done(format!("公共料金 {slips}枚：現金でお支払いください"));
             }
@@ -3161,6 +3281,8 @@ impl Store {
         self.receipts += 1;
         let no = self.receipts;
         let now = self.now;
+        let rates = self.tax.display_rates();
+        let rounding = self.tax.rounding;
         let r = self.reg_mut(register)?;
         let total = r.txn.total();
         let due = r.txn.due();
@@ -3183,6 +3305,14 @@ impl Store {
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
+        // 払込票は払込票ごとに確認済み。通常のお買い物はレシートの税抜金額で判定する
+        let base = total.saturating_sub(txn.taxes(&rates, rounding).iter().map(|t| t.tax).sum());
+        let credit = method == PaymentMethod::Credit && txn.prepaid == 0;
+        r.receipt_stamp = (slips == 0 && !credit && stamp_duty(base) > 0).then_some(ReceiptStamp {
+            stamp: stamp_duty(base),
+            base,
+        });
+        let stamp_call = r.receipt_stamp.is_some() && r.staff_state() != StaffState::Ready;
         r.pickup_handover = txn
             .lines
             .iter()
@@ -3238,6 +3368,13 @@ impl Store {
             CallKind::CashOnly,
         ] {
             self.calls.resolve(register, k, now);
+        }
+        if stamp_call {
+            self.calls
+                .raise(register, CallKind::ReceiptStamp, now, "レシート");
+            return done(format!(
+                "{msg}\nレシートに収入印紙を貼るためスタッフをお呼びしました"
+            ));
         }
         done(msg)
     }
@@ -3599,6 +3736,7 @@ impl Store {
                 returned: returned.clone(),
                 bills: t.bill_rows(),
                 bill_unchecked: c.bill_unchecked,
+                stamp_pending: c.stamp_pending,
                 point_pending: c.point_pending,
                 parcel_ask: c.parcel_ask,
                 method: t.method,
@@ -3628,6 +3766,7 @@ impl Store {
                 parcel_ask: c.parcel_ask,
                 bills: t.bill_rows(),
                 bill_unchecked: c.bill_unchecked,
+                stamp_pending: c.stamp_pending,
                 staff_called,
                 age_wait: t
                     .required_age
@@ -3681,6 +3820,7 @@ impl Store {
             last_receipt: r.last_receipt.clone(),
             bill_handover: r.bill_handover,
             pickup_handover: r.pickup_handover.clone(),
+            receipt_stamp: r.receipt_stamp,
         }
     }
 }
@@ -3741,6 +3881,7 @@ pub struct StaffView {
     pub id_pending: bool,
     pub bills: Vec<BillRow>,
     pub bill_unchecked: bool,
+    pub stamp_pending: bool,
     pub point_pending: bool,
     pub parcel_ask: bool,
     pub method: Option<PaymentMethod>,
@@ -3772,6 +3913,7 @@ pub struct CustomerView {
     pub parcel_ask: bool,
     pub bills: Vec<BillRow>,
     pub bill_unchecked: bool,
+    pub stamp_pending: bool,
     pub staff_called: bool,
     pub age_wait: Option<u8>,
     pub staff_present: bool,
@@ -3816,6 +3958,7 @@ pub struct RegisterView {
     pub last_receipt: Option<Receipt>,
     pub bill_handover: Option<u32>,
     pub pickup_handover: Option<String>,
+    pub receipt_stamp: Option<ReceiptStamp>,
 }
 
 #[derive(Clone, Debug, Serialize)]

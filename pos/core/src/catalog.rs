@@ -82,6 +82,8 @@ pub struct Product {
     pub parcel_send: bool,
     pub parcel_pickup: bool,
     pub parcel_collect: bool,
+    /// 税金（公金）の払込票。領収証に収入印紙が要らない（印紙税の非課税）
+    pub stamp_exempt: bool,
 }
 
 const fn p(
@@ -103,6 +105,7 @@ const fn p(
         parcel_send: false,
         parcel_pickup: false,
         parcel_collect: false,
+        stamp_exempt: false,
     }
 }
 
@@ -129,6 +132,10 @@ pub const CATALOG: &[Product] = &[
     p("4910000000014", "新聞", 160, Standard10, Newspaper),
     p("4910000000038", "雑誌", 480, Standard10, Magazine),
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),
+    // コンビニでは比較的高額な品。たくさん買うと合計が税抜 5 万円を超え、レシートに収入印紙が要る
+    p("4900000000158", "たばこカートン", 6000, Standard10, Tobacco),
+    p("4910000000052", "USBメモリ", 1980, Standard10, Daily),
+    p("4910000000069", "化粧品", 2200, Standard10, Daily),
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
     p("4900000000141", "切手", 110, Standard10, Stamp),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
@@ -149,9 +156,14 @@ pub const CATALOG: &[Product] = &[
         parcel_pickup: true,
         ..p("2100000000038", "荷物を受取る", 0, Standard10, Service)
     },
-    bill("2100000000021", "電気料金", 5000),
+    bill("2100000000021", "電気料金", 50000),
     bill("2100000000043", "水道料金", 4000),
     bill("2100000000050", "ガス料金", 3000),
+    // 同じ5万円でも税金の領収証には収入印紙が要らない
+    Product {
+        stamp_exempt: true,
+        ..bill("2100000000067", "自動車税", 50000)
+    },
     p("FF01", "フライドチキン", 220, Reduced8, FastFood),
     p("FF02", "スパイシーチキン", 220, Reduced8, FastFood),
     p("FF03", "アメリカンドック", 140, Reduced8, FastFood),

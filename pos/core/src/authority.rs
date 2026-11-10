@@ -78,6 +78,8 @@ pub enum Action {
     EarlyAgeCheck,
     CheckId,
     CheckBill,
+    AffixStamp,
+    AffixReceiptStamp,
     HandOverBills,
     InsertCash,
     TapEmoney,
@@ -108,6 +110,8 @@ pub const ACTIONS: &[Action] = &[
     Action::EarlyAgeCheck,
     Action::CheckId,
     Action::CheckBill,
+    Action::AffixStamp,
+    Action::AffixReceiptStamp,
     Action::HandOverBills,
     Action::InsertCash,
     Action::TapEmoney,
@@ -137,7 +141,13 @@ pub struct Context {
     pub parcel_ask: bool,
     pub has_bills: bool,
     pub bill_unchecked: bool,
+    /// 収入印紙が要る払込票がある
+    pub has_stamps: bool,
+    /// 収入印紙の貼り付けがまだ確認できていない払込票がある
+    pub stamp_pending: bool,
     pub bill_handover: bool,
+    /// 決済後、レシートに収入印紙を貼る確認を待っている
+    pub receipt_stamp: bool,
     pub point_pending: bool,
     pub has_coupons: bool,
     pub coupon_unmatched: bool,
@@ -150,8 +160,8 @@ pub struct Context {
     pub cash_only_goods: bool,
 }
 
-pub const MAX_ITEMS: u32 = 10;
-pub const ITEMS_FULL: Denial = "買い物点数の上限（10点）に達しています";
+pub const MAX_ITEMS: u32 = 100;
+pub const ITEMS_FULL: Denial = "買い物点数の上限（100点）に達しています";
 
 pub const TOUCH_LOCK_MS: u64 = 1000;
 
@@ -161,6 +171,8 @@ impl Context {
             Some(EMONEY_SHORT)
         } else if self.bill_unchecked {
             Some(BILL_UNCHECKED)
+        } else if self.stamp_pending {
+            Some(STAMP_UNCHECKED)
         } else if self.mode == Mode::SelfOperated && self.cash_only_goods {
             Some(SELF_OP_CASH_ONLY_GOODS)
         } else if self.mode == Mode::SelfOperated && self.method == Some(PaymentMethod::Cash) {
@@ -193,6 +205,7 @@ const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでい
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります\n対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
+const STAMP_UNCHECKED: Denial = "収入印紙の貼り付けが確認できていません";
 const SELF_OP_CASH_ONLY_GOODS: Denial = "切手・お支払いは現金のみです\nスタッフがお預かりします";
 const SELF_OP_NO_CASH: Denial =
     "セルフレジでは現金を使えません\n現金はスタッフがお預かりいたします";
@@ -216,6 +229,14 @@ fn check_bill(c: &Context) -> Result<(), Denial> {
     require(c.phase == Phase::Paying, "会計ボタンを押してから確認します")
 }
 
+fn affix_stamp(c: &Context) -> Result<(), Denial> {
+    require(c.has_stamps, "収入印紙が必要な払込票はありません")
+}
+
+fn affix_receipt_stamp(c: &Context) -> Result<(), Denial> {
+    require(c.receipt_stamp, "収入印紙を貼るレシートはありません")
+}
+
 fn hand_over_bills(c: &Context) -> Result<(), Denial> {
     require(c.bill_handover, "お渡しする払込票はありません")
 }
@@ -227,6 +248,8 @@ pub fn is_staff_only(action: Action) -> bool {
             | Action::EarlyAgeCheck
             | Action::CheckId
             | Action::CheckBill
+            | Action::AffixStamp
+            | Action::AffixReceiptStamp
             | Action::HandOverBills
             | Action::CheckFf
     )
@@ -298,6 +321,8 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Ok(())
         } else if matches!(action, Action::CheckBill | Action::HandOverBills) {
             Err("払込票の確認・お渡しはスタッフ側の画面で行います")
+        } else if matches!(action, Action::AffixStamp | Action::AffixReceiptStamp) {
+            Err("収入印紙の貼り付け確認はスタッフ側の画面で行います")
         } else if action == Action::CheckFf {
             Err("FF のお渡し確認はスタッフ側の画面で行います")
         } else if is_staff_only(action) {
@@ -402,6 +427,8 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::EarlyAgeCheck => early_age_check(c),
         Action::CheckId => check_id(c),
         Action::CheckBill => check_bill(c),
+        Action::AffixStamp => affix_stamp(c),
+        Action::AffixReceiptStamp => affix_receipt_stamp(c),
         Action::HandOverBills => hand_over_bills(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
@@ -452,6 +479,14 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CheckBill => {
             check_bill(c)?;
             Err("払込票の確認はスタッフがログインしてから行います")
+        }
+        Action::AffixReceiptStamp => {
+            affix_receipt_stamp(c)?;
+            Err("収入印紙の貼り付け確認はスタッフがログインしてから行います")
+        }
+        Action::AffixStamp => {
+            affix_stamp(c)?;
+            Err("収入印紙の貼り付け確認はスタッフがログインしてから行います")
         }
         Action::HandOverBills => hand_over_bills(c),
         Action::InsertCash => Err(SELF_OP_NO_CASH),
@@ -513,7 +548,10 @@ mod tests {
                                             parcel_ask: false,
                                             has_bills: bill_unchecked,
                                             bill_unchecked,
+                                            has_stamps: false,
+                                            stamp_pending: false,
                                             bill_handover: false,
+                                            receipt_stamp: false,
                                             method,
                                         });
                                     }

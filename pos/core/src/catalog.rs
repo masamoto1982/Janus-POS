@@ -134,8 +134,6 @@ pub const CATALOG: &[Product] = &[
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
     p("4900000000141", "切手", 110, Standard10, Stamp),
-    // 税抜 5 万円ちょうど。現金などで払うとレシートに収入印紙が要る
-    p("4910000000045", "ゲーム機", 55000, Standard10, Daily),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
     p("2000000000039", "フォーク", 3, Standard10, Bag),

@@ -160,8 +160,8 @@ pub struct Context {
     pub cash_only_goods: bool,
 }
 
-pub const MAX_ITEMS: u32 = 10;
-pub const ITEMS_FULL: Denial = "買い物点数の上限（10点）に達しています";
+pub const MAX_ITEMS: u32 = 100;
+pub const ITEMS_FULL: Denial = "買い物点数の上限（100点）に達しています";
 
 pub const TOUCH_LOCK_MS: u64 = 1000;
 

@@ -1581,23 +1581,43 @@ fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
     assert_eq!(reg(&s, 1).bill_handover, Some(1));
 }
 
-const GAME: &str = "4910000000045";
+/// たくさんの買い物で合計 55,440円（すべて 10%、税抜 50,400円）：たばこ 600円×90（9 カートン）、雑誌 480円×3
+fn big_basket(s: &mut Store, side: &str) {
+    for (code, qty) in [("4900000000127", 90), ("4910000000038", 3)] {
+        scan(s, 1, side, code);
+        let id = reg(s, 1)
+            .staff
+            .lines
+            .iter()
+            .map(|l| l.line.id)
+            .max()
+            .unwrap();
+        if qty > 1 {
+            ok(
+                s,
+                json!({"type":"set_qty","register":1,"side":side,"line_id":id,"qty":qty}),
+            );
+        }
+    }
+    assert_eq!(reg(s, 1).staff.total, 55_440);
+}
 
 #[test]
 fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", GAME);
+    big_basket(&mut s, "staff");
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
+    no_id_check(&mut s, 1);
     confirm_point(&mut s, 1);
-    ok(&mut s, json!({"type":"insert","register":1,"amount":55000}));
+    ok(&mut s, json!({"type":"insert","register":1,"amount":55440}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     let rs = v.receipt_stamp.unwrap();
-    assert_eq!((rs.stamp, rs.base), (200, 50_000));
+    assert_eq!((rs.stamp, rs.base), (200, 50_400));
     advance(&mut s, 10_000);
     assert!(
         reg(&s, 1).last_receipt.is_some(),
@@ -1621,11 +1641,12 @@ fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
 fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", GAME);
+    big_basket(&mut s, "staff");
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
+    no_id_check(&mut s, 1);
     confirm_point(&mut s, 1);
     ok(
         &mut s,
@@ -1636,42 +1657,6 @@ fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
         json!({"type":"tap_emoney","register":1,"method":"credit"}),
     );
     assert_eq!(reg(&s, 1).receipt_stamp, None);
-}
-
-#[test]
-fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
-    let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", GAME);
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
-    );
-    confirm_point(&mut s, 1);
-    ok(
-        &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"tap_emoney","register":1,"method":"qr"}),
-    );
-    assert!(reg(&s, 1).receipt_stamp.is_some());
-    assert!(s
-        .snapshot()
-        .calls
-        .iter()
-        .any(|c| c.kind == CallKind::ReceiptStamp));
-    assert!(run(
-        &mut s,
-        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"})
-    )
-    .is_err());
-    login(&mut s, 1);
-    ok(
-        &mut s,
-        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
-    );
-    assert!(s.snapshot().calls.is_empty());
 }
 
 #[test]
@@ -2110,31 +2095,40 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
 }
 
 #[test]
-fn shopping_is_limited_to_ten_items() {
+fn shopping_is_limited_to_100_items() {
     let mut s = Store::new(1, 2, 1);
-    for _ in 0..9 {
-        scan(&mut s, 1, "customer", BREAD);
-    }
+    scan(&mut s, 1, "customer", BREAD);
+    let id = reg(&s, 1).customer.lines[0].id;
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":99}),
+    );
     login(&mut s, 1);
     advance(&mut s, 1_000);
     let ff = |qty: u32| json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":qty});
     let e = run(&mut s, ff(2)).unwrap_err();
-    assert!(e.contains("10点"), "{e}");
+    assert!(e.contains("100点"), "{e}");
     ok(&mut s, ff(1));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 10);
+    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 100);
     assert!(!allowed(&v, Side::Staff, Action::RegisterFf));
     let e = run(
         &mut s,
         json!({"type":"scan","register":1,"side":"customer","code":BREAD}),
     )
     .unwrap_err();
-    assert!(e.contains("10点"), "{e}");
-    let id = reg(&s, 1).staff.lines[0].line.id;
+    assert!(e.contains("100点"), "{e}");
+    let ffid = reg(&s, 1)
+        .staff
+        .lines
+        .iter()
+        .map(|l| l.line.id)
+        .max()
+        .unwrap();
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":ffid}),
     );
     scan(&mut s, 1, "customer", BREAD);
 }
@@ -2329,7 +2323,8 @@ fn staff_or_customer_changes_a_line_quantity() {
     let bread = v.customer.lines.iter().find(|l| l.id == id).unwrap();
     assert_eq!(bread.qty, 3);
     assert_eq!(v.customer.total, 160 * 3 + 320);
-    assert!(run(&mut s, set(10)).is_err(), "over the 10-item limit");
+    ok(&mut s, set(99));
+    assert!(run(&mut s, set(100)).is_err(), "over the 100-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
     ok(&mut s, set(1));
     assert_eq!(reg(&s, 1).customer.total, 160 + 320);

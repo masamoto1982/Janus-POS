@@ -14,6 +14,7 @@ const RECEIVE: &str = "2100000000038";
 const BILL: &str = "2100000000021";
 const WATER_BILL: &str = "2100000000043";
 const GAS_BILL: &str = "2100000000050";
+const TAX_BILL: &str = "2100000000067";
 const STAMP: &str = "4900000000141";
 const TOBACCO: &str = "4900000000127";
 
@@ -1548,6 +1549,32 @@ fn revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_the
         .unwrap()
         .contains("収入印紙"));
     affix_stamp(&mut s, 1, id, true);
+    assert_eq!(reg(&s, 1).staff.payment_blocker, None);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":50000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    assert_eq!(reg(&s, 1).bill_handover, Some(1));
+}
+
+#[test]
+fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", TAX_BILL);
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.bills[0].amount, 50_000);
+    assert_eq!(v.staff.bills[0].stamp, 0);
+    assert!(!v.staff.stamp_pending);
+    let id = bill_ids(&s, 1)[0];
+    assert!(run(
+        &mut s,
+        json!({"type":"affix_stamp","register":1,"line_id":id,"affixed":true})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    check_bill(&mut s, 1, id, true);
     assert_eq!(reg(&s, 1).staff.payment_blocker, None);
     ok(&mut s, json!({"type":"insert","register":1,"amount":50000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));

@@ -1396,6 +1396,7 @@ const PARCEL_CODES = ["2100000000014", "2100000000045"];
 const PICKUP_CODE = "2100000000038";
 
 const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
+const TAX_CODES = ["2100000000067"];
 
 const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
 const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
@@ -1425,6 +1426,8 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
       .map((p) =>
         BILL_CODES.includes(p.code)
           ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
+          : TAX_CODES.includes(p.code)
+            ? item(p.code, "税金", `${esc(p.name)} ${yen(p.price)}`)
           :
             PARCEL_CODES.includes(p.code)
             ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))

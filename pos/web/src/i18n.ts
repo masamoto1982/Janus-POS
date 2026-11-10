@@ -465,6 +465,8 @@ const DICT: Record<string, string> = {
   "荷物を送る 着払い": "Send parcel (collect)",
   荷物を受取る: "Parcel pickup",
   電気料金: "Electricity bill",
+  自動車税: "Automobile tax",
+  税金: "Tax",
   水道料金: "Water bill",
   ガス料金: "Gas bill",
   フライドチキン: "Fried chicken",

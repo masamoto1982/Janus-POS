@@ -82,6 +82,8 @@ pub struct Product {
     pub parcel_send: bool,
     pub parcel_pickup: bool,
     pub parcel_collect: bool,
+    /// 税金（公金）の払込票。領収証に収入印紙が要らない（印紙税の非課税）
+    pub stamp_exempt: bool,
 }
 
 const fn p(
@@ -103,6 +105,7 @@ const fn p(
         parcel_send: false,
         parcel_pickup: false,
         parcel_collect: false,
+        stamp_exempt: false,
     }
 }
 
@@ -152,6 +155,11 @@ pub const CATALOG: &[Product] = &[
     bill("2100000000021", "電気料金", 50000),
     bill("2100000000043", "水道料金", 4000),
     bill("2100000000050", "ガス料金", 3000),
+    // 同じ5万円でも税金の領収証には収入印紙が要らない
+    Product {
+        stamp_exempt: true,
+        ..bill("2100000000067", "自動車税", 50000)
+    },
     p("FF01", "フライドチキン", 220, Reduced8, FastFood),
     p("FF02", "スパイシーチキン", 220, Reduced8, FastFood),
     p("FF03", "アメリカンドック", 140, Reduced8, FastFood),

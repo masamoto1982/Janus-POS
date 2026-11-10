@@ -527,6 +527,15 @@ pub struct BillRow {
     pub stamped: bool,
 }
 
+/// 払込票の明細に要る収入印紙の額。税金（公金）の領収証は非課税なので 0
+fn line_stamp(l: &Line) -> u32 {
+    if catalog::find(l.code).is_some_and(|p| p.stamp_exempt) {
+        0
+    } else {
+        stamp_duty(l.amount())
+    }
+}
+
 /// 領収証（払込票のお客様控え）に貼る収入印紙の額。受取金額 5 万円以上で要る
 pub fn stamp_duty(amount: u32) -> u32 {
     match amount {
@@ -828,7 +837,7 @@ impl Txn {
     }
 
     fn needs_stamp(l: &Line) -> bool {
-        l.is_bill() && stamp_duty(l.amount()) > 0
+        l.is_bill() && line_stamp(l) > 0
     }
 
     fn has_stamps(&self) -> bool {
@@ -858,7 +867,7 @@ impl Txn {
                         ..
                     }
                 ),
-                stamp: stamp_duty(l.amount()),
+                stamp: line_stamp(l),
                 stamped: l.stamped,
             })
             .collect()

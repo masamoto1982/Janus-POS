@@ -1061,9 +1061,9 @@ export function firstWelcome(r: RegisterView, side: Side): string {
 }
 
 /** スタッフ側で店舗メニューを開いている間のお客様側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
- *  帯には部品を置かず「空いているレジをお使い下さい」を出し、最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
+ *  帯には部品を置かず英語の「Closed」を出し、最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
 export function menuPaused(): string {
-  return `<div class="reg-top welcome-band"><div class="band-row">${msg("空いているレジをお使い下さい")}</div></div><div class="first-welcome"><b class="mode-big">休止中</b></div>`;
+  return `<div class="reg-top welcome-band"><div class="band-row">${msg("Closed")}</div></div><div class="first-welcome"><b class="mode-big">休止中</b></div>`;
 }
 
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */

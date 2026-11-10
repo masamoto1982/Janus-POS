@@ -6,7 +6,7 @@ describe("view helpers", () => {
   it("shows the customer side as closed in the first-wait style while the store menu is open", () => {
     const html = menuPaused();
     expect(html).toContain('<b class="mode-big">休止中</b>');
-    expect(html).toContain("空いているレジをお使い下さい");
+    expect(html).toContain(">Closed<");
     expect(html).not.toContain("<button");
   });
 

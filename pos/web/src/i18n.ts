@@ -238,15 +238,15 @@ const DICT: Record<string, string> = {
   チケットの発券待ち: "Waiting to issue tickets",
   ほかのレジのチケットのお渡しが済むと発券します: "Tickets will print once another register finishes handing over its tickets",
   発券の順番をお待ちください: "Please wait for your tickets to print",
-  "チケットのお渡しが済んでから、次の登録を始めてください": "Hand over the tickets before starting the next sale",
+  "チケットは、ほかの商品と一緒に会計できません（チケットどうしは一緒に会計できます）": "Tickets can't be paid together with other items (tickets can be paid together)",
   "発券したチケットを数えて、レシートと一緒にお渡しください": "Count the issued tickets and hand them over with the receipt",
   "チケットとレシート、お釣りをお受け取りください": "Please take your tickets, receipt and change",
   チケットとレシートをお受け取りください: "Please take your tickets and receipt",
   お渡しするチケットはありません: "No tickets to hand over",
   チケットのお渡し確認はスタッフ側の画面で行います: "Ticket hand-over is checked on the staff screen",
   チケットのお渡し確認はスタッフがログインしてから行います: "Ticket hand-over is checked after a staff member logs in",
-  "申込券でチケットを買う、現金のみで、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする":
-    "Buy tickets with an application slip; cash only; after payment, staff count the issued tickets and hand them over",
+  "申込券でチケットを買う、現金のみでほかの商品とは別会計、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする":
+    "Buy tickets with an application slip; cash only and paid separately from other items; after payment, staff count the issued tickets and hand them over",
 
   // 公共料金
   事業者: "Payee",

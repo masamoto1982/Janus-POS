@@ -3631,16 +3631,24 @@ fn tickets_are_issued_after_payment_and_handed_over_by_count() {
     login(&mut s, 1);
     scan(&mut s, 1, "staff", TICKET);
     scan(&mut s, 1, "staff", TICKET);
-    scan(&mut s, 1, "staff", BREAD);
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"staff","code":BREAD}),
+    )
+    .unwrap_err();
+    assert!(e.contains("ほかの商品と一緒に"), "{e}");
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.len(), 3, "申込券は一枚ずつ一行");
-    assert_eq!(v.staff.total, 15_600 * 2 + 160);
+    assert_eq!(v.staff.lines.len(), 2, "申込券は一枚ずつ一行");
+    assert_eq!(v.staff.total, 15_600 * 2);
     assert!(v.ticket_handover.is_empty(), "支払い前は発券しない");
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
-    confirm_point(&mut s, 1);
+    assert!(
+        !reg(&s, 1).staff.point_pending,
+        "ポイント対象外なのでカードの確認はない"
+    );
     for m in ["credit", "qr"] {
         assert!(
             run(
@@ -3691,6 +3699,19 @@ fn tickets_are_issued_after_payment_and_handed_over_by_count() {
 }
 
 #[test]
+fn tickets_cannot_share_a_transaction_with_other_goods() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"staff","code":TICKET}),
+    )
+    .unwrap_err();
+    assert!(e.contains("チケット"), "{e}");
+}
+
+#[test]
 fn self_operated_ticket_checkout_calls_staff_for_cash() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "customer", TICKET);
@@ -3716,9 +3737,10 @@ fn pay_tickets(s: &mut Store, r: u8) {
 
 #[test]
 fn tickets_are_issued_first_in_first_out_across_registers() {
-    let mut s = Store::new(2, 2, 1);
+    let mut s = Store::new(3, 3, 1);
     login_as(&mut s, 1, "ST001");
     login_as(&mut s, 2, "ST002");
+    login_as(&mut s, 3, "ST000");
     pay_tickets(&mut s, 2);
     pay_tickets(&mut s, 1);
     let (r1, r2) = (reg(&s, 1), reg(&s, 2));
@@ -3735,12 +3757,14 @@ fn tickets_are_issued_first_in_first_out_across_registers() {
         check_tickets(&mut s, 1, "staff", id1, 2).is_err(),
         "発券前は照合できない"
     );
-    let e = run(
+    // 発券を待っているあいだも、レジ1は次のお客様を受け付けられる
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":BREAD}),
-    )
-    .unwrap_err();
-    assert!(e.contains("チケットのお渡し"), "{e}");
+        json!({"type":"void_transaction","register":1,"side":"staff"}),
+    );
+    pay_tickets(&mut s, 3);
+    assert_eq!(reg(&s, 3).tickets_ahead, 2, "後から支払ったレジ3は列の最後");
     let id2 = r2.ticket_handover[0].line_id;
     check_tickets(&mut s, 2, "staff", id2, 2).unwrap();
     let (r1, r2) = (reg(&s, 1), reg(&s, 2));

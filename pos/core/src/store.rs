@@ -28,7 +28,8 @@ const FF_RECEIVED_SELF: &str =
 const CASH_ONLY: &str = "現金のみの商品（切手・チケット・お支払い）は現金でお支払いください";
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）";
-const TICKETS_FIRST: &str = "チケットのお渡しが済んでから、次の登録を始めてください";
+const TICKET_ALONE: &str =
+    "チケットは、ほかの商品と一緒に会計できません（チケットどうしは一緒に会計できます）";
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
 const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str =
@@ -2792,12 +2793,6 @@ impl Store {
             });
         }
         self.check(register, side, Action::Scan)?;
-        if self
-            .reg(register)
-            .is_some_and(|r| !r.ticket_handover.is_empty())
-        {
-            return Err(TICKETS_FIRST.into());
-        }
         if let Scanned::Pickup(no) = &scanned {
             return self.match_pickup(register, side, no);
         }
@@ -2843,6 +2838,13 @@ impl Store {
             }
             if r.txn.lines.iter().any(|l| l.is_parcel() != p.parcel_send) {
                 return Err(PARCEL_ALONE.into());
+            }
+            if r.txn
+                .lines
+                .iter()
+                .any(|l| (l.tickets() > 0) != (p.tickets > 0))
+            {
+                return Err(TICKET_ALONE.into());
             }
         }
         if matches!(scanned, Scanned::Product(_)) && r.txn.item_count() >= MAX_ITEMS {
@@ -3046,6 +3048,12 @@ impl Store {
         self.check(register, side, Action::RegisterFf)?;
         if self.reg(register).is_some_and(|r| r.txn.bill_slips() > 0) {
             return Err(BILL_ALONE.into());
+        }
+        if self
+            .reg(register)
+            .is_some_and(|r| r.txn.lines.iter().any(|l| l.tickets() > 0))
+        {
+            return Err(TICKET_ALONE.into());
         }
         if self
             .reg(register)
@@ -3434,19 +3442,22 @@ impl Store {
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
-        r.ticket_handover = txn
-            .lines
-            .iter()
-            .filter(|l| l.tickets() > 0)
-            .map(|l| TicketRow {
-                line_id: l.id,
-                code: l.code,
-                name: l.name,
-                issued: l.tickets(),
-                handed: None,
-            })
-            .collect();
-        let has_tickets = !r.ticket_handover.is_empty();
+        // 発券待ちのまま次のお客様の受け付けに進めるので、前の取引のチケットに足していく。
+        // 明細 id は取引ごとに振り直されるので、レシート番号と組み合わせて重ならないようにする
+        let had_tickets = !r.ticket_handover.is_empty();
+        r.ticket_handover.extend(
+            txn.lines
+                .iter()
+                .filter(|l| l.tickets() > 0)
+                .map(|l| TicketRow {
+                    line_id: no * 1000 + l.id,
+                    code: l.code,
+                    name: l.name,
+                    issued: l.tickets(),
+                    handed: None,
+                }),
+        );
+        let has_tickets = !had_tickets && !r.ticket_handover.is_empty();
         // 払込票は払込票ごとに確認済み。通常のお買い物はレシートの税抜金額で判定する
         let base = total.saturating_sub(txn.taxes(&rates, rounding).iter().map(|t| t.tax).sum());
         let credit = method == PaymentMethod::Credit && txn.prepaid == 0;

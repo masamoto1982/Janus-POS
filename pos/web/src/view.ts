@@ -1425,16 +1425,44 @@ const PICKUP_CODE = "2100000000038";
 const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
 const TAX_CODES = ["2100000000067"];
 
-const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
-const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
-const HINT_PAY = "支払方法を選んでから、決済端末にドラッグ＆ドロップ";
-const HINT_EMONEY = "決済端末にドラッグ＆ドロップ";
+/** Item の商品ボタンのホバー：その商品が何のデモンストレーションのために置いてあるか。
+ *  登録のしかたは Item の見出しのホバーにまとめてあるので、ここには書かない */
+const PURPOSE: Record<string, string> = {
+  "4900000000028": "割引券（50円引き）の対象商品、クーポンの読み取りと値引きを試す",
+  "4900000000042": "規則のない軽減税率8%の飲料、基本の登録を試す",
+  "4900000000011": "規則のない軽減税率8%の食品、基本の登録を試す",
+  "4900000000035": "引換券（1個無料）の対象商品、クーポンの読み取りと引き換えを試す",
+  "4900000000103": "法令による年齢確認（20歳）、標準税率10%なので、食品と一緒に買うと税率ごとの内税表示も確かめられる",
+  "4900000000073": "規則のない軽減税率8%の加工食品、数量の変更や販売規則の個数制限を試す",
+  "4900000000066": "規則のない軽減税率8%の加工食品、数量の変更や販売規則の個数制限を試す",
+  "4910000000014": "店頭で買う新聞は軽減税率の対象外（標準税率10%）、税区分の違いを確かめる",
+  "4910000000038": "標準税率10%の非食品、販売規則で店舗独自の年齢確認を付けるなどの設定を試す",
+  "4900000000127": "法令による年齢確認（20歳）、スタッフがログインしているレジでのみ扱える",
+  "4900000000158": "コンビニでは高額な品、まとめ買いで税抜5万円を超え、レシートの収入印紙の確認を再現する",
+  "4910000000052": "コンビニでは高額な品、セルフ操作モードでも買え、28個で税抜5万円を超えて収入印紙の確認を再現できる",
+  "4910000000069": "コンビニでは高額な品、たばこカートンと合わせて税抜5万円を超え、収入印紙の確認を再現する",
+  "4900000000134": "法令ではなく店舗の判断で年齢確認（20歳）を行う例",
+  "4900000000141": "現金でしか買えない商品、スタッフがログインしているレジでのみ扱える",
+  "2000000000015": "有料のレジ袋、待ち受けの「レジ袋」案内と対になる登録",
+  "2000000000022": "有料のレジ袋、待ち受けの「レジ袋」案内と対になる登録",
+  "2000000000039": "お弁当などに添える付属品、オプションの登録を試す",
+  "2000000000046": "お弁当などに添える付属品、オプションの登録を試す",
+  "2000000000053": "お弁当などに添える付属品、オプションの登録を試す",
+  "2100000000014": "宅配便の受付（サイズ・お届け先の郵便番号・送料）、ほかの商品と一緒にお会計できない",
+  "2100000000045": "送料をお届け先が払う宅配便の受付、代金0円で受け付けだけを行う",
+  "2100000000038": "荷物の受け取り、受取番号の表示、保管場所の荷物の照合、サインからお渡しまで",
+  "2100000000021": "5万円以上の払込票、現金のみで、収入印紙の貼り付け確認が済むまでお会計に進めない",
+  "2100000000043": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
+  "2100000000050": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
+  "2100000000067": "電気料金と同じ5万円でも、税金の領収証には収入印紙が要らないことを確かめる",
+};
 
-function item(code: string, name: string, sub: string, cls = "", hint = HINT_SCAN): string {
+function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[code] ?? ""): string {
   if (cls.split(" ").includes("off"))
     return `<button type="button" class="item ${cls}" aria-disabled="true" title="${esc(hint)}" aria-label="${esc(name)}（${esc(hint)}）">
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
-  return `<button type="button" class="item ${cls}" data-code="${esc(code)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ、${esc(hint)}">
+  const tip = hint ? ` data-hint="${esc(hint)}"` : "";
+  return `<button type="button" class="item ${cls}" data-code="${esc(code)}"${tip} aria-label="${esc(name)}${hint ? `、${esc(hint)}` : ""}">
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
@@ -1480,11 +1508,6 @@ function slipShelf(s: Snapshot): string {
   return slips.length ? `<div class="shelf"><h3>荷物の伝票（取り消し用）</h3><div class="items uniform">${slips.join("")}</div></div>` : "";
 }
 
-function walletItem(key: string, name: string, sub: string, cls: string, hint: string): string {
-  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ、${esc(hint)}">
-    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
-}
-
 export function readableCardsShelves(): string {
   const shelf = (label: string, items: string[]) => `<div class="shelf"><h3>${label}</h3><div class="items uniform">${items.join("")}</div></div>`;
   return (
@@ -1493,17 +1516,45 @@ export function readableCardsShelves(): string {
   );
 }
 
+/** Wallet のボタンのホバー：そのお金・カードが何のデモンストレーションのために置いてあるか。
+ *  使い方（どこに落とすか）は Wallet の見出しのホバーにまとめてあるので、ここには書かない */
+const WALLET_PURPOSE: Record<string, string> = {
+  "cash:10000": "高額紙幣、少額の買い物で大きなお釣りが出る場面を確かめる",
+  "cash:5000": "五千円札、お釣りに紙幣が混じる場面を確かめる",
+  "cash:2000": "取り扱わない二千円札、入金ボックスに入れてもすぐ出金ボックスに吐き出されることを確かめる",
+  "cash:1000": "千円札、電子マネーのチャージは紙幣だけを受け付けることも確かめる",
+  "cash:500": "硬貨、少しずつ入れて不足額が減っていく案内を確かめる",
+  "cash:100": "硬貨、少しずつ入れて不足額が減っていく案内を確かめる",
+  "cash:50": "硬貨、ちょうどの金額で払いお釣りが出ない場面を確かめる",
+  "cash:10": "硬貨、ちょうどの金額で払いお釣りが出ない場面を確かめる",
+  "cash:5": "硬貨、レジ袋など1円単位の端数をちょうど払う場面を確かめる",
+  "cash:1": "硬貨、レジ袋など1円単位の端数をちょうど払う場面を確かめる",
+  PC12345678: "ポイントカード、ポイントの確認は一度きりで、お支払いが済む前ならいつ読んでもよいことを確かめる",
+  PC87654321: "スマートフォンのポイントアプリ、カードと同じように読めることを確かめる",
+  CP0001: "ソフトドリンク1個無料の引換券、対象商品がないときの扱いも確かめる",
+  CP0002: "サンドイッチ50円引きの割引券、明細に値引きが付くことを確かめる",
+  "pay:qr": "バーコード決済、選んだ支払方法と違うものは受け付けないことを確かめる",
+  "pay:credit": "クレジットカード、選んだ支払方法と違うものは受け付けないことを確かめる",
+  "pay:emoney": "電子マネー、残高不足のときの案内や現金との併用、チャージ・残高照会を確かめる",
+};
+
+function walletItem(key: string, name: string, sub: string, cls: string): string {
+  const hint = WALLET_PURPOSE[key] ?? "";
+  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}、${esc(hint)}">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
+}
+
 export function walletPanel(emoneyBalance: number): string {
-  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill", HINT_CASH));
-  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin", HINT_CASH));
+  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill"));
+  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin"));
   const cards = [
-    item("PC12345678", "ポイントカード", "", "card"),
-    item("PC87654321", "ポイントアプリ", "", "card"),
-    item("CP0001", "引換券", "ソフトドリンク", "coupon"),
-    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon"),
-    walletItem("pay:qr", "バーコード決済", "", "pay", HINT_PAY),
-    walletItem("pay:credit", "クレジットカード", "", "pay", HINT_PAY),
-    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay", HINT_EMONEY),
+    item("PC12345678", "ポイントカード", "", "card", WALLET_PURPOSE.PC12345678),
+    item("PC87654321", "ポイントアプリ", "", "card", WALLET_PURPOSE.PC87654321),
+    item("CP0001", "引換券", "ソフトドリンク", "coupon", WALLET_PURPOSE.CP0001),
+    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon", WALLET_PURPOSE.CP0002),
+    walletItem("pay:qr", "バーコード決済", "", "pay"),
+    walletItem("pay:credit", "クレジットカード", "", "pay"),
+    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay"),
   ];
   return `<div class="shelf"><div class="items">${[...bills, ...coins].join("")}</div><div class="items wallet-cards">${cards.join("")}</div></div>`;
 }

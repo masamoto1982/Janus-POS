@@ -207,7 +207,7 @@ function buildSkeleton(): void {
           <div data-region="shelf"></div>
         </aside>
         <aside class="right wallet" aria-label="Wallet">
-          <h2>Wallet</h2>
+          <h2><span class="tip" tabindex="0" data-tip="お金やカードは、ドラッグ＆ドロップで使います：現金は入金ボックス、ポイントカード・クーポンはレジ画面、キャッシュレスは支払方法を選んでから決済端末へ" aria-label="Wallet：お金やカードは、ドラッグ＆ドロップで使います：現金は入金ボックス、ポイントカード・クーポンはレジ画面、キャッシュレスは支払方法を選んでから決済端末へ">Wallet <span class="info-icon" aria-hidden="true">i</span></span></h2>
           <div data-region="wallet"></div>
         </aside>
       </div>
@@ -1027,7 +1027,7 @@ function setupDrag(): void {
     const [kind, value] = d.wallet!.split(":");
     if (kind === "cash") {
       if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
-      send({ type: "insert", register, amount: Number(value) });
+      send(cashDrop(register, Number(value)));
     } else {
       if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末にかざしてください", false);
       send({ type: "tap_emoney", register, method: value });
@@ -1095,8 +1095,14 @@ function pick(code?: string, wallet?: string): void {
   if (code?.startsWith("PC") && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
   if (code) return void send({ type: "scan", register, side, code });
   const [kind, value] = wallet!.split(":");
-  if (kind === "cash") send({ type: "insert", register, amount: Number(value) });
+  if (kind === "cash") send(cashDrop(register, Number(value)));
   else send({ type: "tap_emoney", register, method: value });
+}
+
+/** Wallet のお金を入金ボックスに入れる。ふだんは金額の入力と同じ（大きい金種から崩したものとみなす）。
+ *  二千円札だけは札そのものを入れ、取り扱わないので自動釣銭機がそのまま出金ボックスに吐き出す */
+function cashDrop(register: number, d: number): Command {
+  return d === 2000 ? { type: "insert_cash", register, denomination: d, count: 1 } : { type: "insert", register, amount: d };
 }
 
 function swipeTo(reg: number, side: Side): void {

@@ -2421,8 +2421,8 @@ impl Store {
                 done("販売個数の上限を変更しました")
             }
             C::VerifyOwner { owner_id, password } => {
-                let by = self.owner(&owner_id, &password)?;
-                done(format!("{by}として認証しました"))
+                self.owner(&owner_id, &password)?;
+                Ok(Outcome::default())
             }
             C::SetTaxRate {
                 owner_id,

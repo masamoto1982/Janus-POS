@@ -528,7 +528,7 @@ body.dragging .drop-hint { display: inline; }
 .icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: 14px; margin: 14px 0 6px; }
 .rules-dlg h4 { font-size: 13px; margin: 14px 0 6px; }
-.rules-dlg .rules-tab { display: inline-flex; gap: 6px; align-items: center; margin-top: 10px; font-weight: 600; }
+.rules-dlg .rules-tabs { margin-top: 12px; }
 .rules-dlg .rate-in { width: 6em; text-align: right; }
 .rules-dlg .owner-auth[hidden] { display: none; }
 .menu-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }

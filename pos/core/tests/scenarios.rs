@@ -3757,12 +3757,13 @@ fn tickets_are_issued_first_in_first_out_across_registers() {
         check_tickets(&mut s, 1, "staff", id1, 2).is_err(),
         "発券前は照合できない"
     );
-    // 発券を待っているあいだも、レジ1は次のお客様を受け付けられる
-    scan(&mut s, 1, "staff", BREAD);
-    ok(
+    // 発券を待っているあいだも、レジ1はお渡しが済むまで次の取引を始められない
+    let e = run(
         &mut s,
-        json!({"type":"void_transaction","register":1,"side":"staff"}),
-    );
+        json!({"type":"scan","register":1,"side":"staff","code":BREAD}),
+    )
+    .unwrap_err();
+    assert!(e.contains("チケットのお渡し"), "{e}");
     pay_tickets(&mut s, 3);
     assert_eq!(reg(&s, 3).tickets_ahead, 2, "後から支払ったレジ3は列の最後");
     let id2 = r2.ticket_handover[0].line_id;

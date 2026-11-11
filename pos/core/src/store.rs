@@ -28,6 +28,7 @@ const FF_RECEIVED_SELF: &str =
 const CASH_ONLY: &str = "現金のみの商品（切手・チケット・お支払い）は現金でお支払いください";
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）";
+const TICKETS_FIRST: &str = "チケットのお渡しが済むまで、次の取引は始められません";
 const TICKET_ALONE: &str =
     "チケットは、ほかの商品と一緒に会計できません（チケットどうしは一緒に会計できます）";
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
@@ -2793,6 +2794,13 @@ impl Store {
             });
         }
         self.check(register, side, Action::Scan)?;
+        // チケットのお渡しが済むまで、そのレジは取引を終えられない（発券待ちのあいだも同じ）
+        if self
+            .reg(register)
+            .is_some_and(|r| !r.ticket_handover.is_empty())
+        {
+            return Err(TICKETS_FIRST.into());
+        }
         if let Scanned::Pickup(no) = &scanned {
             return self.match_pickup(register, side, no);
         }
@@ -3442,9 +3450,7 @@ impl Store {
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
-        // 発券待ちのまま次のお客様の受け付けに進めるので、前の取引のチケットに足していく。
-        // 明細 id は取引ごとに振り直されるので、レシート番号と組み合わせて重ならないようにする
-        let had_tickets = !r.ticket_handover.is_empty();
+        // チケットのお渡しが済むまで次の取引は始められないので、ここに残っているチケットはない
         r.ticket_handover.extend(
             txn.lines
                 .iter()
@@ -3457,7 +3463,7 @@ impl Store {
                     handed: None,
                 }),
         );
-        let has_tickets = !had_tickets && !r.ticket_handover.is_empty();
+        let has_tickets = !r.ticket_handover.is_empty();
         // 払込票は払込票ごとに確認済み。通常のお買い物はレシートの税抜金額で判定する
         let base = total.saturating_sub(txn.taxes(&rates, rounding).iter().map(|t| t.tax).sum());
         let credit = method == PaymentMethod::Credit && txn.prepaid == 0;

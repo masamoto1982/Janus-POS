@@ -236,6 +236,7 @@ const DICT: Record<string, string> = {
   チケット: "Ticket",
   発券数: "Issued",
   チケットの発券待ち: "Waiting to issue tickets",
+  "チケットのお渡しが済むまで、次の取引は始められません": "The next sale can't start until the tickets are handed over",
   ほかのレジのチケットのお渡しが済むと発券します: "Tickets will print once another register finishes handing over its tickets",
   発券の順番をお待ちください: "Please wait for your tickets to print",
   "チケットは、ほかの商品と一緒に会計できません（チケットどうしは一緒に会計できます）": "Tickets can't be paid together with other items (tickets can be paid together)",

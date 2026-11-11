@@ -3692,6 +3692,20 @@ fn tickets_are_issued_after_payment_and_handed_over_by_count() {
     let m = check_tickets(&mut s, 1, "staff", ids[1], 2)
         .unwrap()
         .unwrap();
+    assert!(m.contains("OK"), "{m}");
+    let v = reg(&s, 1);
+    assert_eq!(v.ticket_handover.len(), 2, "お客様の受け取り確認がまだ");
+    assert_eq!(v.outlet, 0);
+    assert!(
+        receive_tickets(&mut s, 1, "staff", 4).is_err(),
+        "受け取り枚数はお客様側で入力する"
+    );
+    let m = receive_tickets(&mut s, 1, "customer", 3).unwrap().unwrap();
+    assert!(m.contains("合いません"), "{m}");
+    let v = reg(&s, 1);
+    assert_eq!(v.tickets_received, Some(3));
+    assert_eq!(v.ticket_handover.len(), 2, "枚数が合うまで終わらない");
+    let m = receive_tickets(&mut s, 1, "customer", 4).unwrap().unwrap();
     assert!(m.contains("チケット 4枚をお渡ししました"), "{m}");
     let v = reg(&s, 1);
     assert!(v.ticket_handover.is_empty());
@@ -3729,6 +3743,18 @@ fn self_operated_ticket_checkout_calls_staff_for_cash() {
             .any(|c| c.register == 1 && c.kind == CallKind::CashOnly && c.detail == "チケット"),
         "{calls:?}"
     );
+}
+
+fn receive_tickets(
+    s: &mut Store,
+    r: u8,
+    side: &str,
+    received: u32,
+) -> Result<Option<String>, String> {
+    run(
+        s,
+        json!({"type":"receive_tickets","register":r,"side":side,"received":received}),
+    )
 }
 
 fn pay_tickets(s: &mut Store, r: u8) {
@@ -3770,6 +3796,11 @@ fn tickets_are_issued_first_in_first_out_across_registers() {
     pay_tickets(&mut s, 3);
     assert_eq!(reg(&s, 3).tickets_ahead, 2, "後から支払ったレジ3は列の最後");
     let id2 = r2.ticket_handover[0].line_id;
+    receive_tickets(&mut s, 2, "customer", 2).unwrap();
+    assert!(
+        !reg(&s, 2).ticket_handover.is_empty(),
+        "お客様が先に入力しても、スタッフの照合が済むまで終わらない"
+    );
     check_tickets(&mut s, 2, "staff", id2, 2).unwrap();
     let (r1, r2) = (reg(&s, 1), reg(&s, 2));
     assert!(r2.ticket_handover.is_empty());
@@ -3778,6 +3809,7 @@ fn tickets_are_issued_first_in_first_out_across_registers() {
         "先のお渡しが済んだので次を発券"
     );
     check_tickets(&mut s, 1, "staff", id1, 2).unwrap();
+    receive_tickets(&mut s, 1, "customer", 2).unwrap();
     assert!(reg(&s, 1).ticket_handover.is_empty());
     scan(&mut s, 1, "staff", BREAD);
 }

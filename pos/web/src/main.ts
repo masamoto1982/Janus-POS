@@ -579,6 +579,9 @@ function padKey(key: string, k: string): void {
         if (value > 0 && !send({ type: "insert", register, amount: value })) return;
         send({ type: "finish_insert", register });
       }
+    } else if (e.target === "tkr") {
+      if (e.digits === "") return;
+      send({ type: "receive_tickets", register, side: "customer", received: value });
     } else if (e.target === "tkv") {
       if (e.digits === "") return;
       send({ type: "check_tickets", register, side, line_id: e.line!, handed: value });

@@ -296,6 +296,13 @@ pub enum Command {
         line_id: u32,
         handed: u32,
     },
+    /// お客様が受け取ったチケットの枚数を入力する（スタッフの照合と両方合ってお渡し完了）
+    ReceiveTickets {
+        register: u8,
+        #[serde(default = "customer_side")]
+        side: Side,
+        received: u32,
+    },
     InsertCash {
         register: u8,
         denomination: u32,
@@ -471,6 +478,7 @@ impl Command {
             | C::AffixReceiptStamp { register, .. }
             | C::HandOverBills { register, .. }
             | C::CheckTickets { register, .. }
+            | C::ReceiveTickets { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
             | C::TapEmoney { register, .. }
@@ -510,6 +518,7 @@ impl Command {
             | C::AffixReceiptStamp { side, .. }
             | C::HandOverBills { side, .. }
             | C::CheckTickets { side, .. }
+            | C::ReceiveTickets { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
             | C::ResolveEmoneyShort { side, .. }
@@ -1072,6 +1081,8 @@ struct Register {
     tickets_issued: bool,
     /// チケットのお釣り。お渡しの確認が済むまで出金ボックスに出さずに留めておく
     held_change: Cash,
+    /// お客様が入力した受け取り枚数（まだなら None）。発券した枚数の合計と合ってお渡し完了
+    tickets_received: Option<u32>,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -1297,6 +1308,10 @@ fn staff_side() -> Side {
     Side::Staff
 }
 
+fn customer_side() -> Side {
+    Side::Customer
+}
+
 pub const THANKS_MS: u64 = 3000;
 pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
@@ -1334,6 +1349,7 @@ impl Store {
                 ticket_handover: vec![],
                 tickets_issued: false,
                 held_change: Cash::default(),
+                tickets_received: None,
                 pickup_handover: None,
                 receipt_stamp: None,
                 last_op: 0,
@@ -2161,24 +2177,32 @@ impl Store {
                     .ok_or("チケットが見つかりません")?;
                 row.handed = Some(handed);
                 let (name, issued, matched) = (row.name, row.issued, row.matched());
-                if r.ticket_handover.iter().all(TicketRow::matched) {
-                    let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
-                    r.ticket_handover.clear();
-                    r.tickets_issued = false;
-                    // お渡しが済んだので、留めていたお釣りを出し、レシートを出す
-                    let held = std::mem::take(&mut r.held_change);
-                    r.outlet.merge(&held);
-                    if let Some(rc) = r.last_receipt.as_mut() {
-                        rc.at = now;
-                    }
-                    self.ticket_queue.retain(|&id| id != register);
-                    self.issue_next_tickets();
-                    return done(format!("チケット {n}枚をお渡ししました"));
+                if let Some(m) = self.finish_tickets(register, now) {
+                    return done(m);
                 }
                 done(if matched {
                     format!("{name}：照合 OK")
                 } else {
                     format!("{name}：照合 NG（お渡し数 {handed} が発券数 {issued} と合いません）")
+                })
+            }
+            C::ReceiveTickets {
+                register,
+                side,
+                received,
+            } => {
+                self.check(register, side, Action::ReceiveTickets)?;
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                let total: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
+                r.tickets_received = Some(received);
+                if let Some(m) = self.finish_tickets(register, now) {
+                    return done(m);
+                }
+                done(if received == total {
+                    "受け取り枚数を確認しました\nスタッフの確認をお待ちください".to_string()
+                } else {
+                    "受け取り枚数が合いません\nもう一度お確かめください".to_string()
                 })
             }
             C::InsertCash {
@@ -2751,6 +2775,30 @@ impl Store {
         if let Some(r) = self.registers.iter_mut().find(|r| r.id == id) {
             r.tickets_issued = true;
         }
+    }
+
+    /// スタッフの照合とお客様の受け取り枚数がどちらも合ったら、お渡しを終える。
+    /// 留めていたお釣りとレシートを出し、発券の列の次のレジに発券させる
+    fn finish_tickets(&mut self, register: u8, now: u64) -> Option<String> {
+        let r = self.registers.iter_mut().find(|r| r.id == register)?;
+        let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
+        if r.ticket_handover.is_empty()
+            || !r.ticket_handover.iter().all(TicketRow::matched)
+            || r.tickets_received != Some(n)
+        {
+            return None;
+        }
+        r.ticket_handover.clear();
+        r.tickets_issued = false;
+        r.tickets_received = None;
+        let held = std::mem::take(&mut r.held_change);
+        r.outlet.merge(&held);
+        if let Some(rc) = r.last_receipt.as_mut() {
+            rc.at = now;
+        }
+        self.ticket_queue.retain(|&id| id != register);
+        self.issue_next_tickets();
+        Some(format!("チケット {n}枚をお渡ししました"))
     }
 
     fn restock(&mut self, code: &str, qty: u32) {
@@ -4000,6 +4048,7 @@ impl Store {
             bill_handover: r.bill_handover,
             ticket_handover: r.ticket_handover.clone(),
             tickets_issued: r.tickets_issued,
+            tickets_received: r.tickets_received,
             tickets_ahead: self
                 .ticket_queue
                 .iter()
@@ -4146,6 +4195,8 @@ pub struct RegisterView {
     pub ticket_handover: Vec<TicketRow>,
     /// チケットを発券した（列の先頭に来た）。false のあいだは発券待ち
     pub tickets_issued: bool,
+    /// お客様が入力した受け取り枚数
+    pub tickets_received: Option<u32>,
     /// 発券の列で、このレジより先に並んでいるレジの数
     pub tickets_ahead: usize,
     pub pickup_handover: Option<String>,

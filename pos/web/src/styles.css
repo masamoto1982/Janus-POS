@@ -60,59 +60,9 @@
   --bill-bg: color-mix(in oklch, var(--ac-green) 12%, white);
   --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, white);
   --pay-bg: color-mix(in oklch, var(--ac-sky) 18%, white);
-  color-scheme: light;
+  color-scheme: only light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: oklch(0.1773 0.00887 264);
-    --panel: oklch(0.2217 0.0126 264);
-    --ink: oklch(0.9276 0.00581 265);
-    --muted: oklch(0.7137 0.0192 261);
-    --line: oklch(0.3041 0.0177 262); --border: oklch(0.6234 0 0); --msg-strong: var(--ink); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.3041 0.0177 262); --off-ink: oklch(0.6234 0 0);
-    --bill-bg: color-mix(in oklch, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
-    --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
-    --pay-bg: color-mix(in oklch, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
-    --accent: var(--ac-sky);
-    --accent-ink: oklch(0 0 0);
-    --accent-soft: color-mix(in oklch, var(--ac-sky) 12%, transparent);
-    --staff-bg: oklch(0.2101 0.0318 265);
-    --staff-line: oklch(0.3193 0.0296 261);
-    --cust-bg: oklch(0.2226 0.0099 89);
-    --warn: var(--ac-orange);
-    --warn-bg: color-mix(in oklch, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
-    --danger: color-mix(in oklch, var(--ac-red) 70%, white);
-    --danger-bg: color-mix(in oklch, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
-    --ok: var(--ac-green);
-    --call: var(--ac-sky);
-    --call-bg: color-mix(in oklch, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: oklch(0.1773 0.00887 264);
-  --panel: oklch(0.2217 0.0126 264);
-  --ink: oklch(0.9276 0.00581 265);
-  --muted: oklch(0.7137 0.0192 261);
-  --line: oklch(0.3041 0.0177 262); --border: oklch(0.6234 0 0); --msg-strong: var(--ink); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.3041 0.0177 262); --off-ink: oklch(0.6234 0 0);
-  --bill-bg: color-mix(in oklch, var(--ac-green) 20%, oklch(0.2217 0.0126 264));
-  --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, oklch(0.2217 0.0126 264));
-  --pay-bg: color-mix(in oklch, var(--ac-sky) 15%, oklch(0.2217 0.0126 264));
-  --accent: var(--ac-sky);
-  --accent-ink: oklch(0 0 0);
-  --accent-soft: color-mix(in oklch, var(--ac-sky) 12%, transparent);
-  --staff-bg: oklch(0.2101 0.0318 265);
-  --staff-line: oklch(0.3193 0.0296 261);
-  --cust-bg: oklch(0.2226 0.0099 89);
-  --warn: var(--ac-orange);
-  --warn-bg: color-mix(in oklch, var(--ac-orange) 20%, oklch(0.2217 0.0126 264));
-  --danger: color-mix(in oklch, var(--ac-red) 70%, white);
-  --danger-bg: color-mix(in oklch, var(--ac-red) 25%, oklch(0.2217 0.0126 264));
-  --ok: var(--ac-green);
-  --call: var(--ac-sky);
-  --call-bg: color-mix(in oklch, var(--ac-blue) 30%, oklch(0.2217 0.0126 264));
-  color-scheme: dark;
-}
 
 * { box-sizing: border-box; }
 body {
@@ -301,8 +251,6 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
    画面の色変数はグレーに置き換わるので、色はここで直接 OKLCH で持つ
    小さなテキストを足すときはオレンジ --alert-note */
 :root { --alert-bg: oklch(0.96 0.07 98); --alert-ink: oklch(0.53 0.2 29); --alert-note: oklch(0.58 0.15 55); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --alert-bg: oklch(0.34 0.06 95); --alert-ink: oklch(0.74 0.16 29); --alert-note: oklch(0.78 0.13 65); } }
-:root[data-theme="dark"] { --alert-bg: oklch(0.34 0.06 95); --alert-ink: oklch(0.74 0.16 29); --alert-note: oklch(0.78 0.13 65); }
 .screen .confirm.change-alert { margin: -8px -12px; background: var(--alert-bg); }
 .screen .change-alert .big { color: var(--alert-ink); }
 .screen .change-alert p.small { color: var(--alert-note); }
@@ -454,8 +402,6 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
    黄（--call-soft）と並べても浮かない濃さにし、文字は白にする。
    待ち時間で色や速さは変えない（経過時間がお客様にも伝わり、待たされた不満を増やしかねないため） */
 :root { --call-soft: oklch(0.93 0.10 95); --sos-head: oklch(0.6 0.17 29); --sos-head-ink: oklch(1 0 0); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sos-head: oklch(0.5 0.15 29); } }
-:root[data-theme="dark"] { --sos-head: oklch(0.5 0.15 29); }
 .screen-head.calling { --head-call-bg: var(--call-soft); animation: head-call 1s steps(1) infinite; }
 .screen-head.sos { --head-call-bg: var(--sos-head); animation: head-call 1s steps(1) infinite; }
 .screen-head.sos :is(.mode-title, .clock) { animation: sos-ink 1s steps(1) infinite; }
@@ -531,34 +477,6 @@ body.dragging .drop-hint { display: inline; }
   --danger: oklch(0.4349 0 0); --danger-bg: oklch(0.937 0 0); --ok: oklch(0.4819 0 0); --call: oklch(0.3942 0 0);
   --call-bg: oklch(0.937 0 0); --ff: oklch(0.7508 0 0); --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0);
   --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.9581 0 0); --coin-bg: oklch(0.9551 0 0); --pay-bg: oklch(0.9581 0 0);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :is(.staff-screen, .customer-screen) {
-    --base-pink: oklch(0.8699 0 0); --base-cream: oklch(0.9731 0 0); --base-lime: oklch(0.9097 0 0); --base-sky: oklch(0.9006 0 0);
-    --base-beige: oklch(0.8576 0 0); --base-green: oklch(0.8109 0 0); --base-purple: oklch(0.7763 0 0); --ac-red: oklch(0.5313 0 0);
-    --ac-yellow: oklch(0.9158 0 0); --ac-green: oklch(0.6234 0 0); --ac-blue: oklch(0.4423 0 0); --ac-sky: oklch(0.754 0 0);
-    --ac-pink: oklch(0.6895 0 0); --ac-orange: oklch(0.7508 0 0); --ac-purple: oklch(0.2931 0 0); --ac-brown: oklch(0.4054 0 0);
-    --bg: oklch(0.1776 0 0); --panel: oklch(0.2221 0 0); --ink: oklch(0.928 0 0); --line: oklch(0.3052 0 0);
-    --msg-strong: oklch(0.928 0 0); --off-bg: oklch(0.3052 0 0); --accent: oklch(0.754 0 0); --accent-soft: oklch(0.754 0 0 / 0.12);
-    --staff-bg: oklch(0.209 0 0); --staff-ink: oklch(0.9672 0 0); --staff-line: oklch(0.3171 0 0); --cust-bg: oklch(0.2221 0 0);
-    --warn: oklch(0.7508 0 0); --warn-bg: oklch(0.3407 0 0); --danger: oklch(0.6797 0 0); --danger-bg: oklch(0.3052 0 0);
-    --ok: oklch(0.6234 0 0); --call: oklch(0.754 0 0); --call-bg: oklch(0.2931 0 0); --ff: oklch(0.7508 0 0);
-    --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0); --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.3092 0 0);
-    --coin-bg: oklch(0.329 0 0); --pay-bg: oklch(0.3132 0 0);
-  }
-}
-:root[data-theme="dark"] :is(.staff-screen, .customer-screen) {
-  --base-pink: oklch(0.8699 0 0); --base-cream: oklch(0.9731 0 0); --base-lime: oklch(0.9097 0 0); --base-sky: oklch(0.9006 0 0);
-  --base-beige: oklch(0.8576 0 0); --base-green: oklch(0.8109 0 0); --base-purple: oklch(0.7763 0 0); --ac-red: oklch(0.5313 0 0);
-  --ac-yellow: oklch(0.9158 0 0); --ac-green: oklch(0.6234 0 0); --ac-blue: oklch(0.4423 0 0); --ac-sky: oklch(0.754 0 0);
-  --ac-pink: oklch(0.6895 0 0); --ac-orange: oklch(0.7508 0 0); --ac-purple: oklch(0.2931 0 0); --ac-brown: oklch(0.4054 0 0);
-  --bg: oklch(0.1776 0 0); --panel: oklch(0.2221 0 0); --ink: oklch(0.928 0 0); --line: oklch(0.3052 0 0);
-  --msg-strong: oklch(0.928 0 0); --off-bg: oklch(0.3052 0 0); --accent: oklch(0.754 0 0); --accent-soft: oklch(0.754 0 0 / 0.12);
-  --staff-bg: oklch(0.209 0 0); --staff-ink: oklch(0.9672 0 0); --staff-line: oklch(0.3171 0 0); --cust-bg: oklch(0.2221 0 0);
-  --warn: oklch(0.7508 0 0); --warn-bg: oklch(0.3407 0 0); --danger: oklch(0.6797 0 0); --danger-bg: oklch(0.3052 0 0);
-  --ok: oklch(0.6234 0 0); --call: oklch(0.754 0 0); --call-bg: oklch(0.2931 0 0); --ff: oklch(0.7508 0 0);
-  --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0); --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.3092 0 0);
-  --coin-bg: oklch(0.329 0 0); --pay-bg: oklch(0.3132 0 0);
 }
 .screen :is(button, input, select, summary) { filter: grayscale(1); }
 .screen.operable [data-region] :is(button, input, select, summary),
@@ -792,16 +710,10 @@ body.dragging .drop-hint { display: inline; }
    呼び出し中のスタッフ側画面は、エマージェンシーと同じやわらかい黄色を同じ塗り分けで */
 :root { --mode-staff-bg: oklch(0.95 0.035 330); --mode-staff-deep: oklch(0.89 0.07 330);
   --mode-self-bg: oklch(0.95 0.04 150); --mode-self-deep: oklch(0.89 0.08 150); --alert-deep: oklch(0.91 0.11 98); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --mode-staff-bg: oklch(0.30 0.04 330); --mode-staff-deep: oklch(0.38 0.06 330);
-  --mode-self-bg: oklch(0.30 0.04 150); --mode-self-deep: oklch(0.38 0.06 150); --alert-deep: oklch(0.42 0.08 95); } }
-:root[data-theme="dark"] { --mode-staff-bg: oklch(0.30 0.04 330); --mode-staff-deep: oklch(0.38 0.06 330);
-  --mode-self-bg: oklch(0.30 0.04 150); --mode-self-deep: oklch(0.38 0.06 150); --alert-deep: oklch(0.42 0.08 95); }
 :root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
 :root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
 /* セルフ操作モードのスタッフ側（操作できない側）はモードの色ではなくグレーの段でグレーアウトする */
 :root { --off-light: color-mix(in oklch, oklch(0.8699 0 0) 45%, oklch(1 0 0)); --off-deep: oklch(0.8699 0 0); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --off-light: oklch(0.26 0 0); --off-deep: oklch(0.3052 0 0); } }
-:root[data-theme="dark"] { --off-light: oklch(0.26 0 0); --off-deep: oklch(0.3052 0 0); }
 :root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--off-light); --tier-deep: var(--off-deep); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 商品が登録された行を一瞬だけ染めるエフェクトも、濃いめの段と同じモードの色 */

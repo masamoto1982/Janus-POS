@@ -391,13 +391,13 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], st: A
   if (side === "customer") {
     const ok = received === total;
     const field = rst?.allowed === false
-      ? `<span class="pad-field ticket-received">${received ?? ""}</span>`
-      : padField(reg, side, "tkr", received === null ? "" : String(received), "", "受け取り枚数", undefined, "ticket-received");
+      ? `<button type="button" class="pad-field" disabled>${received ?? ""}</button>`
+      : padField(reg, side, "tkr", received === null ? "" : String(received), "", "受け取り枚数");
     // 枚数が合わなければ再確認を促す警告。合っていればスタッフの確認を待つ
     const note = received === null ? "" : ok ? `<p class="small">スタッフの確認をお待ちください</p>` : `<p class="ticket-alert">受け取り枚数が合いません<br>もう一度お確かめください</p>`;
     return `<div class="point-screen ticket-done">
       ${msg("受け取り枚数をご入力ください")}
-      <div class="ticket-received-row">${field}<span class="ticket-unit">枚</span></div>
+      <div class="parcel-fields"><label>${field}<span>枚</span></label></div>
       ${note}
     </div>`;
   }

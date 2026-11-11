@@ -318,9 +318,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* チケットの受け取り枚数（お客様側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
-.ticket-received-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
-.ticket-received-row .pad-field { width: 96px; text-align: right; }
-.ticket-unit { color: var(--msg-strong); font-weight: 700; }
+/* 入力欄は荷物の長さ・重さと同じ形（.parcel-fields） */
 .screen .ticket-alert { margin: 0; color: var(--alert-ink); font-size: var(--msg-small); font-weight: 700; text-align: center; }
 .ffv-screen.ticket-verify .lines.ffv { margin-bottom: 0; }
 .ticket-customer { margin: 8px 0 0; text-align: center; }
@@ -504,7 +502,8 @@ body.dragging .drop-hint { display: inline; }
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
-.parcel-fields button.pad-field { width: 84px; height: auto; min-height: 1.6em; font-size: 18px; padding: 6px 8px; }
+/* 空のときも数字が入ったときと同じ高さ（空だと潰れて見えるため） */
+.parcel-fields button.pad-field { box-sizing: border-box; width: 84px; height: 40px; font-size: 18px; padding: 6px 8px; }
 .parcel-entry button.parcel-post { justify-content: center; height: auto; min-height: 1.6em; width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-no { margin-right: 8px; padding: 1px 8px; border: 1.5px solid var(--msg-strong); border-radius: 999px; font-size: 14px; }

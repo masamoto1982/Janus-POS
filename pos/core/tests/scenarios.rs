@@ -3609,3 +3609,159 @@ fn two_thousand_yen_bill_is_returned_to_the_outlet() {
     assert_eq!(v.staff.inserted, 2000);
     assert_eq!(v.outlet, 0);
 }
+
+const TICKET: &str = "2100000000074";
+
+fn check_tickets(
+    s: &mut Store,
+    r: u8,
+    side: &str,
+    line_id: u32,
+    handed: u32,
+) -> Result<Option<String>, String> {
+    run(
+        s,
+        json!({"type":"check_tickets","register":r,"side":side,"line_id":line_id,"handed":handed}),
+    )
+}
+
+#[test]
+fn tickets_are_issued_after_payment_and_handed_over_by_count() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", TICKET);
+    scan(&mut s, 1, "staff", TICKET);
+    scan(&mut s, 1, "staff", BREAD);
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.lines.len(), 3, "申込券は一枚ずつ一行");
+    assert_eq!(v.staff.total, 15_600 * 2 + 160);
+    assert!(v.ticket_handover.is_empty(), "支払い前は発券しない");
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    for m in ["credit", "qr"] {
+        assert!(
+            run(
+                &mut s,
+                json!({"type":"select_payment","register":1,"side":"staff","method":m})
+            )
+            .is_err(),
+            "チケットは現金のみ: {m}"
+        );
+    }
+    ok(&mut s, json!({"type":"insert","register":1,"amount":32000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.last_receipt.as_ref().unwrap().points, 0);
+    let rows: Vec<_> = v
+        .ticket_handover
+        .iter()
+        .map(|t| (t.name, t.issued, t.handed))
+        .collect();
+    assert_eq!(rows, [("チケット", 2, None), ("チケット", 2, None)]);
+    let ids: Vec<u32> = v.ticket_handover.iter().map(|t| t.line_id).collect();
+    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    advance(&mut s, 10_000);
+    assert!(
+        reg(&s, 1).last_receipt.is_some(),
+        "お渡しが済むまでお礼の画面に戻らない"
+    );
+    let e = check_tickets(&mut s, 1, "customer", ids[0], 2).unwrap_err();
+    assert!(e.contains("スタッフ側"), "{e}");
+    let m = check_tickets(&mut s, 1, "staff", ids[0], 1)
+        .unwrap()
+        .unwrap();
+    assert!(m.contains("NG"), "{m}");
+    assert_eq!(reg(&s, 1).ticket_handover[0].handed, Some(1));
+    check_tickets(&mut s, 1, "staff", ids[0], 2).unwrap();
+    assert_eq!(
+        reg(&s, 1).ticket_handover.len(),
+        2,
+        "全部合うまで照合は続く"
+    );
+    let m = check_tickets(&mut s, 1, "staff", ids[1], 2)
+        .unwrap()
+        .unwrap();
+    assert!(m.contains("チケット 4枚をお渡ししました"), "{m}");
+    assert!(reg(&s, 1).ticket_handover.is_empty());
+    advance(&mut s, 100);
+    assert!(reg(&s, 1).last_receipt.is_none());
+}
+
+#[test]
+fn self_operated_ticket_checkout_calls_staff_for_cash() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", TICKET);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    let calls = s.snapshot().calls;
+    assert!(
+        calls
+            .iter()
+            .any(|c| c.register == 1 && c.kind == CallKind::CashOnly && c.detail == "チケット"),
+        "{calls:?}"
+    );
+}
+
+fn pay_tickets(s: &mut Store, r: u8) {
+    scan(s, r, "staff", TICKET);
+    ok(s, json!({"type":"checkout","register":r,"side":"staff"}));
+    ok(s, json!({"type":"insert","register":r,"amount":16000}));
+    ok(s, json!({"type":"finish_insert","register":r}));
+}
+
+#[test]
+fn tickets_are_issued_first_in_first_out_across_registers() {
+    let mut s = Store::new(2, 2, 1);
+    login_as(&mut s, 1, "ST001");
+    login_as(&mut s, 2, "ST002");
+    pay_tickets(&mut s, 2);
+    pay_tickets(&mut s, 1);
+    let (r1, r2) = (reg(&s, 1), reg(&s, 2));
+    assert!(
+        r2.tickets_issued && r2.tickets_ahead == 0,
+        "先に支払ったレジ2から発券"
+    );
+    assert!(
+        !r1.tickets_issued && r1.tickets_ahead == 1,
+        "レジ1は発券待ち"
+    );
+    let id1 = r1.ticket_handover[0].line_id;
+    assert!(
+        check_tickets(&mut s, 1, "staff", id1, 2).is_err(),
+        "発券前は照合できない"
+    );
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"staff","code":BREAD}),
+    )
+    .unwrap_err();
+    assert!(e.contains("チケットのお渡し"), "{e}");
+    let id2 = r2.ticket_handover[0].line_id;
+    check_tickets(&mut s, 2, "staff", id2, 2).unwrap();
+    let (r1, r2) = (reg(&s, 1), reg(&s, 2));
+    assert!(r2.ticket_handover.is_empty());
+    assert!(
+        r1.tickets_issued && r1.tickets_ahead == 0,
+        "先のお渡しが済んだので次を発券"
+    );
+    check_tickets(&mut s, 1, "staff", id1, 2).unwrap();
+    assert!(reg(&s, 1).ticket_handover.is_empty());
+    scan(&mut s, 1, "staff", BREAD);
+}
+
+#[test]
+fn ticket_queue_survives_save_and_load() {
+    let mut s = Store::new(2, 2, 1);
+    login_as(&mut s, 1, "ST001");
+    login_as(&mut s, 2, "ST002");
+    pay_tickets(&mut s, 1);
+    pay_tickets(&mut s, 2);
+    let s = Store::load_json(&s.save_json()).unwrap();
+    assert!(reg(&s, 1).tickets_issued);
+    assert!(!reg(&s, 2).tickets_issued && reg(&s, 2).tickets_ahead == 1);
+}

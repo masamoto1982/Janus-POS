@@ -84,6 +84,8 @@ pub struct Product {
     pub parcel_collect: bool,
     /// 税金（公金）の払込票。領収証に収入印紙が要らない（印紙税の非課税）
     pub stamp_exempt: bool,
+    /// チケットの申込券。支払いが済むとこの枚数のチケットを発券する（チケットでなければ 0）
+    pub tickets: u32,
 }
 
 const fn p(
@@ -106,6 +108,7 @@ const fn p(
         parcel_pickup: false,
         parcel_collect: false,
         stamp_exempt: false,
+        tickets: 0,
     }
 }
 
@@ -159,6 +162,13 @@ pub const CATALOG: &[Product] = &[
     bill("2100000000021", "電気料金", 50000),
     bill("2100000000043", "水道料金", 4000),
     bill("2100000000050", "ガス料金", 3000),
+    // 申込券1枚でチケット2枚（7,800円×2）。支払いが済むと発券し、スタッフが枚数を照合してお渡しする
+    Product {
+        needs_staff: false,
+        cash_only: true,
+        tickets: 2,
+        ..p("2100000000074", "チケット", 15600, Standard10, Service)
+    },
     // 同じ5万円でも税金の領収証には収入印紙が要らない
     Product {
         stamp_exempt: true,

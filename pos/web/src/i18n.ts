@@ -161,7 +161,7 @@ const DICT: Record<string, string> = {
   "お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください": "Put the received cash in the inlet and press \"Done\"",
   スタッフが現金をお預かりします: "Staff will take your cash",
   "Wallet のポイントカードかポイントアプリを、決済端末にかざしてください": "Hold the point card or point app from the Wallet over the payment terminal",
-  "現金のみの商品（切手・お支払い）は現金でお支払いください": "Please pay for cash-only items (stamps, bills) in cash",
+  "現金のみの商品（切手・チケット・お支払い）は現金でお支払いください": "Please pay for cash-only items (stamps, tickets, bills) in cash",
   投入おわり: "Done",
   お金を入れてください: "Please insert money",
   ありがとうございました: "Thank you",
@@ -179,7 +179,6 @@ const DICT: Record<string, string> = {
   "消防救急：": "Fire / ambulance: ",
   事件または事故の可能性があります: "There may have been an incident or accident",
   "ご自身の安全を確保の上、通報をお願いいたします": "Please make sure you are safe, then call for help",
-  切手は現金のみのお取り扱いです: "Stamps can only be paid in cash",
   スタッフをお呼びしました: "We have called a staff member",
   そのままお待ちください: "Please wait a moment",
 
@@ -232,6 +231,22 @@ const DICT: Record<string, string> = {
   他の決済を使う: "Use another method",
   お支払い方法の確認: "Confirm payment method",
   確認しました: "Confirmed",
+
+  // チケット
+  チケット: "Ticket",
+  発券数: "Issued",
+  チケットの発券待ち: "Waiting to issue tickets",
+  ほかのレジのチケットのお渡しが済むと発券します: "Tickets will print once another register finishes handing over its tickets",
+  発券の順番をお待ちください: "Please wait for your tickets to print",
+  "チケットのお渡しが済んでから、次の登録を始めてください": "Hand over the tickets before starting the next sale",
+  "発券したチケットを数えて、レシートと一緒にお渡しください": "Count the issued tickets and hand them over with the receipt",
+  "チケットとレシート、お釣りをお受け取りください": "Please take your tickets, receipt and change",
+  チケットとレシートをお受け取りください: "Please take your tickets and receipt",
+  お渡しするチケットはありません: "No tickets to hand over",
+  チケットのお渡し確認はスタッフ側の画面で行います: "Ticket hand-over is checked on the staff screen",
+  チケットのお渡し確認はスタッフがログインしてから行います: "Ticket hand-over is checked after a staff member logs in",
+  "申込券でチケットを買う、現金のみで、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする":
+    "Buy tickets with an application slip; cash only; after payment, staff count the issued tickets and hand them over",
 
   // 公共料金
   事業者: "Payee",
@@ -405,7 +420,7 @@ const DICT: Record<string, string> = {
   ポイントカードの確認が済んでいません: "Point card has not been checked",
   ポイントカードの確認は済んでいます: "Point card already checked",
   スタッフが公共料金の内容を確認していません: "Staff has not checked the bills",
-  "切手・お支払いは現金のみです": "Stamps and bills are cash only",
+  "切手・チケット・お支払いは現金のみです": "Stamps, tickets and bills are cash only",
   スタッフがお預かりします: "Staff will take your cash",
   セルフレジでは現金を使えません: "Cash can't be used at self checkout",
   "ほかの支払方法を選ぶか、スタッフをお呼びください": "Choose another method or call a staff member",
@@ -435,10 +450,10 @@ const DICT: Record<string, string> = {
   案内を確認してから電子マネーをかざしてください: "Check the guidance, then hold your e-money card",
   "案内を確認してから、電子マネーをかざしてください": "Check the guidance, then hold your e-money card",
   "現金が投入済みです": "Cash has been inserted",
-  "ポイントを使える商品がありません（宅配便・代金引換・公共料金・切手・たばこにはポイントを使えません）":
-    "No items can be paid with points (not parcels, COD, bills, stamps or tobacco)",
-  "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）":
-    "Credit card and barcode pay can't be combined with cash (stamps and bills are cash only)",
+  "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）":
+    "No items can be paid with points (not parcels, COD, bills, tickets, stamps or tobacco)",
+  "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）":
+    "Credit card and barcode pay can't be combined with cash (stamps, tickets and bills are cash only)",
   "このレジは休止中です（スタッフバーコードで再開）": "This register is closed (scan a staff barcode to reopen)",
   店舗メニューはログインしたスタッフだけが使えます: "Only logged-in staff can use the store menu",
   取引中は店舗メニューを開けません: "The store menu can't be opened during a transaction",
@@ -609,6 +624,10 @@ const HTML_RULES: HtmlRule[] = [
     (m) =>
       `Total <span class="count"><b>${m[1]}</b> ${Number(m[1]) === 1 ? "item" : "items"}${m[2] ? `<small class="full">Max</small>` : ""}</span> <span class="yen">¥</span><b class="total">${m[3]}</b>`,
   ],
+  [/^チケット(<span class="bill-n">)(\d+)枚(<\/span>)を発券しました$/, (m) => `${m[1]}${plural(m[2], "ticket")}${m[3]} issued`],
+  [/^(.+)は現金のみのお取り扱いです$/, (m) => `${m[1].split("・").map((x) => t(x)).join(", ")} can only be paid in cash`],
+  [/^チケット(<span class="bill-n">)(\d+)枚(<\/span>)$/, (m) => `${m[1]}${plural(m[2], "ticket")}${m[3]}`],
+  [/^チケット (\d+)枚をお渡ししました$/, (m) => `Handed over ${plural(m[1], "ticket")}`],
   [/^公共料金(<span class="bill-n">)(\d+)枚(<\/span>)を受け付けます$/, (m) => `Accepting ${m[1]}${plural(m[2], "utility bill")}${m[3]}`],
   [/^公共料金(<span class="bill-n">)(\d+)枚(<\/span>)　支払いが完了しました$/, (m) => `${m[1]}${plural(m[2], "utility bill")}${m[3]} paid`],
   [/^公共料金(<span class="bill-n">)(\d+)枚(<\/span>)$/, (m) => `Utility bills ${m[1]}${plural(m[2], "slip")}${m[3]}`],
@@ -626,10 +645,10 @@ const HTML_RULES: HtmlRule[] = [
   [/^(.+?)で (.+?) お支払い済み、残り <b>(.+?)<\/b> を現金で$/, (m) => `${yenify(m[2])} paid by ${t(m[1]).toLowerCase()}. Please pay the remaining <b>${yenify(m[3])}</b> in cash`],
   [/^現金 <b>(.+?)<\/b> を出金ボックスからお返しください$/, (m) => `Return <b>${yenify(m[1])}</b> in cash from the outlet`],
   [/^現金 <b>(.+?)<\/b> をお返しします$/, (m) => `We'll return <b>${yenify(m[1])}</b> in cash`],
-  [/^切手・お支払いの <b>(.+?)<\/b> は現金のみ（併用できるのは電子マネー）$/, (m) => `Stamps and bills (<b>${yenify(m[1])}</b>) are cash only (only e-money can be combined)`],
+  [/^切手・チケット・お支払いの <b>(.+?)<\/b> は現金のみ（併用できるのは電子マネー）$/, (m) => `Stamps, tickets and bills (<b>${yenify(m[1])}</b>) are cash only (only e-money can be combined)`],
   [
-    /^(.+?)で <b>(.+?)<\/b>、切手・お支払いの <b>(.+?)<\/b> はそのあと現金で$/,
-    (m) => `<b>${yenify(m[2])}</b> by ${t(m[1]).toLowerCase()}, then stamps and bills (<b>${yenify(m[3])}</b>) in cash`,
+    /^(.+?)で <b>(.+?)<\/b>、切手・チケット・お支払いの <b>(.+?)<\/b> はそのあと現金で$/,
+    (m) => `<b>${yenify(m[2])}</b> by ${t(m[1]).toLowerCase()}, then stamps, tickets and bills (<b>${yenify(m[3])}</b>) in cash`,
   ],
   [/^あと <b>(.+?)<\/b> 不足しています$/, (m) => `<b>${yenify(m[1])}</b> short`],
   [

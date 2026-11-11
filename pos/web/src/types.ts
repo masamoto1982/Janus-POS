@@ -123,6 +123,14 @@ export interface StaffView {
   bell_down: string[];
 }
 
+export interface TicketRow {
+  line_id: number;
+  code: string;
+  name: string;
+  issued: number;
+  handed: number | null;
+}
+
 export interface BillRow {
   line_id: number;
   code: string;
@@ -192,6 +200,12 @@ export interface RegisterView {
   unavailable: Unavailable[];
   last_receipt: Receipt | null;
   bill_handover: number | null;
+  /** 決済後に発券したチケット。申込券ごとに発券数とお渡し数を照合する（全部合うと空） */
+  ticket_handover: TicketRow[];
+  /** 発券の列の先頭に来て発券した（false のあいだは発券待ち） */
+  tickets_issued: boolean;
+  /** 発券の列でこのレジより先に並んでいるレジの数 */
+  tickets_ahead: number;
   /** 決済後、レシートに収入印紙を貼る確認待ち（stamp＝印紙の額、base＝税抜の受取金額） */
   receipt_stamp: { stamp: number; base: number } | null;
   pickup_handover: string | null;
@@ -236,7 +250,7 @@ export interface Snapshot {
   ff_stock: { code: string; name: string; price: number; level: "made_to_order" | "plenty" | "low" | "out"; tab: string; tab_label: string }[];
   bell_loss: number;
   accounts: { id: string; barcode: string; name: string; role: string }[];
-  catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string }[];
+  catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string; tickets: number }[];
   tax: TaxView;
   categories: [string, string][];
   emoney_balance: number;

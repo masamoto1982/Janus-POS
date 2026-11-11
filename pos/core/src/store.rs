@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use serde::{Deserialize, Serialize};
 
 use crate::age_rules::{AgeRules, RuleTarget};
@@ -23,9 +25,10 @@ pub const MAX_BELLS: u8 = 5;
 
 const FF_RECEIVED_SELF: &str =
     "お渡し済みの FF の数量はスタッフが変更します\nスタッフをお呼びください";
-const CASH_ONLY: &str = "現金のみの商品（切手・お支払い）は現金でお支払いください";
+const CASH_ONLY: &str = "現金のみの商品（切手・チケット・お支払い）は現金でお支払いください";
 const NO_CASH_MIX: &str =
-    "クレジットカード・バーコード決済は現金と併用できません（切手・お支払いは現金のみ）";
+    "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）";
+const TICKETS_FIRST: &str = "チケットのお渡しが済んでから、次の登録を始めてください";
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
 const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str =
@@ -39,7 +42,7 @@ const PARCEL_SLIP_TO_REMOVE: &str =
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません\nお支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
-    "ポイントを使える商品がありません（宅配便・代金引換・公共料金・切手・たばこにはポイントを使えません）";
+    "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）";
 const EMONEY_NO_CASH: &str =
     "セルフレジでは現金を使えません\nほかの支払方法を選ぶか、スタッフをお呼びください";
 const EMONEY_NO_CHARGE: &str =
@@ -283,6 +286,14 @@ pub enum Command {
         #[serde(default = "staff_side")]
         side: Side,
     },
+    /// 発券したチケットのお渡し枚数を照合する（FF のお渡し確認と同じ、数を打って照合）
+    CheckTickets {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+        line_id: u32,
+        handed: u32,
+    },
     InsertCash {
         register: u8,
         denomination: u32,
@@ -457,6 +468,7 @@ impl Command {
             | C::AffixStamp { register, .. }
             | C::AffixReceiptStamp { register, .. }
             | C::HandOverBills { register, .. }
+            | C::CheckTickets { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
             | C::TapEmoney { register, .. }
@@ -495,6 +507,7 @@ impl Command {
             | C::AffixStamp { side, .. }
             | C::AffixReceiptStamp { side, .. }
             | C::HandOverBills { side, .. }
+            | C::CheckTickets { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
             | C::ResolveEmoneyShort { side, .. }
@@ -532,6 +545,23 @@ pub struct BillRow {
     pub stamp: u32,
     /// 収入印紙の貼り付けを確認した
     pub stamped: bool,
+}
+
+/// 決済後に発券したチケット。申込券の明細ごとに、発券した枚数とお渡しした枚数を照合する
+#[derive(Clone, Debug, Serialize)]
+pub struct TicketRow {
+    pub line_id: u32,
+    pub code: &'static str,
+    pub name: &'static str,
+    pub issued: u32,
+    /// スタッフが打ち込んだお渡し枚数（まだなら None）
+    pub handed: Option<u32>,
+}
+
+impl TicketRow {
+    pub fn matched(&self) -> bool {
+        self.handed == Some(self.issued)
+    }
 }
 
 /// 払込票の明細に要る収入印紙の額。税金（公金）の領収証は非課税なので 0
@@ -638,10 +668,16 @@ impl Line {
         self.parcel.is_some()
     }
 
+    /// 申込券なら、支払い後に発券するチケットの枚数（チケットでなければ 0）
+    fn tickets(&self) -> u32 {
+        catalog::find(self.code).map_or(0, |p| p.tickets) * self.qty
+    }
+
     fn earns_points(&self) -> bool {
         !self.is_parcel()
             && !self.is_pickup()
             && !self.is_bill()
+            && self.tickets() == 0
             && !matches!(self.category, Category::Stamp | Category::Tobacco)
     }
 
@@ -824,6 +860,22 @@ impl Txn {
         self.lines
             .iter()
             .any(|l| matches!(l.kind, LineKind::Service { done: false, .. }))
+    }
+
+    /// セルフ操作モードで現金のみの商品のためにスタッフを呼ぶときの呼び出し内容
+    fn cash_only_label(&self) -> String {
+        let mut names: Vec<&str> = vec![];
+        for l in self.lines.iter().filter(|l| l.cash_only) {
+            let n = if l.tickets() > 0 {
+                "チケット"
+            } else {
+                l.name
+            };
+            if !names.contains(&n) {
+                names.push(n);
+            }
+        }
+        names.join("・")
     }
 
     fn bill_slips(&self) -> u32 {
@@ -1012,6 +1064,10 @@ struct Register {
     bill_handover: Option<u32>,
     pickup_handover: Option<String>,
     receipt_stamp: Option<ReceiptStamp>,
+    /// 決済が済んだチケット。発券の順番が来たら、お渡し照合を待つ（全部合うと空になる）
+    ticket_handover: Vec<TicketRow>,
+    /// 発券の列（Store.ticket_queue）の先頭に来て、チケットを発券した
+    tickets_issued: bool,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -1121,6 +1177,7 @@ impl Register {
             stamp_pending: t.stamp_pending(),
             bill_handover: self.bill_handover.is_some(),
             receipt_stamp: self.receipt_stamp.is_some(),
+            ticket_handover: self.tickets_issued && !self.ticket_handover.is_empty(),
             point_pending: t.paying
                 && !t.point_checked
                 && !(t.age_choice_pending() || t.id_pending()),
@@ -1164,6 +1221,9 @@ pub struct Store {
     presses: u64,
     receipts: u32,
     emoney_balance: u32,
+    /// チケットの発券の列（先入れ先出し）。決済が済んだ順にレジ番号が並び、先頭のレジだけが発券する。
+    /// 複数のレジで同時・僅差に申し込まれても、先のチケットの発券とお渡しが済むまで次は発券しない
+    ticket_queue: VecDeque<u8>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1267,6 +1327,8 @@ impl Store {
                 drawer: Drawer::default(),
                 last_receipt: None,
                 bill_handover: None,
+                ticket_handover: vec![],
+                tickets_issued: false,
                 pickup_handover: None,
                 receipt_stamp: None,
                 last_op: 0,
@@ -1299,6 +1361,7 @@ impl Store {
             presses: 0,
             receipts: 0,
             emoney_balance: EMONEY_INITIAL,
+            ticket_queue: VecDeque::new(),
         }
     }
 
@@ -1315,6 +1378,7 @@ impl Store {
             }
             if r.outlet.total() == 0
                 && r.bill_handover.is_none()
+                && r.ticket_handover.is_empty()
                 && r.pickup_handover.is_none()
                 && r.receipt_stamp.is_none()
                 && r.last_receipt
@@ -2076,6 +2140,35 @@ impl Store {
                 let n = r.bill_handover.take().unwrap_or(0);
                 done(format!("払込票 {n}枚をお渡ししました"))
             }
+            C::CheckTickets {
+                register,
+                side,
+                line_id,
+                handed,
+            } => {
+                self.check(register, side, Action::CheckTickets)?;
+                let r = self.reg_mut(register)?;
+                let row = r
+                    .ticket_handover
+                    .iter_mut()
+                    .find(|t| t.line_id == line_id)
+                    .ok_or("チケットが見つかりません")?;
+                row.handed = Some(handed);
+                let (name, issued, matched) = (row.name, row.issued, row.matched());
+                if r.ticket_handover.iter().all(TicketRow::matched) {
+                    let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
+                    r.ticket_handover.clear();
+                    r.tickets_issued = false;
+                    self.ticket_queue.retain(|&id| id != register);
+                    self.issue_next_tickets();
+                    return done(format!("チケット {n}枚をお渡ししました"));
+                }
+                done(if matched {
+                    format!("{name}：照合 OK")
+                } else {
+                    format!("{name}：照合 NG（お渡し数 {handed} が発券数 {issued} と合いません）")
+                })
+            }
             C::InsertCash {
                 register,
                 denomination,
@@ -2638,6 +2731,16 @@ impl Store {
         done(format!("{name}の個数を {qty} にしました"))
     }
 
+    /// 発券の列の先頭のレジがまだ発券していなければ発券する（先のお渡しが済むまで次は発券しない）
+    pub(super) fn issue_next_tickets(&mut self) {
+        let Some(&id) = self.ticket_queue.front() else {
+            return;
+        };
+        if let Some(r) = self.registers.iter_mut().find(|r| r.id == id) {
+            r.tickets_issued = true;
+        }
+    }
+
     fn restock(&mut self, code: &str, qty: u32) {
         if let Some(e) = self.ff_stock.iter_mut().find(|(c, _)| *c == code) {
             e.1 += qty;
@@ -2689,6 +2792,12 @@ impl Store {
             });
         }
         self.check(register, side, Action::Scan)?;
+        if self
+            .reg(register)
+            .is_some_and(|r| !r.ticket_handover.is_empty())
+        {
+            return Err(TICKETS_FIRST.into());
+        }
         if let Scanned::Pickup(no) = &scanned {
             return self.match_pickup(register, side, no);
         }
@@ -2788,6 +2897,19 @@ impl Store {
                     l.slip_no = Some(slip_no(seed));
                 }
                 done(format!("{} {}円{back}", p.name, p.price))
+            }
+            // チケットの申込券：お支払いのあとに発券する。申込券ごとに一行（重ねない）
+            Scanned::Product(p) if p.tickets > 0 => {
+                r.txn.push(
+                    p,
+                    1,
+                    LineKind::Service {
+                        done: true,
+                        confirm_pending: false,
+                    },
+                    tax,
+                );
+                done(format!("{} {}枚 {}円{back}", p.name, p.tickets, p.price))
             }
             Scanned::Product(p) if p.needs_staff => {
                 r.txn.push(
@@ -3074,10 +3196,11 @@ impl Store {
             ));
         }
         if mode != Mode::StaffOperated && !ready && r.txn.cash_only() > 0 {
+            let label = r.txn.cash_only_label();
             self.calls
-                .raise(register, CallKind::CashOnly, self.now, "切手");
+                .raise(register, CallKind::CashOnly, self.now, label.clone());
             if !pending {
-                return done("切手は現金のみのためスタッフをお呼びしました");
+                return done(format!("{label}は現金のみのためスタッフをお呼びしました"));
             }
         }
         if pending && mode != Mode::StaffOperated && !ready {
@@ -3311,6 +3434,19 @@ impl Store {
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
+        r.ticket_handover = txn
+            .lines
+            .iter()
+            .filter(|l| l.tickets() > 0)
+            .map(|l| TicketRow {
+                line_id: l.id,
+                code: l.code,
+                name: l.name,
+                issued: l.tickets(),
+                handed: None,
+            })
+            .collect();
+        let has_tickets = !r.ticket_handover.is_empty();
         // 払込票は払込票ごとに確認済み。通常のお買い物はレシートの税抜金額で判定する
         let base = total.saturating_sub(txn.taxes(&rates, rounding).iter().map(|t| t.tax).sum());
         let credit = method == PaymentMethod::Credit && txn.prepaid == 0;
@@ -3374,6 +3510,10 @@ impl Store {
             CallKind::CashOnly,
         ] {
             self.calls.resolve(register, k, now);
+        }
+        if has_tickets {
+            self.ticket_queue.push_back(register);
+            self.issue_next_tickets();
         }
         if stamp_call {
             self.calls
@@ -3558,6 +3698,7 @@ impl Store {
                     store_age: self.age_rules.store_age_for(p.code),
                     limit: self.age_rules.limit_for(p.code),
                     tax_class: self.tax.class_for(p.code).id.clone(),
+                    tickets: p.tickets,
                 })
                 .collect(),
             tax: TaxView {
@@ -3825,6 +3966,13 @@ impl Store {
             .collect(),
             last_receipt: r.last_receipt.clone(),
             bill_handover: r.bill_handover,
+            ticket_handover: r.ticket_handover.clone(),
+            tickets_issued: r.tickets_issued,
+            tickets_ahead: self
+                .ticket_queue
+                .iter()
+                .position(|&id| id == r.id)
+                .unwrap_or(0),
             pickup_handover: r.pickup_handover.clone(),
             receipt_stamp: r.receipt_stamp,
         }
@@ -3963,6 +4111,11 @@ pub struct RegisterView {
     pub unavailable: Vec<Unavailable>,
     pub last_receipt: Option<Receipt>,
     pub bill_handover: Option<u32>,
+    pub ticket_handover: Vec<TicketRow>,
+    /// チケットを発券した（列の先頭に来た）。false のあいだは発券待ち
+    pub tickets_issued: bool,
+    /// 発券の列で、このレジより先に並んでいるレジの数
+    pub tickets_ahead: usize,
     pub pickup_handover: Option<String>,
     pub receipt_stamp: Option<ReceiptStamp>,
 }
@@ -4085,6 +4238,8 @@ pub struct CatalogItem {
     pub store_age: Option<u8>,
     pub limit: Option<u32>,
     pub tax_class: String,
+    /// チケットの申込券で発券する枚数（チケットでなければ 0）
+    pub tickets: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

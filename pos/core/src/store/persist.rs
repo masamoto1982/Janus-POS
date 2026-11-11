@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     bell_name, AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, Receipt, ReceiptStamp,
-    Register, StaffSession, Store, Txn,
+    Register, StaffSession, Store, TicketRow, Txn,
 };
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
 use crate::auth::{self, Authenticator, Guard};
@@ -46,6 +46,9 @@ struct Saved {
     audit: Vec<SavedAudit>,
     receipts: u32,
     emoney_balance: u32,
+    /// チケットの発券の列（先頭のレジだけが発券済み）
+    #[serde(default)]
+    ticket_queue: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -129,6 +132,9 @@ struct SavedRegister {
     pickup_handover: Option<String>,
     #[serde(default)]
     receipt_stamp: Option<ReceiptStamp>,
+    /// 発券したチケットのお渡し照合（明細 id・商品コード・発券数・お渡し数）
+    #[serde(default)]
+    ticket_handover: Vec<(u32, String, u32, Option<u32>)>,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -402,6 +408,11 @@ impl SavedRegister {
             bill_handover: r.bill_handover,
             pickup_handover: r.pickup_handover.clone(),
             receipt_stamp: r.receipt_stamp,
+            ticket_handover: r
+                .ticket_handover
+                .iter()
+                .map(|t| (t.line_id, t.code.to_string(), t.issued, t.handed))
+                .collect(),
             last_op: r.last_op,
             outlet: r.outlet.clone(),
             outlet_since: r.outlet_since,
@@ -442,6 +453,21 @@ impl SavedRegister {
             bill_handover: self.bill_handover,
             pickup_handover: self.pickup_handover,
             receipt_stamp: self.receipt_stamp,
+            tickets_issued: false,
+            ticket_handover: self
+                .ticket_handover
+                .into_iter()
+                .filter_map(|(line_id, code, issued, handed)| {
+                    let p = catalog::find(&code)?;
+                    Some(TicketRow {
+                        line_id,
+                        code: p.code,
+                        name: p.name,
+                        issued,
+                        handed,
+                    })
+                })
+                .collect(),
             last_op: self.last_op,
             outlet: self.outlet,
             outlet_since: self.outlet_since,
@@ -546,6 +572,7 @@ impl Store {
                 .collect(),
             receipts: self.receipts,
             emoney_balance: self.emoney_balance,
+            ticket_queue: self.ticket_queue.iter().copied().collect(),
         };
         serde_json::to_string(&saved).expect("saved state is always serializable")
     }
@@ -593,7 +620,7 @@ impl Store {
             .collect();
         let mut signal = s.signal;
         signal.held = 0;
-        Ok(Store {
+        let mut store = Store {
             now: s.now,
             rng: Rng(s.rng.max(1)),
             registers,
@@ -663,6 +690,9 @@ impl Store {
             presses: s.presses,
             receipts: s.receipts,
             emoney_balance: s.emoney_balance,
-        })
+            ticket_queue: s.ticket_queue.into_iter().collect(),
+        };
+        store.issue_next_tickets();
+        Ok(store)
     }
 }

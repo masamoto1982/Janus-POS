@@ -3582,3 +3582,30 @@ fn emergency_lasts_until_staff_log_in() {
     login(&mut s, 1);
     assert!(!reg(&s, 1).emergency);
 }
+
+#[test]
+fn two_thousand_yen_bill_is_returned_to_the_outlet() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    // 二千円札そのものは受け付けず、出金ボックスへ
+    ok(
+        &mut s,
+        json!({"type":"insert_cash","register":1,"denomination":2000,"count":1}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.inserted, 0);
+    assert_eq!(v.outlet, 2000);
+    assert_eq!(v.outlet_detail, vec![(2000, 1)]);
+    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    // テンキーで 2000 と打つのは千円札 2 枚とみなす
+    ok(&mut s, json!({"type":"insert","register":1,"amount":2000}));
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.inserted, 2000);
+    assert_eq!(v.outlet, 0);
+}

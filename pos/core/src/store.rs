@@ -3108,6 +3108,12 @@ impl Store {
         }
         let mut c = Cash::default();
         c.add(d, count.max(1));
+        // 二千円札は取り扱わない。自動釣銭機は受け付けず、そのまま出金ボックスに吐き出す
+        // （テンキーで 2000 と打った場合は千円札 2 枚とみなすので、これに当たらない）
+        if d == 2_000 {
+            self.reg_mut(register)?.outlet.merge(&c);
+            return done("二千円札はお取り扱いしていません\n出金ボックスからお受け取りください");
+        }
         if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
             return self.charge_cash(register, c);
         }

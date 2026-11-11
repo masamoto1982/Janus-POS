@@ -17,6 +17,7 @@ import type {
   StaffView,
   TaxKind,
   TaxTotal,
+  TicketRow,
 } from "./types";
 
 export function esc(s: unknown): string {
@@ -378,6 +379,37 @@ export function billHandover(reg: number, side: Side, count: number, st: ActionS
     </div>`;
 }
 
+/** 決済後のチケットのお渡し。FF のお渡し確認と同じく、スタッフが発券数を数えて打ち込み、その場で照合する。
+ *  全部合うとお釣り・お礼の画面に進む。お客様側には照合を見せず、受け取りの案内だけ */
+export function ticketHandover(reg: number, side: Side, rows: TicketRow[], change: number, st: ActionState, issued = true): string {
+  const total = rows.reduce((n, t) => n + t.issued, 0);
+  // 発券はお店全体で先入れ先出し。先に支払ったレジのお渡しが済むまで、このレジは発券を待つ
+  if (!issued)
+    return `<div class="point-screen ticket-wait">
+      ${side === "customer" ? msg(`チケット${billN(total)}`, "発券の順番をお待ちください") : msg("チケットの発券待ち", "ほかのレジのチケットのお渡しが済むと発券します")}
+    </div>`;
+  if (side === "customer")
+    return `<div class="point-screen ticket-done">
+      ${msg(`チケット${billN(total)}を発券しました`, change ? "チケットとレシート、お釣りをお受け取りください" : "チケットとレシートをお受け取りください")}
+    </div>`;
+  const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
+  const body = rows
+    .map((t) => {
+      const judge = t.handed === null ? "" : t.handed === t.issued ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
+      const field = t.issued === 1
+        ? `<input type="checkbox" class="ffv-check" data-tkcheck="${reg}:${t.line_id}" ${t.handed === 1 ? "checked disabled" : ""}${off} aria-label="${esc(t.name)}のお渡しを確認した" />`
+        : st.allowed
+          ? padField(reg, side, "tkv", t.handed === null ? "" : String(t.handed), "", `${t.name}のお渡し数`, t.line_id, "ffv-input")
+          : `<span class="muted">${t.handed ?? "—"}</span>`;
+      return `<tr><td>${esc(t.name)}</td><td class="num">${t.issued}</td><td class="num">${field}</td><td class="ffv-judge">${judge}</td></tr>`;
+    })
+    .join("");
+  return `<div class="ffv-screen ticket-verify">
+      ${msg("お渡しの確認", "発券したチケットを数えて、レシートと一緒にお渡しください")}
+      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">発券数</th><th class="num">お渡し数</th><th class="ffv-judge">照合</th></tr></thead><tbody>${body}</tbody></table>
+    </div>`;
+}
+
 function billNote(count: number, sub: string): string {
   return `<div class="point-screen pair-note">${msg(`公共料金${billN(count)}`, esc(sub))}</div>`;
 }
@@ -402,7 +434,7 @@ const INSERT_DONE_MS = 30_000;
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   if (method && method !== "cash" && cashlessDue < due)
-    return `<p class="guide">${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
+    return `<p class="guide">${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
   if (method === "points") return `<p class="guide">Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
   if (method && method !== "cash") return `<p class="guide">Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
   if (selfOperated) return "";
@@ -499,7 +531,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "inlet" | "mamt" | "mpw";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkv" | "inlet" | "mamt" | "mpw";
 export type PadEntry = { target: PadTarget; line?: number; digits: string };
 export const padEntry = new Map<string, PadEntry>();
 export const padValue = new Map<string, string>();
@@ -510,6 +542,7 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   post: { title: "お届け先の郵便番号（7桁）", unit: "", max: 7, code: true },
   birth: { title: "身分証の生年月日（西暦8桁）", unit: "", max: 8, code: true },
   ffv: { title: "お渡し数", unit: "", max: 3, code: true },
+  tkv: { title: "お渡し数", unit: "", max: 3, code: true },
   inlet: { title: "入金", unit: "円", max: 6 },
   mamt: { title: "出金する金額", unit: "円", max: 6 },
   mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
@@ -535,7 +568,7 @@ export function padPopup(r: RegisterView, side: Side): string {
   const inserted = e.target === "inlet" ? (r.emoney && !r.menu ? r.emoney.inserted : !r.menu ? r.staff.inserted : 0) : 0;
   const ok = e.digits !== "" ? d.code || Number(e.digits) > 0 : e.target === "inlet" && !r.menu && inserted > 0;
   const now = e.target === "inlet" && inserted ? `<span class="muted">入金済み ${yen(inserted)}</span>` : "";
-  const name = e.target === "ffv" ? r.staff.lines.find((l) => l.id === e.line)?.name : undefined;
+  const name = e.target === "ffv" ? r.staff.lines.find((l) => l.id === e.line)?.name : e.target === "tkv" ? r.ticket_handover.find((t) => t.line_id === e.line)?.name : undefined;
   const title = name ? `${name}の${side === "customer" ? "お受け取り数" : "お渡し数"}` : d.title;
   const last = d.decimal ? `${k("0")}${k(".", ".")}` : k("0", "0", "pad-key zero");
   const shown = padShow(e.target, e.digits);
@@ -596,9 +629,9 @@ export function callScreen(r: RegisterView, now: number): string {
     </div>`;
 }
 
-function cashOnlyWait(): string {
+function cashOnlyWait(names: string[]): string {
   return `<div class="point-screen">
-      ${msg("切手は現金のみのお取り扱いです", "スタッフをお呼びしました<br>そのままお待ちください")}
+      ${msg(`${esc(names.join("・"))}は現金のみのお取り扱いです`, "スタッフをお呼びしました<br>そのままお待ちください")}
     </div>`;
 }
 
@@ -765,6 +798,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.outlet, a("check_tickets"), r.tickets_issued));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks()));
@@ -987,7 +1021,7 @@ function cashBackNote(side: Side, amount: number): string {
 function cashOnlyNote(r: RegisterView): string {
   if (!r.cash_only || r.prepaid) return "";
   return r.cashless_due
-    ? `<p>切手・お支払いの <b>${yen(r.cash_only)}</b> は現金のみ（併用できるのは電子マネー）</p>`
+    ? `<p>切手・チケット・お支払いの <b>${yen(r.cash_only)}</b> は現金のみ（併用できるのは電子マネー）</p>`
     : `<p>${CASH_ONLY_NOTE}</p>`;
 }
 
@@ -1198,6 +1232,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.outlet, a("check_tickets"), r.tickets_issued));
   if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks()));
 
@@ -1231,7 +1266,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const slips = c.bills.length;
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : c.stamp_pending ? billNote(slips, "スタッフが領収証に収入印紙を貼り付けます") : billPayCard(slips, true));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
-  if (c.phase === "paying" && r.cash_only) return screen(cashOnlyWait());
+  if (c.phase === "paying" && r.cash_only) return screen(cashOnlyWait([...new Set(c.lines.filter((l) => l.cash_only).map((l) => l.name))]));
   // セルフ操作モードで「現金」を選ぶと店員呼び出し、お客様側は支払方法の選択から案内画面に切り替わる
   if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
@@ -1424,6 +1459,7 @@ const PICKUP_CODE = "2100000000038";
 
 const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
 const TAX_CODES = ["2100000000067"];
+const TICKET_CODES = ["2100000000074"];
 
 /** Item の商品ボタンのホバー：その商品が何のデモンストレーションのために置いてあるか。
  *  登録のしかたは Item の見出しのホバーにまとめてあるので、ここには書かない */
@@ -1455,6 +1491,7 @@ const PURPOSE: Record<string, string> = {
   "2100000000043": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
   "2100000000050": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
   "2100000000067": "電気料金と同じ5万円でも、税金の領収証には収入印紙が要らないことを確かめる",
+  "2100000000074": "申込券でチケットを買う、現金のみでほかの商品とは別会計、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする",
 };
 
 function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[code] ?? ""): string {
@@ -1483,6 +1520,8 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
           ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
           : TAX_CODES.includes(p.code)
             ? item(p.code, "税金", `${esc(p.name)} ${yen(p.price)}`)
+          : TICKET_CODES.includes(p.code)
+            ? item(p.code, p.name, `${p.tickets}枚 ${yen(p.price)}`)
           :
             PARCEL_CODES.includes(p.code)
             ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))

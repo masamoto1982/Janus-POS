@@ -81,6 +81,7 @@ pub enum Action {
     AffixStamp,
     AffixReceiptStamp,
     HandOverBills,
+    CheckTickets,
     InsertCash,
     TapEmoney,
     CallStaff,
@@ -113,6 +114,7 @@ pub const ACTIONS: &[Action] = &[
     Action::AffixStamp,
     Action::AffixReceiptStamp,
     Action::HandOverBills,
+    Action::CheckTickets,
     Action::InsertCash,
     Action::TapEmoney,
     Action::CallStaff,
@@ -148,6 +150,8 @@ pub struct Context {
     pub bill_handover: bool,
     /// 決済後、レシートに収入印紙を貼る確認を待っている
     pub receipt_stamp: bool,
+    /// 決済後、発券したチケットのお渡し枚数の照合を待っている
+    pub ticket_handover: bool,
     pub point_pending: bool,
     pub has_coupons: bool,
     pub coupon_unmatched: bool,
@@ -206,7 +210,8 @@ const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります\n対象商品を確かめるか、クーポンを取り消してください";
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
 const STAMP_UNCHECKED: Denial = "収入印紙の貼り付けが確認できていません";
-const SELF_OP_CASH_ONLY_GOODS: Denial = "切手・お支払いは現金のみです\nスタッフがお預かりします";
+const SELF_OP_CASH_ONLY_GOODS: Denial =
+    "切手・チケット・お支払いは現金のみです\nスタッフがお預かりします";
 const SELF_OP_NO_CASH: Denial =
     "セルフレジでは現金を使えません\n現金はスタッフがお預かりいたします";
 const SELF_OP_CASH_CHOSEN: Denial = "現金はスタッフがお預かりいたします\nスタッフをお呼びしました";
@@ -241,6 +246,10 @@ fn hand_over_bills(c: &Context) -> Result<(), Denial> {
     require(c.bill_handover, "お渡しする払込票はありません")
 }
 
+fn check_tickets(c: &Context) -> Result<(), Denial> {
+    require(c.ticket_handover, "お渡しするチケットはありません")
+}
+
 pub fn is_staff_only(action: Action) -> bool {
     matches!(
         action,
@@ -252,6 +261,7 @@ pub fn is_staff_only(action: Action) -> bool {
             | Action::AffixReceiptStamp
             | Action::HandOverBills
             | Action::CheckFf
+            | Action::CheckTickets
     )
 }
 
@@ -325,6 +335,8 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Err("収入印紙の貼り付け確認はスタッフ側の画面で行います")
         } else if action == Action::CheckFf {
             Err("FF のお渡し確認はスタッフ側の画面で行います")
+        } else if action == Action::CheckTickets {
+            Err("チケットのお渡し確認はスタッフ側の画面で行います")
         } else if is_staff_only(action) {
             Err("年齢確認はスタッフ側の画面で行います")
         } else {
@@ -430,6 +442,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::AffixStamp => affix_stamp(c),
         Action::AffixReceiptStamp => affix_receipt_stamp(c),
         Action::HandOverBills => hand_over_bills(c),
+        Action::CheckTickets => check_tickets(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
         Action::CallStaff => Ok(()),
@@ -489,6 +502,10 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
             Err("収入印紙の貼り付け確認はスタッフがログインしてから行います")
         }
         Action::HandOverBills => hand_over_bills(c),
+        Action::CheckTickets => {
+            check_tickets(c)?;
+            Err("チケットのお渡し確認はスタッフがログインしてから行います")
+        }
         Action::InsertCash => Err(SELF_OP_NO_CASH),
         Action::TapEmoney => pay_action(action, c),
         Action::CallStaff => Ok(()),
@@ -552,6 +569,7 @@ mod tests {
                                             stamp_pending: false,
                                             bill_handover: false,
                                             receipt_stamp: false,
+                                            ticket_handover: false,
                                             method,
                                         });
                                     }

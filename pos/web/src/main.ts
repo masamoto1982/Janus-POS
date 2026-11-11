@@ -207,7 +207,7 @@ function buildSkeleton(): void {
           <div data-region="shelf"></div>
         </aside>
         <aside class="right wallet" aria-label="Wallet">
-          <h2>Wallet</h2>
+          <h2><span class="tip" tabindex="0" data-tip="お金やカードは、ドラッグ＆ドロップで使います：現金は入金ボックス、ポイントカード・クーポンはレジ画面、キャッシュレスは支払方法を選んでから決済端末へ" aria-label="Wallet：お金やカードは、ドラッグ＆ドロップで使います：現金は入金ボックス、ポイントカード・クーポンはレジ画面、キャッシュレスは支払方法を選んでから決済端末へ">Wallet <span class="info-icon" aria-hidden="true">i</span></span></h2>
           <div data-region="wallet"></div>
         </aside>
       </div>

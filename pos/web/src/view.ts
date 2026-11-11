@@ -1425,11 +1425,6 @@ const PICKUP_CODE = "2100000000038";
 const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
 const TAX_CODES = ["2100000000067"];
 
-const HINT_SCAN = "レジ画面にドラッグ＆ドロップ";
-const HINT_CASH = "入金ボックスにドラッグ＆ドロップ";
-const HINT_PAY = "支払方法を選んでから、決済端末にドラッグ＆ドロップ";
-const HINT_EMONEY = "決済端末にドラッグ＆ドロップ";
-
 /** Item の商品ボタンのホバー：その商品が何のデモンストレーションのために置いてあるか。
  *  登録のしかたは Item の見出しのホバーにまとめてあるので、ここには書かない */
 const PURPOSE: Record<string, string> = {
@@ -1513,11 +1508,6 @@ function slipShelf(s: Snapshot): string {
   return slips.length ? `<div class="shelf"><h3>荷物の伝票（取り消し用）</h3><div class="items uniform">${slips.join("")}</div></div>` : "";
 }
 
-function walletItem(key: string, name: string, sub: string, cls: string, hint: string): string {
-  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}をドラッグ、${esc(hint)}">
-    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
-}
-
 export function readableCardsShelves(): string {
   const shelf = (label: string, items: string[]) => `<div class="shelf"><h3>${label}</h3><div class="items uniform">${items.join("")}</div></div>`;
   return (
@@ -1526,17 +1516,45 @@ export function readableCardsShelves(): string {
   );
 }
 
+/** Wallet のボタンのホバー：そのお金・カードが何のデモンストレーションのために置いてあるか。
+ *  使い方（どこに落とすか）は Wallet の見出しのホバーにまとめてあるので、ここには書かない */
+const WALLET_PURPOSE: Record<string, string> = {
+  "cash:10000": "高額紙幣、少額の買い物で大きなお釣りが出る場面を確かめる",
+  "cash:5000": "五千円札、お釣りに紙幣が混じる場面を確かめる",
+  "cash:2000": "流通の少ない二千円札も受け付けることを確かめる",
+  "cash:1000": "千円札、電子マネーのチャージは紙幣だけを受け付けることも確かめる",
+  "cash:500": "硬貨、少しずつ入れて不足額が減っていく案内を確かめる",
+  "cash:100": "硬貨、少しずつ入れて不足額が減っていく案内を確かめる",
+  "cash:50": "硬貨、ちょうどの金額で払いお釣りが出ない場面を確かめる",
+  "cash:10": "硬貨、ちょうどの金額で払いお釣りが出ない場面を確かめる",
+  "cash:5": "硬貨、レジ袋など1円単位の端数をちょうど払う場面を確かめる",
+  "cash:1": "硬貨、レジ袋など1円単位の端数をちょうど払う場面を確かめる",
+  PC12345678: "ポイントカード、ポイントの確認は一度きりで、お支払いが済む前ならいつ読んでもよいことを確かめる",
+  PC87654321: "スマートフォンのポイントアプリ、カードと同じように読めることを確かめる",
+  CP0001: "ソフトドリンク1個無料の引換券、対象商品がないときの扱いも確かめる",
+  CP0002: "サンドイッチ50円引きの割引券、明細に値引きが付くことを確かめる",
+  "pay:qr": "バーコード決済、選んだ支払方法と違うものは受け付けないことを確かめる",
+  "pay:credit": "クレジットカード、選んだ支払方法と違うものは受け付けないことを確かめる",
+  "pay:emoney": "電子マネー、残高不足のときの案内や現金との併用、チャージ・残高照会を確かめる",
+};
+
+function walletItem(key: string, name: string, sub: string, cls: string): string {
+  const hint = WALLET_PURPOSE[key] ?? "";
+  return `<button type="button" class="item ${cls}" data-wallet="${esc(key)}" data-hint="${esc(hint)}" aria-label="${esc(name)}、${esc(hint)}">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
+}
+
 export function walletPanel(emoneyBalance: number): string {
-  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill", HINT_CASH));
-  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin", HINT_CASH));
+  const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill"));
+  const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin"));
   const cards = [
-    item("PC12345678", "ポイントカード", "", "card", HINT_SCAN),
-    item("PC87654321", "ポイントアプリ", "", "card", HINT_SCAN),
-    item("CP0001", "引換券", "ソフトドリンク", "coupon", HINT_SCAN),
-    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon", HINT_SCAN),
-    walletItem("pay:qr", "バーコード決済", "", "pay", HINT_PAY),
-    walletItem("pay:credit", "クレジットカード", "", "pay", HINT_PAY),
-    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay", HINT_EMONEY),
+    item("PC12345678", "ポイントカード", "", "card", WALLET_PURPOSE.PC12345678),
+    item("PC87654321", "ポイントアプリ", "", "card", WALLET_PURPOSE.PC87654321),
+    item("CP0001", "引換券", "ソフトドリンク", "coupon", WALLET_PURPOSE.CP0001),
+    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon", WALLET_PURPOSE.CP0002),
+    walletItem("pay:qr", "バーコード決済", "", "pay"),
+    walletItem("pay:credit", "クレジットカード", "", "pay"),
+    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay"),
   ];
   return `<div class="shelf"><div class="items">${[...bills, ...coins].join("")}</div><div class="items wallet-cards">${cards.join("")}</div></div>`;
 }

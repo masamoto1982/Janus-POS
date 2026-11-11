@@ -2202,7 +2202,7 @@ impl Store {
                 done(if received == total {
                     "受け取り枚数を確認しました\nスタッフの確認をお待ちください".to_string()
                 } else {
-                    "受け取り枚数が合いません\nもう一度お確かめください".to_string()
+                    "申込数と受け取り数が一致しません\n再度ご確認ください".to_string()
                 })
             }
             C::InsertCash {

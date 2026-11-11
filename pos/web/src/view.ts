@@ -390,7 +390,7 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], st: A
     </div>`;
   if (side === "customer")
     return `<div class="point-screen ticket-done">
-      ${msg(`チケット${billN(total)}を発券しました`, "スタッフがチケットを数えてお渡しします")}
+      ${msg("受け取り枚数をご確認ください", billN(total))}
     </div>`;
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const body = rows
@@ -405,7 +405,7 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], st: A
     })
     .join("");
   return `<div class="ffv-screen ticket-verify">
-      ${msg("お渡しの確認", "発券したチケットを数えてお渡しください")}
+      ${msg("お渡し枚数を確認してください", billN(total))}
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">発券数</th><th class="num">お渡し数</th><th class="ffv-judge">照合</th></tr></thead><tbody>${body}</tbody></table>
     </div>`;
 }

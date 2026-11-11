@@ -380,18 +380,27 @@ export function billHandover(reg: number, side: Side, count: number, st: ActionS
 }
 
 /** 決済後のチケットのお渡し。FF のお渡し確認と同じく、スタッフが発券数を数えて打ち込み、その場で照合する。
- *  全部合うとお釣り・お礼の画面に進む。お客様側には照合を見せず、受け取りの案内だけ */
-export function ticketHandover(reg: number, side: Side, rows: TicketRow[], change: number, st: ActionState, issued = true): string {
+ *  お客様も受け取った枚数を入力する（発券数は見せない）。両方合うまでレシートもお釣りも出さず、合うとお釣り・お礼の画面に進む */
+export function ticketHandover(reg: number, side: Side, rows: TicketRow[], st: ActionState, issued = true, received: number | null = null, rst?: ActionState): string {
   const total = rows.reduce((n, t) => n + t.issued, 0);
   // 発券はお店全体で先入れ先出し。先に支払ったレジのお渡しが済むまで、このレジは発券を待つ
   if (!issued)
     return `<div class="point-screen ticket-wait">
       ${side === "customer" ? msg(`チケット${billN(total)}`, "発券の順番をお待ちください") : msg("チケットの発券待ち", "ほかのレジのチケットのお渡しが済むと発券します")}
     </div>`;
-  if (side === "customer")
+  if (side === "customer") {
+    const ok = received === total;
+    const field = rst?.allowed === false
+      ? `<span class="pad-field ticket-received">${received ?? ""}</span>`
+      : padField(reg, side, "tkr", received === null ? "" : String(received), "", "受け取り枚数", undefined, "ticket-received");
+    // 枚数が合わなければ再確認を促す警告。合っていればスタッフの確認を待つ
+    const note = received === null ? "" : ok ? `<p class="small">スタッフの確認をお待ちください</p>` : `<p class="ticket-alert">受け取り枚数が合いません<br>もう一度お確かめください</p>`;
     return `<div class="point-screen ticket-done">
-      ${msg(`チケット${billN(total)}を発券しました`, change ? "チケットとレシート、お釣りをお受け取りください" : "チケットとレシートをお受け取りください")}
+      ${msg("受け取り枚数をご入力ください")}
+      <div class="ticket-received-row">${field}<span class="ticket-unit">枚</span></div>
+      ${note}
     </div>`;
+  }
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const body = rows
     .map((t) => {
@@ -405,8 +414,9 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], chang
     })
     .join("");
   return `<div class="ffv-screen ticket-verify">
-      ${msg("お渡しの確認", "発券したチケットを数えて、レシートと一緒にお渡しください")}
+      ${msg("お渡し枚数を確認してください", billN(total))}
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">発券数</th><th class="num">お渡し数</th><th class="ffv-judge">照合</th></tr></thead><tbody>${body}</tbody></table>
+      <p class="muted ticket-customer">お客様の受け取り枚数：${received === null ? "入力待ち" : received === total ? `${received}枚 <span class="ffv-ok">OK</span>` : `${received}枚 <span class="ffv-ng">NG</span>`}</p>
     </div>`;
 }
 
@@ -531,7 +541,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkv" | "inlet" | "mamt" | "mpw";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkv" | "tkr" | "inlet" | "mamt" | "mpw";
 export type PadEntry = { target: PadTarget; line?: number; digits: string };
 export const padEntry = new Map<string, PadEntry>();
 export const padValue = new Map<string, string>();
@@ -543,6 +553,7 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   birth: { title: "身分証の生年月日（西暦8桁）", unit: "", max: 8, code: true },
   ffv: { title: "お渡し数", unit: "", max: 3, code: true },
   tkv: { title: "お渡し数", unit: "", max: 3, code: true },
+  tkr: { title: "受け取り枚数", unit: "枚", max: 3, code: true },
   inlet: { title: "入金", unit: "円", max: 6 },
   mamt: { title: "出金する金額", unit: "円", max: 6 },
   mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
@@ -798,7 +809,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.outlet, a("check_tickets"), r.tickets_issued));
+  if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, a("check_tickets"), r.tickets_issued, r.tickets_received, find(r.customer.actions, "receive_tickets")));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks()));
@@ -1232,7 +1243,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.outlet, a("check_tickets"), r.tickets_issued));
+  if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, a("check_tickets"), r.tickets_issued, r.tickets_received, find(r.customer.actions, "receive_tickets")));
   if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks()));
 
@@ -1491,7 +1502,7 @@ const PURPOSE: Record<string, string> = {
   "2100000000043": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
   "2100000000050": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
   "2100000000067": "電気料金と同じ5万円でも、税金の領収証には収入印紙が要らないことを確かめる",
-  "2100000000074": "申込券でチケットを買う、現金のみでほかの商品とは別会計、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする",
+  "2100000000074": "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする",
 };
 
 function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[code] ?? ""): string {

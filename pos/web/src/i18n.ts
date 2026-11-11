@@ -239,15 +239,21 @@ const DICT: Record<string, string> = {
   "チケットのお渡しが済むまで、次の取引は始められません": "The next sale can't start until the tickets are handed over",
   ほかのレジのチケットのお渡しが済むと発券します: "Tickets will print once another register finishes handing over its tickets",
   発券の順番をお待ちください: "Please wait for your tickets to print",
-  "チケットは、ほかの商品と一緒に会計できません（チケットどうしは一緒に会計できます）": "Tickets can't be paid together with other items (tickets can be paid together)",
-  "発券したチケットを数えて、レシートと一緒にお渡しください": "Count the issued tickets and hand them over with the receipt",
-  "チケットとレシート、お釣りをお受け取りください": "Please take your tickets, receipt and change",
-  チケットとレシートをお受け取りください: "Please take your tickets and receipt",
+  "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）": "Tickets are handled one order at a time (not with other tickets or items)",
+  お渡し枚数を確認してください: "Check the number of tickets handed over",
+  受け取り枚数をご入力ください: "Please enter the number of tickets you received",
+  受け取り枚数: "Tickets received",
+  スタッフの確認をお待ちください: "Please wait for staff to confirm",
+  受け取り枚数が合いません: "The number doesn't match",
+  もう一度お確かめください: "Please count again",
+  "受け取り枚数が合いません\nもう一度お確かめください": "The number doesn't match\nPlease count again",
+  "受け取り枚数を確認しました\nスタッフの確認をお待ちください": "Number confirmed\nPlease wait for staff to confirm",
+  "チケットの受け取り枚数はお客様側の画面で入力していただきます": "The customer enters the number of tickets on the customer screen",
   お渡しするチケットはありません: "No tickets to hand over",
   チケットのお渡し確認はスタッフ側の画面で行います: "Ticket hand-over is checked on the staff screen",
   チケットのお渡し確認はスタッフがログインしてから行います: "Ticket hand-over is checked after a staff member logs in",
-  "申込券でチケットを買う、現金のみでほかの商品とは別会計、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする":
-    "Buy tickets with an application slip; cash only and paid separately from other items; after payment, staff count the issued tickets and hand them over",
+  "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする":
+    "Buy tickets with an application slip; cash only, one order per sale; after payment, staff count the issued tickets and hand them over",
 
   // 公共料金
   事業者: "Payee",

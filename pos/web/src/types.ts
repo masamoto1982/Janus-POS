@@ -204,6 +204,8 @@ export interface RegisterView {
   ticket_handover: TicketRow[];
   /** 発券の列の先頭に来て発券した（false のあいだは発券待ち） */
   tickets_issued: boolean;
+  /** お客様が入力した受け取り枚数 */
+  tickets_received: number | null;
   /** 発券の列でこのレジより先に並んでいるレジの数 */
   tickets_ahead: number;
   /** 決済後、レシートに収入印紙を貼る確認待ち（stamp＝印紙の額、base＝税抜の受取金額） */

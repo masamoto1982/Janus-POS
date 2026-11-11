@@ -135,6 +135,9 @@ struct SavedRegister {
     /// 発券したチケットのお渡し照合（明細 id・商品コード・発券数・お渡し数）
     #[serde(default)]
     ticket_handover: Vec<(u32, String, u32, Option<u32>)>,
+    /// お渡しの確認が済むまで留めているチケットのお釣り
+    #[serde(default)]
+    held_change: Cash,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -413,6 +416,7 @@ impl SavedRegister {
                 .iter()
                 .map(|t| (t.line_id, t.code.to_string(), t.issued, t.handed))
                 .collect(),
+            held_change: r.held_change.clone(),
             last_op: r.last_op,
             outlet: r.outlet.clone(),
             outlet_since: r.outlet_since,
@@ -454,6 +458,7 @@ impl SavedRegister {
             pickup_handover: self.pickup_handover,
             receipt_stamp: self.receipt_stamp,
             tickets_issued: false,
+            held_change: self.held_change,
             ticket_handover: self
                 .ticket_handover
                 .into_iter()

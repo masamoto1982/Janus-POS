@@ -1070,6 +1070,8 @@ struct Register {
     ticket_handover: Vec<TicketRow>,
     /// 発券の列（Store.ticket_queue）の先頭に来て、チケットを発券した
     tickets_issued: bool,
+    /// チケットのお釣り。お渡しの確認が済むまで出金ボックスに出さずに留めておく
+    held_change: Cash,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -1331,6 +1333,7 @@ impl Store {
                 bill_handover: None,
                 ticket_handover: vec![],
                 tickets_issued: false,
+                held_change: Cash::default(),
                 pickup_handover: None,
                 receipt_stamp: None,
                 last_op: 0,
@@ -2149,6 +2152,7 @@ impl Store {
                 handed,
             } => {
                 self.check(register, side, Action::CheckTickets)?;
+                let now = self.now;
                 let r = self.reg_mut(register)?;
                 let row = r
                     .ticket_handover
@@ -2161,6 +2165,12 @@ impl Store {
                     let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
                     r.ticket_handover.clear();
                     r.tickets_issued = false;
+                    // お渡しが済んだので、留めていたお釣りを出し、レシートを出す
+                    let held = std::mem::take(&mut r.held_change);
+                    r.outlet.merge(&held);
+                    if let Some(rc) = r.last_receipt.as_mut() {
+                        rc.at = now;
+                    }
                     self.ticket_queue.retain(|&id| id != register);
                     self.issue_next_tickets();
                     return done(format!("チケット {n}枚をお渡ししました"));
@@ -3446,7 +3456,12 @@ impl Store {
                 return Err(format!("{e}\nスタッフをお呼びください"));
             }
         };
-        r.outlet.merge(&change);
+        // チケットはお渡しの確認が済むまでレシートもお釣りも出さない
+        if r.txn.lines.iter().any(|l| l.tickets() > 0) {
+            r.held_change.merge(&change);
+        } else {
+            r.outlet.merge(&change);
+        }
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);

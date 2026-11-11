@@ -380,8 +380,8 @@ export function billHandover(reg: number, side: Side, count: number, st: ActionS
 }
 
 /** 決済後のチケットのお渡し。FF のお渡し確認と同じく、スタッフが発券数を数えて打ち込み、その場で照合する。
- *  全部合うとお釣り・お礼の画面に進む。お客様側には照合を見せず、受け取りの案内だけ */
-export function ticketHandover(reg: number, side: Side, rows: TicketRow[], change: number, st: ActionState, issued = true): string {
+ *  全部合うまでレシートもお釣りも出さず、合うとお釣り・お礼の画面に進む。お客様側には照合を見せない */
+export function ticketHandover(reg: number, side: Side, rows: TicketRow[], st: ActionState, issued = true): string {
   const total = rows.reduce((n, t) => n + t.issued, 0);
   // 発券はお店全体で先入れ先出し。先に支払ったレジのお渡しが済むまで、このレジは発券を待つ
   if (!issued)
@@ -390,7 +390,7 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], chang
     </div>`;
   if (side === "customer")
     return `<div class="point-screen ticket-done">
-      ${msg(`チケット${billN(total)}を発券しました`, change ? "チケットとレシート、お釣りをお受け取りください" : "チケットとレシートをお受け取りください")}
+      ${msg(`チケット${billN(total)}を発券しました`, "スタッフがチケットを数えてお渡しします")}
     </div>`;
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const body = rows
@@ -405,7 +405,7 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], chang
     })
     .join("");
   return `<div class="ffv-screen ticket-verify">
-      ${msg("お渡しの確認", "発券したチケットを数えて、レシートと一緒にお渡しください")}
+      ${msg("お渡しの確認", "発券したチケットを数えてお渡しください")}
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">発券数</th><th class="num">お渡し数</th><th class="ffv-judge">照合</th></tr></thead><tbody>${body}</tbody></table>
     </div>`;
 }
@@ -798,7 +798,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const reg = r.id;
   const a = (n: string) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.outlet, a("check_tickets"), r.tickets_issued));
+  if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, a("check_tickets"), r.tickets_issued));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks()));
@@ -1232,7 +1232,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const reg = r.id;
   const a = (n: string) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
-  if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.outlet, a("check_tickets"), r.tickets_issued));
+  if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, a("check_tickets"), r.tickets_issued));
   if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks()));
 

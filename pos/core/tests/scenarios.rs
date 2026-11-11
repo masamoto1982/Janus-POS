@@ -3670,7 +3670,7 @@ fn tickets_are_issued_after_payment_and_handed_over_by_count() {
         .collect();
     assert_eq!(rows, [("チケット", 2, None), ("チケット", 2, None)]);
     let ids: Vec<u32> = v.ticket_handover.iter().map(|t| t.line_id).collect();
-    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    assert_eq!(v.outlet, 0, "お渡しの確認が済むまでお釣りは出さない");
     advance(&mut s, 10_000);
     assert!(
         reg(&s, 1).last_receipt.is_some(),
@@ -3693,8 +3693,11 @@ fn tickets_are_issued_after_payment_and_handed_over_by_count() {
         .unwrap()
         .unwrap();
     assert!(m.contains("チケット 4枚をお渡ししました"), "{m}");
-    assert!(reg(&s, 1).ticket_handover.is_empty());
-    advance(&mut s, 100);
+    let v = reg(&s, 1);
+    assert!(v.ticket_handover.is_empty());
+    assert_eq!(v.outlet, 32_000 - 31_200, "お渡しが済んでからお釣りを出す");
+    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    advance(&mut s, 10_000);
     assert!(reg(&s, 1).last_receipt.is_none());
 }
 

@@ -1300,13 +1300,13 @@ export type RulesTab = "age" | "limit" | "tax";
 const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   {
     id: "age",
-    label: "年確設定",
+    label: "年齢制限",
     note: "年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います<br>酒・たばこは法令どおり20歳以上で固定され、変更できません",
   },
-  { id: "limit", label: "制限設定", note: "1回のお会計で売れる販売個数の上限です<br>超える分はスキャンしても登録されません" },
+  { id: "limit", label: "個数制限", note: "1回のお会計で売れる販売個数の上限です<br>超える分はスキャンしても登録されません" },
   {
     id: "tax",
-    label: "税率設定",
+    label: "税率",
     note: "税率は税区分ごとに持ちます<br>法改正で税率が変わったら区分の税率を変え、新しい税率ができたら区分を追加してください<br>価格は税込で、1回のお会計で税率ごとに合計してから1回だけ端数処理します<br>変更はこれから登録する商品から適用されます",
   },
 ];
@@ -1388,7 +1388,7 @@ function taxPanel(s: Snapshot): string {
 }
 
 export function ownerPanel(s: Snapshot, tab: RulesTab): string {
-  const cur = RULES_TABS.find((x) => x.id === tab) ?? RULES_TABS[0];
+  const cur = RULES_TABS.find((x) => x.id === tab) ?? RULES_TABS[2];
   const body =
     cur.id === "age"
       ? `<table class="lines rules"><thead><tr><th>商品</th><th>法令</th><th>店舗の年確</th><th class="num">会計時の年確</th></tr></thead><tbody>${ageRows(s)}</tbody></table>`
@@ -1398,7 +1398,10 @@ export function ownerPanel(s: Snapshot, tab: RulesTab): string {
   const hist = s.age_rules.history.length
     ? s.age_rules.history.map((h) => `<li>${esc(h.by)}：${esc(h.change)}</li>`).join("")
     : `<li class="muted">変更はまだありません</li>`;
-  return `<label class="rules-tab">設定 <select data-rules-tab aria-label="設定する項目">${RULES_TABS.map((x) => `<option value="${x.id}" ${x.id === cur.id ? "selected" : ""}>${x.label}</option>`).join("")}</select></label>
+  const tabs = RULES_TABS.map(
+    (x) => `<button type="button" role="tab" class="tab ${x.id === cur.id ? "on" : ""}" data-rules-tab="${x.id}" aria-selected="${x.id === cur.id}">${x.label}</button>`,
+  ).join("");
+  return `<div class="tabs rules-tabs" role="tablist" aria-label="設定する項目">${tabs}</div>
     <p class="muted">${cur.note}</p>
     ${body}
     <h4>変更履歴</h4><ul>${hist}</ul>`;

@@ -203,7 +203,7 @@ function buildSkeleton(): void {
       </div>
       <div class="right-col">
         <aside class="right" aria-label="Item">
-          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="商品ルール設定" title="商品ルール設定">⚙</button></h2>
+          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="販売規則の設定" title="販売規則の設定">⚙</button></h2>
           <div data-region="shelf"></div>
         </aside>
         <aside class="right wallet" aria-label="Wallet">
@@ -216,9 +216,9 @@ function buildSkeleton(): void {
       <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>
     </footer>
     <dialog class="rules-dlg" id="rules-dlg" aria-labelledby="rules-title">
-      <div class="dlg-head"><h2 id="rules-title">商品ルール設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
+      <div class="dlg-head"><h2 id="rules-title">販売規則の設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
       <form class="owner-auth" data-owner-auth>
-        <p class="muted">商品ルールを変えられるのはオーナーだけです<br>オーナーの従業員番号とパスワードを入れてください<br>閉じると認証は解除されます</p>
+        <p class="muted">販売規則を変えられるのはオーナーだけです<br>オーナーの従業員番号とパスワードを入れてください<br>閉じると認証は解除されます</p>
         <div class="row wrap">
           <input data-owner="id" placeholder="オーナーの従業員番号" value="000" aria-label="オーナーの従業員番号" />
           <input data-owner="pw" type="password" placeholder="パスワード" autocomplete="off" aria-label="オーナーのパスワード" />
@@ -769,11 +769,6 @@ app.addEventListener("change", (e) => {
     frame();
     return;
   }
-  if (sel.dataset.rulesTab !== undefined) {
-    rulesTab = sel.value as RulesTab;
-    render();
-    return;
-  }
   if (sel.dataset.taxRate && ownerAuth) {
     const rate = Number((sel as unknown as HTMLInputElement).value);
     const ok = Number.isFinite(rate) && send({ type: "set_tax_rate", ...ownerAuth, class_id: sel.dataset.taxRate, rate_bp: Math.round(rate * 100) });
@@ -816,10 +811,11 @@ const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") a
 
 const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
 let ownerAuth: { owner_id: string; password: string } | null = null;
-let rulesTab: RulesTab = "age";
+let rulesTab: RulesTab = "tax";
 
 function lockRules(): void {
   ownerAuth = null;
+  rulesTab = "tax";
   const pw = rulesDlg().querySelector<HTMLInputElement>(`[data-owner="pw"]`);
   if (pw) pw.value = "";
   const form = rulesDlg().querySelector<HTMLElement>("[data-owner-auth]");
@@ -856,6 +852,10 @@ app.addEventListener("click", (e) => {
   if (!b || b.disabled) return;
   if (b.hasAttribute("data-open-rules")) return rulesDlg().showModal();
   if (b.hasAttribute("data-close-rules")) return rulesDlg().close();
+  if (b.dataset.rulesTab) {
+    rulesTab = b.dataset.rulesTab as RulesTab;
+    return render();
+  }
   if (b.hasAttribute("data-add-tax") && ownerAuth) {
     const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-new-tax="${k}"]`)!;
     const rate = Number(field("rate").value || 0);

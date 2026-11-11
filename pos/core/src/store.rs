@@ -30,7 +30,7 @@ const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）";
 const TICKETS_FIRST: &str = "チケットのお渡しが済むまで、次の取引は始められません";
 const TICKET_ALONE: &str =
-    "チケットは、ほかの商品と一緒に会計できません（チケットどうしは一緒に会計できます）";
+    "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）";
 const BILL_ALONE: &str = "公共料金のお支払いは、ほかの商品と一緒に登録できません";
 const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str =
@@ -2905,10 +2905,9 @@ impl Store {
             if r.txn.lines.iter().any(|l| l.is_parcel() != p.parcel_send) {
                 return Err(PARCEL_ALONE.into());
             }
-            if r.txn
-                .lines
-                .iter()
-                .any(|l| (l.tickets() > 0) != (p.tickets > 0))
+            // チケットは一件（申込券一枚）ずつ、ほかの商品ともほかのチケットとも一緒に会計しない
+            if r.txn.lines.iter().any(|l| l.tickets() > 0)
+                || p.tickets > 0 && !r.txn.lines.is_empty()
             {
                 return Err(TICKET_ALONE.into());
             }

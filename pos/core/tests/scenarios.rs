@@ -3692,7 +3692,7 @@ fn tickets_are_issued_after_payment_and_handed_over_by_count() {
         "受け取り枚数はお客様側で入力する"
     );
     let m = receive_tickets(&mut s, 1, "customer", 3).unwrap().unwrap();
-    assert!(m.contains("合いません"), "{m}");
+    assert!(m.contains("一致しません"), "{m}");
     let v = reg(&s, 1);
     assert_eq!(v.tickets_received, Some(3));
     assert_eq!(v.ticket_handover.len(), 1, "枚数が合うまで終わらない");

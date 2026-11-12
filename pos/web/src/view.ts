@@ -302,17 +302,31 @@ function parcelStep(reg: number, l: StaffLine, st: Gate, count: number): string 
     </div>${back()}`;
 }
 
+/** 複数口の伝票で、この荷物が何個口目か。同じお届け先へ続けて受け付けた複数口だけを数え、ほかの伝票は混ぜない */
+function multiPiece(lines: StaffLine[], l: StaffLine): number {
+  if (!l.parcel?.multi) return 0;
+  const parcels = lines.filter((x) => x.parcel).sort((a, b) => a.id - b.id);
+  let n = 1;
+  for (let i = parcels.findIndex((x) => x.id === l.id) - 1; i >= 0; i--) {
+    const q = parcels[i].parcel;
+    if (!q?.multi || !l.parcel.postal || q.postal !== l.parcel.postal) break;
+    n++;
+  }
+  return n;
+}
+
 function parcelAsk(reg: number, lines: StaffLine[], st: Gate): string {
   const done = lines.filter((l) => l.parcel && l.kind === "service" && l.done);
   const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
   const p = last?.parcel;
+  const pieces = last ? multiPiece(lines, last) : 0;
   return `<div class="point-screen parcel-ask">
       ${msg("同じお届け先の荷物はありますか？", p && last ? `${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b class="parcel-fee">${p.collect ? "着払い" : yen(last.amount)}</b>` : "")}
       <div class="point-choices">
         ${btn("ある", { type: "parcel_next", register: reg, more: true }, st)}
         ${btn("ない", { type: "parcel_next", register: reg, more: false }, st, "primary")}
       </div>
-      <p class="muted">受付済み ${done.length}個</p>
+      <p class="muted">受付済み ${pieces}個</p>
     </div>`;
 }
 
@@ -961,7 +975,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (!paying && parcel)
     return screen(
       side === "staff"
-        ? parcelStep(reg, parcel, a("complete_service"), v.lines.filter((l) => l.parcel).length)
+        ? parcelStep(reg, parcel, a("complete_service"), multiPiece(v.lines, parcel))
         : parcelNote(reg, parcel),
     );
   if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("同じお届け先にお送りする荷物はございますか？"));

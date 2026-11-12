@@ -575,7 +575,9 @@ body.dragging .drop-hint { display: inline; }
 /* 文字の濃さは決済端末・スキャナで同じ（以前の 黒・太字 と グレー・細字 の中間） */
 .money-io .terminal .placeholder { color: color-mix(in oklch, var(--ink) 50%, var(--muted)); font-weight: 500; }
 /* スキャナの二重枠は、読み取り時に走る赤帯と同じ濃い赤 */
-.money-io .terminal.scanner { --glow: oklch(0.9 0.06 25); --glow-ms: 0.45s; border-color: var(--scan-red); outline-color: var(--scan-red); }
+/* 待機中のスキャナは、白に戻らず薄い赤のままやや早めに明滅（現実のスキャナの読み取り窓のイメージ） */
+.money-io .terminal.scanner { --glow: oklch(0.88 0.07 25); --glow-ms: 0.35s; border-color: var(--scan-red); outline-color: var(--scan-red); animation-name: scanner-glow; }
+@keyframes scanner-glow { from { background: oklch(0.95 0.03 25); } to { background: var(--glow); } }
 /* 読み取った瞬間の演出（一回きり）。決済端末：電子マネー・クレジットカードをかざすと中心から青白い光が広がる。
    スキャナ：商品・決済用バーコードを読む（レジ画面に商品を入れるのも同じ）と、濃いめの赤帯が左から右へ走る */
 .money-io .terminal { position: relative; overflow: hidden; }
@@ -593,7 +595,7 @@ body.dragging .drop-hint { display: inline; }
 }
 @keyframes terminal-scan { to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) {
-  .money-io .terminal { animation: none; background: color-mix(in oklch, var(--glow) 60%, transparent); }
+  .money-io .terminal, .money-io .terminal.scanner { animation: none; background: color-mix(in oklch, var(--glow) 60%, transparent); }
   .money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { animation-duration: 0.01s; }
 }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }

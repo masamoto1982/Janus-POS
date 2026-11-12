@@ -1010,6 +1010,16 @@ impl Txn {
         names.join("・")
     }
 
+    /// 着払いの荷物だけの取引。レジで受け取るお金はない
+    fn collect_only(&self) -> bool {
+        !self.lines.is_empty()
+            && self
+                .lines
+                .iter()
+                .all(|l| l.parcel.as_ref().is_some_and(|p| p.collect))
+            && self.due() == 0
+    }
+
     fn bill_slips(&self) -> u32 {
         self.lines.iter().filter(|l| l.is_bill()).count() as u32
     }
@@ -3565,6 +3575,10 @@ impl Store {
             || r.txn.bill_slips() > 0
             || !r.txn.lines.iter().any(Line::earns_points);
         r.txn.customer_turn = r.mode == Mode::SelfOperated;
+        // 着払いの荷物だけなら払う額がないので、決済手段を選ばずにそのまま取引を終える
+        if r.txn.collect_only() {
+            return self.settle(register, PaymentMethod::Cash, 0, Cash::default());
+        }
         let ready = r.staff_state() == StaffState::Ready;
         let pending = r.txn.age_choice_pending();
         let mode = r.mode;
@@ -3883,6 +3897,7 @@ impl Store {
                 (Some(PaymentMethod::Emoney), _) => "電子マネー・現金",
                 (Some(PaymentMethod::Qr), _) => "バーコード決済・現金",
                 (Some(PaymentMethod::Credit), _) => "クレジットカード・現金",
+                _ if txn.collect_only() => "着払い",
                 _ => method.label(),
             },
             paid,

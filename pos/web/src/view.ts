@@ -198,7 +198,7 @@ export function expiryLabel(min: number, fresh: boolean): string {
   return `${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:00`;
 }
 
-// 販売期限切れ：明細に「期限切れ」のフラグ。押すと（会計を押しても）取り替えの画面を開く。
+// 販売期限切れ：明細に「期限切れ」のフラグ。押すと案内の画面を開く（会計はグレーアウト）。
 // 期限切れの品を読むとその場で自動的に開き、バックで閉じると、次に期限切れの品を読むまで開かない
 export const expiredClosed = new Map<string, string>();
 type ExpiredLine = { id: number; touched: number; name: string; qty: number; expired: boolean; fresh: boolean; dates: Dates | null };
@@ -876,7 +876,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       : "";
 
   const ffFirst = !paying && v.lines.some((l) => l.kind === "ff" && l.state === "waiting") && a("check_ff").allowed;
-  const expiredFirst = !paying && v.lines.some((l) => l.expired) && a("remove_line").allowed;
+  // 販売期限切れの品を回収するまで会計は押せないので、会計ボタンはグレーアウト（core の checkout が理由つきで拒む）
+  const expiredAny = v.lines.some((l) => l.expired);
   const top = regTop(
     v.total,
     itemCount(v.lines),
@@ -884,9 +885,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro || paying
         ? ""
-        : expiredFirst
-          ? `<button type="button" class="primary" data-expiredview="${reg}:${side}">会計</button>`
-        : ffFirst
+        : ffFirst && !expiredAny
           ? `<button type="button" class="primary" data-ffverify="${reg}:${side}">会計</button>`
           : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.max_items,
@@ -1311,9 +1310,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
     c.total,
     itemCount(c.lines),
     (c.phase === "registering"
-      ? c.lines.some((l) => l.expired) && a("remove_line").allowed
-        ? `<button type="button" class="primary" data-expiredview="${reg}:${side}">お会計</button>`
-        : btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
+      ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : ""),
     r.max_items,
     !!c.point_card,

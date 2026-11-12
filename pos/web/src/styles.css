@@ -488,7 +488,8 @@ body.dragging .drop-hint { display: inline; }
 }
 .screen :is(button, input, select, summary) { filter: grayscale(1); }
 .screen.operable [data-region] :is(button, input, select, summary),
-.staff-screen [data-region] .staff-only button { filter: url(#ramp); }
+.staff-screen [data-region] .staff-only button,
+.customer-screen [data-region] .customer-only button { filter: url(#ramp); }
 .screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
 /* ボタン操作で出すガイダンス（案内ボタン・支払方法の選択）は青文字（濃いグレーを青のランプで青にする） */

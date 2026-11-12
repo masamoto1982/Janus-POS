@@ -241,14 +241,22 @@ const DICT: Record<string, string> = {
   "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）": "Tickets are handled one order at a time (not with other tickets or items)",
   受け取り枚数をご入力ください: "Please enter the number of tickets you received",
   受け取り枚数: "Tickets received",
-  チケットをお客様にお渡ししてください: "Please hand the tickets to the customer",
+  発券枚数: "Tickets",
+  お渡し枚数を入力してください: "Enter the number of tickets handed over",
+  お渡し枚数: "Tickets handed over",
+  発券枚数とお渡し枚数が一致しません: "The number handed over doesn't match the number issued",
+  "発券枚数とお渡し枚数が一致しません\n再度ご確認ください": "The number handed over doesn't match the number issued\nPlease check again",
+  お渡し枚数を入力しました: "Number handed over entered",
+  受け取り枚数を入力しました: "Number received entered",
+  チケットのお渡し枚数はスタッフ側の画面で入力します: "Staff enter the number of tickets handed over on the staff screen",
+  チケットのお渡し枚数はスタッフがログインしてから入力します: "Staff enter the number of tickets handed over after logging in",
   申込数と受け取り数が一致しません: "The number received doesn't match the number ordered",
   再度ご確認ください: "Please check again",
   "申込数と受け取り数が一致しません\n再度ご確認ください": "The number received doesn't match the number ordered\nPlease check again",
   "チケットの受け取り枚数はお客様側の画面で入力していただきます": "The customer enters the number of tickets on the customer screen",
   お渡しするチケットはありません: "No tickets to hand over",
-  "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券したチケットをお渡しし、お客様が受け取り枚数を入力して申込数と照合する":
-    "Buy tickets with an application slip; cash only, one order per sale; after payment, staff hand over the tickets and the customer enters the number received, which must match the number ordered",
+  "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券し、スタッフのお渡し枚数とお客様の受け取り枚数をそれぞれ発券枚数と照合する":
+    "Buy tickets with an application slip; cash only, one order per sale; after payment the tickets print, and the staff count handed over and the customer count received are each checked against the number issued",
 
   // 公共料金
   事業者: "Payee",

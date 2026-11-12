@@ -82,6 +82,7 @@ pub enum Action {
     AffixReceiptStamp,
     HandOverBills,
     ReceiveTickets,
+    HandTickets,
     InsertCash,
     TapEmoney,
     CallStaff,
@@ -115,6 +116,7 @@ pub const ACTIONS: &[Action] = &[
     Action::AffixReceiptStamp,
     Action::HandOverBills,
     Action::ReceiveTickets,
+    Action::HandTickets,
     Action::InsertCash,
     Action::TapEmoney,
     Action::CallStaff,
@@ -266,6 +268,7 @@ pub fn is_staff_only(action: Action) -> bool {
             | Action::AffixReceiptStamp
             | Action::HandOverBills
             | Action::CheckFf
+            | Action::HandTickets
     )
 }
 
@@ -346,6 +349,8 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Err("収入印紙の貼り付け確認はスタッフ側の画面で行います")
         } else if action == Action::CheckFf {
             Err("FF のお渡し確認はスタッフ側の画面で行います")
+        } else if action == Action::HandTickets {
+            Err("チケットのお渡し枚数はスタッフ側の画面で入力します")
         } else if action == Action::ReceiveTickets {
             Err("チケットの受け取り枚数はお客様側の画面で入力していただきます")
         } else if is_staff_only(action) {
@@ -454,7 +459,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::AffixStamp => affix_stamp(c),
         Action::AffixReceiptStamp => affix_receipt_stamp(c),
         Action::HandOverBills => hand_over_bills(c),
-        Action::ReceiveTickets => check_tickets(c),
+        Action::ReceiveTickets | Action::HandTickets => check_tickets(c),
         Action::InsertCash | Action::TapEmoney => pay_action(action, c),
         Action::FfButton => Err("FF はタブから登録します"),
         Action::CallStaff => Ok(()),
@@ -516,6 +521,10 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
         }
         Action::HandOverBills => hand_over_bills(c),
         Action::ReceiveTickets => check_tickets(c),
+        Action::HandTickets => {
+            check_tickets(c)?;
+            Err("チケットのお渡し枚数はスタッフがログインしてから入力します")
+        }
         Action::InsertCash => Err(SELF_OP_NO_CASH),
         Action::TapEmoney => pay_action(action, c),
         Action::CallStaff => Ok(()),

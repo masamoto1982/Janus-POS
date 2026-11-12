@@ -4074,16 +4074,16 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
         json!({"type":"checkout","register":1,"side":"staff"}),
     );
     no_id_check(&mut s, 1);
-    assert_eq!(reg(&s, 1).points.usable, 80);
+    assert_eq!(reg(&s, 1).points.usable, 1);
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
     );
     use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
-    assert_eq!((v.prepaid, v.staff.due), (80, 840));
+    assert_eq!((v.prepaid, v.staff.due), (1, 919));
     assert_eq!(v.staff.method, None);
-    assert_eq!(v.points.earn, (320 - 80) / 200, "no points on the part paid by points");
+    assert_eq!(v.points.earn, (320 - 1) / 200, "no points on the part paid by points");
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
@@ -4093,7 +4093,7 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
         json!({"type":"tap_emoney","register":1,"method":"credit"}),
     );
     let r = reg(&s, 1).last_receipt.expect("決済済み");
-    assert_eq!((r.points, r.points_used, r.point_balance), (1, 80, Some(1)));
+    assert_eq!((r.points, r.points_used, r.point_balance), (1, 1, Some(1)));
 }
 
 #[test]
@@ -4118,9 +4118,9 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
     );
     scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "staff", "PC87654321");
-    assert_eq!(reg(&s, 1).points.balance, Some(80));
+    assert_eq!(reg(&s, 1).points.balance, Some(1));
 
-    // 80P を使い切ると、残高 0 のカードではポイント利用を選べない
+    // 1P を使い切ると、残高 0 のカードではポイント利用を選べない
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"staff"}),

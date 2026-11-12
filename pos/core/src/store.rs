@@ -2354,6 +2354,7 @@ impl Store {
                     }
                     if balance < part {
                         r.txn.emoney_short = true;
+                        self.call_emoney_short(register);
                         return done(format!(
                             "電子マネーの残高が足りません（残高 {balance}円・お支払い {part}円）"
                         ));
@@ -2372,6 +2373,7 @@ impl Store {
                 if method == PaymentMethod::Emoney {
                     if balance < due {
                         r.txn.emoney_short = true;
+                        self.call_emoney_short(register);
                         return done(format!(
                             "電子マネーの残高が足りません（残高 {balance}円・お支払い {due}円）"
                         ));
@@ -2464,6 +2466,10 @@ impl Store {
                 match choice {
                     ShortChoice::Cancel => {
                         r.txn.method = None;
+                        // セルフ操作モードの残高不足で呼んだスタッフは、他の決済を選んだら取り下げる
+                        if r.mode == Mode::SelfOperated {
+                            self.calls.resolve(register, CallKind::Emoney, self.now);
+                        }
                         done("電子マネーを使うのをやめました\nお支払い方法を選んでください")
                     }
                     ShortChoice::Cash => {
@@ -2738,6 +2744,15 @@ impl Store {
             return Err(format!("{name}は1回のお会計で{limit}点までです"));
         }
         Ok(())
+    }
+
+    /// セルフ操作モードで電子マネーの残高が足りないとき：セルフは現金を扱わずチャージもできないので、
+    /// スタッフを呼ぶ。スタッフがログインすると、スタッフ操作モードの「電子マネーの残高が足りません」
+    /// （不足額を現金で払う／チャージする）につながる
+    fn call_emoney_short(&mut self, register: u8) {
+        if self.reg(register).is_some_and(|r| r.mode == Mode::SelfOperated) {
+            self.calls.raise(register, CallKind::Emoney, self.now, "残高不足");
+        }
     }
 
     fn call(&mut self, register: u8, kind: CallKind, detail: &str) {

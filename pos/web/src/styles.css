@@ -454,8 +454,8 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 body.dragging, body.dragging * { cursor: grabbing !important; }
 body.dragging .screen { border-color: var(--accent); }
 body.dragging .screen::after { content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; border: var(--frame-w) solid var(--accent); }
-body.dragging-wallet .money-io :is(.inlet, .terminal) { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); }
-body.dragging-wallet .money-io .terminal { box-shadow: none; outline-color: var(--accent); }
+body.dragging-wallet .money-io :is(.inlet, .terminal:not(.scanner)) { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); }
+body.dragging-wallet .money-io .terminal:not(.scanner) { box-shadow: none; outline-color: var(--accent); }
 body.dragging .drop-hint { display: inline; }
 .drag-ghost {
   position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none;
@@ -564,14 +564,13 @@ body.dragging .drop-hint { display: inline; }
 @keyframes io-frame { 50% { border-color: var(--msg-strong); box-shadow: inset 0 0 0 var(--frame-w) var(--msg-strong); } }
 .money-io .inlet.blink, .money-io .outlet.blink, .money-io .terminal.blink { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); animation: io-frame 1s steps(1) infinite; }
 .money-io .inlet.blink .placeholder { color: var(--ink); font-weight: 700; }
-/* お客様側の下は、左に決済端末・右にスキャナ（スタッフ側の入金・出金ボックスと同じ横並び）。どちらも二重枠、文字は同じ濃さ */
+/* お客様側の下は、左に決済端末・右にスキャナ（スタッフ側の入金・出金ボックスと同じ横並び）。どちらも二重枠、文字は入金・出金と同じ色 */
 .money-io .terminal { width: 100%; outline: var(--frame-w) solid var(--msg-strong); outline-offset: calc(var(--frame-w) * -3); justify-content: center; text-align: center; }
-.money-io .terminal .placeholder { color: color-mix(in oklch, var(--ink) 50%, var(--muted)); font-weight: 500; }
 .money-io .terminal { --scan-red: oklch(0.6 0.2 27); --tap-blue: oklch(0.6 0.2 255); position: relative; overflow: hidden; }
 .money-io .terminal > * { position: relative; z-index: 1; }
-/* 決済端末：電子マネー・クレジットカードを待っているあいだだけ、青白い光がゆったり明滅し二重枠は操作色 */
-.money-io .terminal.reader { border-color: var(--accent); outline-color: var(--accent); animation: terminal-glow 1.6s ease-in-out infinite alternate; }
-@keyframes terminal-glow { from { background: transparent; } to { background: oklch(0.94 0.04 240); } }
+/* 決済端末：電子マネー・クレジットカードを待っているあいだだけ、二重枠が操作色で点滅（入金ボックスと同じ。背景は塗らない） */
+.money-io .terminal.reader { border-color: var(--accent); outline-color: var(--accent); animation: io-frame-double 1s steps(1) infinite; }
+@keyframes io-frame-double { 50% { border-color: var(--msg-strong); outline-color: var(--msg-strong); } }
 /* スキャナ：二重枠は読み取り時の赤帯と同じ濃い赤。待機中は光らない（user：点滅は目障り）。赤はレジ画面内の「危険・否定」とは別の周辺機器の演出 */
 .money-io .terminal.scanner { border-color: var(--scan-red); outline-color: var(--scan-red); }
 /* 読み取った瞬間の演出（一回きり）。色の濃さは赤帯と青い光でそろえる。
@@ -590,7 +589,7 @@ body.dragging .drop-hint { display: inline; }
 }
 @keyframes terminal-scan { to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) {
-  .money-io .terminal.reader { animation: none; background: oklch(0.96 0.025 240); }
+  .money-io .terminal.reader { animation: none; }
   .money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { animation-duration: 0.01s; }
 }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }

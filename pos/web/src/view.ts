@@ -1075,7 +1075,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       ? `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`
       : "";
     return `<div class="point-screen emoney-screen">
-        ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
+        ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>${staffOp ? "" : "<br>スタッフが向かっています"}`)}
         ${ro ? "" : buttons}
       </div>${ro ? "" : `<div class="back-foot">${choice("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`}`;
   }

@@ -1961,6 +1961,7 @@ fn points_pay_only_for_point_eligible_goods() {
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
     );
+    use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
     assert_eq!(v.prepaid, sand);
     assert_eq!(v.staff.due, tob);
@@ -2403,11 +2404,11 @@ fn points_can_pay_once_staff_chooses_them() {
         json!({"type":"tap_emoney","register":1,"method":"points"})
     )
     .is_err());
-    // カードは読み取り済みなので、選んだその場でポイントを充てる
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
     );
+    use_points(&mut s, 1, "all", None);
     assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
@@ -2428,7 +2429,11 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     assert_eq!(v.staff.method, Some(PaymentMethod::Points));
     scan(&mut s, 1, "staff", "PC12345678");
     let v = reg(&s, 1);
-    assert!(v.staff.lines.is_empty(), "reading the card pays with points at once");
+    assert_eq!(v.staff.phase, Phase::Paying, "reading the card keeps the payment screen");
+    assert_eq!(v.staff.method, Some(PaymentMethod::Points));
+    use_points(&mut s, 1, "all", None);
+    let v = reg(&s, 1);
+    assert!(v.staff.lines.is_empty());
     assert_eq!(v.last_receipt.map(|r| r.method), Some("ポイント利用"));
 
     let mut s = Store::new(1, 2, 1);
@@ -4074,6 +4079,7 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
     );
+    use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
     assert_eq!((v.prepaid, v.staff.due), (80, 840));
     assert_eq!(v.staff.method, None);
@@ -4104,6 +4110,7 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
     );
+    use_points(&mut s, 1, "all", None);
     assert_eq!(reg(&s, 1).points.balance, Some(0));
     ok(
         &mut s,
@@ -4122,6 +4129,7 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
     );
+    use_points(&mut s, 1, "all", None);
     pay_cash(&mut s, 1);
     assert_eq!(reg(&s, 1).last_receipt.and_then(|r| r.point_balance), Some(0));
     scan(&mut s, 1, "staff", BREAD);
@@ -4153,4 +4161,57 @@ fn only_non_point_goods_skip_the_point_card_check() {
     );
     no_id_check(&mut s, 1);
     assert!(!reg(&s, 1).staff.point_pending);
+}
+
+fn use_points(s: &mut Store, r: u8, how: &str, points: Option<u32>) {
+    ok(
+        s,
+        json!({"type":"use_points","register":r,"side":"staff","how":how,"points":points}),
+    );
+}
+
+#[test]
+fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
+    let start = |s: &mut Store| {
+        login(s, 1);
+        scan(s, 1, "staff", "PC12345678");
+        scan(s, 1, "staff", SANDWICH);
+        scan(s, 1, "staff", BREAD);
+        scan(s, 1, "staff", TOBACCO);
+        ok(
+            s,
+            json!({"type":"checkout","register":1,"side":"staff"}),
+        );
+        no_id_check(s, 1);
+        ok(
+            s,
+            json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+        );
+    };
+    // 合計 1,080円（うちポイントを使えるのは 480円）
+    let mut s = Store::new(1, 2, 1);
+    start(&mut s);
+    let v = reg(&s, 1);
+    assert_eq!(v.prepaid, 0, "choosing points alone uses nothing yet");
+    assert_eq!((v.points.usable, v.points.fraction), (480, 80));
+    use_points(&mut s, 1, "fraction", None);
+    let v = reg(&s, 1);
+    assert_eq!((v.prepaid, v.staff.due), (80, 1_000));
+
+    let mut s = Store::new(1, 2, 1);
+    start(&mut s);
+    assert!(run(
+        &mut s,
+        json!({"type":"use_points","register":1,"side":"staff","how":"amount","points":481})
+    )
+    .is_err());
+    use_points(&mut s, 1, "amount", Some(300));
+    let v = reg(&s, 1);
+    assert_eq!((v.prepaid, v.staff.due), (300, 780));
+    assert_eq!(v.points.balance, Some(950));
+
+    let mut s = Store::new(1, 2, 1);
+    start(&mut s);
+    use_points(&mut s, 1, "all", None);
+    assert_eq!(reg(&s, 1).prepaid, 480);
 }

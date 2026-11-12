@@ -618,7 +618,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt";
 export type PadEntry = { target: PadTarget; line?: number; digits: string };
 export const padEntry = new Map<string, PadEntry>();
 export const padValue = new Map<string, string>();
@@ -634,6 +634,7 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   inlet: { title: "入金", unit: "円", max: 6 },
   mamt: { title: "出金する金額", unit: "円", max: 6 },
   mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
+  ppt: { title: "使うポイント数", unit: "P", max: 5 },
 };
 export const padShow = (target: PadTarget, digits: string): string =>
   target === "mpw" ? "●".repeat(digits.length) : target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits;
@@ -904,7 +905,11 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const agePending = (paying || v.age_early) && (v.age_choice_pending || v.id_pending);
   const payStage = paying && !pointPending && !agePending;
   const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
-  const pay = payStage
+  // 「ポイント利用」を選んだら、ポイントの使い方（全部・端数・指定）を選ぶ画面に切り替わる
+  const pointsUsing = payStage && v.method === "points" && r.points.balance !== null && !r.prepaid;
+  const pay = pointsUsing
+    ? pointsUse(r, side, a("select_payment"), side === "staff" ? "ポイントのご利用方法をお伺いしてください" : null)
+    : payStage
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : v.method ? "" : methodList(v.method, v.inserted, r.unavailable)}
@@ -933,7 +938,9 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   );
   const back = ro
     ? ""
-    : paying
+    : pointsUsing
+      ? backCorner({ type: "select_payment", register: reg, side, method: "points" }, a("select_payment"))
+      : paying
       ? backFoot(reg, side, a("back_to_registering"))
       : agePending
         ? backCorner({ type: "early_age_check", register: reg, side: "staff", start: false }, a("early_age_check"))
@@ -1135,6 +1142,25 @@ function prepaidNote(r: RegisterView, due: number): string {
 
 function cashBackNote(side: Side, amount: number): string {
   return side === "staff" ? `<p>現金 <b>${yen(amount)}</b> を出金ボックスからお返しください</p>` : `<p>現金 <b>${yen(amount)}</b> をお返しします</p>`;
+}
+
+/** ポイントの使い方：使える分を全部・お支払いの端数（100円未満）・ポイント数を指定。
+ *  head が null の側（スタッフ操作モードのお客様側）は操作せず、案内だけを出す */
+function pointsUse(r: RegisterView, side: Side, st: Gate, head: string | null): string {
+  const p = r.points;
+  const reg = r.id;
+  const sub = `ポイント残高 ${pt(p.balance ?? 0)}、ご利用可能 ${pt(p.usable)}`;
+  if (head === null) return `<div class="point-screen pair-note">${msg("ポイントのご利用方法をお申しつけください", sub)}</div>`;
+  const use = (how: "all" | "fraction"): Command => ({ type: "use_points", register: reg, side, how });
+  const frac: Gate = !st.allowed ? st : !p.fraction ? { allowed: false, reason: "お支払い額に端数がありません" } : p.fraction > p.usable ? { allowed: false, reason: "端数がご利用可能なポイントを超えています" } : st;
+  const amount = padValue.get(padValueKey(reg, "ppt")) ?? "";
+  const n = Number(amount || 0);
+  const okAmount = st.allowed && n > 0 && n <= p.usable;
+  return `<div class="point-screen points-use">
+      ${msg(head, sub)}
+      <div class="point-choices pair">${btn(`全部使う\n${pt(p.usable)}`, use("all"), st, "primary")}${btn(`端数を払う\n${pt(p.fraction)}`, use("fraction"), frac, "primary")}</div>
+      <div class="parcel-fields points-amount"><label>ポイント数を指定${padField(reg, side, "ppt", amount, "", "使うポイント数")}<span>P</span></label><button type="button" class="primary" data-form="points-amount" data-reg="${reg}" data-side="${side}"${okAmount ? "" : " disabled"}>決定</button></div>
+    </div>`;
 }
 
 /** 支払方法を選ぶ前に、読み取ったカードで使えるポイントを出す（スタッフ側・お客様側で同じ言い回し） */
@@ -1406,6 +1432,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (card) return screen(card);
   if (c.phase === "paying" && c.point_pending) return screen(pointCheck(reg, side, a("confirm_point_card")));
   scanGuide.delete(`${reg}:${side}`);
+  if (c.phase === "paying" && c.method === "points" && r.points.balance !== null && !r.prepaid)
+    return `${top}${confirm(pointsUse(r, side, a("select_payment"), "ポイントの使い方を選んでください") + (voidAsk.has(reg) ? "" : backCorner({ type: "select_payment", register: reg, side, method: "points" }, a("select_payment"))))}`;
   if (c.phase === "paying")
     return screen(`<div class="paybox pay-stage">
         <div class="big">お支払い方法を選択してください</div>

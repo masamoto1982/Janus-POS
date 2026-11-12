@@ -466,6 +466,8 @@ function render(): void {
         padValue.delete(padValueKey(r.id, "mamt"));
         padValue.delete(padValueKey(r.id, "mpw"));
       }
+      // ポイントの使い方の画面を離れたら、指定しかけたポイント数を捨てる
+      if (r.customer.method !== "points" || r.prepaid) padValue.delete(padValueKey(r.id, "ppt"));
       setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side), lang);
       el?.classList.toggle("no-items", !items);
     }
@@ -728,6 +730,9 @@ function form(b: HTMLElement): void {
   switch (b.dataset.form) {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
+      break;
+    case "points-amount":
+      if (send({ type: "use_points", register: reg, side: b.dataset.side as Side, how: "amount", points: Number(padValue.get(padValueKey(reg, "ppt")) ?? 0) })) padValue.delete(padValueKey(reg, "ppt"));
       break;
     case "parcel-length":
       send({ type: "parcel_length", register: reg, line_id: Number(b.dataset.line), sum_cm: Number(padValue.get(padValueKey(reg, "pcm", Number(b.dataset.line))) ?? 0) });

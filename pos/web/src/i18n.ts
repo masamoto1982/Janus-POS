@@ -484,6 +484,15 @@ const DICT: Record<string, string> = {
   "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）":
     "No items can be paid with points (not parcels, COD, bills, tickets, stamps or tobacco)",
   ポイントの残高がありません: "No points left on the card",
+  ポイントの使い方を選んでください: "Please choose how to use points",
+  ポイントのご利用方法をお伺いしてください: "Ask how the customer wants to use points",
+  ポイントのご利用方法をお申しつけください: "Please tell us how you'd like to use points",
+  ポイント数を指定: "Points to use",
+  全部使う: "Use all",
+  端数を払う: "Pay odd yen",
+  使うポイント数: "Points to use",
+  お支払い額に端数がありません: "The amount has no odd yen",
+  端数がご利用可能なポイントを超えています: "The odd yen exceed the usable points",
   クレジットカード・バーコード決済は現金と併用できません: "Credit card and barcode pay can't be combined with cash",
   "このレジは休止中です（スタッフバーコードで再開）": "This register is closed (scan a staff barcode to reopen)",
   店舗メニューはログインしたスタッフだけが使えます: "Only logged-in staff can use the store menu",
@@ -609,6 +618,7 @@ const RULES: Rule[] = [
   [/^内税 (.*)$/, (m) => `Tax incl. ${yenify(m[1])}`],
   [/^ポイント ([\d,]+P)（今回 \+([\d,]+P)）$/, (m) => `Points ${m[1]} (+${m[2]} this time)`],
   [/^ポイント ([\d,]+P)$/, (m) => `Points ${m[1]}`],
+  [/^ポイント残高 ([\d,]+P)、ご利用可能 ([\d,]+P)$/, (m) => `Point balance ${m[1]}, usable ${m[2]}`],
   [/^(?:ご利用 ([\d,]+P)、)?付与 ([\d,]+P)、ポイント残高 ([\d,]+P)$/, (m) => `${m[1] ? `Used ${m[1]}, earned` : "Earned"} ${m[2]}, point balance ${m[3]}`],
   [/^ポイントで払った ([\d,]+P) は残高に戻ります$/, (m) => `The ${m[1]} paid with points go back to the card`],
 ];

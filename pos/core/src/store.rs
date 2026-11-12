@@ -49,9 +49,13 @@ const BILL_NO_REMOVE: &str =
 const NO_POINTS: &str =
     "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）";
 const NO_POINT_BALANCE: &str = "ポイントの残高がありません";
+const NO_FRACTION: &str = "お支払い額に端数がありません";
+const FRACTION_OVER: &str = "端数がご利用可能なポイントを超えています";
 const NO_POINT_CARD: &str = "ポイントカードが読まれていません\nポイントカードを読み取ってください";
 /// ポイントは付与対象の金額（付与対象外の商品・クーポンの値引き・ポイントで払った分を除く）200円につき1ポイント
 pub const YEN_PER_POINT: u32 = 200;
+/// 「端数をポイントで払う」の端数＝お支払い額の 100円未満
+pub const FRACTION_UNIT: u32 = 100;
 /// シミュレーターのポイントカードの残高（初期値）。1ポイント＝1円。
 /// カードは残高が多め、アプリは少なめで、ポイントで払い切れずに残りを別の支払方法で払う流れも試せる
 const POINT_INITIAL: [(&str, u32); 2] = [("12345678", 1_250), ("87654321", 80)];
@@ -65,6 +69,16 @@ const EMONEY_NO_CASH: &str =
     "セルフレジでは現金を使えません\nほかの支払方法を選ぶか、スタッフをお呼びください";
 const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません\nお会計のあとにどうぞ";
+
+/// ポイントの使い方：使える分を全部・お支払いの端数（100円未満）・ポイント数を指定
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum PointsUse {
+    All,
+    Fraction,
+    Amount,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -380,6 +394,16 @@ pub enum Command {
         register: u8,
         side: Side,
     },
+    /// 「ポイント利用」を選んだあと、ポイントの使い方を決めて充てる
+    UsePoints {
+        register: u8,
+        side: Side,
+        how: PointsUse,
+        /// 使うポイント数（how が amount のときだけ）
+        #[serde(default)]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        points: Option<u32>,
+    },
     ReleaseCall {
         register: u8,
     },
@@ -534,6 +558,7 @@ impl Command {
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
             | C::ConfirmPointCard { register, .. }
+            | C::UsePoints { register, .. }
             | C::VoidTransaction { register, .. }
             | C::EndStaffMode { register, .. }
             | C::Pause { register }
@@ -559,6 +584,7 @@ impl Command {
             | C::BackToRegistering { side, .. }
             | C::SelectPayment { side, .. }
             | C::ConfirmPointCard { side, .. }
+            | C::UsePoints { side, .. }
             | C::CheckBill { side, .. }
             | C::AffixStamp { side, .. }
             | C::AffixReceiptStamp { side, .. }
@@ -1694,9 +1720,9 @@ impl Store {
         }
     }
 
-    /// 読み取ったポイントカードの残高を、ポイントを使える商品の分だけ充てる（1ポイント＝1円）。
+    /// 読み取ったポイントカードの残高から want ポイントを、ポイントを使える商品の分を上限に充てる（1ポイント＝1円）。
     /// 足りない分や付与対象外の商品の分は、別の支払方法で払う
-    fn use_points(&mut self, register: u8) -> Result<Outcome, String> {
+    fn use_points(&mut self, register: u8, want: u32) -> Result<Outcome, String> {
         let r = self.reg(register).ok_or("レジがありません")?;
         let Some(no) = r.txn.point_card.clone() else {
             return Err(NO_POINT_CARD.into());
@@ -1711,7 +1737,10 @@ impl Store {
             r.txn.method = None;
             return Err(NO_POINT_BALANCE.into());
         }
-        let used = part.min(balance);
+        let used = part.min(balance).min(want);
+        if used == 0 {
+            return Err("使うポイント数を入力してください".into());
+        }
         let r = self.reg_mut(register)?;
         let due = r.txn.due();
         if used == due {
@@ -2194,8 +2223,7 @@ impl Store {
                         r.txn.point_checked = false;
                         return done(NO_POINT_CARD);
                     }
-                    // ポイントカードは読み取り済みなので、かざし直さずにその場で充てる
-                    return self.use_points(register);
+                    return done("ポイントの使い方を選んでください");
                 }
                 done(format!("{}を選びました", method.label()))
             }
@@ -2462,7 +2490,7 @@ impl Store {
                 let method = chosen;
                 let due = r.txn.due();
                 if method == PaymentMethod::Points {
-                    return self.use_points(register);
+                    return Err("ポイントの使い方を選んでください".into());
                 }
                 let part = r.txn.cashless_due();
                 if part == 0 {
@@ -2650,6 +2678,47 @@ impl Store {
                     Some(CallTopic::Sos) => unreachable!(),
                     None => "スタッフをお呼びしました",
                 })
+            }
+            C::UsePoints {
+                register,
+                side,
+                how,
+                points,
+            } => {
+                self.check(register, side, Action::SelectPayment)?;
+                let r = self.reg(register).ok_or("レジがありません")?;
+                if r.txn.method != Some(PaymentMethod::Points) {
+                    return Err("「ポイント利用」が選ばれていません".into());
+                }
+                let usable = r
+                    .txn
+                    .point_card
+                    .as_deref()
+                    .map_or(0, |no| self.point_balance(no).min(r.txn.points_due()));
+                let n = match how {
+                    PointsUse::All => usable,
+                    PointsUse::Fraction => {
+                        let f = r.txn.due() % FRACTION_UNIT;
+                        if f == 0 {
+                            return Err(NO_FRACTION.into());
+                        }
+                        if f > usable {
+                            return Err(FRACTION_OVER.into());
+                        }
+                        f
+                    }
+                    PointsUse::Amount => {
+                        let n = points.unwrap_or(0);
+                        if n == 0 {
+                            return Err("使うポイント数を入力してください".into());
+                        }
+                        if n > usable {
+                            return Err(format!("ご利用可能なポイントは {usable}P までです"));
+                        }
+                        n
+                    }
+                };
+                self.use_points(register, n)
             }
             C::ConfirmPointCard { register, side } => {
                 self.check(register, side, Action::ConfirmPointCard)?;
@@ -3120,10 +3189,6 @@ impl Store {
                 let asked = !r.txn.point_checked;
                 r.txn.point_card = Some(no.clone());
                 r.txn.point_checked = true;
-                // 「ポイント利用」を選んでから読んだら、そのままポイントを充てる
-                if r.txn.method == Some(PaymentMethod::Points) && r.txn.prepaid == 0 {
-                    return self.use_points(register);
-                }
                 return done(if asked && r.txn.method.is_none() {
                     "ポイントカードを読みました\nお支払い方法を選んでください"
                 } else {
@@ -4302,6 +4367,7 @@ impl Store {
                     usable: balance.map_or(0, |b| b.min(t.points_due())),
                     earn: t.points_to_earn(),
                     used: t.points_used(),
+                    fraction: t.due() % FRACTION_UNIT,
                 }
             },
             prepaid: t.prepaid,
@@ -4470,6 +4536,8 @@ pub struct PointsView {
     pub earn: u32,
     /// 支払いに使ったポイント
     pub used: u32,
+    /// お支払い額の端数（100円未満）。ご利用可能なポイントを超えていれば端数では払えない
+    pub fraction: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

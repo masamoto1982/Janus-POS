@@ -1026,7 +1026,7 @@ function setupDrag(): void {
   const end = () => {
     drag = null;
     ghost.hidden = true;
-    document.body.classList.remove("dragging", "dragging-wallet");
+    document.body.classList.remove("dragging", "dragging-cash", "dragging-tap");
   };
 
   app.addEventListener("pointerdown", (e) => {
@@ -1044,7 +1044,10 @@ function setupDrag(): void {
       ghost.textContent = drag.label;
       ghost.hidden = false;
       document.body.classList.add("dragging");
-      document.body.classList.toggle("dragging-wallet", !!drag.wallet);
+      // ドラッグ中は、それを受け取る機器の枠だけを強調する：現金＝スタッフ側の入金ボックス、
+      // 電子マネー・クレジットカード＝お客様側の決済端末（バーコード決済はスキャナで、赤い枠のまま）
+      document.body.classList.toggle("dragging-cash", !!drag.wallet?.startsWith("cash:"));
+      document.body.classList.toggle("dragging-tap", drag.wallet === "pay:emoney" || drag.wallet === "pay:credit");
     }
     ghost.style.transform = `translate(${e.clientX + 8}px, ${e.clientY + 8}px)`;
   });

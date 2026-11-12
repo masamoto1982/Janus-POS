@@ -132,6 +132,8 @@ pub enum ShortChoice {
     Cash,
     CashConfirmed,
     Charge,
+    /// セルフ操作モード：「チャージまたは現金併用」＝スタッフを呼ぶ
+    Staff,
 }
 
 pub const EMONEY_MAX: u32 = 20_000;
@@ -2354,7 +2356,6 @@ impl Store {
                     }
                     if balance < part {
                         r.txn.emoney_short = true;
-                        self.call_emoney_short(register);
                         return done(format!(
                             "電子マネーの残高が足りません（残高 {balance}円・お支払い {part}円）"
                         ));
@@ -2373,7 +2374,6 @@ impl Store {
                 if method == PaymentMethod::Emoney {
                     if balance < due {
                         r.txn.emoney_short = true;
-                        self.call_emoney_short(register);
                         return done(format!(
                             "電子マネーの残高が足りません（残高 {balance}円・お支払い {due}円）"
                         ));
@@ -2445,6 +2445,13 @@ impl Store {
                 self.check(register, side, Action::ResolveEmoneyShort)?;
                 let balance = self.emoney_balance;
                 let r = self.reg_mut(register)?;
+                if choice == ShortChoice::Staff {
+                    if r.mode != Mode::SelfOperated {
+                        return Err("スタッフ操作モードでは、その場でチャージ・現金併用を選べます".into());
+                    }
+                    self.call_emoney_short(register);
+                    return done("スタッフをお呼びしました\nチャージまたは現金併用はスタッフがお手伝いします");
+                }
                 if r.mode == Mode::SelfOperated && choice == ShortChoice::Charge {
                     return Err(EMONEY_NO_CHARGE.into());
                 }
@@ -2480,7 +2487,7 @@ impl Store {
                             "電子マネーの残高 {drawn}円を引き出し、残り {rest}円を現金でお支払いいただきます"
                         ))
                     }
-                    ShortChoice::CashConfirmed => unreachable!(),
+                    ShortChoice::CashConfirmed | ShortChoice::Staff => unreachable!(),
                     ShortChoice::Charge => {
                         r.emoney = Some(EmoneyTask::Charge {
                             inserted: Cash::default(),
@@ -2746,9 +2753,10 @@ impl Store {
         Ok(())
     }
 
-    /// セルフ操作モードで電子マネーの残高が足りないとき：セルフは現金を扱わずチャージもできないので、
-    /// スタッフを呼ぶ。スタッフがログインすると、スタッフ操作モードの「電子マネーの残高が足りません」
-    /// （不足額を現金で払う／チャージする）につながる
+    /// セルフ操作モードで電子マネーの残高が足りず、お客様が「チャージまたは現金併用」を選んだとき：
+    /// セルフは現金を扱わずチャージもできないので、スタッフを呼ぶ（残高不足の時点では呼ばない。
+    /// 他の決済を使うならスタッフの無駄足になるため）。スタッフがログインすると、スタッフ操作モードの
+    /// 「電子マネーの残高が足りません」（不足額を現金で払う／チャージする）につながる
     fn call_emoney_short(&mut self, register: u8) {
         if self.reg(register).is_some_and(|r| r.mode == Mode::SelfOperated) {
             self.calls.raise(register, CallKind::Emoney, self.now, "残高不足");

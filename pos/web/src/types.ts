@@ -148,7 +148,7 @@ export type RuleChange = { at: number, by: string, change: string, };
 
 export type RuleTarget = { "kind": "category", category: Category, } | { "kind": "product", code: string, };
 
-export type ShortChoice = "cancel" | "cash" | "cash_confirmed" | "charge";
+export type ShortChoice = "cancel" | "cash" | "cash_confirmed" | "charge" | "staff";
 
 export type Side = "staff" | "customer";
 

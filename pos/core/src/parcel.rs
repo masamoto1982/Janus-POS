@@ -49,6 +49,7 @@ pub fn size_for(sum_cm: u32, weight_g: u32) -> Result<u32, String> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub enum Region {
     Hokkaido,
     NorthTohoku,
@@ -145,6 +146,7 @@ pub fn fee(size: u32, region: Region) -> u32 {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Parcel {
     pub sum_cm: u32,
     pub weight_g: u32,
@@ -157,6 +159,7 @@ pub struct Parcel {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Pickup {
     pub no: String,
     pub amount: u32,

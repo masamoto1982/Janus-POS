@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::catalog::{self, Category};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum RuleTarget {
     Category { category: Category },
@@ -12,6 +13,7 @@ pub enum RuleTarget {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AgeRule {
     pub id: u32,
     pub target: RuleTarget,
@@ -21,6 +23,7 @@ pub struct AgeRule {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct RuleChange {
     pub at: u64,
     pub by: String,
@@ -28,6 +31,7 @@ pub struct RuleChange {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AgeRules {
     pub rules: Vec<AgeRule>,
     pub history: Vec<RuleChange>,

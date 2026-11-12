@@ -8,6 +8,7 @@ pub const LINK_TIMEOUT_MS: u64 = 5_000;
 pub const MIN_RING_MS: u64 = 1_000;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct BellSignal {
     pub seq: u64,
     pub held: usize,
@@ -15,6 +16,7 @@ pub struct BellSignal {
 }
 
 #[derive(Clone, Debug, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub(crate) struct Packet {
     signal: BellSignal,
     deliver_at: u64,
@@ -23,6 +25,7 @@ pub(crate) struct Packet {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Bell {
     pub id: String,
     pub received: BellSignal,

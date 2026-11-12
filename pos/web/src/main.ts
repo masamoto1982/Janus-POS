@@ -623,11 +623,16 @@ function qtyKey(key: string, k: string): void {
   frame();
 }
 
+/** スタッフバーコードの頭（core catalog::STAFF_PREFIX と同じ） */
+const STAFF_BARCODE_PREFIX = "ST";
+
 /** 読み取った瞬間の演出。読んだ機器のボックスに出す：
  *  スキャナ＝商品（レジ画面に商品を入れるのも同じ）・決済用バーコード・ポイントカード→赤帯が左から右へ、
  *  決済端末＝電子マネー・クレジットカード→中心から光が広がる（決済端末が待ち受けているときだけ） */
 function deviceFx(cmd: Command): (() => void) | null {
   if (cmd.type !== "scan" && cmd.type !== "tap_emoney") return null;
+  // スタッフバーコード（ログイン・担当者の切り替え）は商品や支払いではないので、スキャナの演出を出さない
+  if (cmd.type === "scan" && cmd.code.startsWith(STAFF_BARCODE_PREFIX)) return null;
   const scanned = cmd.type === "scan" || cmd.method === "qr" || cmd.method === "points";
   const el = app.querySelector<HTMLElement>(scanned ? `[data-scanner="${cmd.register}"]` : `[data-terminal="${cmd.register}"]`);
   if (!el || (!scanned && !el.classList.contains("reader"))) return null;

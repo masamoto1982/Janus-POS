@@ -583,9 +583,6 @@ function padKey(key: string, k: string): void {
     } else if (e.target === "tkr") {
       if (e.digits === "") return;
       send({ type: "receive_tickets", register, side: "customer", received: value });
-    } else if (e.target === "tkv") {
-      if (e.digits === "") return;
-      send({ type: "check_tickets", register, side, line_id: e.line!, handed: value });
     } else if (e.target === "ffv") {
       if (e.digits === "") return;
       const ffKey = `${register}:${side}:${e.line}`;
@@ -756,13 +753,6 @@ app.addEventListener("change", (e) => {
   if (sel.hasAttribute("data-bells-offline")) {
     const box = sel as unknown as HTMLInputElement;
     snap.bells.forEach((_, i) => send({ type: "set_bell_offline", bell: i, offline: box.checked }));
-    return;
-  }
-  if (sel.dataset.tkcheck) {
-    const box = sel as unknown as HTMLInputElement;
-    const [reg, line] = box.dataset.tkcheck!.split(":").map(Number);
-    if (!box.checked) return;
-    if (!send({ type: "check_tickets", register: reg, side: "staff", line_id: line, handed: 1 })) box.checked = false;
     return;
   }
   if (sel.dataset.ffcheck) {

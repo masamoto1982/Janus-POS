@@ -291,15 +291,7 @@ pub enum Command {
         #[serde(default = "staff_side")]
         side: Side,
     },
-    /// 発券したチケットのお渡し枚数を照合する（FF のお渡し確認と同じ、数を打って照合）
-    CheckTickets {
-        register: u8,
-        #[serde(default = "staff_side")]
-        side: Side,
-        line_id: u32,
-        handed: u32,
-    },
-    /// お客様が受け取ったチケットの枚数を入力する（スタッフの照合と両方合ってお渡し完了）
+    /// お客様が受け取ったチケットの枚数を入力する（申込数と一致したらお渡し完了）
     ReceiveTickets {
         register: u8,
         #[serde(default = "customer_side")]
@@ -480,7 +472,6 @@ impl Command {
             | C::AffixStamp { register, .. }
             | C::AffixReceiptStamp { register, .. }
             | C::HandOverBills { register, .. }
-            | C::CheckTickets { register, .. }
             | C::ReceiveTickets { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
@@ -520,7 +511,6 @@ impl Command {
             | C::AffixStamp { side, .. }
             | C::AffixReceiptStamp { side, .. }
             | C::HandOverBills { side, .. }
-            | C::CheckTickets { side, .. }
             | C::ReceiveTickets { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
@@ -561,21 +551,13 @@ pub struct BillRow {
     pub stamped: bool,
 }
 
-/// 決済後に発券したチケット。申込券の明細ごとに、発券した枚数とお渡しした枚数を照合する
+/// 決済後に発券するチケット。申込券の明細ごとの発券枚数（＝申込数）
 #[derive(Clone, Debug, Serialize)]
 pub struct TicketRow {
     pub line_id: u32,
     pub code: &'static str,
     pub name: &'static str,
     pub issued: u32,
-    /// スタッフが打ち込んだお渡し枚数（まだなら None）
-    pub handed: Option<u32>,
-}
-
-impl TicketRow {
-    pub fn matched(&self) -> bool {
-        self.handed == Some(self.issued)
-    }
 }
 
 /// 払込票の明細に要る収入印紙の額。税金（公金）の領収証は非課税なので 0
@@ -2181,31 +2163,6 @@ impl Store {
                 let n = r.bill_handover.take().unwrap_or(0);
                 done(format!("払込票 {n}枚をお渡ししました"))
             }
-            C::CheckTickets {
-                register,
-                side,
-                line_id,
-                handed,
-            } => {
-                self.check(register, side, Action::CheckTickets)?;
-                let now = self.now;
-                let r = self.reg_mut(register)?;
-                let row = r
-                    .ticket_handover
-                    .iter_mut()
-                    .find(|t| t.line_id == line_id)
-                    .ok_or("チケットが見つかりません")?;
-                row.handed = Some(handed);
-                let (name, issued, matched) = (row.name, row.issued, row.matched());
-                if let Some(m) = self.finish_tickets(register, now) {
-                    return done(m);
-                }
-                done(if matched {
-                    format!("{name}：照合 OK")
-                } else {
-                    format!("{name}：照合 NG（お渡し数 {handed} が発券数 {issued} と合いません）")
-                })
-            }
             C::ReceiveTickets {
                 register,
                 side,
@@ -2214,16 +2171,11 @@ impl Store {
                 self.check(register, side, Action::ReceiveTickets)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
-                let total: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
                 r.tickets_received = Some(received);
                 if let Some(m) = self.finish_tickets(register, now) {
                     return done(m);
                 }
-                done(if received == total {
-                    "受け取り枚数を確認しました\nスタッフの確認をお待ちください".to_string()
-                } else {
-                    "申込数と受け取り数が一致しません\n再度ご確認ください".to_string()
-                })
+                done("申込数と受け取り数が一致しません\n再度ご確認ください")
             }
             C::InsertCash {
                 register,
@@ -2800,15 +2752,12 @@ impl Store {
         }
     }
 
-    /// スタッフの照合とお客様の受け取り枚数がどちらも合ったら、お渡しを終える。
+    /// お客様の受け取り枚数が申込数と一致したら、お渡しを終える。
     /// 留めていたお釣りとレシートを出し、発券の列の次のレジに発券させる
     fn finish_tickets(&mut self, register: u8, now: u64) -> Option<String> {
         let r = self.registers.iter_mut().find(|r| r.id == register)?;
         let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
-        if r.ticket_handover.is_empty()
-            || !r.ticket_handover.iter().all(TicketRow::matched)
-            || r.tickets_received != Some(n)
-        {
+        if r.ticket_handover.is_empty() || r.tickets_received != Some(n) {
             return None;
         }
         r.ticket_handover.clear();
@@ -3560,7 +3509,6 @@ impl Store {
                     code: l.code,
                     name: l.name,
                     issued: l.tickets(),
-                    handed: None,
                 }),
         );
         let has_tickets = !r.ticket_handover.is_empty();

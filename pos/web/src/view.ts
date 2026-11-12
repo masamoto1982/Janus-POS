@@ -1073,10 +1073,11 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     const staffOp = r.mode === "staff_operated";
     if (!staffOp) {
       // セルフ操作モード：残高不足の時点ではスタッフを呼ばない（他の決済を使うならスタッフの無駄足になる）。
-      // 「チャージまたは現金併用」（左・消極）でスタッフを呼び、「他の決済を使う」（右・積極）で支払方法の選択へ
+      // 「チャージまたは現金併用」（左・消極）でスタッフを呼び、「他の決済を使う」（右・積極）で支払方法の選択へ。
       const called = r.staff.calls.some((c) => c.kind === "emoney");
+      // スタッフを呼んだあとは「他の決済を使う」も出さない（押されるとスタッフの無駄足になる）
       const buttons = called
-        ? `<div class="point-choices">${choice("他の決済を使う", "cancel", "primary")}</div>`
+        ? ""
         : `<div class="point-choices pair">${choice("チャージまたは\n現金併用", "staff", "ghost")}${choice("他の決済を使う", "cancel", "primary")}</div>`;
       return `<div class="point-screen emoney-screen">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>${called ? "<br>スタッフが向かっています" : ""}`)}

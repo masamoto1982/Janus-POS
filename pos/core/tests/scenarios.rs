@@ -3994,12 +3994,15 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
     );
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
     assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
-    // 他の決済を選んだら呼び出しは取り下げる
-    ok(
-        &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"})
+        )
+        .is_err(),
+        "呼んだあとは他の決済に切り替えない（スタッフの無駄足になる）"
     );
-    assert!(reg(&s, 1).staff.calls.is_empty());
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
 
     // スタッフがログインすると、スタッフ操作モードの残高不足の画面につながり、不足額を現金で払える
     let mut s = Store::new(1, 2, 1);

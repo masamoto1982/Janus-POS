@@ -2452,6 +2452,18 @@ impl Store {
                     self.call_emoney_short(register);
                     return done("スタッフをお呼びしました\nチャージまたは現金併用はスタッフがお手伝いします");
                 }
+                // スタッフを呼んだあとは、お客様は他の決済に切り替えられない（スタッフの無駄足になる）
+                if r.mode == Mode::SelfOperated
+                    && choice == ShortChoice::Cancel
+                    && self
+                        .calls
+                        .open
+                        .iter()
+                        .any(|c| c.register == register && c.kind == CallKind::Emoney)
+                {
+                    return Err("スタッフが向かっています\nそのままお待ちください".into());
+                }
+                let r = self.reg_mut(register)?;
                 if r.mode == Mode::SelfOperated && choice == ShortChoice::Charge {
                     return Err(EMONEY_NO_CHARGE.into());
                 }

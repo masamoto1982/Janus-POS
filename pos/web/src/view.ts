@@ -922,8 +922,9 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks(r.last_receipt)));
-  if (!v.lines.length && !v.coupons.length) voidAsk.delete(reg);
-  if (!v.lines.length && !v.coupons.length && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
+  if (!v.lines.length && !v.coupons.length && !v.point_card) voidAsk.delete(reg);
+  // ポイントカード（アプリ）だけ読んだときも取引は始まっているので、登録画面に進む
+  if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
   const ro = side === "customer";
   const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
@@ -1073,7 +1074,8 @@ function pointInfo(p: PointsView | undefined): string {
 const pt = (n: number): string => `${n.toLocaleString("ja-JP")}P`;
 
 export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = ""): string {
-  if (count === 0) return "";
+  // ポイントカードだけ読んだときも、取引中止と読んだポイントを出す
+  if (count === 0 && (points?.balance ?? null) === null) return "";
   const full = count >= max ? `<small class="full">上限</small>` : "";
   const point = pointInfo(points);
   const info = point ? `<small class="info">${point}</small>` : "";
@@ -1445,8 +1447,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
     voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
   );
 
-  if (!c.lines.length && !c.coupons.length) voidAsk.delete(reg);
-  if (!c.lines.length && !c.coupons.length && !c.returned.length) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
+  if (!c.lines.length && !c.coupons.length && !c.point_card) voidAsk.delete(reg);
+  if (!c.lines.length && !c.coupons.length && !c.point_card && !c.returned.length) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));

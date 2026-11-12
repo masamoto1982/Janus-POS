@@ -4405,3 +4405,17 @@ fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
     );
     assert_eq!(reg(&s, 2).parcel_handover, None);
 }
+
+#[test]
+fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", "PC12345678");
+    let v = reg(&s, 1);
+    assert!(v.customer.point_card);
+    assert!(allowed(&v, Side::Customer, Action::VoidTransaction));
+    ok(
+        &mut s,
+        json!({"type":"void_transaction","register":1,"side":"customer"}),
+    );
+    assert!(!reg(&s, 1).customer.point_card);
+}

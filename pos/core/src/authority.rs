@@ -162,6 +162,8 @@ pub struct Context {
     pub ticket_handover: bool,
     pub point_pending: bool,
     pub has_coupons: bool,
+    /// ポイントカード（アプリ）を読んだ。商品がなくても取引は始まっている
+    pub has_point_card: bool,
     pub coupon_unmatched: bool,
     pub method: Option<PaymentMethod>,
     pub customer_turn: bool,
@@ -235,7 +237,10 @@ fn emoney(c: &Context) -> Result<(), Denial> {
 }
 
 fn void_transaction(c: &Context) -> Result<(), Denial> {
-    require(c.has_lines || c.has_coupons, "中止する取引はありません")
+    require(
+        c.has_lines || c.has_coupons || c.has_point_card,
+        "中止する取引はありません",
+    )
 }
 
 fn resolve_emoney_short(c: &Context) -> Result<(), Denial> {
@@ -569,6 +574,7 @@ mod tests {
                                             menu_open: false,
                                             point_pending: false,
                                             has_coupons: false,
+                                            has_point_card: false,
                                             coupon_unmatched: false,
                                             touching: None,
                                             items_full: false,

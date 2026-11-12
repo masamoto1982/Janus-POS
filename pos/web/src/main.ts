@@ -360,6 +360,7 @@ function inTransaction(r: RegisterView): boolean {
   return (
     v.lines.length > 0 ||
     v.coupons.length > 0 ||
+    v.point_card !== null ||
     v.returned.length > 0 ||
     v.confiscated.length > 0 ||
     v.ff_collect.length > 0 ||

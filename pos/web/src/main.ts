@@ -634,7 +634,9 @@ function send(cmd: Command): boolean {
     if (res.ok) parcelError.delete(Number(cmd.register));
     else parcelError.set(Number(cmd.register), res.error ?? "受け付けられません");
   }
-  if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok ? beepScan : beepError)();
+  // 販売期限切れの品は登録はされるが、一緒に決済できない商品と同じ異常音（ブブッ）を鳴らす
+  const expired = cmd.type === "scan" && !!res.message?.includes("販売期限が切れています");
+  if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired ? beepScan : beepError)();
   frame();
   if (res.ok) save();
   return res.ok;

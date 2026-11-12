@@ -201,7 +201,7 @@ export function expiryLabel(min: number, fresh: boolean): string {
 // 販売期限切れ：明細に「期限切れ」のフラグ。押すと（会計を押しても）取り替えの画面を開く。
 // 期限切れの品を読むとその場で自動的に開き、バックで閉じると、次に期限切れの品を読むまで開かない
 export const expiredClosed = new Map<string, string>();
-type ExpiredLine = { id: number; name: string; qty: number; expired: boolean; fresh: boolean; dates: Dates | null };
+type ExpiredLine = { id: number; touched: number; name: string; qty: number; expired: boolean; fresh: boolean; dates: Dates | null };
 const expiredSig = (lines: ExpiredLine[]): string =>
   lines
     .filter((l) => l.expired)
@@ -219,19 +219,16 @@ function expiredFlag(reg: number, side: Side, l: { expired: boolean }, operable:
   return `<button type="button" class="flag" data-expiredview="${reg}:${side}" title="押して新しい商品との取り替えを案内">期限切れ</button>`;
 }
 
-function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: ActionState, staff: boolean): string {
-  const rows = lines
-    .filter((l) => l.expired)
-    .map(
-      (l) =>
-        `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num">${l.dates ? esc(expiryLabel(l.dates.sell_by_min, l.fresh)) : ""}</td><td class="num">${l.dates ? esc(expiryLabel(l.dates.best_before_min, l.fresh)) : ""}</td><td class="num">${btn("取り消す", { type: "remove_line", register: reg, side, line_id: l.id }, st, "md neg expired-remove")}</td></tr>`,
-    )
-    .join("");
-  return `<div class="ffv-screen expired-screen">
-      ${msg("販売期限が切れています", staff ? "お客様にお詫びし、売場の新しい商品とお取り替えください" : "申し訳ございません、売場の新しい商品とお取り替えください")}
-      <table class="lines ffv"><thead><tr><th>品名</th><th class="num">数量</th><th class="num">販売期限</th><th class="num">賞味期限</th><th class="num"></th></tr></thead><tbody>${rows}</tbody></table>
-      <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>
-    </div>`;
+/** 販売期限切れの案内。期限切れの品はレジを通るたびに一点ずつ出てくるので、表にせず直近の一点だけを、
+ *  ほかの案内画面と同じく縦横中央の二行（大きなテキスト・小さなテキスト）で出す。
+ *  操作できる側には「取り消す」と左下のバック、お客様が見るだけの側は案内だけ */
+function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: ActionState | null, staff: boolean): string {
+  const l = lines.filter((x) => x.expired).sort((a, b) => b.touched - a.touched)[0];
+  if (!l) return "";
+  const sub = staff ? "お客様にお詫びし、売場の新しい商品とお取り替えください" : "申し訳ございません、店員が新しい商品にお取替えいたします";
+  const choices = st ? `<div class="point-choices">${btn("取り消す", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary")}</div>` : "";
+  const back = st ? `<div class="back-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>` : "";
+  return `<div class="point-screen pair-note expired-screen">${msg(esc(`${l.name}の販売期限が切れています`), esc(sub))}${choices}</div>${back}`;
 }
 
 export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
@@ -934,6 +931,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (payStage) return screen(pay);
   if (!ro && !paying && a("remove_line").allowed && expiredOpen(reg, side, v.lines))
     return screen(expiredScreen(reg, side, v.lines, a("remove_line"), true));
+  if (ro && !paying && v.lines.some((l) => l.expired)) return screen(expiredScreen(reg, side, v.lines, null, false));
   if (!ro && !paying && ffVerifyOpen(reg, side, v.lines))
     return screen(ffVerifyScreen(reg, side, v.lines, false));
   closeFfVerify(reg, side);
@@ -1326,7 +1324,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   if (c.phase === "registering" && a("remove_line").allowed && expiredOpen(reg, side, c.lines))
-    return screen(expiredScreen(reg, side, c.lines, a("remove_line"), side === "staff"));
+    return screen(expiredScreen(reg, side, c.lines, side === "staff" ? a("remove_line") : null, side === "staff"));
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
     returnedCard(reg, side, c.returned, true),

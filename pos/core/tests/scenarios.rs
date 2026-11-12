@@ -3981,3 +3981,38 @@ fn an_18_item_after_a_20_check_redoes_the_check_for_18() {
     no_id_check(&mut s, 1);
     assert!(reg(&s, 1).staff.lines.iter().all(|l| l.age_checked));
 }
+
+#[test]
+fn self_operated_emoney_short_calls_staff_and_continues_in_staff_mode() {
+    let mut s = Store::new(1, 2, 1);
+    short_checkout(&mut s);
+    assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
+    // 他の決済を選んだら呼び出しは取り下げる
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+    );
+    assert!(reg(&s, 1).staff.calls.is_empty());
+
+    // スタッフがログインすると、スタッフ操作モードの残高不足の画面につながり、不足額を現金で払える
+    let mut s = Store::new(1, 2, 1);
+    short_checkout(&mut s);
+    login(&mut s, 1);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::StaffOperated);
+    assert_eq!(v.emoney_short, Some(1_000));
+    assert!(v.staff.calls.is_empty());
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash_confirmed"}),
+    );
+    ok(&mut s, json!({"type":"tap_emoney","register":1,"method":"emoney"}));
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
+    ok(&mut s, json!({"type":"finish_insert","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().method, "電子マネー・現金");
+}

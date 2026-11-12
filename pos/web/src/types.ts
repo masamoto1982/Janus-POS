@@ -98,7 +98,41 @@ export type Phase = "registering" | "paying";
 
 export type Pickup = { no: string, amount: number, matched: boolean, wrong: string | null, missing: boolean, };
 
-export type Receipt = { no: number, at: number, total: number, method: string, paid: number, change: Cash, change_total: number, items: number, point_card: string | null, points: number, };
+export type PointsView = { 
+/**
+ * 付与対象の商品がある（ないときはポイントの確認も表示もしない）
+ */
+eligible: boolean, 
+/**
+ * 読み取ったカードの残高（ポイント）
+ */
+balance: number | null, 
+/**
+ * いま支払いに充てられるポイント（残高と、ポイントを使える商品の金額の小さいほう）
+ */
+usable: number, 
+/**
+ * このお会計で付与する見込みのポイント
+ */
+earn: number, 
+/**
+ * 支払いに使ったポイント
+ */
+used: number, };
+
+export type Receipt = { no: number, at: number, total: number, method: string, paid: number, change: Cash, change_total: number, items: number, point_card: string | null, 
+/**
+ * 付与したポイント（付与対象の金額 200円につき1ポイント）
+ */
+points: number, 
+/**
+ * 支払いに使ったポイント
+ */
+points_used: number, 
+/**
+ * 付与・利用のあとのポイント残高（カードを読んでいなければなし）
+ */
+point_balance: number | null, };
 
 /**
  * 通常のお買い物でレシート（金銭の受取書）に収入印紙が要るとき。
@@ -118,7 +152,11 @@ bell_dead: boolean,
 /**
  * エマージェンシーモード（セルフ操作モードで呼び鈴に応答がない）
  */
-emergency: boolean, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, mode: Mode, mode_label: string, outlet: number, outlet_detail: Array<[number, number]>, menu: Menu | null, paused: boolean, idle_revert_in: number | null, idle_voids: boolean, change_left: boolean, staff: StaffView, customer: CustomerView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, cash_only: number, cashless_due: number, unavailable: Array<Unavailable>, last_receipt: Receipt | null, bill_handover: number | null, ticket_handover: Array<TicketRow>, 
+emergency: boolean, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, mode: Mode, mode_label: string, outlet: number, outlet_detail: Array<[number, number]>, menu: Menu | null, paused: boolean, idle_revert_in: number | null, idle_voids: boolean, change_left: boolean, staff: StaffView, customer: CustomerView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 
+/**
+ * ポイント：付与対象の商品があるか・カードの残高・いま充てられる分・このお会計で付与する分
+ */
+points: PointsView, cash_only: number, cashless_due: number, unavailable: Array<Unavailable>, last_receipt: Receipt | null, bill_handover: number | null, ticket_handover: Array<TicketRow>, 
 /**
  * チケットを発券した（列の先頭に来た）。false のあいだは発券待ち
  */

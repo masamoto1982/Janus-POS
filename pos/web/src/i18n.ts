@@ -120,7 +120,6 @@ const DICT: Record<string, string> = {
   見つかりません: "Not found",
   代金引換: "Cash on delivery",
   着払い: "Collect",
-  "ポイント：読取済": "Points: card read",
   "ポイント：未読取": "Points: not read",
   新しい数量: "New quantity",
 
@@ -484,6 +483,7 @@ const DICT: Record<string, string> = {
   "現金が投入済みです": "Cash has been inserted",
   "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）":
     "No items can be paid with points (not parcels, COD, bills, tickets, stamps or tobacco)",
+  ポイントの残高がありません: "No points left on the card",
   クレジットカード・バーコード決済は現金と併用できません: "Credit card and barcode pay can't be combined with cash",
   "このレジは休止中です（スタッフバーコードで再開）": "This register is closed (scan a staff barcode to reopen)",
   店舗メニューはログインしたスタッフだけが使えます: "Only logged-in staff can use the store menu",
@@ -607,6 +607,10 @@ const RULES: Rule[] = [
   [/^(.+)は欠品です（FF ボタンの長押しで予約注文として登録できます）$/, (m) => `${t(m[1])} is sold out (long-press to pre-order)`],
   [/^電子マネーの残高が足りません（残高 (.+)円・お支払い (.+)円）$/, (m) => `Not enough e-money (balance ¥${m[1]}, due ¥${m[2]})`],
   [/^内税 (.*)$/, (m) => `Tax incl. ${yenify(m[1])}`],
+  [/^ポイント ([\d,]+P)（今回 \+([\d,]+P)）$/, (m) => `Points ${m[1]} (+${m[2]} this time)`],
+  [/^ポイント ([\d,]+P)$/, (m) => `Points ${m[1]}`],
+  [/^(?:ご利用 ([\d,]+P)、)?付与 ([\d,]+P)、ポイント残高 ([\d,]+P)$/, (m) => `${m[1] ? `Used ${m[1]}, earned` : "Earned"} ${m[2]}, point balance ${m[3]}`],
+  [/^ポイントで払った ([\d,]+P) は残高に戻ります$/, (m) => `The ${m[1]} paid with points go back to the card`],
 ];
 
 function t(s: string): string {
@@ -684,6 +688,7 @@ const HTML_RULES: HtmlRule[] = [
     (m) => `<b>${yenify(m[2])}</b> by ${t(m[1]).toLowerCase()}, then stamps, tickets and bills (<b>${yenify(m[3])}</b>) in cash`,
   ],
   [/^あと <b>(.+?)<\/b> 不足しています$/, (m) => `<b>${yenify(m[1])}</b> short`],
+  [/^ポイント残高 ([\d,]+P)、ご利用可能 <b>([\d,]+P)<\/b>$/, (m) => `Point balance ${m[1]}, usable <b>${m[2]}</b>`],
   [
     /^(\d+)サイズ・(.*?)あて（〒(.*?)）<b class="parcel-fee">(.+?)<\/b>$/,
     (m) => `Size ${m[1]}, to ${t(m[2])} (〒${m[3]})<b class="parcel-fee">${t(m[4])}</b>`,

@@ -48,6 +48,19 @@ const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません\nお支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
     "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）";
+const NO_POINT_BALANCE: &str = "ポイントの残高がありません";
+const NO_POINT_CARD: &str = "ポイントカードが読まれていません\nポイントカードを読み取ってください";
+/// ポイントは付与対象の金額（付与対象外の商品・クーポンの値引き・ポイントで払った分を除く）200円につき1ポイント
+pub const YEN_PER_POINT: u32 = 200;
+/// シミュレーターのポイントカードの残高（初期値）。1ポイント＝1円。
+/// カードは残高が多め、アプリは少なめで、ポイントで払い切れずに残りを別の支払方法で払う流れも試せる
+const POINT_INITIAL: [(&str, u32); 2] = [("12345678", 1_250), ("87654321", 80)];
+fn initial_point_balances() -> Vec<(String, u32)> {
+    POINT_INITIAL
+        .iter()
+        .map(|&(no, p)| (no.to_string(), p))
+        .collect()
+}
 const EMONEY_NO_CASH: &str =
     "セルフレジでは現金を使えません\nほかの支払方法を選ぶか、スタッフをお呼びください";
 const EMONEY_NO_CHARGE: &str =
@@ -853,17 +866,55 @@ impl Txn {
         self.due().saturating_sub(self.cash_only())
     }
 
-    fn points_due(&self) -> u32 {
-        if self.prepaid > 0 {
-            return 0;
-        }
-        let eligible: u32 = self
+    /// ポイント付与・利用の対象になる金額：付与対象の商品の小計から、その商品へのクーポンの値引きを引いたもの。
+    /// 付与対象外の商品（荷物・公共料金・チケット・切手・たばこ）にはポイントを付けず、ポイントを充てることもできない
+    fn point_eligible(&self) -> u32 {
+        let gross: u32 = self
             .lines
             .iter()
             .filter(|l| l.earns_points())
             .map(Line::amount)
             .sum();
-        eligible.min(self.due())
+        let discount: u32 = self
+            .coupon_uses()
+            .iter()
+            .filter(|(_, c, _)| {
+                self.lines
+                    .iter()
+                    .any(|l| l.code == c.target && l.kind == LineKind::Item && l.earns_points())
+            })
+            .filter_map(|(_, _, u)| u.map(|(yen, _)| yen))
+            .sum();
+        gross.saturating_sub(discount)
+    }
+
+    fn has_point_goods(&self) -> bool {
+        self.lines.iter().any(Line::earns_points)
+    }
+
+    /// ポイントで払った分（ポイント）
+    fn points_used(&self) -> u32 {
+        if self.prepaid_method == Some(PaymentMethod::Points) {
+            self.prepaid
+        } else {
+            0
+        }
+    }
+
+    /// ポイントを充てられる金額（残高は見ない）
+    fn points_due(&self) -> u32 {
+        if self.prepaid > 0 {
+            return 0;
+        }
+        self.point_eligible().min(self.due())
+    }
+
+    /// このお会計で付与するポイント。ポイントで払った分には付けない
+    fn points_to_earn(&self) -> u32 {
+        if self.point_card.is_none() {
+            return 0;
+        }
+        self.point_eligible().saturating_sub(self.points_used()) / YEN_PER_POINT
     }
 
     fn method_refusal(&self, m: PaymentMethod) -> Option<&'static str> {
@@ -1116,7 +1167,12 @@ pub struct Receipt {
     pub change_total: u32,
     pub items: u32,
     pub point_card: Option<String>,
+    /// 付与したポイント（付与対象の金額 200円につき1ポイント）
     pub points: u32,
+    /// 支払いに使ったポイント
+    pub points_used: u32,
+    /// 付与・利用のあとのポイント残高（カードを読んでいなければなし）
+    pub point_balance: Option<u32>,
 }
 
 /// 通常のお買い物でレシート（金銭の受取書）に収入印紙が要るとき。
@@ -1310,6 +1366,8 @@ pub struct Store {
     presses: u64,
     receipts: u32,
     emoney_balance: u32,
+    /// ポイントカードの番号ごとの残高（ポイント）
+    point_balances: Vec<(String, u32)>,
     /// チケットの発券の列（先入れ先出し）。決済が済んだ順にレジ番号が並び、先頭のレジだけが発券する。
     /// 複数のレジで同時・僅差に申し込まれても、先のチケットの発券とお渡しが済むまで次は発券しない
     ticket_queue: VecDeque<u8>,
@@ -1461,6 +1519,7 @@ impl Store {
             presses: 0,
             receipts: 0,
             emoney_balance: EMONEY_INITIAL,
+            point_balances: initial_point_balances(),
             ticket_queue: VecDeque::new(),
         }
     }
@@ -1586,6 +1645,10 @@ impl Store {
         if txn.prepaid_method == Some(PaymentMethod::Emoney) {
             self.emoney_balance += txn.prepaid;
         }
+        if let Some(no) = &txn.point_card {
+            let used = txn.points_used();
+            self.add_points(no, used);
+        }
         for l in &txn.lines {
             if l.kind
                 == (LineKind::Ff {
@@ -1609,6 +1672,67 @@ impl Store {
             self.calls.resolve(register, k, now);
         }
         back
+    }
+
+    fn point_balance(&self, no: &str) -> u32 {
+        self.point_balances
+            .iter()
+            .find(|(n, _)| n == no)
+            .map_or(0, |e| e.1)
+    }
+
+    fn add_points(&mut self, no: &str, points: u32) {
+        match self.point_balances.iter_mut().find(|(n, _)| n == no) {
+            Some(e) => e.1 += points,
+            None => self.point_balances.push((no.to_string(), points)),
+        }
+    }
+
+    fn take_points(&mut self, no: &str, points: u32) {
+        if let Some(e) = self.point_balances.iter_mut().find(|(n, _)| n == no) {
+            e.1 = e.1.saturating_sub(points);
+        }
+    }
+
+    /// 読み取ったポイントカードの残高を、ポイントを使える商品の分だけ充てる（1ポイント＝1円）。
+    /// 足りない分や付与対象外の商品の分は、別の支払方法で払う
+    fn use_points(&mut self, register: u8) -> Result<Outcome, String> {
+        let r = self.reg(register).ok_or("レジがありません")?;
+        let Some(no) = r.txn.point_card.clone() else {
+            return Err(NO_POINT_CARD.into());
+        };
+        let part = r.txn.points_due();
+        if part == 0 {
+            return Err(NO_POINTS.into());
+        }
+        let balance = self.point_balance(&no);
+        if balance == 0 {
+            let r = self.reg_mut(register)?;
+            r.txn.method = None;
+            return Err(NO_POINT_BALANCE.into());
+        }
+        let used = part.min(balance);
+        let r = self.reg_mut(register)?;
+        let due = r.txn.due();
+        if used == due {
+            self.take_points(&no, used);
+            let out = self.settle(register, PaymentMethod::Points, due, Cash::default());
+            if out.is_err() {
+                self.add_points(&no, used);
+            }
+            return out;
+        }
+        r.txn.prepaid += used;
+        r.txn.prepaid_method = Some(PaymentMethod::Points);
+        let cash = r.txn.cashless_due() == 0;
+        r.txn.method = cash.then_some(PaymentMethod::Cash);
+        let rest = r.txn.due();
+        self.take_points(&no, used);
+        done(if cash {
+            format!("ポイントで {used}円 お支払いしました\n残り {rest}円を現金でお支払いください")
+        } else {
+            format!("ポイントで {used}円 お支払いしました\n残り {rest}円のお支払い方法を選んでください")
+        })
     }
 
     fn reg(&self, id: u8) -> Option<&Register> {
@@ -2039,6 +2163,13 @@ impl Store {
                 if let Some(why) = r.txn.method_refusal(method) {
                     return Err(why.into());
                 }
+                let card = r.txn.point_card.clone();
+                if method == PaymentMethod::Points
+                    && card.is_some_and(|no| self.point_balance(&no) == 0)
+                {
+                    return Err(NO_POINT_BALANCE.into());
+                }
+                let r = self.reg_mut(register)?;
                 r.txn.method = Some(method);
                 let no_cash_goods = r.txn.cash_only() == 0;
                 if self_op {
@@ -2058,11 +2189,13 @@ impl Store {
                     }
                 }
                 let r = self.reg_mut(register)?;
-                if method == PaymentMethod::Points && r.txn.point_card.is_none() {
-                    r.txn.point_checked = false;
-                    return done(
-                        "ポイントカードが読まれていません\nポイントカードを読み取ってください",
-                    );
+                if method == PaymentMethod::Points {
+                    if r.txn.point_card.is_none() {
+                        r.txn.point_checked = false;
+                        return done(NO_POINT_CARD);
+                    }
+                    // ポイントカードは読み取り済みなので、かざし直さずにその場で充てる
+                    return self.use_points(register);
                 }
                 done(format!("{}を選びました", method.label()))
             }
@@ -2329,22 +2462,7 @@ impl Store {
                 let method = chosen;
                 let due = r.txn.due();
                 if method == PaymentMethod::Points {
-                    let part = r.txn.points_due();
-                    if part == 0 {
-                        return Err(NO_POINTS.into());
-                    }
-                    if part < due {
-                        r.txn.prepaid += part;
-                        r.txn.prepaid_method = Some(method);
-                        let cash = r.txn.cashless_due() == 0;
-                        r.txn.method = cash.then_some(PaymentMethod::Cash);
-                        let rest = r.txn.due();
-                        return done(if cash {
-                            format!("ポイントで {part}円 お支払いしました\n残り {rest}円を現金でお支払いください")
-                        } else {
-                            format!("ポイントで {part}円 お支払いしました\n残り {rest}円のお支払い方法を選んでください")
-                        });
-                    }
+                    return self.use_points(register);
                 }
                 let part = r.txn.cashless_due();
                 if part == 0 {
@@ -3002,6 +3120,10 @@ impl Store {
                 let asked = !r.txn.point_checked;
                 r.txn.point_card = Some(no.clone());
                 r.txn.point_checked = true;
+                // 「ポイント利用」を選んでから読んだら、そのままポイントを充てる
+                if r.txn.method == Some(PaymentMethod::Points) && r.txn.prepaid == 0 {
+                    return self.use_points(register);
+                }
                 return done(if asked && r.txn.method.is_none() {
                     "ポイントカードを読みました\nお支払い方法を選んでください"
                 } else {
@@ -3617,6 +3739,10 @@ impl Store {
         let now = self.now;
         let rates = self.tax.display_rates();
         let rounding = self.tax.rounding;
+        let point_before = self
+            .reg(register)
+            .and_then(|r| r.txn.point_card.as_deref())
+            .map_or(0, |no| self.point_balance(no));
         let r = self.reg_mut(register)?;
         let total = r.txn.total();
         let due = r.txn.due();
@@ -3670,6 +3796,13 @@ impl Store {
             .iter()
             .find_map(|l| l.pickup.as_ref())
             .map(|p| p.no.clone());
+        // ポイントで払い切ったときも、その分にはポイントを付けない
+        let points_used = txn.points_used() + if method == PaymentMethod::Points { due } else { 0 };
+        let earned = if txn.point_card.is_some() {
+            txn.point_eligible().saturating_sub(points_used) / YEN_PER_POINT
+        } else {
+            0
+        };
         let receipt = Receipt {
             no,
             at: now,
@@ -3690,17 +3823,9 @@ impl Store {
             change_total: change.total(),
             change,
             items: txn.lines.iter().map(|l| l.qty).sum(),
-            points: if txn.point_card.is_some() {
-                txn.lines
-                    .iter()
-                    .filter(|l| l.earns_points())
-                    .map(Line::amount)
-                    .sum::<u32>()
-                    .min(total)
-                    / 100
-            } else {
-                0
-            },
+            points: earned,
+            points_used,
+            point_balance: txn.point_card.as_ref().map(|_| point_before + earned),
             point_card: txn.point_card,
         };
         let msg = if receipt.change_total > 0 {
@@ -3708,7 +3833,11 @@ impl Store {
         } else {
             "お支払いが完了しました".to_string()
         };
+        let card = receipt.point_card.clone();
         r.last_receipt = Some(receipt);
+        if let Some(no) = card {
+            self.add_points(&no, earned);
+        }
         for k in [
             CallKind::AgeCheck,
             CallKind::FastFood,
@@ -4165,6 +4294,16 @@ impl Store {
                 .emoney_partial
                 .then_some(self.emoney_balance.min(t.cashless_due())),
             emoney_partial_ok: t.emoney_partial_ok,
+            points: {
+                let balance = t.point_card.as_deref().map(|no| self.point_balance(no));
+                PointsView {
+                    eligible: t.has_point_goods(),
+                    balance,
+                    usable: balance.map_or(0, |b| b.min(t.points_due())),
+                    earn: t.points_to_earn(),
+                    used: t.points_used(),
+                }
+            },
             prepaid: t.prepaid,
             prepaid_method: t
                 .prepaid_method
@@ -4180,7 +4319,10 @@ impl Store {
             ]
             .into_iter()
             .filter_map(|m| {
+                let empty = m == PaymentMethod::Points
+                    && t.point_card.as_deref().is_some_and(|no| self.point_balance(no) == 0);
                 t.method_refusal(m)
+                    .or(empty.then_some(NO_POINT_BALANCE))
                     .map(|reason| Unavailable { method: m, reason })
             })
             .collect(),
@@ -4315,6 +4457,21 @@ pub struct CustomerView {
     pub actions: Vec<ActionState>,
 }
 
+#[derive(Clone, Copy, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct PointsView {
+    /// 付与対象の商品がある（ないときはポイントの確認も表示もしない）
+    pub eligible: bool,
+    /// 読み取ったカードの残高（ポイント）
+    pub balance: Option<u32>,
+    /// いま支払いに充てられるポイント（残高と、ポイントを使える商品の金額の小さいほう）
+    pub usable: u32,
+    /// このお会計で付与する見込みのポイント
+    pub earn: u32,
+    /// 支払いに使ったポイント
+    pub used: u32,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct RegisterView {
@@ -4346,6 +4503,8 @@ pub struct RegisterView {
     pub emoney_partial_ok: bool,
     pub prepaid: u32,
     pub prepaid_method: Option<&'static str>,
+    /// ポイント：付与対象の商品があるか・カードの残高・いま充てられる分・このお会計で付与する分
+    pub points: PointsView,
     pub cash_only: u32,
     pub cashless_due: u32,
     pub unavailable: Vec<Unavailable>,

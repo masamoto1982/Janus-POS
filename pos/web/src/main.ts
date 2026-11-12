@@ -1075,13 +1075,11 @@ function setupDrag(): void {
     const el = t as HTMLElement;
     const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "staff" : "customer"];
     const register = Number(reg);
-    const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
     // 決済端末は電子マネー・クレジットカードだけ、スキャナはバーコード（商品・決済用）とポイントカードだけを読む
     const device = el.dataset.device;
     const toScanner = !!d.code || d.wallet === "pay:qr" || d.wallet === "pay:points";
     if (device === "terminal" && toScanner) return toast("toast-store", "商品・決済用バーコード・ポイントカードは、スキャナにかざしてください", false);
     if (device === "scanner" && !toScanner && !d.wallet?.startsWith("cash")) return toast("toast-store", "電子マネー・クレジットカードは、決済端末にかざしてください", false);
-    if (d.code?.startsWith("PC") && el.dataset.payDrop && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
     if (d.code) return void send({ type: "scan", register, side: side as Side, code: d.code });
     const [kind, value] = d.wallet!.split(":");
     if (kind === "cash") {
@@ -1150,8 +1148,6 @@ function pick(code?: string, wallet?: string): void {
   const { register, side } = pickFor;
   pickerDlg().close();
   pickFor = null;
-  const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
-  if (code?.startsWith("PC") && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
   if (code) return void send({ type: "scan", register, side, code });
   const [kind, value] = wallet!.split(":");
   if (kind === "cash") send(cashDrop(register, Number(value)));

@@ -274,6 +274,7 @@ const DICT: Record<string, string> = {
   現金はスタッフがお預かりします: "Staff will take your cash",
   スタッフをお呼びください: "Please call a staff member",
   現金でお支払いください: "Please pay in cash",
+  現金のみ取り扱いいたします: "Cash only",
   "払込票とレシート、お釣りをお受け取りください": "Please take your slips, receipt and change",
   払込票に収納印を押してお渡しください: "Stamp the slips and hand them over",
   スタッフが払込票を確認しています: "Staff is checking your slips",
@@ -677,7 +678,7 @@ const HTML_RULES: HtmlRule[] = [
   [/^(.+?)で (.+?) お支払い済み、残り <b>(.+?)<\/b> を現金で$/, (m) => `${yenify(m[2])} paid by ${t(m[1]).toLowerCase()}. Please pay the remaining <b>${yenify(m[3])}</b> in cash`],
   [/^現金 <b>(.+?)<\/b> を出金ボックスからお返しください$/, (m) => `Return <b>${yenify(m[1])}</b> in cash from the outlet`],
   [/^現金 <b>(.+?)<\/b> をお返しします$/, (m) => `We'll return <b>${yenify(m[1])}</b> in cash`],
-  [/^うち <b>(.+?)<\/b> は現金でお支払いください$/, (m) => `Please pay <b>${yenify(m[1])}</b> of this in cash`],
+  [/^うち <b>(.+?)<\/b> は現金のみ取り扱いいたします$/, (m) => `<b>${yenify(m[1])}</b> of this is cash only`],
   [
     /^(.+?)で <b>(.+?)<\/b>、切手・チケット・お支払いの <b>(.+?)<\/b> はそのあと現金で$/,
     (m) => `<b>${yenify(m[2])}</b> by ${t(m[1]).toLowerCase()}, then stamps, tickets and bills (<b>${yenify(m[3])}</b>) in cash`,

@@ -524,7 +524,7 @@ function methodRow(reg: number, side: Side, method: string | null, inserted: num
     .join("")}</div>`;
 }
 
-const CASH_ONLY_NOTE = "現金でお支払いください";
+const CASH_ONLY_NOTE = "現金のみ取り扱いいたします";
 
 function methodList(method: string | null, inserted: number, unavailable: Unavailable[] = []): string {
   if (method === "cash" && inserted) return "";
@@ -1119,7 +1119,7 @@ function cashBackNote(side: Side, amount: number): string {
 function cashOnlyNote(r: RegisterView): string {
   if (!r.cash_only || r.prepaid) return "";
   return r.cashless_due
-    ? `<p>うち <b>${yen(r.cash_only)}</b> は現金でお支払いください</p>`
+    ? `<p>うち <b>${yen(r.cash_only)}</b> は現金のみ取り扱いいたします</p>`
     : `<p>${CASH_ONLY_NOTE}</p>`;
 }
 

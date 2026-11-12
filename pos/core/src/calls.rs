@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CallKind {
     AgeCheck,
@@ -37,6 +38,7 @@ impl CallKind {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Call {
     pub id: u32,
     pub register: u8,
@@ -47,6 +49,7 @@ pub struct Call {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ResolvedCall {
     pub id: u32,
     pub register: u8,

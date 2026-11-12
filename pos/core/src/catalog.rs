@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum TaxRate {
     Reduced8,
@@ -8,6 +9,7 @@ pub enum TaxRate {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Category {
     Food,
@@ -70,6 +72,7 @@ impl Category {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Product {
     pub code: &'static str,
     pub name: &'static str,
@@ -95,6 +98,7 @@ pub struct Product {
 /// 販売期限と賞味期限。シミュレーターをいつ開いても同じ状態になるよう、いまからの分で持つ
 /// （負の値は期限切れ）。販売期限は賞味期限より前に店が決める売り場から下げる時刻
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Dates {
     pub sell_by_min: i32,
     pub best_before_min: i32,
@@ -308,6 +312,7 @@ pub const CATALOG: &[Product] = &[
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum FfTab {
     Fried,
@@ -425,6 +430,7 @@ pub const PICKUP_PREFIX: &str = "PK";
 pub const SLIP_PREFIX: &str = "PS";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case", tag = "kind", content = "yen")]
 pub enum CouponKind {
     Exchange,

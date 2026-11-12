@@ -22,6 +22,10 @@ jobs:
         working-directory: pos/core
         run: cargo test --verbose
 
+      - name: types.ts matches the Rust types
+        working-directory: pos/core
+        run: cargo test --features ts --test ts_bindings
+
       - name: Cache wasm-pack
         uses: actions/cache@v4
         with:

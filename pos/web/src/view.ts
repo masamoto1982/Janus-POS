@@ -1,12 +1,15 @@
 import type {
+  Action,
   ActionState,
+  EmoneyKind,
+  ShortChoice,
   BillRow,
   Parcel,
   Pickup,
   Unavailable,
-  Coupon,
+  CouponView as Coupon,
   Dates,
-  Returned,
+  ReturnedCoupon as Returned,
   Command,
   CustomerView,
   FfState,
@@ -21,6 +24,8 @@ import type {
   TicketRow,
 } from "./types";
 
+type Gate = Pick<ActionState, "allowed" | "reason">;
+
 export function esc(s: unknown): string {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -34,29 +39,29 @@ export const yen = (n: number): string => `${n.toLocaleString("ja-JP")}円`;
 
 const secs = (now: number, at: number): string => `${Math.max(0, Math.floor((now - at) / 1000))}秒`;
 
-function find(actions: ActionState[], name: string): ActionState {
+function find(actions: ActionState[], name: Action): Gate {
   return actions.find((a) => a.action === name) ?? { action: name, allowed: false, reason: null };
 }
 
-export function btn(label: string, cmd: Command, a?: ActionState, cls = ""): string {
+export function btn(label: string, cmd: Command, a?: Gate, cls = ""): string {
   const disabled = a && !a.allowed;
   const title = disabled && a.reason ? ` title="${esc(a.reason)}"` : "";
   return `<button class="${cls}" data-cmd="${esc(JSON.stringify(cmd))}"${disabled ? " disabled" : ""}${title}>${esc(label)}</button>`;
 }
 
-export function backBtn(cmd: Command, a?: ActionState): string {
+export function backBtn(cmd: Command, a?: Gate): string {
   return btn("バック", cmd, a, "md ghost back-btn");
 }
-const backFootRow = (cmd: Command, a?: ActionState): string => `<div class="screen-foot">${backBtn(cmd, a)}</div>`;
-const backCorner = (cmd: Command, a?: ActionState): string => `<div class="back-foot">${backBtn(cmd, a)}</div>`;
-const cashCorner = (reg: number, side: Side, method: string | null, st: ActionState): string =>
+const backFootRow = (cmd: Command, a?: Gate): string => `<div class="screen-foot">${backBtn(cmd, a)}</div>`;
+const backCorner = (cmd: Command, a?: Gate): string => `<div class="back-foot">${backBtn(cmd, a)}</div>`;
+const cashCorner = (reg: number, side: Side, method: string | null, st: Gate): string =>
   `<div class="skip-foot">${btn("現金", { type: "select_payment", register: reg, side, method: "cash" }, st, `md skip${method === "cash" ? " on" : ""}`)}</div>`;
 
-const skipCorner = (cmd: Command, a?: ActionState): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "md skip")}</div>`;
+const skipCorner = (cmd: Command, a?: Gate): string => `<div class="skip-foot">${btn("スキップ", cmd, a, "md skip")}</div>`;
 
 const flagSpan = (label: string): string => `<span class="flag">${esc(label)}</span>`;
 
-function ffFlag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: ActionState, ro: boolean): string {
+function ffFlag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: Gate, ro: boolean): string {
   if (l.kind !== "ff" || l.state !== "waiting" || ro) return "";
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
   return `<button type="button" class="flag ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>お渡し前</button>`;
@@ -128,7 +133,7 @@ export function isoDate(t: Date): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
-function idCard(reg: number, age: number, v: StaffView, a: (n: string) => ActionState): string {
+function idCard(reg: number, age: number, v: StaffView, a: (n: Action) => Gate): string {
   const choose = (idCheck: boolean, label: string, cls = "") =>
     btn(label, { type: "choose_age_check", register: reg, side: "staff", id_check: idCheck }, a("choose_age_check"), cls);
   if (v.age_choice_pending) {
@@ -147,9 +152,9 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: string) => Action
     </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
 }
 
-function pickupStep(reg: number, p: Pickup, st: ActionState): string {
-  const found = (v: boolean | null) => ({ type: "pickup_found", register: reg, found: v });
-  const end = { type: "pickup_handover", register: reg };
+function pickupStep(reg: number, p: Pickup, st: Gate): string {
+  const found = (v: boolean | null): Command => ({ type: "pickup_found", register: reg, found: v });
+  const end: Command = { type: "pickup_handover", register: reg };
   if (p.missing) {
     return `<div class="point-screen pickup-step">
         <p class="pickup-no">${esc(p.no)} ${flagSpan("見つかりません")}</p>
@@ -183,7 +188,7 @@ function serviceFlag(l: { kind: string; done?: boolean; cash_only: boolean; parc
   return flagSpan("受付待ち");
 }
 
-function ageFlag(l: { age: number | null; age_checked?: boolean }, cmd?: Command, st?: ActionState): string {
+function ageFlag(l: { age: number | null; age_checked?: boolean }, cmd?: Command, st?: Gate): string {
   if (!l.age || l.age_checked) return "";
   return cmd && st?.allowed ? btn(`年確${l.age}`, cmd, st, "flag age-start") : flagSpan(`年確${l.age}`);
 }
@@ -222,7 +227,7 @@ function expiredFlag(reg: number, side: Side, l: { expired: boolean }, operable:
 /** 販売期限切れの案内。期限切れの品はレジを通るたびに一点ずつ出てくるので、表にせず直近の一点だけを、
  *  ほかの案内画面と同じく縦横中央の二行（大きなテキスト・小さなテキスト）で出す。
  *  操作できる側には「回収しました」と左下のバック、お客様が見るだけの側は案内だけ */
-function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: ActionState | null, staff: boolean): string {
+function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate | null, staff: boolean): string {
   const l = lines.filter((x) => x.expired).sort((a, b) => b.touched - a.touched)[0];
   if (!l) return "";
   const sub = staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "申し訳ございません、店員が新しい商品にお取替えいたします";
@@ -258,7 +263,7 @@ function parcelWait(): string {
     </div>`;
 }
 
-function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): string {
+function parcelStep(reg: number, l: StaffLine, st: Gate, count: number): string {
   const p = l.parcel as Parcel;
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
@@ -288,7 +293,7 @@ function parcelStep(reg: number, l: StaffLine, st: ActionState, count: number): 
     </div>${back()}`;
 }
 
-function parcelAsk(reg: number, lines: StaffLine[], st: ActionState): string {
+function parcelAsk(reg: number, lines: StaffLine[], st: Gate): string {
   const done = lines.filter((l) => l.parcel && l.kind === "service" && l.done);
   const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
   const p = last?.parcel;
@@ -330,7 +335,7 @@ function ffCollectCard(reg: number, v: StaffView): string {
   const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}を${c.qty}点回収してください</div>`).join("");
   return `<div class="point-screen collect">
       ${lines}
-      <div class="point-choices">${btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { action: "dismiss_ff_collect", allowed: true, reason: null }, "primary")}</div>
+      <div class="point-choices">${btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { allowed: true, reason: null }, "primary")}</div>
     </div>`;
 }
 
@@ -341,13 +346,13 @@ function ffReturnCard(v: StaffView): string {
 }
 
 
-function backFoot(reg: number, side: Side, st: ActionState): string {
+function backFoot(reg: number, side: Side, st: Gate): string {
   return backCorner({ type: "back_to_registering", register: reg, side }, st);
 }
 
 const billN = (n: number): string => `<span class="bill-n">${n}枚</span>`;
 
-export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: ActionState): string {
+export function billVerifyScreen(reg: number, side: Side, bills: BillRow[], st: Gate): string {
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const rows = bills
     .map(
@@ -370,14 +375,14 @@ export const stampVerifying = new Set<string>();
 const stampRows = (bills: BillRow[]): BillRow[] => bills.filter((b) => b.stamp > 0);
 const stampPending = (bills: BillRow[]): boolean => stampRows(bills).some((b) => !b.stamped);
 
-function stampFlag(reg: number, side: Side, b: BillRow | undefined, st: ActionState, ro: boolean): string {
+function stampFlag(reg: number, side: Side, b: BillRow | undefined, st: Gate, ro: boolean): string {
   if (!b || !b.stamp || b.stamped) return "";
   if (ro) return flagSpan("印紙貼付前");
   const title = st.allowed ? "押して収入印紙の貼り付けを確認" : (st.reason ?? "");
   return `<button type="button" class="flag ff-verify" data-stampverify="${reg}:${side}" title="${esc(title)}"${st.allowed ? "" : " disabled"}>印紙貼付前</button>`;
 }
 
-export function stampVerifyScreen(reg: number, side: Side, bills: BillRow[], st: ActionState, close: boolean): string {
+export function stampVerifyScreen(reg: number, side: Side, bills: BillRow[], st: Gate, close: boolean): string {
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const rows = stampRows(bills)
     .map(
@@ -395,7 +400,7 @@ export function stampVerifyScreen(reg: number, side: Side, bills: BillRow[], st:
 
 // 通常のお買い物：税抜 5 万円以上をクレジットカード以外で受け取ると、レシートに収入印紙が要る。
 // レシートは決済のあとに出るので、確認も決済のあと（お釣り・お礼の案内の前）
-export function receiptStampScreen(reg: number, side: Side, rs: { stamp: number; base: number }, receiptNo: number | undefined, st: ActionState, staffPresent = true): string {
+export function receiptStampScreen(reg: number, side: Side, rs: { stamp: number; base: number }, receiptNo: number | undefined, st: Gate, staffPresent = true): string {
   if (side === "customer")
     return `<div class="point-screen pair-note">${staffPresent ? msg("レシートに収入印紙を貼り付けています", "少々お待ちください") : msg("レシートに収入印紙を貼り付けます", "スタッフが向かっています")}</div>`;
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
@@ -412,7 +417,7 @@ export function billPayCard(count: number, selfOperated = false): string {
     </div>`;
 }
 
-export function billHandover(reg: number, side: Side, count: number, st: ActionState): string {
+export function billHandover(reg: number, side: Side, count: number, st: Gate): string {
   if (side === "customer")
     return `<div class="point-screen bill-done">
       ${msg(`公共料金${billN(count)}　支払いが完了しました`, "払込票とレシート、お釣りをお受け取りください")}
@@ -426,7 +431,7 @@ export function billHandover(reg: number, side: Side, count: number, st: ActionS
 /** 決済後のチケットのお渡し。スタッフはお渡しした枚数、お客様は受け取った枚数を、それぞれ入力欄に入力する（発券枚数は見せない）。
  *  どちらの入力も発券枚数とだけ比べ（スタッフとお客様の入力どうしは比べない）、一致しない側にだけ警告を出す。
  *  両方が一致したらお渡し完了。それまでレシートもお釣りも出さず、完了するとお釣り・お礼の画面に進む */
-export function ticketHandover(reg: number, side: Side, rows: TicketRow[], issued = true, received: number | null = null, handed: number | null = null, st?: ActionState): string {
+export function ticketHandover(reg: number, side: Side, rows: TicketRow[], issued = true, received: number | null = null, handed: number | null = null, st?: Gate): string {
   const total = rows.reduce((n, t) => n + t.issued, 0);
   // 発券はお店全体で先入れ先出し。先に支払ったレジのお渡しが済むまで、このレジは発券を待つ
   if (!issued)
@@ -484,11 +489,11 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
 }
 
-function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: ActionState, cls = "", unavailable: Unavailable[] = [], noCash = false): string {
+function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: Gate, cls = "", unavailable: Unavailable[] = [], noCash = false): string {
   if (method === "cash" && inserted) return "";
-  const off = (m: string): ActionState => {
+  const off = (m: string): Gate => {
     const u = unavailable.find((x) => x.method === m);
-    return u ? { action: st.action, allowed: false, reason: u.reason } : st;
+    return u ? { allowed: false, reason: u.reason } : st;
   };
   return `<div class="row method-row ${cls}">${METHODS.filter((m) => !(noCash && m === "cash"))
     .map((m) => btn(METHOD_LABEL[m], { type: "select_payment", register: reg, side, method: m }, off(m), `seg ${method === m ? "on" : ""}`))
@@ -550,7 +555,7 @@ export const qtyEntry = new Map<string, { id: number; digits: string }>();
  *  期限切れの品がお客様に渡ってしまう（ポカヨケ）。続けて読んでも一点ずつ別の行になるので、
  *  数量の欄は「削除」と数字だけ（サービス商品と同じ固定の形） */
 
-function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false, fresh = false): string {
+function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Gate, remove: Command, fixed = false, fresh = false): string {
   if (!st.allowed) return `${l.qty}`;
   if (fresh) return qtyCell(reg, side, l, st, remove, true);
   if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b><i class="qty-pad" aria-hidden="true"></i></span>`;
@@ -700,7 +705,7 @@ function ageWait(age: number): string {
     </div>`;
 }
 
-function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => ActionState): string {
+function ageStep(reg: number, v: StaffView, side: Side, a: (n: Action) => Gate): string {
   const age = v.required_age;
   if (!age || side === "customer") return "";
   return v.age_choice_pending || v.id_pending ? idCard(reg, age, v, a) : "";
@@ -709,7 +714,7 @@ function ageStep(reg: number, v: StaffView, side: Side, a: (n: string) => Action
 export const flashing = new Set<string>();
 const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
 
-export function couponRows(reg: number, side: Side, coupons: Coupon[], st: ActionState, ro = false): Row[] {
+export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Gate, ro = false): Row[] {
   return coupons.map((c) => [
     c.id,
     `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${
@@ -727,11 +732,11 @@ function newestFirst(rows: Row[]): string {
     .join("");
 }
 
-function removeCoupon(reg: number, side: Side, c: Coupon, st: ActionState): string {
+function removeCoupon(reg: number, side: Side, c: Coupon, st: Gate): string {
   return btn("取消", { type: "remove_coupon", register: reg, side, coupon_id: c.id }, st, "small ghost");
 }
 
-export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: ActionState, ro = false): string {
+export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: Gate, ro = false): string {
   const list = coupons
     .filter((c) => c.discount === null)
     .map((c) => `<li><b>${esc(c.name)}</b> ${ro ? "" : removeCoupon(reg, side, c, st)}</li>`)
@@ -773,7 +778,7 @@ const modeTitle = (staffOperated: boolean): string => `<span class="mode-title $
 /** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。呼び鈴（大きめ）を中央に、左に言語切り替え、右に電子マネー（チャージ・残高照会）を寄せる
  *  言語切り替えは押した側の画面だけを切り替える（日本語・英語、標準は英語）。セルフ操作モードのスタッフ側は操作不可。
  *  電子マネーはスタッフ操作モードのお客様側では表示のみ。商品登録が始まると呼び鈴はヘッダーに戻る */
-function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, emoneyRo: boolean): string {
+function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolean): string {
   const mirror = ' tabindex="-1" aria-disabled="true"';
   const big = (cls: string, main: string, sub: string, ro: boolean, attrs: string) =>
     `<button type="button" class="band-btn neg ${cls}${ro ? " mirror-only" : ""}"${cls === "lang-btn" ? " data-i18n-skip" : ""}${ro ? mirror : attrs}><b>${main}</b><small>${sub}</small></button>`;
@@ -784,7 +789,7 @@ function welcomeBand(r: RegisterView, side: Side, emoney: ActionState, emoneyRo:
   return `<div class="reg-top welcome-band"><div class="band-row">${lang}<span class="bell-slot">${bellBtn(r, side)}</span>${money}</div></div>`;
 }
 
-export function welcome(r: RegisterView, side: Side, emoney?: ActionState): string {
+export function welcome(r: RegisterView, side: Side, emoney?: Gate): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:${side}`);
   const guide = GUIDES.find(([k]) => k === on);
@@ -799,7 +804,7 @@ export function welcome(r: RegisterView, side: Side, emoney?: ActionState): stri
 
 export const voidAsk = new Map<number, Side>();
 
-function voidBtn(reg: number, side: Side, st: ActionState): string {
+function voidBtn(reg: number, side: Side, st: Gate): string {
   const title = st.allowed ? "取引を中止する（確認があります）" : (st.reason ?? "");
   return `<button type="button" class="void-btn"${st.allowed ? ` data-void-ask="${reg}:${side}"` : " disabled"} title="${esc(title)}">取引中止</button>`;
 }
@@ -849,7 +854,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (r.menu) return side === "staff" ? storeMenu(r) : menuPaused();
   const v = r.staff;
   const reg = r.id;
-  const a = (n: string) => find(v.actions, n);
+  const a = (n: Action) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
@@ -955,7 +960,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
 `;
 }
 
-function pointCheck(reg: number, side: Side, st: ActionState): string {
+function pointCheck(reg: number, side: Side, st: Gate): string {
   const reading = scanGuide.get(`${reg}:${side}`) === "point";
   return `<div class="point-screen">
       <div class="big">ポイントを付与しますか？</div>
@@ -978,8 +983,8 @@ function customerPointAsk(): string {
     </div>`;
 }
 
-function finishInsert(reg: number, inserted: number, due: number, st: ActionState): string {
-  const ready: ActionState = !st.allowed
+function finishInsert(reg: number, inserted: number, due: number, st: Gate): string {
+  const ready: Gate = !st.allowed
     ? st
     : !inserted
       ? { ...st, allowed: false, reason: "お金を入れてください" }
@@ -1025,7 +1030,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   if (r.emoney_partial !== null) {
     const rest = Math.max(0, r.staff.due - r.emoney_partial);
     const st = find(actions, "resolve_emoney_short");
-    const go = (label: string, c: string, cls: string) => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
+    const go = (label: string, c: ShortChoice, cls: string) => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     const other = ro ? "" : `<div class="back-foot">${go("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`;
     const note = `電子マネーの残高 <b>${yen(r.emoney_partial)}</b> を引き出し、残り <b>${yen(rest)}</b> を現金でお支払いいただきます`;
     if (!r.emoney_partial_ok)
@@ -1039,7 +1044,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   }
   if (r.emoney_short !== null) {
     const st = find(actions, "resolve_emoney_short");
-    const choice = (label: string, c: string, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
+    const choice = (label: string, c: ShortChoice, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     const short = Math.max(0, r.staff.due - r.emoney_short);
     const staffOp = r.mode === "staff_operated";
     const buttons = staffOp
@@ -1052,7 +1057,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   }
   const e = r.emoney!;
   if (e.kind === "menu") {
-    const go = (label: string, kind: string) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
+    const go = (label: string, kind: EmoneyKind) => btn(label, { type: "start_emoney", register: reg, side, kind }, find(actions, "emoney"));
     return `<div class="point-screen emoney-screen">
         ${msg("電子マネー", "選択してください")}
         ${ro ? "" : `<div class="point-choices">${go("チャージ", "charge")}${go("残高確認", "inquiry")}</div>`}
@@ -1168,8 +1173,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {
-    const a = (n: string) => find(r.customer.actions, n);
-    const callBtn = (main: string, sub: string, cmd: Command, st: ActionState, cls: string) =>
+    const a = (n: Action) => find(r.customer.actions, n);
+    const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     return `<div class="call-row">${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
@@ -1235,7 +1240,7 @@ export function storeMenu(r: RegisterView): string {
   const v = r.staff;
   const reg = r.id;
   const m = r.menu!;
-  const go = (screen: MenuScreen | null, extra: Record<string, unknown> = {}) => ({ type: "open_menu", register: reg, screen, ...extra });
+  const go = (screen: MenuScreen | null, extra: { exchange_to?: number } = {}): Command => ({ type: "open_menu", register: reg, screen, ...extra });
   const head = (title: string) => `<div class="menu-head"><b class="big">${esc(title)}</b></div>`;
   const screen = (body: string) => `<div class="menu-screen">${body}${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
@@ -1288,7 +1293,7 @@ export function storeMenu(r: RegisterView): string {
 export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "customer"): string {
   const c: CustomerView = r.customer;
   const reg = r.id;
-  const a = (n: string) => find(c.actions, n);
+  const a = (n: Action) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
   if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
   if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
@@ -1669,8 +1674,8 @@ export function walletPanel(emoneyBalance: number): string {
 }
 
 export function sideOf(cmd: Command): "staff" | "customer" | "store" {
-  if (cmd.side === "staff" || cmd.side === "customer") return cmd.side;
+  if ("side" in cmd && cmd.side) return cmd.side;
   if (["ff_button", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
-  if (typeof cmd.register === "number") return "staff";
+  if ("register" in cmd) return "staff";
   return "store";
 }

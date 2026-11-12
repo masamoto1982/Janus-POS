@@ -17,6 +17,7 @@ npm run build:wasm   # Rust コアを wasm にビルド
 npm run dev          # 開発サーバー
 npm test             # Vitest
 (cd core && cargo test)
+npm run gen:types    # Rust の型を変えたら web/src/types.ts を作り直す
 ```
 
 ## ライセンス

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::catalog::{self, TaxRate};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum TaxKind {
     Standard,
@@ -29,6 +30,7 @@ impl TaxKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Rounding {
     Floor,
@@ -47,6 +49,7 @@ impl Rounding {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct TaxClass {
     pub id: String,
     pub name: String,
@@ -81,6 +84,7 @@ pub fn rate_label(rate_bp: u32) -> String {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct TaxSettings {
     pub classes: Vec<TaxClass>,
     pub products: BTreeMap<String, String>,

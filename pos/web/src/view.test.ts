@@ -21,14 +21,14 @@ describe("view helpers", () => {
   });
 
   it("disables a button with the core's reason", () => {
-    const html = btn("会計", { type: "checkout" }, { action: "checkout", allowed: false, reason: "明細がありません" });
+    const html = btn("会計", { type: "checkout", register: 1, side: "staff" }, { allowed: false, reason: "明細がありません" });
     expect(html).toContain("disabled");
     expect(html).toContain('title="明細がありません"');
   });
 
   it("routes notices to the side that acted", () => {
-    expect(sideOf({ type: "scan", register: 1, side: "customer" })).toBe("customer");
-    expect(sideOf({ type: "insert_cash", register: 1 })).toBe("customer");
+    expect(sideOf({ type: "scan", register: 1, side: "customer", code: "" })).toBe("customer");
+    expect(sideOf({ type: "insert_cash", register: 1, denomination: 1000, count: 1 })).toBe("customer");
     expect(sideOf({ type: "void_transaction", register: 1 })).toBe("staff");
     expect(sideOf({ type: "set_bell_loss", percent: 30 })).toBe("store");
   });
@@ -60,7 +60,7 @@ describe("view helpers", () => {
         { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: false, stamp: 0, stamped: false },
         { line_id: 3, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 5555 6666 7777", checked: false, stamp: 200, stamped: true },
       ],
-      { action: "check_bill", allowed: true, reason: null },
+      { allowed: true, reason: null },
     );
     for (const h of ["事業者", "金額", "バーコード番号", "確認"]) expect(html).toContain(`>${h}<`);
     expect(html).toContain("9100 2222 3333 4444");
@@ -80,7 +80,7 @@ describe("view helpers", () => {
       { line_id: 1, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 1234 5678 9012", checked: true, stamp: 200, stamped: false },
       { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: true, stamp: 0, stamped: false },
     ];
-    const html = stampVerifyScreen(1, "staff", bills, { action: "affix_stamp", allowed: true, reason: null }, true);
+    const html = stampVerifyScreen(1, "staff", bills, { allowed: true, reason: null }, true);
     expect(html).toContain("収入印紙の貼り付け確認");
     expect(html).not.toContain("ガス料金");
     expect(html).toContain('data-stamp-check="1:staff:1"');

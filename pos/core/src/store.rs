@@ -54,6 +54,7 @@ const EMONEY_NO_CHARGE: &str =
     "お買い物の途中は電子マネーのチャージ・残高確認はできません\nお会計のあとにどうぞ";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CashOutKind {
     Refund,
@@ -64,6 +65,7 @@ pub enum CashOutKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum MenuScreen {
     Top,
@@ -78,12 +80,14 @@ pub enum MenuScreen {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Menu {
     pub screen: MenuScreen,
     pub exchange_to: u32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CashInKind {
     Deposit,
@@ -112,6 +116,7 @@ impl CashOutKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum EmoneyKind {
     Menu,
@@ -120,6 +125,7 @@ pub enum EmoneyKind {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum ShortChoice {
     Cancel,
@@ -132,6 +138,7 @@ pub const EMONEY_MAX: u32 = 20_000;
 pub const EMONEY_INITIAL: u32 = 1_000;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 enum EmoneyTask {
     Menu,
     Inquiry { shown: bool },
@@ -139,6 +146,7 @@ enum EmoneyTask {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CallTopic {
     Service,
@@ -149,6 +157,7 @@ pub enum CallTopic {
 }
 
 #[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
     Scan {
@@ -159,10 +168,12 @@ pub enum Command {
     RegisterFf {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         code: String,
         qty: u32,
         #[serde(default)]
+        #[cfg_attr(feature = "ts", ts(as = "Option<bool>", optional))]
         force: bool,
     },
     FfButton {
@@ -208,6 +219,7 @@ pub enum Command {
     },
     PickupFound {
         register: u8,
+        #[cfg_attr(feature = "ts", ts(optional = nullable))]
         found: Option<bool>,
     },
     RemoveLine {
@@ -245,18 +257,21 @@ pub enum Command {
     ChooseAgeCheck {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         id_check: bool,
     },
     EarlyAgeCheck {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         start: bool,
     },
     CheckId {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         birth: String,
         today: String,
@@ -270,6 +285,7 @@ pub enum Command {
     CheckBill {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         line_id: u32,
         checked: bool,
@@ -277,11 +293,13 @@ pub enum Command {
     AffixReceiptStamp {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
     },
     AffixStamp {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         line_id: u32,
         affixed: bool,
@@ -289,12 +307,14 @@ pub enum Command {
     HandOverBills {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
     },
     /// スタッフがお渡ししたチケットの枚数を入力する（発券枚数と照合）
     HandTickets {
         register: u8,
         #[serde(default = "staff_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         handed: u32,
     },
@@ -303,6 +323,7 @@ pub enum Command {
     ReceiveTickets {
         register: u8,
         #[serde(default = "customer_side")]
+        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         received: u32,
     },
@@ -317,6 +338,7 @@ pub enum Command {
     TapEmoney {
         register: u8,
         #[serde(default)]
+        #[cfg_attr(feature = "ts", ts(optional))]
         method: Option<PaymentMethod>,
     },
     StartEmoney {
@@ -336,6 +358,7 @@ pub enum Command {
     CallStaff {
         register: u8,
         #[serde(default)]
+        #[cfg_attr(feature = "ts", ts(optional))]
         topic: Option<CallTopic>,
     },
     ConfirmPointCard {
@@ -359,6 +382,7 @@ pub enum Command {
         kind: CashOutKind,
         amount: u32,
         #[serde(default)]
+        #[cfg_attr(feature = "ts", ts(as = "Option<String>", optional))]
         password: String,
     },
     CashIn {
@@ -368,8 +392,10 @@ pub enum Command {
     },
     OpenMenu {
         register: u8,
+        #[cfg_attr(feature = "ts", ts(optional = nullable))]
         screen: Option<MenuScreen>,
         #[serde(default)]
+        #[cfg_attr(feature = "ts", ts(optional))]
         exchange_to: Option<u32>,
     },
     Insert {
@@ -398,12 +424,14 @@ pub enum Command {
         owner_id: String,
         password: String,
         code: String,
+        #[cfg_attr(feature = "ts", ts(optional = nullable))]
         min_age: Option<u8>,
     },
     SetSaleLimit {
         owner_id: String,
         password: String,
         code: String,
+        #[cfg_attr(feature = "ts", ts(optional = nullable))]
         limit: Option<u32>,
     },
     VerifyOwner {
@@ -548,6 +576,7 @@ impl Command {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct BillRow {
     pub line_id: u32,
     pub code: &'static str,
@@ -563,6 +592,7 @@ pub struct BillRow {
 
 /// 決済後に発券するチケット。申込券の明細ごとの発券枚数（＝申込数）
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct TicketRow {
     pub line_id: u32,
     pub code: &'static str,
@@ -603,6 +633,7 @@ fn done(msg: impl Into<String>) -> Result<Outcome, String> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum FfState {
     Waiting,
@@ -610,6 +641,7 @@ pub enum FfState {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LineKind {
     Item,
@@ -618,6 +650,7 @@ pub enum LineKind {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Line {
     pub id: u32,
     pub touched: u32,
@@ -638,8 +671,10 @@ pub struct Line {
     #[serde(skip)]
     pub stamped: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub parcel: Option<Parcel>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(optional))]
     pub pickup: Option<Pickup>,
 }
 
@@ -1068,6 +1103,7 @@ impl Txn {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Receipt {
     pub no: u32,
     pub at: u64,
@@ -1084,6 +1120,7 @@ pub struct Receipt {
 /// 通常のお買い物でレシート（金銭の受取書）に収入印紙が要るとき。
 /// 税抜の受取金額が 5 万円以上で、クレジットカード払いでないとき
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ReceiptStamp {
     pub stamp: u32,
     /// 印紙税の判定に使う税抜の金額
@@ -1244,6 +1281,7 @@ impl Register {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AuditEntry {
     pub at: u64,
     pub register: u8,
@@ -1276,12 +1314,14 @@ pub struct Store {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 enum AgeMethod {
     Skip,
     Id,
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CouponView {
     pub id: u32,
     pub code: &'static str,
@@ -1290,12 +1330,14 @@ pub struct CouponView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ReturnedCoupon {
     pub name: &'static str,
     pub unmatched: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Confiscated {
     pub name: &'static str,
     pub qty: u32,
@@ -4125,6 +4167,7 @@ impl Store {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ActionState {
     pub action: Action,
     pub allowed: bool,
@@ -4132,6 +4175,7 @@ pub struct ActionState {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct StaffLine {
     #[serde(flatten)]
     pub line: Line,
@@ -4150,6 +4194,7 @@ pub struct StaffLine {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CustomerLine {
     pub id: u32,
     pub touched: u32,
@@ -4172,6 +4217,7 @@ pub struct CustomerLine {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct StaffView {
     pub state: StaffState,
     pub name: Option<&'static str>,
@@ -4208,6 +4254,7 @@ pub struct StaffView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CustomerView {
     pub phase: Phase,
     pub lines: Vec<CustomerLine>,
@@ -4234,6 +4281,7 @@ pub struct CustomerView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct RegisterView {
     pub id: u8,
     /// ON の Bell がどれも通じず、呼び出しが誰にも届かない
@@ -4282,12 +4330,14 @@ pub struct RegisterView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Unavailable {
     pub method: PaymentMethod,
     pub reason: &'static str,
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct EmoneyView {
     pub kind: EmoneyKind,
     pub inserted: u32,
@@ -4295,6 +4345,7 @@ pub struct EmoneyView {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum BellKind {
     Fixed,
@@ -4320,6 +4371,7 @@ fn bell_name(i: u8) -> String {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct BellView {
     pub id: String,
     pub kind: BellKind,
@@ -4331,6 +4383,7 @@ pub struct BellView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct BellLink {
     pub id: String,
     pub link_ok: bool,
@@ -4340,6 +4393,7 @@ pub struct BellLink {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AgeRulesView {
     pub rules: Vec<crate::age_rules::AgeRule>,
     pub history: Vec<crate::age_rules::RuleChange>,
@@ -4350,6 +4404,7 @@ pub const FF_PLENTY_STOCK: u32 = 10;
 const FF_OUT: &str = "は欠品です（FF ボタンの長押しで予約注文として登録できます）";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum StockLevel {
     /// 作り置きの概念が無い（注文を受けてから作る）
@@ -4370,6 +4425,7 @@ impl StockLevel {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct FfMenuItem {
     pub code: &'static str,
     pub name: &'static str,
@@ -4380,6 +4436,7 @@ pub struct FfMenuItem {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AccountView {
     pub id: &'static str,
     pub barcode: String,
@@ -4388,6 +4445,7 @@ pub struct AccountView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CatalogItem {
     pub code: &'static str,
     pub name: &'static str,
@@ -4408,6 +4466,7 @@ pub struct CatalogItem {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct TaxTotal {
     pub rate_bp: u32,
     pub rate: String,
@@ -4416,6 +4475,7 @@ pub struct TaxTotal {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct TaxClassView {
     pub id: String,
     pub name: String,
@@ -4426,6 +4486,7 @@ pub struct TaxClassView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct TaxView {
     pub classes: Vec<TaxClassView>,
     pub invoice_no: String,
@@ -4433,6 +4494,7 @@ pub struct TaxView {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Snapshot {
     pub now: u64,
     pub registers: Vec<RegisterView>,

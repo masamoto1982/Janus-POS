@@ -12,6 +12,7 @@ pub fn is_valid_denomination(d: u32) -> bool {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Cash(pub Vec<(u32, u32)>);
 
 impl Cash {
@@ -53,6 +54,7 @@ impl Cash {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Drawer {
     pub cash: Cash,
 }

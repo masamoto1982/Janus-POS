@@ -1,5 +1,5 @@
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { Command, RegisterView, Side, Snapshot } from "./types";
+import type { CashOutKind, Command, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
@@ -539,7 +539,7 @@ function press(b: HTMLElement, pointer: number | null): void {
   if (held || (b as HTMLButtonElement).disabled) return;
   const cmd = b.dataset.hold!;
   const c = JSON.parse(cmd) as Command;
-  if (send(c)) held = { cmd, register: c.register as number, pointer };
+  if (send(c)) held = { cmd, register: "register" in c ? c.register : 0, pointer };
   frame();
 }
 
@@ -590,7 +590,7 @@ function padKey(key: string, k: string): void {
       if (e.digits === "") return;
       const ffKey = `${register}:${side}:${e.line}`;
       ffvInput.set(ffKey, String(value));
-      send({ type: "check_ff", register, side, line_id: e.line!, handed: value });
+      send({ type: "check_ff", register, side: side as Side, line_id: e.line!, handed: value });
     } else {
       if (e.digits === "" || (!d.code && value <= 0)) return;
       padValue.set(padValueKey(register, e.target, e.line), d.code ? e.digits : String(value));
@@ -614,7 +614,7 @@ function qtyKey(key: string, k: string): void {
   else if (k === "ok") {
     if (!e.digits || Number(e.digits) <= 0) return;
     const [register, side] = key.split(":");
-    send({ type: "set_qty", register: Number(register), side, line_id: e.id, qty: Number(e.digits) });
+    send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
     qtyEntry.delete(key);
   } else if (/^[0-9]$/.test(k) && e.digits.length < 2) e.digits = (e.digits + k).replace(/^0+/, "");
   frame();
@@ -634,8 +634,8 @@ function send(cmd: Command): boolean {
     if (res.error?.includes("1回のお会計で")) setTimeout(() => alert(res.error), 0);
   }
   if (cmd.type.startsWith("parcel_")) {
-    if (res.ok) parcelError.delete(Number(cmd.register));
-    else parcelError.set(Number(cmd.register), res.error ?? "受け付けられません");
+    if (res.ok) parcelError.delete("register" in cmd ? cmd.register : 0);
+    else parcelError.set("register" in cmd ? cmd.register : 0, res.error ?? "受け付けられません");
   }
   // 販売期限切れの品は登録はされるが、一緒に決済できない商品と同じ異常音（ブブッ）を鳴らす
   const expired = cmd.type === "scan" && !!res.message?.includes("販売期限が切れています");
@@ -717,7 +717,7 @@ function form(b: HTMLElement): void {
         send({
           type: "cash_out",
           register: reg,
-          kind: b.dataset.kind,
+          kind: b.dataset.kind as CashOutKind,
           amount: Number(padValue.get(padValueKey(reg, "mamt")) ?? 0),
           password: padValue.get(padValueKey(reg, "mpw")) ?? "",
         })
@@ -733,17 +733,17 @@ app.addEventListener("input", (e) => {
   const el = e.target as HTMLInputElement;
   if (el.dataset.billCheck) {
     const [reg, side, line] = el.dataset.billCheck.split(":");
-    send({ type: "check_bill", register: Number(reg), side, line_id: Number(line), checked: el.checked });
+    send({ type: "check_bill", register: Number(reg), side: side as Side, line_id: Number(line), checked: el.checked });
     return;
   }
   if (el.dataset.receiptStamp) {
     const [reg, side] = el.dataset.receiptStamp.split(":");
-    if (el.checked) send({ type: "affix_receipt_stamp", register: Number(reg), side });
+    if (el.checked) send({ type: "affix_receipt_stamp", register: Number(reg), side: side as Side });
     return;
   }
   if (el.dataset.stampCheck) {
     const [reg, side, line] = el.dataset.stampCheck.split(":");
-    send({ type: "affix_stamp", register: Number(reg), side, line_id: Number(line), affixed: el.checked });
+    send({ type: "affix_stamp", register: Number(reg), side: side as Side, line_id: Number(line), affixed: el.checked });
     return;
   }
 });
@@ -870,7 +870,7 @@ app.addEventListener("click", (e) => {
     const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-new-tax="${k}"]`)!;
     const rate = Number(field("rate").value || 0);
     if (
-      send({ type: "add_tax_class", ...ownerAuth, name: field("name").value, kind: field("kind").value, rate_bp: Math.round(rate * 100) })
+      send({ type: "add_tax_class", ...ownerAuth, name: field("name").value, kind: field("kind").value as TaxKind, rate_bp: Math.round(rate * 100) })
     ) {
       field("name").value = "";
       field("rate").value = "";
@@ -879,7 +879,7 @@ app.addEventListener("click", (e) => {
   }
   if (b.hasAttribute("data-save-invoice") && ownerAuth) {
     const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-invoice="${k}"]`)!;
-    send({ type: "set_invoice", ...ownerAuth, invoice_no: field("no").value, rounding: field("rounding").value });
+    send({ type: "set_invoice", ...ownerAuth, invoice_no: field("no").value, rounding: field("rounding").value as Rounding });
     return;
   }
   if (b.hasAttribute("data-open-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).showModal();
@@ -1043,14 +1043,14 @@ function setupDrag(): void {
     const register = Number(reg);
     const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
     if (d.code?.startsWith("PC") && el.dataset.payDrop && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
-    if (d.code) return void send({ type: "scan", register, side, code: d.code });
+    if (d.code) return void send({ type: "scan", register, side: side as Side, code: d.code });
     const [kind, value] = d.wallet!.split(":");
     if (kind === "cash") {
       if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
       send(cashDrop(register, Number(value)));
     } else {
       if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末にかざしてください", false);
-      send({ type: "tap_emoney", register, method: value });
+      send({ type: "tap_emoney", register, method: value as PaymentMethod });
     }
   });
 
@@ -1116,7 +1116,7 @@ function pick(code?: string, wallet?: string): void {
   if (code) return void send({ type: "scan", register, side, code });
   const [kind, value] = wallet!.split(":");
   if (kind === "cash") send(cashDrop(register, Number(value)));
-  else send({ type: "tap_emoney", register, method: value });
+  else send({ type: "tap_emoney", register, method: value as PaymentMethod });
 }
 
 /** Wallet のお金を入金ボックスに入れる。ふだんは金額の入力と同じ（大きい金種から崩したものとみなす）。

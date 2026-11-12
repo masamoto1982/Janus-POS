@@ -1,6 +1,7 @@
 use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     Crew,
@@ -46,6 +47,7 @@ pub fn account(id: &str) -> Option<&'static StaffAccount> {
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub(crate) struct Guard {
     pub(crate) failures: u32,
     pub(crate) locked_until: u64,

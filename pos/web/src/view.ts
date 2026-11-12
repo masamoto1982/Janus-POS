@@ -475,7 +475,7 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 const INSERT_DONE_MS = 30_000;
 
 /** お客様がかざすもの（レジ画面にデモ用の「Wallet」という言葉は出さない） */
-const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "バーコード", credit: "クレジットカード", points: "ポイントカード" };
+const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "決済用バーコード", credit: "クレジットカード", points: "ポイントカード" };
 /** かざす機器：電子マネー・クレジットカードは決済端末、バーコード・ポイントカードはスキャナ（同じボックスの表示が切り替わる） */
 const TAP_DEVICE = (method: string): string => (method === "emoney" || method === "credit" ? "決済端末" : "スキャナ");
 

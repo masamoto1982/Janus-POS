@@ -504,7 +504,8 @@ function render(): void {
     if (terminal) {
       // 電子マネー・クレジットカードを読むときだけ「決済端末」（青白くゆったり点滅）。それ以外はずっと「スキャナ」（赤く早めに点滅）。
       // 赤はレジ画面内の「危険・否定」とは別の、周辺機器の演出
-      const reader = (paying && READER_METHODS.has(r.staff.method!)) || partial || tapping;
+      // かざした直後に決済が終わっても、光が広がり終わるまでは決済端末のまま
+      const reader = (paying && READER_METHODS.has(r.staff.method!)) || partial || tapping || terminal.classList.contains("fx-tap");
       terminal.classList.toggle("reader", reader);
       terminal.classList.toggle("scanner", !reader);
       setRegion(`terminal-${r.id}`, `<span class="placeholder">${reader ? "決済端末" : "スキャナ"}</span>`);
@@ -622,7 +623,29 @@ function qtyKey(key: string, k: string): void {
   frame();
 }
 
+/** 決済端末・スキャナが読み取った瞬間の演出。いまボックスが何として読んでいるか（表示）で決める：
+ *  商品のスキャン（レジ画面に商品を入れるのも同じ）と、スキャナ表示のときのバーコード決済・ポイントカード＝赤帯、
+ *  決済端末表示のときの電子マネー・クレジットカード＝中心から広がる光。かざしても読まない組み合わせは演出なし */
+function deviceFx(cmd: Command): (() => void) | null {
+  if (cmd.type !== "scan" && cmd.type !== "tap_emoney") return null;
+  const el = app.querySelector<HTMLElement>(`[data-terminal="${cmd.register}"]`);
+  if (!el) return null;
+  const reader = el.classList.contains("reader");
+  const scanned = cmd.type === "scan" || (!reader && (cmd.method === "qr" || cmd.method === "points"));
+  const tapped = cmd.type === "tap_emoney" && reader && cmd.method !== "qr" && cmd.method !== "points";
+  if (!scanned && !tapped) return null;
+  const cls = scanned ? "fx-scan" : "fx-tap";
+  return () => {
+    el.classList.remove("fx-scan", "fx-tap");
+    void el.offsetWidth; // 続けて読んだときも最初から再生する
+    el.classList.add(cls);
+    window.clearTimeout(Number(el.dataset.fxTimer));
+    el.dataset.fxTimer = String(window.setTimeout(() => el.classList.remove(cls), 1000));
+  };
+}
+
 function send(cmd: Command): boolean {
+  const fx = deviceFx(cmd);
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
@@ -643,6 +666,7 @@ function send(cmd: Command): boolean {
   const expired = cmd.type === "scan" && !!res.message?.includes("販売期限が切れています");
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired ? beepScan : beepError)();
   frame();
+  fx?.();
   if (res.ok) save();
   return res.ok;
 }

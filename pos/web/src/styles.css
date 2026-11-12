@@ -574,7 +574,26 @@ body.dragging .drop-hint { display: inline; }
 .money-io .terminal.reader { --glow: oklch(0.94 0.04 240); --glow-ms: 1.6s; border-color: var(--accent); outline-color: var(--accent); }
 .money-io .terminal.reader .placeholder { color: var(--ink); font-weight: 700; }
 .money-io .terminal.scanner { --glow: oklch(0.9 0.06 25); --glow-ms: 0.45s; }
-@media (prefers-reduced-motion: reduce) { .money-io .terminal { animation: none; background: color-mix(in oklch, var(--glow) 60%, transparent); } }
+/* 読み取った瞬間の演出（一回きり）。決済端末：電子マネー・クレジットカードをかざすと中心から青白い光が広がる。
+   スキャナ：商品・決済用バーコードを読む（レジ画面に商品を入れるのも同じ）と、濃いめの赤帯が左から右へ走る */
+.money-io .terminal { position: relative; overflow: hidden; }
+.money-io .terminal > * { position: relative; z-index: 1; }
+.money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { content: ""; position: absolute; pointer-events: none; }
+.money-io .terminal.fx-tap::after {
+  inset: 0; background: radial-gradient(closest-side, oklch(0.99 0.02 240), oklch(0.86 0.08 240 / 0.7) 55%, transparent);
+  animation: terminal-tap 0.8s ease-out forwards;
+}
+@keyframes terminal-tap { from { transform: scale(0.05); opacity: 1; } 60% { opacity: 0.9; } to { transform: scale(1.8); opacity: 0; } }
+.money-io .terminal.fx-scan::before {
+  top: 0; bottom: 0; left: -24%; width: 24%;
+  background: linear-gradient(90deg, transparent, oklch(0.6 0.2 27 / 0.75) 50%, transparent);
+  animation: terminal-scan 0.5s linear forwards;
+}
+@keyframes terminal-scan { to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .money-io .terminal { animation: none; background: color-mix(in oklch, var(--glow) 60%, transparent); }
+  .money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { animation-duration: 0.01s; }
+}
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-staff, .money-io-cust { grid-column: 1; } }
 

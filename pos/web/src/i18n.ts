@@ -220,7 +220,7 @@ const DICT: Record<string, string> = {
   残高確認: "Balance",
   電子マネーを決済端末にかざしてください: "Hold your e-money card over the payment terminal",
   クレジットカードを決済端末にかざしてください: "Hold your credit card over the payment terminal",
-  バーコードをスキャナにかざしてください: "Hold the barcode over the scanner",
+  決済用バーコードをスキャナにかざしてください: "Hold the payment barcode over the scanner",
   ポイントカードをスキャナにかざしてください: "Hold your point card over the scanner",
   お客様にスキャナの位置を案内してください: "Show the customer where the scanner is",
   決済端末: "Payment terminal",

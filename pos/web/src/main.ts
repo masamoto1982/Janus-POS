@@ -178,7 +178,7 @@ function buildSkeleton(): void {
           </div>
         </div>
         <div class="money-io-cust" aria-label="レジ${r.id}の決済端末（お客様側の画面に付いています）">
-          <div class="terminal-slot" data-pay-drop="${r.id}"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・カード・バーコードをかざす）"><span data-region="terminal-${r.id}"></span></button></div>
+          <div class="terminal-slot" data-pay-drop="${r.id}"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末・スキャナ（電子マネー・クレジットカード・バーコード・ポイントカードをかざす）"><span data-region="terminal-${r.id}"></span></button></div>
         </div>
       </div>
     </section>`,
@@ -493,7 +493,6 @@ function render(): void {
     const emoney = r.menu ? null : r.emoney;
     const partial = !r.menu && r.emoney_partial !== null && r.emoney_partial_ok;
     const cashPay = paying && r.staff.method === "cash";
-    const cashlessPay = (paying && r.staff.method !== "cash") || partial;
     const charging = !!emoney && emoney.kind === "charge";
     const tapping = !!emoney && emoney.kind !== "menu" && !(charging && !emoney.inserted);
     if (inlet) {
@@ -503,9 +502,12 @@ function render(): void {
       setRegion(`inlet-${r.id}`, shown ? `<b>${shown.toLocaleString()}円</b>` : `<span class="placeholder">${esc(hint)}</span>`);
     }
     if (terminal) {
-      terminal.classList.toggle("blink", cashlessPay || tapping);
-      const hint = cashlessPay || tapping ? (cashlessPay && !partial ? (TERMINAL_HINT[r.staff.method!] ?? "決済端末") : "電子マネーをかざす") : "決済端末";
-      setRegion(`terminal-${r.id}`, `<span class="placeholder">${esc(hint)}</span>`);
+      // 電子マネー・クレジットカードを読むときだけ「決済端末」（青白くゆったり点滅）。それ以外はずっと「スキャナ」（赤く早めに点滅）。
+      // 赤はレジ画面内の「危険・否定」とは別の、周辺機器の演出
+      const reader = (paying && READER_METHODS.has(r.staff.method!)) || partial || tapping;
+      terminal.classList.toggle("reader", reader);
+      terminal.classList.toggle("scanner", !reader);
+      setRegion(`terminal-${r.id}`, `<span class="placeholder">${reader ? "決済端末" : "スキャナ"}</span>`);
     }
   }
   setRegion("bells", bellPanel(snap));
@@ -990,12 +992,8 @@ app.addEventListener("click", (e) => {
   else if (b.dataset.form) form(b);
 });
 
-const TERMINAL_HINT: Record<string, string> = {
-  emoney: "電子マネーをかざす",
-  qr: "バーコードをかざす",
-  credit: "カードをかざす",
-  points: "ポイントをかざす",
-};
+/** 決済端末として読む支払方法（バーコード決済・ポイントはスキャナで読む） */
+const READER_METHODS = new Set(["emoney", "credit"]);
 
 function setupDrag(): void {
   const ghost = document.getElementById("ghost")!;
@@ -1049,7 +1047,7 @@ function setupDrag(): void {
       if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
       send(cashDrop(register, Number(value)));
     } else {
-      if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末にかざしてください", false);
+      if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末・スキャナにかざしてください", false);
       send({ type: "tap_emoney", register, method: value as PaymentMethod });
     }
   });
@@ -1099,7 +1097,7 @@ const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg")
 
 function openPicker(register: number, side: Side, kind: "item" | "wallet"): void {
   pickFor = { register, side, kind };
-  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の${side === "staff" ? "入金ボックス（現金）" : "決済端末（かざす）"}`;
+  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の${side === "staff" ? "入金ボックス（現金）" : "決済端末・スキャナ（かざす）"}`;
   document.getElementById("picker-title")!.textContent = title;
   const body = document.getElementById("picker-body")!;
   body.innerHTML = kind === "item" ? shelfPanel(snap, readableCardsShelves()) : walletPanel(snap.emoney_balance);

@@ -86,6 +86,66 @@ pub struct Product {
     pub stamp_exempt: bool,
     /// チケットの申込券。支払いが済むとこの枚数のチケットを発券する（チケットでなければ 0）
     pub tickets: u32,
+    /// 日配食品。販売期限切れの品が紛れないよう、レジ画面で数量を増やせない（一点ずつスキャンする）
+    pub fresh: bool,
+    /// 販売期限と賞味期限（日配食品・加工食品だけ）
+    pub dates: Option<Dates>,
+}
+
+/// 販売期限と賞味期限。シミュレーターをいつ開いても同じ状態になるよう、いまからの分で持つ
+/// （負の値は期限切れ）。販売期限は賞味期限より前に店が決める売り場から下げる時刻
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct Dates {
+    pub sell_by_min: i32,
+    pub best_before_min: i32,
+}
+
+impl Product {
+    /// 販売期限が切れている
+    pub fn expired(&self) -> bool {
+        self.dates.is_some_and(|d| d.sell_by_min < 0)
+    }
+}
+
+const H: i32 = 60;
+const D: i32 = 24 * H;
+
+/// 日配食品（販売期限・賞味期限つき、数量を増やせない）
+const fn fresh(
+    code: &'static str,
+    name: &'static str,
+    price: u32,
+    category: Category,
+    sell_by_min: i32,
+    best_before_min: i32,
+) -> Product {
+    Product {
+        fresh: true,
+        dates: Some(Dates {
+            sell_by_min,
+            best_before_min,
+        }),
+        ..p(code, name, price, Reduced8, category)
+    }
+}
+
+/// 加工食品（販売期限・賞味期限つき）
+const fn packaged(
+    code: &'static str,
+    name: &'static str,
+    price: u32,
+    tax: TaxRate,
+    category: Category,
+    sell_by_min: i32,
+    best_before_min: i32,
+) -> Product {
+    Product {
+        dates: Some(Dates {
+            sell_by_min,
+            best_before_min,
+        }),
+        ..p(code, name, price, tax, category)
+    }
 }
 
 const fn p(
@@ -109,6 +169,8 @@ const fn p(
         parcel_collect: false,
         stamp_exempt: false,
         tickets: 0,
+        fresh: false,
+        dates: None,
     }
 }
 
@@ -125,13 +187,49 @@ use Category::*;
 use TaxRate::*;
 
 pub const CATALOG: &[Product] = &[
-    p("4900000000028", "サンドイッチ", 320, Reduced8, Food),
-    p("4900000000042", "牛乳", 198, Reduced8, Drink),
-    p("4900000000011", "パン", 160, Reduced8, Food),
-    p("4900000000035", "ソフトドリンク", 150, Reduced8, Drink),
-    p("4900000000103", "アルコール", 248, Standard10, Alcohol),
-    p("4900000000073", "袋菓子", 150, Reduced8, Food),
-    p("4900000000066", "即席麺", 214, Reduced8, Food),
+    // 日配食品：販売期限・賞味期限は時刻まで。数量はレジ画面で増やせない
+    fresh("4900000000028", "サンドイッチ", 320, Food, 6 * H, 10 * H),
+    fresh("4900000000042", "牛乳", 198, Drink, 3 * D, 5 * D),
+    fresh("4900000000011", "パン", 160, Food, D, 2 * D),
+    // 販売期限切れを登録したときのデモ。賞味期限はまだ先でも、販売期限を過ぎたら売らない
+    fresh("4900000000080", "おにぎり", 150, Food, -2 * H, 4 * H),
+    // 加工食品：販売期限・賞味期限は日付まで
+    packaged(
+        "4900000000035",
+        "ソフトドリンク",
+        150,
+        Reduced8,
+        Drink,
+        150 * D,
+        180 * D,
+    ),
+    packaged(
+        "4900000000103",
+        "アルコール",
+        248,
+        Standard10,
+        Alcohol,
+        240 * D,
+        270 * D,
+    ),
+    packaged(
+        "4900000000073",
+        "袋菓子",
+        150,
+        Reduced8,
+        Food,
+        90 * D,
+        120 * D,
+    ),
+    packaged(
+        "4900000000066",
+        "即席麺",
+        214,
+        Reduced8,
+        Food,
+        150 * D,
+        180 * D,
+    ),
     p("4910000000014", "新聞", 160, Standard10, Newspaper),
     p("4910000000038", "雑誌", 480, Standard10, Magazine),
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),

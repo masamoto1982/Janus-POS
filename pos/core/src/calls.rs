@@ -14,6 +14,7 @@ pub enum CallKind {
     Emoney,
     CashOnly,
     ReceiptStamp,
+    Expired,
 }
 
 impl CallKind {
@@ -30,6 +31,7 @@ impl CallKind {
             CallKind::Emoney => "電子マネー",
             CallKind::CashOnly => "現金",
             CallKind::ReceiptStamp => "収入印紙",
+            CallKind::Expired => "販売期限切れ",
         }
     }
 }

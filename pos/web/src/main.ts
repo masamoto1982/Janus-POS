@@ -9,6 +9,7 @@ import {
   FF_TABS,
   ffVerifying,
   stampVerifying,
+  expiredClosed,
   ffvInput,
   qtyEntry,
   flashing,
@@ -928,6 +929,16 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.ffverify) {
     ffVerifying.add(b.dataset.ffverify);
+    frame();
+    return;
+  }
+  if (b.dataset.expiredview) {
+    expiredClosed.delete(b.dataset.expiredview);
+    frame();
+    return;
+  }
+  if (b.dataset.expiredClose) {
+    expiredClosed.set(b.dataset.expiredClose, b.dataset.expiredSig ?? "");
     frame();
     return;
   }

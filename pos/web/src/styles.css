@@ -292,7 +292,7 @@ details summary h3 { display: inline; }
 .point-service { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: 14px; }
-.confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
+.confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip):not(.expired-remove) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
@@ -448,6 +448,11 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .item.off:active { transform: none; }
 .wallet-cards { margin-top: 4px; }
 .items.uniform .item, .wallet-cards .item, .item.bill { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); justify-content: center; align-items: center; text-align: center; }
+.confirm button.expired-remove { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
+/* 日配食品・加工食品は名前・値段・販売期限の三行。ボタンの大きさはそのままで行間を詰める */
+.items.uniform .item:has(.item-date) { gap: 0; padding-top: 1px; padding-bottom: 1px; }
+.items.uniform .item:has(.item-date) > span { line-height: 1.2; }
+.item-sub.item-date { font-size: 10px; }
 .items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 .drop-hint { display: none; margin-left: 8px; letter-spacing: 0; }

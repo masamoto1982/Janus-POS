@@ -25,6 +25,9 @@ pub const MAX_BELLS: u8 = 5;
 
 const FF_RECEIVED_SELF: &str =
     "お渡し済みの FF の数量はスタッフが変更します\nスタッフをお呼びください";
+/// 日配食品は数量を増やせない。同じ商品でも一点ずつ販売期限が違うので、
+/// 一つを読んで数量を増やすと、期限切れの品がお客様に渡ってしまう（ポカヨケ）
+pub const FRESH_ONE_BY_ONE: &str = "日配食品は数量を増やせません\n一点ずつスキャンしてください";
 const CASH_ONLY: &str = "現金のみの商品（切手・チケット・お支払い）は現金でお支払いください";
 const NO_CASH_MIX: &str =
     "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）";
@@ -696,6 +699,16 @@ impl Line {
         self.pickup.is_some()
     }
 
+    /// 日配食品（数量を増やせない）
+    fn is_fresh(&self) -> bool {
+        catalog::find(self.code).is_some_and(|p| p.fresh)
+    }
+
+    /// 販売期限が切れている
+    fn is_expired(&self) -> bool {
+        catalog::find(self.code).is_some_and(Product::expired)
+    }
+
     fn set_pickup_found(&mut self, found: Option<bool>) {
         let Some(pk) = self.pickup.as_mut() else {
             return;
@@ -1190,6 +1203,7 @@ impl Register {
             bill_unchecked: t.bill_unchecked(),
             has_stamps: t.has_stamps(),
             stamp_pending: t.stamp_pending(),
+            expired: t.lines.iter().any(Line::is_expired),
             bill_handover: self.bill_handover.is_some(),
             receipt_stamp: self.receipt_stamp.is_some(),
             ticket_handover: self.tickets_issued && !self.ticket_handover.is_empty(),
@@ -1525,6 +1539,7 @@ impl Store {
             CallKind::Bill,
             CallKind::Emoney,
             CallKind::CashOnly,
+            CallKind::Expired,
         ] {
             self.calls.resolve(register, k, now);
         }
@@ -1892,8 +1907,13 @@ impl Store {
                     self.restock(l.code, l.qty);
                 }
                 let r = self.reg_mut(register)?;
-                if !r.txn.service_pending() {
+                let service_pending = r.txn.service_pending();
+                let expired = r.txn.lines.iter().any(Line::is_expired);
+                if !service_pending {
                     self.calls.resolve(register, CallKind::Service, self.now);
+                }
+                if !expired {
+                    self.calls.resolve(register, CallKind::Expired, self.now);
                 }
                 done(format!("{}を取り消しました", l.name))
             }
@@ -2719,6 +2739,9 @@ impl Store {
             }
             _ => {}
         }
+        if qty > old && catalog::find(code).is_some_and(|p| p.fresh) {
+            return Err(FRESH_ONE_BY_ONE.into());
+        }
         if qty > old && r.txn.item_count() - old + qty > MAX_ITEMS {
             return Err(ITEMS_FULL.into());
         }
@@ -2840,6 +2863,7 @@ impl Store {
                 CallKind::AgeCheck,
                 CallKind::Bill,
                 CallKind::CashOnly,
+                CallKind::Expired,
             ] {
                 self.calls.resolve(register, k, now);
             }
@@ -3032,6 +3056,20 @@ impl Store {
                     r.txn.tobacco_asked = false;
                 }
                 r.txn.push(p, 1, LineKind::Item, tax);
+                if p.expired() {
+                    // 販売期限切れ：明細に「期限切れ」のフラグを出し、取り消すまでお会計に進めない
+                    if r.staff_state() != StaffState::Ready {
+                        self.calls.raise(register, CallKind::Expired, now, p.name);
+                        return done(format!(
+                            "{}は販売期限が切れています\nスタッフをお呼びしました{back}",
+                            p.name
+                        ));
+                    }
+                    return done(format!(
+                        "{}は販売期限が切れています\n新しい商品とお取り替えください{back}",
+                        p.name
+                    ));
+                }
                 done(format!("{} {}円{back}", p.name, p.price))
             }
         }
@@ -3778,6 +3816,8 @@ impl Store {
                     limit: self.age_rules.limit_for(p.code),
                     tax_class: self.tax.class_for(p.code).id.clone(),
                     tickets: p.tickets,
+                    fresh: p.fresh,
+                    dates: p.dates,
                 })
                 .collect(),
             tax: TaxView {
@@ -3888,6 +3928,9 @@ impl Store {
                 age: self.age_rules.age_for(l.code, l.category),
                 age_checked: t.line_age_checked(l.id),
                 limit: self.age_rules.limit_for(l.code),
+                fresh: l.is_fresh(),
+                expired: l.is_expired(),
+                dates: catalog::find(l.code).and_then(|p| p.dates),
             })
             .collect();
 
@@ -3907,6 +3950,9 @@ impl Store {
                 cash_only: l.cash_only,
                 pickup: l.is_pickup(),
                 parcel: l.is_parcel(),
+                fresh: l.is_fresh(),
+                expired: l.is_expired(),
+                dates: catalog::find(l.code).and_then(|p| p.dates),
                 kind: l.kind,
             })
             .collect();
@@ -4074,6 +4120,12 @@ pub struct StaffLine {
     pub age: Option<u8>,
     pub age_checked: bool,
     pub limit: Option<u32>,
+    /// 日配食品（数量を増やせない）
+    pub fresh: bool,
+    /// 販売期限切れ（取り消すまでお会計に進めない）
+    pub expired: bool,
+    /// 販売期限・賞味期限（いまからの分）
+    pub dates: Option<catalog::Dates>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -4090,6 +4142,9 @@ pub struct CustomerLine {
     pub cash_only: bool,
     pub pickup: bool,
     pub parcel: bool,
+    pub fresh: bool,
+    pub expired: bool,
+    pub dates: Option<catalog::Dates>,
     #[serde(flatten)]
     pub kind: LineKind,
 }
@@ -4322,6 +4377,10 @@ pub struct CatalogItem {
     pub tax_class: String,
     /// チケットの申込券で発券する枚数（チケットでなければ 0）
     pub tickets: u32,
+    /// 日配食品
+    pub fresh: bool,
+    /// 販売期限・賞味期限（いまからの分）
+    pub dates: Option<catalog::Dates>,
 }
 
 #[derive(Clone, Debug, Serialize)]

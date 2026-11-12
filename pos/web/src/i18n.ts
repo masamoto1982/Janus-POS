@@ -283,6 +283,20 @@ const DICT: Record<string, string> = {
   スタッフが領収証に収入印紙を貼り付けています: "Staff is affixing revenue stamps to your receipts",
   スタッフが領収証に収入印紙を貼り付けます: "Staff will affix revenue stamps to your receipts",
   収入印紙の貼り付けが確認できていません: "Revenue stamps have not been confirmed",
+
+  // 販売期限・日配食品
+  期限切れ: "Expired",
+  販売期限: "Sell by",
+  賞味期限: "Best before",
+  品名: "Item",
+  取り消す: "Cancel",
+  販売期限が切れています: "This item is past its sell-by date",
+  "お客様にお詫びし、売場の新しい商品とお取り替えください": "Apologise and swap it for a fresh one from the shelf",
+  "申し訳ございません、売場の新しい商品とお取り替えください": "Sorry, please swap it for a fresh one from the shelf",
+  "販売期限切れの商品があります\n取り消してから、お会計に進んでください": "An item is past its sell-by date\nCancel it before checking out",
+  日配食品は一点ずつスキャンしてください: "Scan fresh food one at a time",
+  "日配食品は数量を増やせません\n一点ずつスキャンしてください": "Fresh food quantity can't be raised\nScan each one",
+  押して新しい商品との取り替えを案内: "Press to guide the swap for a fresh item",
   公共料金: "Utility bills",
 
   // 荷物
@@ -474,6 +488,7 @@ const DICT: Record<string, string> = {
   アルコール: "Alcohol",
   袋菓子: "Snacks",
   即席麺: "Instant noodles",
+  おにぎり: "Rice ball",
   新聞: "Newspaper",
   雑誌: "Magazine",
   ライター: "Lighter",
@@ -572,6 +587,7 @@ const RULES: Rule[] = [
   [/^担当：(.*)$/, (m) => `Staff: ${t(m[1])}`],
   [/^同じ額を (.+) で$/, (m) => `and the same amount comes out in ${yenify(m[1])} pieces from the `],
   [/^釣銭機の (.+)：残り (\d+) 枚 在高 (.+)$/, (m) => `${yenify(m[1])} in the changer: ${m[2]} left, total ${yenify(m[3])}`],
+  [/^(.+)は販売期限が切れています\n(スタッフをお呼びしました|新しい商品とお取り替えください)(.*)$/, (m) => `${t(m[1])} is past its sell-by date\n${m[2] === "スタッフをお呼びしました" ? "We have called a staff member" : "Swap it for a fresh one"}`],
   [/^(.+)：スタッフをお呼びしました(.*)$/, (m) => `${t(m[1])}: we have called a staff member`],
   [/^(.+)が選ばれています（(.+)は使えません）$/, (m) => `${t(m[1])} is selected (${t(m[2])} can't be used)`],
   [/^あと (.+)円 入れてください$/, (m) => `Insert ¥${m[1]} more`],

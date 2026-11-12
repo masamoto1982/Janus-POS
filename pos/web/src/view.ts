@@ -1152,14 +1152,20 @@ function pointsUse(r: RegisterView, side: Side, st: Gate, head: string | null): 
   const sub = `ポイント残高 ${pt(p.balance ?? 0)}、ご利用可能 ${pt(p.usable)}`;
   if (head === null) return `<div class="point-screen pair-note">${msg("ポイントのご利用方法をお申しつけください", sub)}</div>`;
   const use = (how: "all" | "fraction"): Command => ({ type: "use_points", register: reg, side, how });
-  const frac: Gate = !st.allowed ? st : !p.fraction ? { allowed: false, reason: "お支払い額に端数がありません" } : p.fraction > p.usable ? { allowed: false, reason: "端数がご利用可能なポイントを超えています" } : st;
   const amount = padValue.get(padValueKey(reg, "ppt")) ?? "";
   const n = Number(amount || 0);
   const okAmount = st.allowed && n > 0 && n <= p.usable;
+  // 端数がない、またはご利用可能なポイントが端数に満たないときは「端数を払う」を出さない。
+  // ご利用可能なポイントが 1P だけなら、指定しても「全部使う」と同じなので指定欄を出さない
+  const fraction = p.fraction > 0 && p.fraction <= p.usable ? btn(`端数を払う\n${pt(p.fraction)}`, use("fraction"), st, "primary") : "";
+  const specify =
+    p.usable > 1
+      ? `<div class="parcel-fields points-amount"><label>ポイント数を指定${padField(reg, side, "ppt", amount, "", "使うポイント数")}<span>P</span></label><button type="button" class="primary" data-form="points-amount" data-reg="${reg}" data-side="${side}"${okAmount ? "" : " disabled"}>決定</button></div>`
+      : "";
   return `<div class="point-screen points-use">
       ${msg(head, sub)}
-      <div class="point-choices pair">${btn(`全部使う\n${pt(p.usable)}`, use("all"), st, "primary")}${btn(`端数を払う\n${pt(p.fraction)}`, use("fraction"), frac, "primary")}</div>
-      <div class="parcel-fields points-amount"><label>ポイント数を指定${padField(reg, side, "ppt", amount, "", "使うポイント数")}<span>P</span></label><button type="button" class="primary" data-form="points-amount" data-reg="${reg}" data-side="${side}"${okAmount ? "" : " disabled"}>決定</button></div>
+      <div class="point-choices pair">${btn(`全部使う\n${pt(p.usable)}`, use("all"), st, "primary")}${fraction}</div>
+      ${specify}
     </div>`;
 }
 

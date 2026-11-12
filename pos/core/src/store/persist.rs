@@ -134,7 +134,7 @@ struct SavedRegister {
     receipt_stamp: Option<ReceiptStamp>,
     /// 発券したチケットのお渡し照合（明細 id・商品コード・発券数・お渡し数）
     #[serde(default)]
-    ticket_handover: Vec<(u32, String, u32, Option<u32>)>,
+    ticket_handover: Vec<(u32, String, u32)>,
     /// お渡しの確認が済むまで留めているチケットのお釣り
     #[serde(default)]
     held_change: Cash,
@@ -416,7 +416,7 @@ impl SavedRegister {
             ticket_handover: r
                 .ticket_handover
                 .iter()
-                .map(|t| (t.line_id, t.code.to_string(), t.issued, t.handed))
+                .map(|t| (t.line_id, t.code.to_string(), t.issued))
                 .collect(),
             held_change: r.held_change.clone(),
             tickets_received: r.tickets_received,
@@ -466,14 +466,13 @@ impl SavedRegister {
             ticket_handover: self
                 .ticket_handover
                 .into_iter()
-                .filter_map(|(line_id, code, issued, handed)| {
+                .filter_map(|(line_id, code, issued)| {
                     let p = catalog::find(&code)?;
                     Some(TicketRow {
                         line_id,
                         code: p.code,
                         name: p.name,
                         issued,
-                        handed,
                     })
                 })
                 .collect(),

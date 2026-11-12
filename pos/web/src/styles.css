@@ -320,8 +320,6 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 /* チケットの受け取り枚数（お客様側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
 /* 入力欄は荷物の長さ・重さと同じ形（.parcel-fields） */
 .screen .ticket-alert { margin: 0; color: var(--alert-ink); font-size: var(--msg-small); font-weight: 700; text-align: center; }
-.ffv-screen.ticket-verify .lines.ffv { margin-bottom: 0; }
-.ticket-customer { margin: 8px 0 0; text-align: center; }
 .ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 8px 0 0; }
 .ffv-foot.end { justify-content: flex-end; }
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }

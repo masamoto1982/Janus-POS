@@ -234,26 +234,21 @@ const DICT: Record<string, string> = {
 
   // チケット
   チケット: "Ticket",
-  発券数: "Issued",
   チケットの発券待ち: "Waiting to issue tickets",
   "チケットのお渡しが済むまで、次の取引は始められません": "The next sale can't start until the tickets are handed over",
   ほかのレジのチケットのお渡しが済むと発券します: "Tickets will print once another register finishes handing over its tickets",
   発券の順番をお待ちください: "Please wait for your tickets to print",
   "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）": "Tickets are handled one order at a time (not with other tickets or items)",
-  お渡し枚数を確認してください: "Check the number of tickets handed over",
   受け取り枚数をご入力ください: "Please enter the number of tickets you received",
   受け取り枚数: "Tickets received",
-  スタッフの確認をお待ちください: "Please wait for staff to confirm",
+  チケットをお客様にお渡ししてください: "Please hand the tickets to the customer",
   申込数と受け取り数が一致しません: "The number received doesn't match the number ordered",
   再度ご確認ください: "Please check again",
   "申込数と受け取り数が一致しません\n再度ご確認ください": "The number received doesn't match the number ordered\nPlease check again",
-  "受け取り枚数を確認しました\nスタッフの確認をお待ちください": "Number confirmed\nPlease wait for staff to confirm",
   "チケットの受け取り枚数はお客様側の画面で入力していただきます": "The customer enters the number of tickets on the customer screen",
   お渡しするチケットはありません: "No tickets to hand over",
-  チケットのお渡し確認はスタッフ側の画面で行います: "Ticket hand-over is checked on the staff screen",
-  チケットのお渡し確認はスタッフがログインしてから行います: "Ticket hand-over is checked after a staff member logs in",
-  "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券したチケットの枚数をスタッフが照合してお渡しする":
-    "Buy tickets with an application slip; cash only, one order per sale; after payment, staff count the issued tickets and hand them over",
+  "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券したチケットをお渡しし、お客様が受け取り枚数を入力して申込数と照合する":
+    "Buy tickets with an application slip; cash only, one order per sale; after payment, staff hand over the tickets and the customer enters the number received, which must match the number ordered",
 
   // 公共料金
   事業者: "Payee",

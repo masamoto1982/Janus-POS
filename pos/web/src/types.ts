@@ -128,7 +128,6 @@ export interface TicketRow {
   code: string;
   name: string;
   issued: number;
-  handed: number | null;
 }
 
 export interface BillRow {

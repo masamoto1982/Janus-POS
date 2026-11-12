@@ -3983,21 +3983,34 @@ fn an_18_item_after_a_20_check_redoes_the_check_for_18() {
 }
 
 #[test]
-fn self_operated_emoney_short_calls_staff_and_continues_in_staff_mode() {
+fn self_operated_emoney_short_calls_staff_only_when_asked() {
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
-    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
-    // 他の決済を選んだら呼び出しは取り下げる
+    assert!(reg(&s, 1).staff.calls.is_empty(), "残高不足の時点では呼ばない");
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"staff"}),
     );
-    assert!(reg(&s, 1).staff.calls.is_empty());
+    assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"})
+        )
+        .is_err(),
+        "呼んだあとは他の決済に切り替えない（スタッフの無駄足になる）"
+    );
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
 
     // スタッフがログインすると、スタッフ操作モードの残高不足の画面につながり、不足額を現金で払える
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
+    ok(
+        &mut s,
+        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"staff"}),
+    );
     login(&mut s, 1);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::StaffOperated);

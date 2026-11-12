@@ -1071,11 +1071,22 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     const choice = (label: string, c: ShortChoice, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     const short = Math.max(0, r.staff.due - r.emoney_short);
     const staffOp = r.mode === "staff_operated";
-    const buttons = staffOp
-      ? `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`
-      : "";
+    if (!staffOp) {
+      // セルフ操作モード：残高不足の時点ではスタッフを呼ばない（他の決済を使うならスタッフの無駄足になる）。
+      // 「チャージまたは現金併用」（左・消極）でスタッフを呼び、「他の決済を使う」（右・積極）で支払方法の選択へ。
+      const called = r.staff.calls.some((c) => c.kind === "emoney");
+      // スタッフを呼んだあとは「他の決済を使う」も出さない（押されるとスタッフの無駄足になる）
+      const buttons = called
+        ? ""
+        : `<div class="point-choices pair">${choice("チャージまたは\n現金併用", "staff", "ghost")}${choice("他の決済を使う", "cancel", "primary")}</div>`;
+      return `<div class="point-screen emoney-screen">
+        ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>${called ? "<br>スタッフが向かっています" : ""}`)}
+        ${ro ? "" : buttons}
+      </div>`;
+    }
+    const buttons = `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`;
     return `<div class="point-screen emoney-screen">
-        ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>${staffOp ? "" : "<br>スタッフが向かっています"}`)}
+        ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
         ${ro ? "" : buttons}
       </div>${ro ? "" : `<div class="back-foot">${choice("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`}`;
   }

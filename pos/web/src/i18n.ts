@@ -236,6 +236,7 @@ const DICT: Record<string, string> = {
   電子マネーの残高が足りません: "Not enough e-money balance",
   不足額: "Short by",
   "不足額を\n現金で払う": "Pay the rest\nin cash",
+  "チャージまたは\n現金併用": "Charge or\nadd cash",
   "電子マネーを\nチャージする": "Top up\ne-money",
   他の決済を使う: "Use another method",
   お支払い方法の確認: "Confirm payment method",

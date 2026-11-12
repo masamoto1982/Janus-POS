@@ -306,8 +306,6 @@ details summary h3 { display: inline; }
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-radius: 8px;
 }
 button.flag { cursor: pointer; }
-/* 明細の「削除」「−」「＋」は、行の色に左右されないよう入金ボックスと同じグレー（青くしない） */
-.screen .qty-step button.neg, .screen .qty-step button.neg:disabled { color: var(--msg-strong); border-color: var(--msg-strong); filter: grayscale(1) !important; }
 .ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; text-align: center; }
 .ffv-screen .lines.ffv { margin-bottom: auto; }
 .ffv-screen .lines.ffv td, .ffv-screen .lines.ffv th { padding-top: 1px; padding-bottom: 1px; }

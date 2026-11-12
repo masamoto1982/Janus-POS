@@ -17,6 +17,8 @@ const GAS_BILL: &str = "2100000000050";
 const TAX_BILL: &str = "2100000000067";
 const STAMP: &str = "4900000000141";
 const TOBACCO: &str = "4900000000127";
+const SNACK: &str = "4900000000073";
+const ONIGIRI: &str = "4900000000080";
 
 fn run(s: &mut Store, v: Value) -> Result<Option<String>, String> {
     let cmd: Command = serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("{v}: {e}"));
@@ -2139,7 +2141,7 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
 #[test]
 fn shopping_is_limited_to_100_items() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", SNACK);
     let id = reg(&s, 1).customer.lines[0].id;
     ok(
         &mut s,
@@ -2156,7 +2158,7 @@ fn shopping_is_limited_to_100_items() {
     assert!(!allowed(&v, Side::Staff, Action::RegisterFf));
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":BREAD}),
+        json!({"type":"scan","register":1,"side":"customer","code":SNACK}),
     )
     .unwrap_err();
     assert!(e.contains("100点"), "{e}");
@@ -2172,7 +2174,7 @@ fn shopping_is_limited_to_100_items() {
         &mut s,
         json!({"type":"remove_line","register":1,"side":"staff","line_id":ffid}),
     );
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", SNACK);
 }
 
 #[test]
@@ -2353,7 +2355,7 @@ fn same_item_merges_only_when_scanned_in_a_row() {
 #[test]
 fn staff_or_customer_changes_a_line_quantity() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", SNACK);
     scan(&mut s, 1, "customer", SANDWICH);
     let id = reg(&s, 1).customer.lines[0].id;
     let set =
@@ -2364,12 +2366,12 @@ fn staff_or_customer_changes_a_line_quantity() {
     assert_eq!(top.name, "サンドイッチ", "the changed line keeps its place");
     let bread = v.customer.lines.iter().find(|l| l.id == id).unwrap();
     assert_eq!(bread.qty, 3);
-    assert_eq!(v.customer.total, 160 * 3 + 320);
+    assert_eq!(v.customer.total, 150 * 3 + 320);
     ok(&mut s, set(99));
     assert!(run(&mut s, set(100)).is_err(), "over the 100-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
     ok(&mut s, set(1));
-    assert_eq!(reg(&s, 1).customer.total, 160 + 320);
+    assert_eq!(reg(&s, 1).customer.total, 150 + 320);
 }
 
 #[test]
@@ -3815,4 +3817,102 @@ fn ticket_queue_survives_save_and_load() {
     let s = Store::load_json(&s.save_json()).unwrap();
     assert!(reg(&s, 1).tickets_issued);
     assert!(!reg(&s, 2).tickets_issued && reg(&s, 2).tickets_ahead == 1);
+}
+
+#[test]
+fn fresh_food_quantity_cannot_be_raised_on_screen() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    let id = reg(&s, 1).staff.lines[0].line.id;
+    let set =
+        |qty: u32| json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":qty});
+    let e = run(&mut s, set(2)).unwrap_err();
+    assert!(e.contains("日配食品"), "{e}");
+    assert!(reg(&s, 1).staff.lines[0].fresh);
+    // スキャンし直せば数量は増える（一点ずつ読む）
+    scan(&mut s, 1, "staff", BREAD);
+    assert_eq!(reg(&s, 1).staff.lines[0].line.qty, 2);
+    ok(&mut s, set(1));
+    // 加工食品は数量を変えられる
+    scan(&mut s, 1, "staff", SNACK);
+    let snack = reg(&s, 1)
+        .staff
+        .lines
+        .iter()
+        .find(|l| l.line.code == SNACK)
+        .unwrap()
+        .line
+        .id;
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"staff","line_id":snack,"qty":3}),
+    );
+}
+
+#[test]
+fn expired_onigiri_blocks_checkout_until_removed() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    let m = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"staff","code":ONIGIRI}),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(m.contains("販売期限が切れています"), "{m}");
+    let v = reg(&s, 1);
+    let l = v
+        .staff
+        .lines
+        .iter()
+        .find(|l| l.line.code == ONIGIRI)
+        .unwrap();
+    assert!(l.expired && l.fresh);
+    assert!(v.customer.lines.iter().any(|l| l.expired));
+    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    let id = l.line.id;
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+    );
+    let v = reg(&s, 1);
+    assert!(allowed(&v, Side::Staff, Action::Checkout));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+}
+
+#[test]
+fn self_operated_expired_scan_calls_staff() {
+    let mut s = Store::new(1, 2, 1);
+    let m = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":ONIGIRI}),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(m.contains("スタッフをお呼びしました"), "{m}");
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.kind == CallKind::Expired));
+    let id = reg(&s, 1).customer.lines[0].id;
+    assert!(run(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"customer","line_id":id}),
+    );
+    assert!(!s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.kind == CallKind::Expired));
 }

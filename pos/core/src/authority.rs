@@ -164,6 +164,8 @@ pub struct Context {
     pub items_full: bool,
     pub emoney_short: bool,
     pub cash_only_goods: bool,
+    /// 販売期限切れの明細がある
+    pub expired: bool,
 }
 
 pub const MAX_ITEMS: u32 = 100;
@@ -175,6 +177,8 @@ impl Context {
     pub fn payment_blocker(&self) -> Option<&'static str> {
         if self.emoney_short {
             Some(EMONEY_SHORT)
+        } else if self.expired {
+            Some(EXPIRED)
         } else if self.bill_unchecked {
             Some(BILL_UNCHECKED)
         } else if self.stamp_pending {
@@ -207,6 +211,7 @@ pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
 const PARCEL_ASK: Denial = "次の荷物があるか選んでください";
+pub const EXPIRED: Denial = "販売期限切れの商品があります\n取り消してから、お会計に進んでください";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
 const COUPON_UNMATCHED: Denial =
     "適用先のないクーポンがあります\n対象商品を確かめるか、クーポンを取り消してください";
@@ -436,6 +441,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
+            require(!c.expired, EXPIRED)?;
             require(!c.ff_waiting, FF_UNCHECKED)?;
             require(!c.service_pending, "サービス商品の受付が済んでいません")?;
             require(!c.parcel_ask, PARCEL_ASK)
@@ -480,6 +486,7 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::Checkout => {
             require(!paying, "すでにお会計中です")?;
             require(c.has_lines, "商品を登録してください")?;
+            require(!c.expired, EXPIRED)?;
             require(!c.ff_waiting, FF_UNCHECKED)?;
             require(
                 !c.service_pending,
@@ -561,6 +568,7 @@ mod tests {
                                             items_full: false,
                                             emoney_short: false,
                                             cash_only_goods: false,
+                                            expired: false,
                                             customer_turn,
                                             mode,
                                             phase,

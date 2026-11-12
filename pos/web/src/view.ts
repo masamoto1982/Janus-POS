@@ -5,6 +5,7 @@ import type {
   Pickup,
   Unavailable,
   Coupon,
+  Dates,
   Returned,
   Command,
   CustomerView,
@@ -185,6 +186,52 @@ function serviceFlag(l: { kind: string; done?: boolean; cash_only: boolean; parc
 function ageFlag(l: { age: number | null; age_checked?: boolean }, cmd?: Command, st?: ActionState): string {
   if (!l.age || l.age_checked) return "";
   return cmd && st?.allowed ? btn(`年確${l.age}`, cmd, st, "flag age-start") : flagSpan(`年確${l.age}`);
+}
+
+// 販売期限・賞味期限：core はいまからの分で持つので、ページを開いた時刻を起点に日時へ直す
+// （画面を描くたびに時刻がずれないよう起点は固定、日配食品は時刻まで・加工食品は日付まで）
+const DATES_FROM = Date.now();
+export function expiryLabel(min: number, fresh: boolean): string {
+  const t = new Date(DATES_FROM + min * 60_000);
+  if (!fresh) return `${t.getFullYear()}/${t.getMonth() + 1}/${t.getDate()}`;
+  t.setMinutes(0, 0, 0);
+  return `${t.getMonth() + 1}/${t.getDate()} ${pad(t.getHours())}:00`;
+}
+
+// 販売期限切れ：明細に「期限切れ」のフラグ。押すと（会計を押しても）取り替えの画面を開く。
+// 期限切れの品を読むとその場で自動的に開き、バックで閉じると、次に期限切れの品を読むまで開かない
+export const expiredClosed = new Map<string, string>();
+type ExpiredLine = { id: number; name: string; qty: number; expired: boolean; fresh: boolean; dates: Dates | null };
+const expiredSig = (lines: ExpiredLine[]): string =>
+  lines
+    .filter((l) => l.expired)
+    .map((l) => `${l.id}x${l.qty}`)
+    .join(",");
+function expiredOpen(reg: number, side: Side, lines: ExpiredLine[]): boolean {
+  const sig = expiredSig(lines);
+  if (!sig) expiredClosed.delete(`${reg}:${side}`);
+  return !!sig && expiredClosed.get(`${reg}:${side}`) !== sig;
+}
+
+function expiredFlag(reg: number, side: Side, l: { expired: boolean }, operable: boolean): string {
+  if (!l.expired) return "";
+  if (!operable) return flagSpan("期限切れ");
+  return `<button type="button" class="flag" data-expiredview="${reg}:${side}" title="押して新しい商品との取り替えを案内">期限切れ</button>`;
+}
+
+function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: ActionState, staff: boolean): string {
+  const rows = lines
+    .filter((l) => l.expired)
+    .map(
+      (l) =>
+        `<tr><td>${esc(l.name)}</td><td class="num">${l.qty}</td><td class="num">${l.dates ? esc(expiryLabel(l.dates.sell_by_min, l.fresh)) : ""}</td><td class="num">${l.dates ? esc(expiryLabel(l.dates.best_before_min, l.fresh)) : ""}</td><td class="num">${btn("取り消す", { type: "remove_line", register: reg, side, line_id: l.id }, st, "md neg expired-remove")}</td></tr>`,
+    )
+    .join("");
+  return `<div class="ffv-screen expired-screen">
+      ${msg("販売期限が切れています", staff ? "お客様にお詫びし、売場の新しい商品とお取り替えください" : "申し訳ございません、売場の新しい商品とお取り替えください")}
+      <table class="lines ffv"><thead><tr><th>品名</th><th class="num">数量</th><th class="num">販売期限</th><th class="num">賞味期限</th><th class="num"></th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>
+    </div>`;
 }
 
 export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
@@ -483,6 +530,7 @@ function taxNote(v: { taxes: TaxTotal[] }): string {
 function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
   const ro = side === "customer";
   const tags = [
+    expiredFlag(reg, side, l, !ro),
     ffFlag(reg, side, l, find(v.actions, "check_ff"), ro),
     stampFlag(reg, side, v.bills.find((b) => b.line_id === l.id), find(v.actions, "affix_stamp"), ro),
     serviceFlag(l),
@@ -500,7 +548,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
   const qty =
     ro || isBill(l) || l.pickup || l.parcel
       ? `${l.qty}`
-      : qtyCell(reg, side, l, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service");
+      : qtyCell(reg, side, l, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh);
   return `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}">
     <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
     <td class="num">${qty}</td>
@@ -512,8 +560,16 @@ const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolea
 
 export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
-function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false): string {
+/** 日配食品は数量を増やせない。同じ商品でも一点ずつ販売期限が違うので、一つを読んで数量を増やすと
+ *  期限切れの品がお客様に渡ってしまう（ポカヨケ）。「−」「削除」は使え、数字は打ち込めず、「＋」はグレー */
+export const FRESH_ONE_BY_ONE = "日配食品は一点ずつスキャンしてください";
+
+function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false, fresh = false): string {
   if (!st.allowed) return `${l.qty}`;
+  if (fresh) {
+    const minus = l.qty <= 1 ? btn("削除", remove, st, "small neg") : btn("−", { type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty - 1 }, st, "small neg");
+    return `<span class="qty-step">${minus}<b class="qty-fixed">${l.qty}</b>${btn("＋", { type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + 1 }, { action: st.action, allowed: false, reason: FRESH_ONE_BY_ONE }, "small neg")}</span>`;
+  }
   if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b><i class="qty-pad" aria-hidden="true"></i></span>`;
   const step = (d: number): Command => ({ type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + d });
   const minus = l.qty <= 1 ? btn("削除", remove, st, "small neg") : btn("−", step(-1), st, "small neg");
@@ -834,6 +890,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       : "";
 
   const ffFirst = !paying && v.lines.some((l) => l.kind === "ff" && l.state === "waiting") && a("check_ff").allowed;
+  const expiredFirst = !paying && v.lines.some((l) => l.expired) && a("remove_line").allowed;
   const top = regTop(
     v.total,
     itemCount(v.lines),
@@ -841,6 +898,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
       : ro || paying
         ? ""
+        : expiredFirst
+          ? `<button type="button" class="primary" data-expiredview="${reg}:${side}">会計</button>`
         : ffFirst
           ? `<button type="button" class="primary" data-ffverify="${reg}:${side}">会計</button>`
           : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
@@ -892,6 +951,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
+  if (!ro && !paying && a("remove_line").allowed && expiredOpen(reg, side, v.lines))
+    return screen(expiredScreen(reg, side, v.lines, a("remove_line"), true));
   if (!ro && !paying && ffVerifyOpen(reg, side, v.lines))
     return screen(ffVerifyScreen(reg, side, v.lines, false));
   closeFfVerify(reg, side);
@@ -1248,11 +1309,11 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks()));
 
   const lineRows = c.lines.map((l): Row => {
-      const tags = [stampFlag(reg, side, c.bills.find((b) => b.line_id === l.id), a("affix_stamp"), true), serviceFlag(l), ageFlag(l)].filter(Boolean);
+      const tags = [expiredFlag(reg, side, l, a("remove_line").allowed), stampFlag(reg, side, c.bills.find((b) => b.line_id === l.id), a("affix_stamp"), true), serviceFlag(l), ageFlag(l)].filter(Boolean);
       const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
       const qty =
         c.phase === "registering" && !fixedHere
-          ? qtyCell(reg, side, l, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service")
+          ? qtyCell(reg, side, l, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh)
           : `${l.qty}`;
       return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(l.name)} ${tags.join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>`];
     });
@@ -1262,7 +1323,9 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
     c.total,
     itemCount(c.lines),
     (c.phase === "registering"
-      ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
+      ? c.lines.some((l) => l.expired) && a("remove_line").allowed
+        ? `<button type="button" class="primary" data-expiredview="${reg}:${side}">お会計</button>`
+        : btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : ""),
     r.max_items,
     !!c.point_card,
@@ -1281,6 +1344,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   // セルフ操作モードで「現金」を選ぶと店員呼び出し、お客様側は支払方法の選択から案内画面に切り替わる
   if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
+  if (c.phase === "registering" && a("remove_line").allowed && expiredOpen(reg, side, c.lines))
+    return screen(expiredScreen(reg, side, c.lines, a("remove_line"), side === "staff"));
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
     returnedCard(reg, side, c.returned, true),
@@ -1457,7 +1522,7 @@ type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean
 
 const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(p.code);
 const SHELVES: Shelf[] = [
-  { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011") },
+  { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011", "4900000000080") },
   { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073", "4900000000066") },
   { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000158", "4900000000134", "4900000000141", "4910000000052", "4910000000069") },
   { label: "サービス", match: (p) => p.category === "service" },
@@ -1476,10 +1541,11 @@ const TICKET_CODES = ["2100000000074"];
  *  登録のしかたは Item の見出しのホバーにまとめてあるので、ここには書かない */
 const PURPOSE: Record<string, string> = {
   "4900000000028": "割引券（50円引き）の対象商品、クーポンの読み取りと値引きを試す",
-  "4900000000042": "規則のない軽減税率8%の飲料、基本の登録を試す",
-  "4900000000011": "規則のない軽減税率8%の食品、基本の登録を試す",
+  "4900000000042": "軽減税率8%の日配食品、レジ画面では数量を増やせず、一点ずつスキャンすることを確かめる",
+  "4900000000011": "軽減税率8%の日配食品、基本の登録と、＋で数量を増やせないことを確かめる",
   "4900000000035": "引換券（1個無料）の対象商品、クーポンの読み取りと引き換えを試す",
   "4900000000103": "法令による年齢確認（20歳）、標準税率10%なので、食品と一緒に買うと税率ごとの内税表示も確かめられる",
+  "4900000000080": "販売期限が切れた日配食品、期限切れの商品を登録したときの警告と取り替えを試す",
   "4900000000073": "規則のない軽減税率8%の加工食品、数量の変更や販売規則の個数制限を試す",
   "4900000000066": "規則のない軽減税率8%の加工食品、数量の変更や販売規則の個数制限を試す",
   "4910000000014": "店頭で買う新聞は軽減税率の対象外（標準税率10%）、税区分の違いを確かめる",
@@ -1541,12 +1607,20 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
               : item(
                 p.code,
                 p.name,
-                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`,
+                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${datesSub(p)}`,
                 p.category === "tobacco" && asked ? "call-blink" : "",
               ),
       )
       .join("")}</div></div>`;
   }).join("") + extra + slipShelf(s);
+}
+
+/** 日配食品・加工食品の販売期限（販売期限切れは警告色）。ボタンの大きさは変えず、名前・値段の下に三行目として足す。
+ *  賞味期限はボタンには載せず、期限切れの取り替え画面で販売期限と並べる */
+function datesSub(p: { fresh: boolean; dates: Dates | null }): string {
+  if (!p.dates) return "";
+  const sell = `販売 ${expiryLabel(p.dates.sell_by_min, p.fresh)}`;
+  return `</span><span class="item-sub item-date">${p.dates.sell_by_min < 0 ? `<b>${sell}</b>` : sell}`;
 }
 
 function slipShelf(s: Snapshot): string {

@@ -47,6 +47,9 @@ export interface Pickup {
   missing: boolean;
 }
 
+/** 販売期限・賞味期限。いまからの分（負なら期限切れ） */
+export type Dates = { sell_by_min: number; best_before_min: number };
+
 export type StaffLine = LineKind & {
   id: number;
   touched: number;
@@ -61,11 +64,16 @@ export type StaffLine = LineKind & {
   age: number | null;
   age_checked: boolean;
   limit: number | null;
+  /** 日配食品（レジ画面で数量を増やせない） */
+  fresh: boolean;
+  /** 販売期限切れ（取り消すまでお会計に進めない） */
+  expired: boolean;
+  dates: Dates | null;
   parcel?: Parcel;
   pickup?: Pickup;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; ff_base: number; amount: number; age: number | null; age_checked: boolean; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; ff_base: number; amount: number; age: number | null; age_checked: boolean; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean; fresh: boolean; expired: boolean; dates: Dates | null };
 
 export interface Call {
   id: number;
@@ -252,7 +260,7 @@ export interface Snapshot {
   ff_stock: { code: string; name: string; price: number; level: "made_to_order" | "plenty" | "low" | "out"; tab: string; tab_label: string }[];
   bell_loss: number;
   accounts: { id: string; barcode: string; name: string; role: string }[];
-  catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string; tickets: number }[];
+  catalog: { code: string; name: string; price: number; category: string; category_label: string; age: number | null; legal_age: number | null; store_age: number | null; limit: number | null; tax_class: string; tickets: number; fresh: boolean; dates: Dates | null }[];
   tax: TaxView;
   categories: [string, string][];
   emoney_balance: number;

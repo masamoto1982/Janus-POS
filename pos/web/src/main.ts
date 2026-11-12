@@ -631,7 +631,10 @@ const STAFF_BARCODE_PREFIX = "ST";
  *  決済端末＝電子マネー・クレジットカード→中心から光が広がる（決済端末が待ち受けているときだけ） */
 function deviceFx(cmd: Command): (() => void) | null {
   if (cmd.type !== "scan" && cmd.type !== "tap_emoney") return null;
-  // スタッフバーコード（ログイン・担当者の切り替え）は商品や支払いではないので、スキャナの演出を出さない
+  // スタッフバーコード（ログイン・担当者の切り替え）では赤帯を出さない。
+  // 経緯（user 2026-11-12）：シミュレーターではスタッフの選択をスタッフバーコードの読み取り（scan コマンド）として送るので、
+  // 演出を出すこと自体には理由がある。ただ、リポジトリのオーナーの目にも不思議に映ったため、便宜的に対象外にした。
+  // 商品・決済用バーコード・ポイントカードの読み取りは従来どおり赤帯を出す
   if (cmd.type === "scan" && cmd.code.startsWith(STAFF_BARCODE_PREFIX)) return null;
   const scanned = cmd.type === "scan" || cmd.method === "qr" || cmd.method === "points";
   const el = app.querySelector<HTMLElement>(scanned ? `[data-scanner="${cmd.register}"]` : `[data-terminal="${cmd.register}"]`);

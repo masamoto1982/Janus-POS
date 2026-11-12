@@ -564,27 +564,22 @@ body.dragging .drop-hint { display: inline; }
 @keyframes io-frame { 50% { border-color: var(--msg-strong); box-shadow: inset 0 0 0 var(--frame-w) var(--msg-strong); } }
 .money-io .inlet.blink, .money-io .outlet.blink, .money-io .terminal.blink { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); animation: io-frame 1s steps(1) infinite; }
 .money-io .inlet.blink .placeholder { color: var(--ink); font-weight: 700; }
-.money-io .terminal-slot { display: flex; justify-content: center; }
-.money-io .terminal { width: calc((100% - 8px) / 2); outline: var(--frame-w) solid var(--msg-strong); outline-offset: calc(var(--frame-w) * -3); justify-content: center; text-align: center; }
-/* 決済端末とスキャナは同じボックス。電子マネー・クレジットカードを読むときだけ「決済端末」：青白い光がゆったり明滅し、二重枠は操作色。
-   それ以外はずっと「スキャナ」：赤い読み取り光が早めに明滅（赤はレジ画面内の「危険・否定」とは別の、周辺機器の演出）。
-   どちらも淡く、明滅は背景だけ（文字・枠は動かさない） */
-.money-io .terminal { --glow: transparent; --glow-ms: 1s; --scan-red: oklch(0.6 0.2 27); animation: terminal-glow var(--glow-ms) ease-in-out infinite alternate; }
-@keyframes terminal-glow { from { background: transparent; } to { background: var(--glow); } }
-.money-io .terminal.reader { --glow: oklch(0.94 0.04 240); --glow-ms: 1.6s; border-color: var(--accent); outline-color: var(--accent); }
-/* 文字の濃さは決済端末・スキャナで同じ（以前の 黒・太字 と グレー・細字 の中間） */
+/* お客様側の下は、左に決済端末・右にスキャナ（スタッフ側の入金・出金ボックスと同じ横並び）。どちらも二重枠、文字は同じ濃さ */
+.money-io .terminal { width: 100%; outline: var(--frame-w) solid var(--msg-strong); outline-offset: calc(var(--frame-w) * -3); justify-content: center; text-align: center; }
 .money-io .terminal .placeholder { color: color-mix(in oklch, var(--ink) 50%, var(--muted)); font-weight: 500; }
-/* スキャナの二重枠は、読み取り時に走る赤帯と同じ濃い赤 */
-/* 待機中のスキャナは、白に戻らず薄い赤のままやや早めに明滅（現実のスキャナの読み取り窓のイメージ） */
-.money-io .terminal.scanner { --glow: oklch(0.88 0.07 25); --glow-ms: 0.35s; border-color: var(--scan-red); outline-color: var(--scan-red); animation-name: scanner-glow; }
-@keyframes scanner-glow { from { background: oklch(0.95 0.03 25); } to { background: var(--glow); } }
-/* 読み取った瞬間の演出（一回きり）。決済端末：電子マネー・クレジットカードをかざすと中心から青白い光が広がる。
-   スキャナ：商品・決済用バーコードを読む（レジ画面に商品を入れるのも同じ）と、濃いめの赤帯が左から右へ走る */
-.money-io .terminal { position: relative; overflow: hidden; }
+.money-io .terminal { --scan-red: oklch(0.6 0.2 27); --tap-blue: oklch(0.6 0.2 255); position: relative; overflow: hidden; }
 .money-io .terminal > * { position: relative; z-index: 1; }
+/* 決済端末：電子マネー・クレジットカードを待っているあいだだけ、青白い光がゆったり明滅し二重枠は操作色 */
+.money-io .terminal.reader { border-color: var(--accent); outline-color: var(--accent); animation: terminal-glow 1.6s ease-in-out infinite alternate; }
+@keyframes terminal-glow { from { background: transparent; } to { background: oklch(0.94 0.04 240); } }
+/* スキャナ：二重枠は読み取り時の赤帯と同じ濃い赤。待機中は光らない（user：点滅は目障り）。赤はレジ画面内の「危険・否定」とは別の周辺機器の演出 */
+.money-io .terminal.scanner { border-color: var(--scan-red); outline-color: var(--scan-red); }
+/* 読み取った瞬間の演出（一回きり）。色の濃さは赤帯と青い光でそろえる。
+   決済端末：電子マネー・クレジットカードをかざすと中心から青い光が広がる。
+   スキャナ：商品・決済用バーコード・ポイントカードを読む（レジ画面に商品を入れるのも同じ）と、濃いめの赤帯が左から右へ走る */
 .money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { content: ""; position: absolute; pointer-events: none; }
 .money-io .terminal.fx-tap::after {
-  inset: 0; background: radial-gradient(closest-side, oklch(0.99 0.02 240), oklch(0.86 0.08 240 / 0.7) 55%, transparent);
+  inset: 0; background: radial-gradient(closest-side, color-mix(in oklch, var(--tap-blue) 75%, transparent), color-mix(in oklch, var(--tap-blue) 35%, transparent) 60%, transparent);
   animation: terminal-tap 0.8s ease-out forwards;
 }
 @keyframes terminal-tap { from { transform: scale(0.05); opacity: 1; } 60% { opacity: 0.9; } to { transform: scale(1.8); opacity: 0; } }
@@ -595,7 +590,7 @@ body.dragging .drop-hint { display: inline; }
 }
 @keyframes terminal-scan { to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) {
-  .money-io .terminal, .money-io .terminal.scanner { animation: none; background: color-mix(in oklch, var(--glow) 60%, transparent); }
+  .money-io .terminal.reader { animation: none; background: oklch(0.96 0.025 240); }
   .money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { animation-duration: 0.01s; }
 }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }

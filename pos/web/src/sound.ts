@@ -33,6 +33,16 @@ export function beepScan(): void {
   tone(2400, 0, 0.09, "square", 0.08);
 }
 
+/** 電子マネー・クレジットカードの決済音「シャーン！」：高い倍音の鈴を素早く重ね、長めに余韻を残す */
+export function chimePay(): void {
+  if (!ready()) return;
+  const notes = [2093, 2637, 3136, 4186, 5274];
+  notes.forEach((f, i) => {
+    tone(f, i * 0.018, 0.9 - i * 0.08, "sine", 0.07);
+    tone(f * 2.01, i * 0.018, 0.35, "sine", 0.02);
+  });
+}
+
 export function beepPress(): void {
   if (!ready()) return;
   tone(900, 0, 0.04, "triangle", 0.05);

@@ -157,6 +157,9 @@ pub struct Parcel {
     pub collect: bool,
     /// 複数口の伝票：受け付けるたびに同じお届け先の荷物があるか尋ねる
     pub multi: bool,
+    /// 複数口で「同じお届け先の荷物がある」として続けた荷物。控え伝票は1個目の伝票にまとまる
+    #[serde(default)]
+    pub continued: bool,
     pub fee: u32,
 }
 

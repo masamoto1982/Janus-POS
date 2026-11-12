@@ -98,7 +98,11 @@ export type Parcel = { sum_cm: number, weight_g: number, size: number | null, po
 /**
  * 複数口の伝票：受け付けるたびに同じお届け先の荷物があるか尋ねる
  */
-multi: boolean, fee: number, };
+multi: boolean, 
+/**
+ * 複数口で「同じお届け先の荷物がある」として続けた荷物。控え伝票は1個目の伝票にまとまる
+ */
+continued: boolean, fee: number, };
 
 export type PaymentMethod = "cash" | "emoney" | "qr" | "credit" | "points";
 
@@ -173,7 +177,11 @@ emergency: boolean, active_side: Side | null, max_items: number, lamp: boolean, 
 /**
  * ポイント：付与対象の商品があるか・カードの残高・いま充てられる分・このお会計で付与する分
  */
-points: PointsView, cash_only: number, cashless_due: number, unavailable: Array<Unavailable>, last_receipt: Receipt | null, bill_handover: number | null, ticket_handover: Array<TicketRow>, 
+points: PointsView, cash_only: number, cashless_due: number, unavailable: Array<Unavailable>, last_receipt: Receipt | null, bill_handover: number | null, 
+/**
+ * お客様控えの伝票をお渡しする枚数（宅配便の決済のあと、スタッフが「お渡し済」を押すまで）
+ */
+parcel_handover: number | null, ticket_handover: Array<TicketRow>, 
 /**
  * チケットを発券した（列の先頭に来た）。false のあいだは発券待ち
  */

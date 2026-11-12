@@ -132,6 +132,8 @@ struct SavedRegister {
     drawer: Cash,
     last_receipt: Option<SavedReceipt>,
     bill_handover: Option<u32>,
+    #[serde(default)]
+    parcel_handover: Option<u32>,
     pickup_handover: Option<String>,
     #[serde(default)]
     receipt_stamp: Option<ReceiptStamp>,
@@ -237,6 +239,8 @@ struct SavedParcel {
     region: Option<String>,
     slip: String,
     collect: bool,
+    #[serde(default)]
+    continued: bool,
     fee: u32,
 }
 
@@ -271,6 +275,7 @@ impl SavedLine {
                 region: p.region.map(str::to_string),
                 slip: p.slip.clone(),
                 collect: p.collect,
+                continued: p.continued,
                 fee: p.fee,
             }),
             pickup: l.pickup.clone(),
@@ -304,6 +309,7 @@ impl SavedLine {
                 slip: p.slip,
                 collect: p.collect,
                 multi,
+                continued: p.continued,
                 fee: p.fee,
             }),
             pickup: self.pickup,
@@ -424,6 +430,7 @@ impl SavedRegister {
                 point_balance: rc.point_balance,
             }),
             bill_handover: r.bill_handover,
+            parcel_handover: r.parcel_handover,
             pickup_handover: r.pickup_handover.clone(),
             receipt_stamp: r.receipt_stamp,
             ticket_handover: r
@@ -474,6 +481,7 @@ impl SavedRegister {
                 point_balance: rc.point_balance,
             }),
             bill_handover: self.bill_handover,
+            parcel_handover: self.parcel_handover,
             pickup_handover: self.pickup_handover,
             receipt_stamp: self.receipt_stamp,
             tickets_issued: false,

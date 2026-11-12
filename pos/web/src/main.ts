@@ -365,6 +365,7 @@ function inTransaction(r: RegisterView): boolean {
     v.ff_collect.length > 0 ||
     r.last_receipt !== null ||
     r.bill_handover !== null ||
+    r.parcel_handover !== null ||
     r.ticket_handover.length > 0 ||
     r.receipt_stamp !== null ||
     r.pickup_handover !== null
@@ -465,6 +466,15 @@ function render(): void {
       if (side === "staff" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {
         padValue.delete(padValueKey(r.id, "mamt"));
         padValue.delete(padValueKey(r.id, "mpw"));
+      }
+      // 荷物の長さ・重さ・郵便番号は受付中の荷物のものだけ残す。明細の番号は取引ごとに振り直すので、
+      // 残しておくと次の取引の荷物に前の荷物の値が入ってしまう
+      if (side === "staff") {
+        const pending = new Set(r.staff.lines.filter((l) => l.parcel && l.kind === "service" && !l.done).map((l) => String(l.id)));
+        for (const key of [...padValue.keys()]) {
+          const [reg, target, line] = key.split(":");
+          if (reg === String(r.id) && ["pcm", "pkg", "post"].includes(target) && !pending.has(line)) padValue.delete(key);
+        }
       }
       // ポイントの使い方の画面を離れたら、指定しかけたポイント数を捨てる
       if (r.customer.method !== "points" || r.prepaid) padValue.delete(padValueKey(r.id, "ppt"));

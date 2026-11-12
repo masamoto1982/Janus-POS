@@ -4350,3 +4350,58 @@ fn multi_piece_parcels_share_the_address_and_only_ask_for_the_size() {
     assert_eq!(v.customer.total, 940 * 2);
     assert!(allowed(&v, Side::Staff, Action::Checkout));
 }
+
+#[test]
+fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL_COLLECT);
+    login_as(&mut s, 2, "ST001");
+    let id = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    scan(&mut s, 2, "staff", PARCEL_MULTI);
+    for i in 0..3 {
+        let id = pending_parcel(&s, 2);
+        ok(
+            &mut s,
+            json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+        );
+        if i == 0 {
+            ok(
+                &mut s,
+                json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"5300001"}),
+            );
+        }
+        ok(
+            &mut s,
+            json!({"type":"parcel_next","register":2,"more":i < 2}),
+        );
+    }
+    assert_eq!(reg(&s, 2).staff.lines.len(), 4);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":2,"side":"staff","method":"cash"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"insert_cash","register":2,"denomination":10000,"count":1}),
+    );
+    ok(&mut s, json!({"type":"finish_insert","register":2}));
+    let v = reg(&s, 2);
+    assert_eq!(v.parcel_handover, Some(2), "着払い1枚＋複数口1枚");
+    ok(
+        &mut s,
+        json!({"type":"hand_over_bills","register":2,"side":"staff"}),
+    );
+    assert_eq!(reg(&s, 2).parcel_handover, None);
+}

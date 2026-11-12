@@ -1190,6 +1190,7 @@ impl Txn {
             parcel: p.parcel_send.then(|| Parcel {
                 collect: p.parcel_collect,
                 multi: p.parcel_multi,
+                continued: false,
                 ..Parcel::default()
             }),
             pickup: None,
@@ -1241,6 +1242,8 @@ struct Register {
     drawer: Drawer,
     last_receipt: Option<Receipt>,
     bill_handover: Option<u32>,
+    /// 宅配便の決済が済んで、お客様控えの伝票をお渡しする枚数（複数口は何個口でも1枚）
+    parcel_handover: Option<u32>,
     pickup_handover: Option<String>,
     receipt_stamp: Option<ReceiptStamp>,
     /// 決済が済んだチケット。発券の順番が来たら、お渡し照合を待つ（全部合うと空になる）
@@ -1361,7 +1364,7 @@ impl Register {
             has_stamps: t.has_stamps(),
             stamp_pending: t.stamp_pending(),
             expired: t.lines.iter().any(Line::is_expired),
-            bill_handover: self.bill_handover.is_some(),
+            bill_handover: self.bill_handover.is_some() || self.parcel_handover.is_some(),
             receipt_stamp: self.receipt_stamp.is_some(),
             ticket_handover: self.tickets_issued && !self.ticket_handover.is_empty(),
             point_pending: t.paying
@@ -1524,6 +1527,7 @@ impl Store {
                 drawer: Drawer::default(),
                 last_receipt: None,
                 bill_handover: None,
+                parcel_handover: None,
                 ticket_handover: vec![],
                 tickets_issued: false,
                 held_change: Cash::default(),
@@ -1579,6 +1583,7 @@ impl Store {
             }
             if r.outlet.total() == 0
                 && r.bill_handover.is_none()
+                && r.parcel_handover.is_none()
                 && r.ticket_handover.is_empty()
                 && r.pickup_handover.is_none()
                 && r.receipt_stamp.is_none()
@@ -1664,6 +1669,7 @@ impl Store {
                 }
                 r.menu = None;
                 r.bill_handover = None;
+                r.parcel_handover = None;
                 r.pickup_handover = None;
                 r.receipt_stamp = None;
                 r.last_op = now;
@@ -2036,6 +2042,7 @@ impl Store {
                     if let Some((postal, region)) = dest {
                         pc.postal = postal;
                         pc.region = region;
+                        pc.continued = true;
                     }
                 }
                 done("同じお届け先の荷物：取り扱いサイズを決定してください".to_string())
@@ -2420,6 +2427,9 @@ impl Store {
             C::HandOverBills { register, side } => {
                 self.check(register, side, Action::HandOverBills)?;
                 let r = self.reg_mut(register)?;
+                if let Some(n) = r.parcel_handover.take() {
+                    return done(format!("控え伝票 {n}枚をお渡ししました"));
+                }
                 let n = r.bill_handover.take().unwrap_or(0);
                 done(format!("払込票 {n}枚をお渡ししました"))
             }
@@ -3225,6 +3235,7 @@ impl Store {
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
         r.bill_handover = None;
+        r.parcel_handover = None;
         r.pickup_handover = None;
         r.receipt_stamp = None;
         if let Scanned::PointCard(no) = &scanned {
@@ -3880,6 +3891,13 @@ impl Store {
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);
+        // 控え伝票は伝票ごとに1枚。複数口で続けた荷物は1個目の伝票にまとまる
+        let copies = txn
+            .lines
+            .iter()
+            .filter(|l| l.parcel.as_ref().is_some_and(|p| !p.continued))
+            .count() as u32;
+        r.parcel_handover = (copies > 0).then_some(copies);
         // チケットのお渡しが済むまで次の取引は始められないので、ここに残っているチケットはない
         r.ticket_handover.extend(
             txn.lines
@@ -4441,6 +4459,7 @@ impl Store {
             .collect(),
             last_receipt: r.last_receipt.clone(),
             bill_handover: r.bill_handover,
+            parcel_handover: r.parcel_handover,
             ticket_handover: r.ticket_handover.clone(),
             tickets_issued: r.tickets_issued,
             tickets_received: r.tickets_received,
@@ -4625,6 +4644,8 @@ pub struct RegisterView {
     pub unavailable: Vec<Unavailable>,
     pub last_receipt: Option<Receipt>,
     pub bill_handover: Option<u32>,
+    /// お客様控えの伝票をお渡しする枚数（宅配便の決済のあと、スタッフが「お渡し済」を押すまで）
+    pub parcel_handover: Option<u32>,
     pub ticket_handover: Vec<TicketRow>,
     /// チケットを発券した（列の先頭に来た）。false のあいだは発券待ち
     pub tickets_issued: bool,

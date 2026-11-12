@@ -714,9 +714,7 @@ impl Store {
             presses: s.presses,
             receipts: s.receipts,
             emoney_balance: s.emoney_balance,
-            point_balances: s
-                .point_balances
-                .unwrap_or_else(super::initial_point_balances),
+            point_balances: s.point_balances.unwrap_or_else(super::initial_point_balances),
             ticket_queue: s.ticket_queue.into_iter().collect(),
         };
         store.issue_next_tickets();

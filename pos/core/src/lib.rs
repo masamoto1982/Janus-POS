@@ -1,10 +1,10 @@
 pub mod age_rules;
 pub mod auth;
 pub mod authority;
-pub mod bell;
 pub mod calls;
 pub mod cash;
 pub mod catalog;
+pub mod bell;
 pub mod parcel;
 pub mod rng;
 pub mod store;

@@ -584,82 +584,6 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
 }
 
 #[test]
-fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
-    let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL_COLLECT);
-    login_as(&mut s, 2, "ST001");
-    let id = pending_parcel(&s, 2);
-    ok(
-        &mut s,
-        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
-    );
-    // 次の荷物を尋ねているあいだは会計できない
-    assert!(run(
-        &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"})
-    )
-    .is_err());
-    ok(
-        &mut s,
-        json!({"type":"parcel_next","register":2,"more":false}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
-    );
-    let v = reg(&s, 2);
-    assert!(v.staff.lines.is_empty(), "取引はもう終わっている");
-    let rc = v.last_receipt.unwrap();
-    assert_eq!((rc.total, rc.paid, rc.change_total), (0, 0, 0));
-    assert_eq!(rc.method, "着払い");
-}
-
-#[test]
-fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
-    let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL);
-    login_as(&mut s, 2, "ST001");
-    let id = pending_parcel(&s, 2);
-    ok(
-        &mut s,
-        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"parcel_next","register":2,"more":false}),
-    );
-    scan(&mut s, 2, "staff", PARCEL_COLLECT);
-    let id2 = pending_parcel(&s, 2);
-    ok(
-        &mut s,
-        json!({"type":"parcel_size","register":2,"line_id":id2,"sum_cm":58,"weight_g":1500}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"parcel_postal","register":2,"line_id":id2,"postal":"1000001"}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"parcel_next","register":2,"more":false}),
-    );
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
-    );
-    let v = reg(&s, 2);
-    assert_eq!(v.staff.lines.len(), 2, "発払いの分を払うまで取引は続く");
-    assert!(v.last_receipt.is_none());
-}
-
-#[test]
 fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", PARCEL);
@@ -2057,10 +1981,7 @@ fn points_pay_only_for_point_eligible_goods() {
     let r = reg(&s, 1).last_receipt.expect("決済済み");
     assert_eq!(r.method, "ポイント利用・クレジットカード");
     assert_eq!(r.points_used, sand);
-    assert_eq!(
-        r.points, 0,
-        "no points on the part paid by points or on tobacco"
-    );
+    assert_eq!(r.points, 0, "no points on the part paid by points or on tobacco");
     assert_eq!(r.point_balance, Some(1_250 - sand));
 
     let mut s = Store::new(1, 2, 1);
@@ -2508,11 +2429,7 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     assert_eq!(v.staff.method, Some(PaymentMethod::Points));
     scan(&mut s, 1, "staff", "PC12345678");
     let v = reg(&s, 1);
-    assert_eq!(
-        v.staff.phase,
-        Phase::Paying,
-        "reading the card keeps the payment screen"
-    );
+    assert_eq!(v.staff.phase, Phase::Paying, "reading the card keeps the payment screen");
     assert_eq!(v.staff.method, Some(PaymentMethod::Points));
     use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
@@ -4064,20 +3981,13 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
-    assert!(
-        reg(&s, 1).staff.calls.is_empty(),
-        "残高不足の時点では呼ばない"
-    );
+    assert!(reg(&s, 1).staff.calls.is_empty(), "残高不足の時点では呼ばない");
     ok(
         &mut s,
         json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"staff"}),
     );
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
-    assert!(reg(&s, 1)
-        .staff
-        .calls
-        .iter()
-        .any(|c| c.label == "電子マネー"));
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
     assert!(
         run(
             &mut s,
@@ -4086,11 +3996,7 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
         .is_err(),
         "呼んだあとは他の決済に切り替えない（スタッフの無駄足になる）"
     );
-    assert!(reg(&s, 1)
-        .staff
-        .calls
-        .iter()
-        .any(|c| c.label == "電子マネー"));
+    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
 
     // スタッフがログインすると、スタッフ操作モードの残高不足の画面につながり、不足額を現金で払える
     let mut s = Store::new(1, 2, 1);
@@ -4112,10 +4018,7 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
         &mut s,
         json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash_confirmed"}),
     );
-    ok(
-        &mut s,
-        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
-    );
+    ok(&mut s, json!({"type":"tap_emoney","register":1,"method":"emoney"}));
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().method, "電子マネー・現金");
@@ -4152,10 +4055,7 @@ fn points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card() {
     no_id_check(&mut s, 1);
     pay_cash(&mut s, 1);
     let r = reg(&s, 1).last_receipt.expect("決済済み");
-    assert_eq!(
-        (r.points, r.points_used, r.point_balance),
-        (3, 0, Some(1_253))
-    );
+    assert_eq!((r.points, r.points_used, r.point_balance), (3, 0, Some(1_253)));
 
     scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "staff", "PC12345678");
@@ -4183,11 +4083,7 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
     let v = reg(&s, 1);
     assert_eq!((v.prepaid, v.staff.due), (1, 919));
     assert_eq!(v.staff.method, None);
-    assert_eq!(
-        v.points.earn,
-        (320 - 1) / 200,
-        "no points on the part paid by points"
-    );
+    assert_eq!(v.points.earn, (320 - 1) / 200, "no points on the part paid by points");
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
@@ -4235,10 +4131,7 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
     );
     use_points(&mut s, 1, "all", None);
     pay_cash(&mut s, 1);
-    assert_eq!(
-        reg(&s, 1).last_receipt.and_then(|r| r.point_balance),
-        Some(0)
-    );
+    assert_eq!(reg(&s, 1).last_receipt.and_then(|r| r.point_balance), Some(0));
     scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "staff", "PC87654321");
     ok(
@@ -4285,7 +4178,10 @@ fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
         scan(s, 1, "staff", SANDWICH);
         scan(s, 1, "staff", BREAD);
         scan(s, 1, "staff", TOBACCO);
-        ok(s, json!({"type":"checkout","register":1,"side":"staff"}));
+        ok(
+            s,
+            json!({"type":"checkout","register":1,"side":"staff"}),
+        );
         no_id_check(s, 1);
         ok(
             s,

@@ -1,7 +1,7 @@
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { CashOutKind, Command, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { GuideKind, RulesTab } from "./view";
-import { beepError, beepPress, beepScan, setBellRinging, unlockAudio } from "./sound";
+import { beepError, beepPress, beepScan, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
 import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
 import {
@@ -177,8 +177,11 @@ function buildSkeleton(): void {
             <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の出金ボックス（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
           </div>
         </div>
-        <div class="money-io-cust" aria-label="レジ${r.id}の決済端末（お客様側の画面に付いています）">
-          <div class="terminal-slot" data-pay-drop="${r.id}"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末・スキャナ（電子マネー・クレジットカード・バーコード・ポイントカードをかざす）"><span data-region="terminal-${r.id}"></span></button></div>
+        <div class="money-io-cust" aria-label="レジ${r.id}の決済端末とスキャナ（お客様側の画面に付いています）">
+          <div class="money-io-boxes">
+            <div data-pay-drop="${r.id}" data-device="terminal"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・クレジットカードをかざす）"><span class="placeholder">決済端末</span></button></div>
+            <div data-pay-drop="${r.id}" data-device="scanner"><button type="button" class="terminal scanner" data-scanner="${r.id}" aria-label="レジ${r.id}のスキャナ（商品・決済用バーコード・ポイントカードを読む）"><span class="placeholder">スキャナ</span></button></div>
+          </div>
         </div>
       </div>
     </section>`,
@@ -502,13 +505,10 @@ function render(): void {
       setRegion(`inlet-${r.id}`, shown ? `<b>${shown.toLocaleString()}円</b>` : `<span class="placeholder">${esc(hint)}</span>`);
     }
     if (terminal) {
-      // 電子マネー・クレジットカードを読むときだけ「決済端末」（青白くゆったり点滅）。それ以外はずっと「スキャナ」（赤く早めに点滅）。
-      // 赤はレジ画面内の「危険・否定」とは別の、周辺機器の演出
-      // かざした直後に決済が終わっても、光が広がり終わるまでは決済端末のまま
+      // 決済端末は、電子マネー・クレジットカードを待っているあいだだけ青白くゆったり明滅する（スキャナは待機中は光らない）。
+      // かざした直後に決済が終わっても、光が広がり終わるまでは待ち受けの見た目のまま
       const reader = (paying && READER_METHODS.has(r.staff.method!)) || partial || tapping || terminal.classList.contains("fx-tap");
       terminal.classList.toggle("reader", reader);
-      terminal.classList.toggle("scanner", !reader);
-      setRegion(`terminal-${r.id}`, `<span class="placeholder">${reader ? "決済端末" : "スキャナ"}</span>`);
     }
   }
   setRegion("bells", bellPanel(snap));
@@ -623,17 +623,14 @@ function qtyKey(key: string, k: string): void {
   frame();
 }
 
-/** 決済端末・スキャナが読み取った瞬間の演出。いまボックスが何として読んでいるか（表示）で決める：
- *  商品のスキャン（レジ画面に商品を入れるのも同じ）と、スキャナ表示のときのバーコード決済・ポイントカード＝赤帯、
- *  決済端末表示のときの電子マネー・クレジットカード＝中心から広がる光。かざしても読まない組み合わせは演出なし */
+/** 読み取った瞬間の演出。読んだ機器のボックスに出す：
+ *  スキャナ＝商品（レジ画面に商品を入れるのも同じ）・決済用バーコード・ポイントカード→赤帯が左から右へ、
+ *  決済端末＝電子マネー・クレジットカード→中心から光が広がる（決済端末が待ち受けているときだけ） */
 function deviceFx(cmd: Command): (() => void) | null {
   if (cmd.type !== "scan" && cmd.type !== "tap_emoney") return null;
-  const el = app.querySelector<HTMLElement>(`[data-terminal="${cmd.register}"]`);
-  if (!el) return null;
-  const reader = el.classList.contains("reader");
-  const scanned = cmd.type === "scan" || (!reader && (cmd.method === "qr" || cmd.method === "points"));
-  const tapped = cmd.type === "tap_emoney" && reader && cmd.method !== "qr" && cmd.method !== "points";
-  if (!scanned && !tapped) return null;
+  const scanned = cmd.type === "scan" || cmd.method === "qr" || cmd.method === "points";
+  const el = app.querySelector<HTMLElement>(scanned ? `[data-scanner="${cmd.register}"]` : `[data-terminal="${cmd.register}"]`);
+  if (!el || (!scanned && !el.classList.contains("reader"))) return null;
   const cls = scanned ? "fx-scan" : "fx-tap";
   return () => {
     el.classList.remove("fx-scan", "fx-tap");
@@ -664,7 +661,9 @@ function send(cmd: Command): boolean {
   }
   // 販売期限切れの品は登録はされるが、一緒に決済できない商品と同じ異常音（ブブッ）を鳴らす
   const expired = cmd.type === "scan" && !!res.message?.includes("販売期限が切れています");
-  if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired ? beepScan : beepError)();
+  // 決済端末（電子マネー・クレジットカード）で払えたら「シャーン！」、スキャナで読んだものはピッ
+  const paidAtTerminal = cmd.type === "tap_emoney" && cmd.method !== "qr" && cmd.method !== "points";
+  if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
   frame();
   fx?.();
   if (res.ok) save();
@@ -1064,6 +1063,11 @@ function setupDrag(): void {
     const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "staff" : "customer"];
     const register = Number(reg);
     const pointsChosen = snap.registers.find((r) => r.id === register)?.customer.method === "points";
+    // 決済端末は電子マネー・クレジットカードだけ、スキャナはバーコード（商品・決済用）とポイントカードだけを読む
+    const device = el.dataset.device;
+    const toScanner = !!d.code || d.wallet === "pay:qr" || d.wallet === "pay:points";
+    if (device === "terminal" && toScanner) return toast("toast-store", "商品・決済用バーコード・ポイントカードは、スキャナにかざしてください", false);
+    if (device === "scanner" && !toScanner && !d.wallet?.startsWith("cash")) return toast("toast-store", "電子マネー・クレジットカードは、決済端末にかざしてください", false);
     if (d.code?.startsWith("PC") && el.dataset.payDrop && pointsChosen) return void send({ type: "tap_emoney", register, method: "points" });
     if (d.code) return void send({ type: "scan", register, side: side as Side, code: d.code });
     const [kind, value] = d.wallet!.split(":");
@@ -1071,7 +1075,7 @@ function setupDrag(): void {
       if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
       send(cashDrop(register, Number(value)));
     } else {
-      if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末・スキャナにかざしてください", false);
+      if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末かスキャナにかざしてください", false);
       send({ type: "tap_emoney", register, method: value as PaymentMethod });
     }
   });
@@ -1236,7 +1240,7 @@ function wireSwipe(): void {
     if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
     const t = e.target as Element;
     if (t.closest("[data-ffforce]")) return;
-    const inlet = t.closest<HTMLElement>("[data-inlet], [data-terminal]");
+    const inlet = t.closest<HTMLElement>("[data-inlet], [data-terminal], [data-scanner]");
     const screen = t.closest(".screen-head, .screen-items") ? null : t.closest<HTMLElement>("[data-drop]");
     if (!inlet && !screen) return;
     cancelLongPress();
@@ -1244,7 +1248,7 @@ function wireSwipe(): void {
       longPress = null;
       swallowClick = true;
       if (inlet) {
-        openPicker(Number(inlet.dataset.inlet ?? inlet.dataset.terminal), inlet.dataset.inlet ? "staff" : "customer", "wallet");
+        openPicker(Number(inlet.dataset.inlet ?? inlet.dataset.terminal ?? inlet.dataset.scanner), inlet.dataset.inlet ? "staff" : "customer", "wallet");
       } else {
         const [reg, side] = screen!.dataset.drop!.split(":");
         openPicker(Number(reg), side as Side, "item");
@@ -1268,7 +1272,7 @@ function wireSwipe(): void {
   );
   window.addEventListener("pointerdown", () => (swallowClick = false), true);
   app.addEventListener("contextmenu", (e) => {
-    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-terminal]")) e.preventDefault();
+    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-terminal], [data-scanner]")) e.preventDefault();
   });
   const dlg = pickerDlg();
   dlg.addEventListener("click", (e) => {

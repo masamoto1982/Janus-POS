@@ -254,6 +254,8 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 .screen .confirm.change-alert { margin: -8px -12px; background: var(--alert-bg); }
 .screen .change-alert .big { color: var(--alert-ink); }
 .screen .change-alert p.small { color: var(--alert-note); }
+/* 電子マネーの残高不足：払えていないことを見落とさないよう、大きなテキストを赤く、さらに大きく（user 2026-11-12）。両画面とも同じ大きさ */
+.screen .emoney-short .big { color: var(--alert-ink); font-size: 28px; }
 /* エマージェンシーモード：通報先の番号は数字の強調（赤・大きく） */
 .screen .sos-tel { display: flex; gap: 24px; justify-content: center; margin: 0; color: var(--alert-ink); font-size: var(--msg-big); font-weight: 700; }
 .screen .sos-tel b { font-size: 32px; font-variant-numeric: tabular-nums; }

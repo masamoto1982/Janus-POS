@@ -675,7 +675,9 @@ function send(cmd: Command): boolean {
   const expired = cmd.type === "scan" && !!res.message?.includes("販売期限が切れています");
   // 決済端末（電子マネー・クレジットカード）で払えたら「シャーン！」、スキャナで読んだものはピッ
   const paidAtTerminal = cmd.type === "tap_emoney" && cmd.method !== "qr" && cmd.method !== "points";
-  if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
+  // 電子マネーの残高不足は払えていないので決済音を鳴らさず異常音（ブブッ）：同じ音だと支払いが済んだと勘違いして退店してしまう
+  const emoneyShort = cmd.type === "tap_emoney" && !!res.message?.startsWith("電子マネーの残高が足りません");
+  if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired && !emoneyShort ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
   frame();
   fx?.();
   if (res.ok) save();

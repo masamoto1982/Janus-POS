@@ -435,12 +435,12 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], issue
     return `<div class="point-screen ticket-wait">
       ${side === "customer" ? msg(`チケット${billN(total)}`, "発券の順番をお待ちください") : msg("チケットの発券待ち", "ほかのレジのチケットのお渡しが済むと発券します")}
     </div>`;
-  if (side === "staff") return `<div class="point-screen ticket-give">${msg("チケットをお客様にお渡ししてください")}</div>`;
+  // 一致すればお渡し完了でこの画面を離れるので、ここに残る入力は一致しなかったもの。両画面に再確認を促す警告を出す
+  const note = received === null ? "" : `<p class="ticket-alert">申込数と受け取り数が一致しません<br>再度ご確認ください</p>`;
+  if (side === "staff") return `<div class="point-screen ticket-give">${msg("チケットをお客様にお渡ししてください")}${note}</div>`;
   const field = rst?.allowed === false
     ? `<button type="button" class="pad-field" disabled>${received ?? ""}</button>`
     : padField(reg, side, "tkr", received === null ? "" : String(received), "", "受け取り枚数");
-  // 一致すればお渡し完了でこの画面を離れるので、ここに残る入力は一致しなかったもの。再確認を促す
-  const note = received === null ? "" : `<p class="ticket-alert">申込数と受け取り数が一致しません<br>再度ご確認ください</p>`;
   return `<div class="point-screen ticket-done">
       ${msg("受け取り枚数をご入力ください")}
       <div class="parcel-fields"><label>${field}<span>枚</span></label></div>

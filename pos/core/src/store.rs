@@ -1011,7 +1011,8 @@ impl Txn {
         self.next_line += 1;
         let touched = self.next_line;
         if let Some(l) = self.lines.iter_mut().max_by_key(|l| l.touched).filter(|l| {
-            l.code == p.code && l.kind == kind && !matches!(kind, LineKind::Service { .. })
+            // 日配食品は一点ずつ販売期限が違うので、続けて読んでもまとめず一行ずつ（期限切れの一点を見分ける）
+            l.code == p.code && l.kind == kind && !matches!(kind, LineKind::Service { .. }) && !p.fresh
         }) {
             l.qty += qty;
             l.touched = touched;

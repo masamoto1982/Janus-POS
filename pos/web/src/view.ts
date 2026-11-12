@@ -152,7 +152,7 @@ function pickupStep(reg: number, p: Pickup, st: ActionState): string {
   const end = { type: "pickup_handover", register: reg };
   if (p.missing) {
     return `<div class="point-screen pickup-step">
-        <p class="pickup-no">${esc(p.no)} <span class="tag warn">見つかりません</span></p>
+        <p class="pickup-no">${esc(p.no)} ${flagSpan("見つかりません")}</p>
         <div class="big">お客様にお詫びし、運送会社へお問い合わせください</div>
         <div class="point-choices">${btn("探し直す", found(null), st, "ghost")}${btn("お受け取りを終える", end, st, "primary")}</div>
       </div>`;
@@ -996,7 +996,7 @@ export function regTop(total: number, count: number, action: string, max = Infin
     pointCard === undefined ? "" : `<span class="point ${pointCard ? "read" : ""}">ポイント：${pointCard ? "読取済" : "未読取"}</span>`;
   const info = point ? `<small class="info">${point}</small>` : "";
   const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
-  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid">${info}<span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${below}</span><span class="action">${action}</span></div>`;
+  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>`;
 }
 
 export function itemCount(lines: { qty: number }[]): number {
@@ -1044,11 +1044,11 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     const staffOp = r.mode === "staff_operated";
     const buttons = staffOp
       ? `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`
-      : `<div class="point-choices">${choice("他の決済を使う", "cancel", "primary")}</div>`;
+      : "";
     return `<div class="point-screen emoney-screen">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
         ${ro ? "" : buttons}
-      </div>${ro || !staffOp ? "" : `<div class="back-foot">${choice("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`}`;
+      </div>${ro ? "" : `<div class="back-foot">${choice("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`}`;
   }
   const e = r.emoney!;
   if (e.kind === "menu") {

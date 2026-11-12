@@ -405,13 +405,17 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
    黄（--call-soft）と並べても浮かない濃さにし、文字は白にする。
    待ち時間で色や速さは変えない（経過時間がお客様にも伝わり、待たされた不満を増やしかねないため） */
 :root { --call-soft: oklch(0.93 0.10 95); --sos-head: oklch(0.6 0.17 29); --sos-head-ink: oklch(1 0 0); }
-.screen-head.calling { --head-call-bg: var(--call-soft); animation: head-call 1s steps(1) infinite; }
-.screen-head.sos { --head-call-bg: var(--sos-head); animation: head-call 1s steps(1) infinite; }
-.screen-head.sos :is(.mode-title, .clock) { animation: sos-ink 1s steps(1) infinite; }
-@keyframes sos-ink { 0% { color: var(--sos-head-ink); } }
-@keyframes head-call { 0% { background: var(--head-call-bg); } 50% { background: var(--head-bg); } }
-@media (prefers-reduced-motion: reduce) { .screen-head:is(.calling, .sos) { animation: none; background: var(--head-call-bg); }
-  .screen-head.sos :is(.mode-title, .clock) { animation: none; color: var(--sos-head-ink); } }
+/* 点滅の拍は画面（.screen.head-blink）に一つだけ持ち、--blink-on（1＝点いている／0＝消えている）として配る。
+   ヘッダーの中身（時計・呼び鈴）は描き直されるので、部品ごとにアニメーションを持つと拍がずれる。
+   ヘッダーの背景・エマージェンシーの白文字・呼び鈴の黄はすべてこの拍で切り替わる */
+@property --blink-on { syntax: "<number>"; inherits: true; initial-value: 0; }
+.screen.head-blink { animation: head-blink 1s steps(1) infinite; }
+@keyframes head-blink { 0% { --blink-on: 1; } 50% { --blink-on: 0; } }
+@media (prefers-reduced-motion: reduce) { .screen.head-blink { animation: none; --blink-on: 1; } }
+.screen-head.calling { --head-call-bg: var(--call-soft); }
+.screen-head.sos { --head-call-bg: var(--sos-head); }
+.screen-head:is(.calling, .sos) { background: color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-bg)); }
+.screen-head.sos :is(.mode-title, .clock) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), currentColor); }
 
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
 @media (max-width: 900px) { .right-col { position: static; max-height: none; } }
@@ -711,6 +715,8 @@ body.dragging .drop-hint { display: inline; }
 .bell-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .screen .bell-btn, .screen .bell-btn:disabled { filter: none !important; opacity: 1 !important; }
 .screen .bell-btn:not(:disabled) { background: var(--bell-bg); color: var(--bell-ink); border: 1.5px solid var(--bell-ring); }
+/* 呼び出し中は呼び鈴の黄もヘッダーと同じ拍で切り替える：ヘッダーが黄のときは同じ黄、ヘッダーが戻るときはやわらかい黄（--alert-bg） */
+.screen.lamp .bell-btn:not(:disabled) { background: color-mix(in oklch, var(--call-soft) calc(var(--blink-on) * 100%), var(--alert-bg)); }
 .screen .bell-btn:disabled { background: var(--off-bg) !important; color: var(--off-ink) !important; border: 1.5px solid var(--border); }
 .bell-btn .bell-svg { width: 62%; height: 62%; display: block; }
 .bell-btn.pressing { transform: translate(1px, 2px); }

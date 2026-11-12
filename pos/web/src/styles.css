@@ -217,7 +217,6 @@ button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
 button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { padding: 4px 10px; }
-.method-list .seg { padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: var(--gap); }
 
@@ -296,6 +295,8 @@ details summary h3 { display: inline; }
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; white-space: nowrap; }
+/* お客様側の支払方法一覧（スタッフ操作モード、表示のみ）はスタッフ側の支払方法ボタンと同じ大きさ（user 2026-11-12） */
+.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: var(--btn-sm-h); padding: 0 6px; font-size: 11px; line-height: 1; white-space: nowrap; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
    （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
 */

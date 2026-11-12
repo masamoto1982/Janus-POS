@@ -547,15 +547,12 @@ const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolea
 export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
 /** 日配食品は数量を増やせない。同じ商品でも一点ずつ販売期限が違うので、一つを読んで数量を増やすと
- *  期限切れの品がお客様に渡ってしまう（ポカヨケ）。「−」「削除」は使え、数字は打ち込めず、「＋」はグレー */
-export const FRESH_ONE_BY_ONE = "日配食品は一点ずつスキャンしてください";
+ *  期限切れの品がお客様に渡ってしまう（ポカヨケ）。続けて読んでも一点ずつ別の行になるので、
+ *  数量の欄は「削除」と数字だけ（サービス商品と同じ固定の形） */
 
 function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: ActionState, remove: Command, fixed = false, fresh = false): string {
   if (!st.allowed) return `${l.qty}`;
-  if (fresh) {
-    const minus = l.qty <= 1 ? btn("削除", remove, st, "small neg") : btn("−", { type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty - 1 }, st, "small neg");
-    return `<span class="qty-step">${minus}<b class="qty-fixed">${l.qty}</b>${btn("＋", { type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + 1 }, { action: st.action, allowed: false, reason: FRESH_ONE_BY_ONE }, "small neg")}</span>`;
-  }
+  if (fresh) return qtyCell(reg, side, l, st, remove, true);
   if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b><i class="qty-pad" aria-hidden="true"></i></span>`;
   const step = (d: number): Command => ({ type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + d });
   const minus = l.qty <= 1 ? btn("削除", remove, st, "small neg") : btn("−", step(-1), st, "small neg");

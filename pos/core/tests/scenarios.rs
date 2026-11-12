@@ -2339,17 +2339,17 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
 #[test]
 fn same_item_merges_only_when_scanned_in_a_row() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", SANDWICH);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "customer", SNACK);
+    scan(&mut s, 1, "customer", SNACK);
+    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "customer", SNACK);
+    scan(&mut s, 1, "customer", SNACK);
+    scan(&mut s, 1, "customer", SNACK);
     let v = reg(&s, 1);
     let mut lines: Vec<_> = v.customer.lines.iter().collect();
     lines.sort_by_key(|l| std::cmp::Reverse(l.touched));
     let rows: Vec<_> = lines.iter().map(|l| (l.name, l.qty)).collect();
-    assert_eq!(rows, [("パン", 3), ("サンドイッチ", 1), ("パン", 2)]);
+    assert_eq!(rows, [("袋菓子", 3), ("ソフトドリンク", 1), ("袋菓子", 2)]);
 }
 
 #[test]
@@ -3828,10 +3828,11 @@ fn fresh_food_quantity_cannot_be_raised_on_screen() {
     let e = run(&mut s, set(2)).unwrap_err();
     assert!(e.contains("日配食品"), "{e}");
     assert!(reg(&s, 1).staff.lines[0].fresh);
-    // スキャンし直せば数量は増える（一点ずつ読む）
+    // 続けて読んでも数量にまとめず、一点ずつ別の行になる
     scan(&mut s, 1, "staff", BREAD);
-    assert_eq!(reg(&s, 1).staff.lines[0].line.qty, 2);
-    ok(&mut s, set(1));
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.lines.len(), 2);
+    assert!(v.staff.lines.iter().all(|l| l.line.qty == 1));
     // 加工食品は数量を変えられる
     scan(&mut s, 1, "staff", SNACK);
     let snack = reg(&s, 1)

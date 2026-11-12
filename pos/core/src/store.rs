@@ -28,9 +28,9 @@ const FF_RECEIVED_SELF: &str =
 /// 日配食品は数量を増やせない。同じ商品でも一点ずつ販売期限が違うので、
 /// 一つを読んで数量を増やすと、期限切れの品がお客様に渡ってしまう（ポカヨケ）
 pub const FRESH_ONE_BY_ONE: &str = "日配食品は数量を増やせません\n一点ずつスキャンしてください";
-const CASH_ONLY: &str = "現金のみの商品（切手・チケット・お支払い）は現金でお支払いください";
+const CASH_ONLY: &str = "現金でお支払いください";
 const NO_CASH_MIX: &str =
-    "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）";
+    "クレジットカード・バーコード決済は現金と併用できません";
 const TICKETS_FIRST: &str = "チケットのお渡しが済むまで、次の取引は始められません";
 const TICKET_ALONE: &str =
     "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）";
@@ -2367,7 +2367,7 @@ impl Store {
                     r.txn.method = Some(PaymentMethod::Cash);
                     let rest = r.txn.due();
                     return done(format!(
-                        "{}で {part}円 お支払いしました\n残り {rest}円（現金のみの商品）を現金でお支払いください",
+                        "{}で {part}円 お支払いしました\n残り {rest}円を現金でお支払いください",
                         method.label()
                     ));
                 }

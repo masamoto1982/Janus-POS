@@ -224,7 +224,7 @@ const COUPON_UNMATCHED: Denial =
 const BILL_UNCHECKED: Denial = "スタッフが公共料金の内容を確認していません";
 const STAMP_UNCHECKED: Denial = "収入印紙の貼り付けが確認できていません";
 const SELF_OP_CASH_ONLY_GOODS: Denial =
-    "切手・チケット・お支払いは現金のみです\nスタッフがお預かりします";
+    "スタッフをお呼びしました";
 const SELF_OP_NO_CASH: Denial =
     "セルフレジでは現金を使えません\n現金はスタッフがお預かりいたします";
 const SELF_OP_CASH_CHOSEN: Denial = "現金はスタッフがお預かりいたします\nスタッフをお呼びしました";

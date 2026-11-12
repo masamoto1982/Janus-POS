@@ -1105,13 +1105,13 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       const buttons = called
         ? ""
         : `<div class="point-choices pair">${choice("チャージまたは\n現金併用", "staff", "ghost")}${choice("他の決済を使う", "cancel", "primary")}</div>`;
-      return `<div class="point-screen emoney-screen">
+      return `<div class="point-screen emoney-screen emoney-short">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>${called ? "<br>スタッフが向かっています" : ""}`)}
         ${ro ? "" : buttons}
       </div>`;
     }
     const buttons = `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`;
-    return `<div class="point-screen emoney-screen">
+    return `<div class="point-screen emoney-screen emoney-short">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
         ${ro ? "" : buttons}
       </div>${ro ? "" : `<div class="back-foot">${choice("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`}`;

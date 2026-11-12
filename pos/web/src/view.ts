@@ -474,8 +474,10 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
 const INSERT_DONE_MS = 30_000;
 
-/** お客様が決済端末にかざすもの（レジ画面にデモ用の「Wallet」という言葉は出さない） */
-const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "バーコード", credit: "クレジットカード", points: "ポイントカード" };
+/** お客様がかざすもの（レジ画面にデモ用の「Wallet」という言葉は出さない） */
+const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "決済用バーコード", credit: "クレジットカード", points: "ポイントカード" };
+/** かざす機器：電子マネー・クレジットカードは決済端末、バーコード・ポイントカードはスキャナ（同じボックスの表示が切り替わる） */
+const TAP_DEVICE = (method: string): string => (method === "emoney" || method === "credit" ? "決済端末" : "スキャナ");
 
 /** 現金のみの商品があるとき：キャッシュレスで払う分と、そのあと現金で払う分 */
 const splitNote = (method: string, cashlessDue: number, due: number): string =>
@@ -488,7 +490,7 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   const guide = inert ? `<p class="guide off">` : `<p class="guide">`;
   if (method && method !== "cash") {
     // スタッフ操作モードのスタッフ側は、キャッシュレスでスタッフのなすべき作業を出す（かざすのはお客様、バーコード決済はスタッフがスキャン）
-    const op = staff ? (method === "qr" ? "決済用バーコードをスキャンしてください" : "お客様に決済端末の位置を案内してください") : `${TAP_THING[method]}を決済端末にかざしてください`;
+    const op = staff ? (method === "qr" ? "決済用バーコードをスキャンしてください" : `お客様に${TAP_DEVICE(method)}の位置を案内してください`) : `${TAP_THING[method]}を${TAP_DEVICE(method)}にかざしてください`;
     const split = cashlessDue < due ? `<br>${splitNote(method, cashlessDue, due)}` : "";
     return `${guide}${op}${split}</p>`;
   }
@@ -507,7 +509,7 @@ function customerPayGuide(method: string, cashlessDue: number, due: number): str
   if (method === "cash") return msg("スタッフが現金をお預かりします");
   const split = cashlessDue < due ? splitNote(method, cashlessDue, due) : "";
   // バーコード決済はスタッフがスキャンするので、お客様には提示をお願いする
-  const big = method === "qr" ? "決済用バーコードをご提示ください" : `${TAP_THING[method]}を決済端末にかざしてください`;
+  const big = method === "qr" ? "決済用バーコードをご提示ください" : `${TAP_THING[method]}を${TAP_DEVICE(method)}にかざしてください`;
   return msg(big, split || (method === "points" ? "ポイントアプリもお使いいただけます" : ""));
 }
 

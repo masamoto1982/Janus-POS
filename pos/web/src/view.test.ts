@@ -131,6 +131,16 @@ describe("view helpers", () => {
     expect(callScreen(r, 6000)).not.toContain("経過");
   });
 
+  it("names the goods, not 現金, for a cash-only call", () => {
+    const r = {
+      staff: { calls: [{ id: 1, register: 1, kind: "cash_only", label: "現金", created_at: 1000, detail: "チケット" }], bell_down: [] },
+      customer: {},
+    } as unknown as RegisterView;
+    const staff = callScreen(r, 6000);
+    expect(staff).toContain("🔔 チケット");
+    expect(staff).not.toContain("現金");
+  });
+
   it("marks the item count when the limit is reached", () => {
     expect(regTop(100, 9, "", 10)).not.toContain("上限");
     expect(regTop(100, 10, "", 10)).toContain("上限");

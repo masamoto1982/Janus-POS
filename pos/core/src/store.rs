@@ -1371,6 +1371,7 @@ impl Register {
                 && !t.point_checked
                 && !(t.age_choice_pending() || t.id_pending()),
             has_coupons: !t.coupons.is_empty(),
+            has_point_card: t.point_card.is_some(),
             coupon_unmatched: t.paying && t.coupon_unmatched(),
             method: t.method,
             customer_turn: t.customer_turn,

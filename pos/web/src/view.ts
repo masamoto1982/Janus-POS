@@ -474,15 +474,24 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
 const INSERT_DONE_MS = 30_000;
 
+/** お客様が決済端末にかざすもの（レジ画面にデモ用の「Wallet」という言葉は出さない） */
+const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "バーコード", credit: "クレジットカード", points: "ポイントカード" };
+
+/** 現金のみの商品があるとき：キャッシュレスで払う分と、そのあと現金で払う分 */
+const splitNote = (method: string, cashlessDue: number, due: number): string =>
+  `${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で`;
+
 /** 支払方法を選んだときの案内。選んだ側には青文字（p.guide）で出す。
  *  inert＝その画面からは操作できない（セルフ操作モードのスタッフ側）。青文字にせず、操作できない部品と同じグレー */
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false, inert = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   const guide = inert ? `<p class="guide off">` : `<p class="guide">`;
-  if (method && method !== "cash" && cashlessDue < due)
-    return `${guide}${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
-  if (method === "points") return `${guide}Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
-  if (method && method !== "cash") return `${guide}Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
+  if (method && method !== "cash") {
+    // スタッフ操作モードのスタッフ側は、キャッシュレスでスタッフのなすべき作業を出す（かざすのはお客様、バーコード決済はスタッフがスキャン）
+    const op = staff ? (method === "qr" ? "決済用バーコードをスキャンしてください" : "お客様に決済端末の位置を案内してください") : `${TAP_THING[method]}を決済端末にかざしてください`;
+    const split = cashlessDue < due ? `<br>${splitNote(method, cashlessDue, due)}` : "";
+    return `${guide}${op}${split}</p>`;
+  }
   if (selfOperated) return "";
   if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
@@ -496,12 +505,11 @@ function payHint(method: string | null, blocker: string | null, inserted: number
  *  お客様が押したボタンの案内ではないので青文字にせず、大きなテキスト／小さなテキストで出す */
 function customerPayGuide(method: string, cashlessDue: number, due: number): string {
   if (method === "cash") return msg("スタッフが現金をお預かりします");
-  const split = cashlessDue < due ? `${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で` : "";
-  return msg(`${TAP_THING[method]}を決済端末にかざしてください`, split || (method === "points" ? "ポイントアプリもお使いいただけます" : ""));
+  const split = cashlessDue < due ? splitNote(method, cashlessDue, due) : "";
+  // バーコード決済はスタッフがスキャンするので、お客様には提示をお願いする
+  const big = method === "qr" ? "決済用バーコードをご提示ください" : `${TAP_THING[method]}を決済端末にかざしてください`;
+  return msg(big, split || (method === "points" ? "ポイントアプリもお使いいただけます" : ""));
 }
-
-/** お客様が決済端末にかざすもの */
-const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "バーコード", credit: "クレジットカード", points: "ポイントカード" };
 
 function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: Gate, cls = "", unavailable: Unavailable[] = [], noCash = false): string {
   if (method === "cash" && inserted) return "";

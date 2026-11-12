@@ -161,7 +161,10 @@ button { touch-action: manipulation; }
 .reg-top .yen { font-size: inherit; font-weight: 400; }
 .reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
-.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { width: var(--btn-md-w); max-width: 100%; height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
+/* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大きさ（user 2026-11-12）。
+   最下段の行（.call-row）は帯の内幅より 8px 広く、大ボタン4つ（最大 116×48）を gap 8px で並べるので、
+   幅＝min(大ボタンの幅, (帯の内幅 + 8px − gap×3) ÷ 4)、高さ＝大ボタンの高さ 48px（帯は 48＋上下8＝64px のまま） */
+.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; width: min(var(--btn-w), (100cqi + 8px - 3 * var(--gap)) / 4); max-width: 100%; height: var(--btn-h); padding: 2px; font-size: 12px; white-space: nowrap; }
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
   .reg-top .mid { --sum-h: 26px; }

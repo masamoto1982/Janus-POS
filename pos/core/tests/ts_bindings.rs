@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use janus_pos_core::{Command, Snapshot};
 use ts_rs::{Config, TypeVisitor, TS};
 
-const HEADER: &str = "// 生成物：手で編集しない（pos/core の型から `npm run gen:types` で作り直す）\n";
+const HEADER: &str =
+    "// 生成物：手で編集しない（pos/core の型から `npm run gen:types` で作り直す）\n";
 
 struct Collect<'a> {
     cfg: &'a Config,

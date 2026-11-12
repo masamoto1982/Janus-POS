@@ -29,8 +29,7 @@ const FF_RECEIVED_SELF: &str =
 /// 一つを読んで数量を増やすと、期限切れの品がお客様に渡ってしまう（ポカヨケ）
 pub const FRESH_ONE_BY_ONE: &str = "日配食品は数量を増やせません\n一点ずつスキャンしてください";
 const CASH_ONLY: &str = "現金のみ取り扱いいたします";
-const NO_CASH_MIX: &str =
-    "クレジットカード・バーコード決済は現金と併用できません";
+const NO_CASH_MIX: &str = "クレジットカード・バーコード決済は現金と併用できません";
 const TICKETS_FIRST: &str = "チケットのお渡しが済むまで、次の取引は始められません";
 const TICKET_ALONE: &str =
     "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）";
@@ -1010,6 +1009,16 @@ impl Txn {
         names.join("・")
     }
 
+    /// 着払いの荷物だけの取引。レジで受け取るお金はない
+    fn collect_only(&self) -> bool {
+        !self.lines.is_empty()
+            && self
+                .lines
+                .iter()
+                .all(|l| l.parcel.as_ref().is_some_and(|p| p.collect))
+            && self.due() == 0
+    }
+
     fn bill_slips(&self) -> u32 {
         self.lines.iter().filter(|l| l.is_bill()).count() as u32
     }
@@ -1761,7 +1770,9 @@ impl Store {
         done(if cash {
             format!("ポイントで {used}円 お支払いしました\n残り {rest}円を現金でお支払いください")
         } else {
-            format!("ポイントで {used}円 お支払いしました\n残り {rest}円のお支払い方法を選んでください")
+            format!(
+                "ポイントで {used}円 お支払いしました\n残り {rest}円のお支払い方法を選んでください"
+            )
         })
     }
 
@@ -2594,7 +2605,9 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 if choice == ShortChoice::Staff {
                     if r.mode != Mode::SelfOperated {
-                        return Err("スタッフ操作モードでは、その場でチャージ・現金併用を選べます".into());
+                        return Err(
+                            "スタッフ操作モードでは、その場でチャージ・現金併用を選べます".into(),
+                        );
                     }
                     self.call_emoney_short(register);
                     return done("スタッフをお呼びしました\nチャージまたは現金併用はスタッフがお手伝いします");
@@ -2958,8 +2971,12 @@ impl Store {
     /// 他の決済を使うならスタッフの無駄足になるため）。スタッフがログインすると、スタッフ操作モードの
     /// 「電子マネーの残高が足りません」（不足額を現金で払う／チャージする）につながる
     fn call_emoney_short(&mut self, register: u8) {
-        if self.reg(register).is_some_and(|r| r.mode == Mode::SelfOperated) {
-            self.calls.raise(register, CallKind::Emoney, self.now, "残高不足");
+        if self
+            .reg(register)
+            .is_some_and(|r| r.mode == Mode::SelfOperated)
+        {
+            self.calls
+                .raise(register, CallKind::Emoney, self.now, "残高不足");
         }
     }
 
@@ -3565,6 +3582,10 @@ impl Store {
             || r.txn.bill_slips() > 0
             || !r.txn.lines.iter().any(Line::earns_points);
         r.txn.customer_turn = r.mode == Mode::SelfOperated;
+        // 着払いの荷物だけなら払う額がないので、決済手段を選ばずにそのまま取引を終える
+        if r.txn.collect_only() {
+            return self.settle(register, PaymentMethod::Cash, 0, Cash::default());
+        }
         let ready = r.staff_state() == StaffState::Ready;
         let pending = r.txn.age_choice_pending();
         let mode = r.mode;
@@ -3863,7 +3884,12 @@ impl Store {
             .find_map(|l| l.pickup.as_ref())
             .map(|p| p.no.clone());
         // ポイントで払い切ったときも、その分にはポイントを付けない
-        let points_used = txn.points_used() + if method == PaymentMethod::Points { due } else { 0 };
+        let points_used = txn.points_used()
+            + if method == PaymentMethod::Points {
+                due
+            } else {
+                0
+            };
         let earned = if txn.point_card.is_some() {
             txn.point_eligible().saturating_sub(points_used) / YEN_PER_POINT
         } else {
@@ -3883,6 +3909,7 @@ impl Store {
                 (Some(PaymentMethod::Emoney), _) => "電子マネー・現金",
                 (Some(PaymentMethod::Qr), _) => "バーコード決済・現金",
                 (Some(PaymentMethod::Credit), _) => "クレジットカード・現金",
+                _ if txn.collect_only() => "着払い",
                 _ => method.label(),
             },
             paid,
@@ -4387,7 +4414,9 @@ impl Store {
             .into_iter()
             .filter_map(|m| {
                 let empty = m == PaymentMethod::Points
-                    && t.point_card.as_deref().is_some_and(|no| self.point_balance(no) == 0);
+                    && t.point_card
+                        .as_deref()
+                        .is_some_and(|no| self.point_balance(no) == 0);
                 t.method_refusal(m)
                     .or(empty.then_some(NO_POINT_BALANCE))
                     .map(|reason| Unavailable { method: m, reason })

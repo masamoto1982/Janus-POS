@@ -584,6 +584,82 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
 }
 
 #[test]
+fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL_COLLECT);
+    login_as(&mut s, 2, "ST001");
+    let id = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    // 次の荷物を尋ねているあいだは会計できない
+    assert!(run(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":false}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    );
+    let v = reg(&s, 2);
+    assert!(v.staff.lines.is_empty(), "取引はもう終わっている");
+    let rc = v.last_receipt.unwrap();
+    assert_eq!((rc.total, rc.paid, rc.change_total), (0, 0, 0));
+    assert_eq!(rc.method, "着払い");
+}
+
+#[test]
+fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL);
+    login_as(&mut s, 2, "ST001");
+    let id = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":false}),
+    );
+    scan(&mut s, 2, "staff", PARCEL_COLLECT);
+    let id2 = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id2,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id2,"postal":"1000001"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_next","register":2,"more":false}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    );
+    let v = reg(&s, 2);
+    assert_eq!(v.staff.lines.len(), 2, "発払いの分を払うまで取引は続く");
+    assert!(v.last_receipt.is_none());
+}
+
+#[test]
 fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 2, "customer", PARCEL);

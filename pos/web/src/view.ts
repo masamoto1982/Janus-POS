@@ -685,8 +685,9 @@ function elapsed(calls: { kind: string; created_at: number }[], now: number, bef
 
 export function callScreen(r: RegisterView, now: number): string {
   const v = r.staff;
-  const kinds = [...new Set(v.calls.map((c) => CALL_SHORT[c.kind] ?? c.label))];
-  const details = [...new Set(v.calls.filter((c) => c.kind !== "bill").map((c) => c.detail).filter(Boolean))];
+  // 現金のみの商品の呼び出しは「現金」ではなく商品名（チケット・切手など）を理由に出す
+  const kinds = [...new Set(v.calls.map((c) => (c.kind === "cash_only" && c.detail ? c.detail : CALL_SHORT[c.kind] ?? c.label)))];
+  const details = [...new Set(v.calls.filter((c) => c.kind !== "bill" && c.kind !== "cash_only").map((c) => c.detail).filter(Boolean))];
   const bill = v.calls.find((c) => c.kind === "bill");
   return `<div class="call-screen">
       <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>

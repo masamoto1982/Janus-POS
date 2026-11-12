@@ -1189,6 +1189,7 @@ impl Txn {
             stamped: false,
             parcel: p.parcel_send.then(|| Parcel {
                 collect: p.parcel_collect,
+                multi: p.parcel_multi,
                 ..Parcel::default()
             }),
             pickup: None,
@@ -1975,7 +1976,12 @@ impl Store {
                 let now = self.now;
                 let r = self.reg_mut(register)?;
                 r.txn.lines.retain(|l| l.id != line_id);
-                r.txn.parcel_ask = r.txn.lines.iter().any(|l| l.is_parcel());
+                // 複数口の続きをやめたときは、同じお届け先の荷物を尋ねる画面に戻る
+                r.txn.parcel_ask = r
+                    .txn
+                    .lines
+                    .iter()
+                    .any(|l| l.parcel.as_ref().is_some_and(|p| p.multi && p.postal.is_some()));
                 if !r.txn.service_pending() {
                     self.calls.resolve(register, CallKind::Service, now);
                 }
@@ -2950,6 +2956,7 @@ impl Store {
         pc.region = Some(region.label());
         pc.fee = fee;
         let charge = if pc.collect { 0 } else { fee };
+        let multi = pc.multi;
         let now = self.now;
         let r = self.reg_mut(register)?;
         if let Some(l) = r.txn.lines.iter_mut().find(|l| l.id == line_id) {
@@ -2959,7 +2966,8 @@ impl Store {
                 confirm_pending: false,
             };
         }
-        r.txn.parcel_ask = true;
+        // 複数口の伝票だけ、同じお届け先の荷物があるか尋ねる。ほかは伝票ごとに受付が済む
+        r.txn.parcel_ask = multi;
         if !r.txn.service_pending() {
             self.calls.resolve(register, CallKind::Service, now);
         }

@@ -183,7 +183,7 @@ struct SavedTxn {
     age_method: Option<AgeMethod>,
     verified_age: Option<u8>,
     #[serde(default)]
-    age_lines: Vec<u32>,
+    age_done: Vec<u8>,
     #[serde(default)]
     age_early: bool,
     confiscated: Vec<(String, u32)>,
@@ -324,7 +324,7 @@ impl SavedTxn {
                 .collect(),
             age_method: t.age_method,
             verified_age: t.verified_age,
-            age_lines: t.age_lines.clone(),
+            age_done: t.age_done.clone(),
             age_early: t.age_early,
             confiscated: named(&t.confiscated),
             ff_collect: named(&t.ff_collect),
@@ -374,7 +374,7 @@ impl SavedTxn {
                 .collect(),
             age_method: self.age_method,
             verified_age: self.verified_age,
-            age_lines: self.age_lines,
+            age_done: self.age_done,
             age_early: self.age_early,
             confiscated: unnamed(self.confiscated),
             ff_collect: unnamed(self.ff_collect),

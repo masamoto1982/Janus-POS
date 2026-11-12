@@ -733,8 +733,9 @@ struct Txn {
     returned: Vec<(&'static str, bool)>,
     age_method: Option<AgeMethod>,
     verified_age: Option<u8>,
-    /// 年齢確認を済ませた時点の年確商品の明細。あとから年確商品が加わったら確認をやり直す
-    age_lines: Vec<u32>,
+    /// 確認を済ませた年確の年齢（20・18 など）。同じ年齢の年確商品があとから加わっても
+    /// やり直さず、まだ確認していない年齢の年確商品が加わったときだけやり直す
+    age_done: Vec<u8>,
     /// スタッフが登録の途中で年齢確認を始めた
     age_early: bool,
     confiscated: Vec<(&'static str, u32)>,
@@ -966,12 +967,33 @@ impl Txn {
             && self.age_method == Some(AgeMethod::Id)
     }
 
-    fn age_line_ids(&self, rules: &AgeRules) -> Vec<u32> {
-        self.lines
+    fn line_ages(&self, rules: &AgeRules) -> Vec<u8> {
+        let mut ages: Vec<u8> = self
+            .lines
             .iter()
-            .filter(|l| rules.age_for(l.code, l.category).is_some())
-            .map(|l| l.id)
-            .collect()
+            .filter_map(|l| rules.age_for(l.code, l.category))
+            .collect();
+        ages.sort_unstable();
+        ages.dedup();
+        ages
+    }
+
+    /// 確認を済ませた年齢に、いま明細にある年確の年齢を加える
+    fn mark_ages_done(&mut self, rules: &AgeRules) {
+        for a in self.line_ages(rules) {
+            if !self.age_done.contains(&a) {
+                self.age_done.push(a);
+            }
+        }
+    }
+
+    /// 求める年齢：まだ確認していない年齢があればそのうち最も高いもの、なければ明細の最も高いもの
+    fn age_to_check(&self, rules: &AgeRules) -> Option<u8> {
+        self.line_ages(rules)
+            .into_iter()
+            .filter(|a| !self.age_done.contains(a))
+            .max()
+            .or_else(|| self.max_age(rules))
     }
 
     fn max_age(&self, rules: &AgeRules) -> Option<u8> {
@@ -982,13 +1004,13 @@ impl Txn {
     }
 
     fn age_unchecked(&self, rules: &AgeRules) -> bool {
-        self.age_line_ids(rules)
+        self.line_ages(rules)
             .iter()
-            .any(|id| !self.age_lines.contains(id))
+            .any(|a| !self.age_done.contains(a))
     }
 
-    fn line_age_checked(&self, id: u32) -> bool {
-        self.verified_age.is_some() && self.age_lines.contains(&id)
+    fn line_age_checked(&self, age: Option<u8>) -> bool {
+        age.is_some_and(|a| self.age_done.contains(&a))
     }
 
     fn coupon_unmatched(&self) -> bool {
@@ -1012,7 +1034,10 @@ impl Txn {
         let touched = self.next_line;
         if let Some(l) = self.lines.iter_mut().max_by_key(|l| l.touched).filter(|l| {
             // 日配食品は一点ずつ販売期限が違うので、続けて読んでもまとめず一行ずつ（期限切れの一点を見分ける）
-            l.code == p.code && l.kind == kind && !matches!(kind, LineKind::Service { .. }) && !p.fresh
+            l.code == p.code
+                && l.kind == kind
+                && !matches!(kind, LineKind::Service { .. })
+                && !p.fresh
         }) {
             l.qty += qty;
             l.touched = touched;
@@ -2014,11 +2039,11 @@ impl Store {
                     r.txn.age_method = Some(AgeMethod::Id);
                     done("身分証の生年月日を入力してください")
                 } else {
-                    r.txn.required_age = r.txn.max_age(rules);
+                    r.txn.required_age = r.txn.age_to_check(rules);
                     let age = r.txn.required_age.unwrap_or(0);
                     r.txn.age_method = Some(AgeMethod::Skip);
                     r.txn.verified_age = r.txn.required_age;
-                    r.txn.age_lines = r.txn.age_line_ids(rules);
+                    r.txn.mark_ages_done(rules);
                     r.txn.age_early = false;
                     done(format!("{age}歳以上の年齢確認を省略しました"))
                 }
@@ -2040,7 +2065,7 @@ impl Store {
                     r.txn.age_method = None;
                     return done("登録画面に戻りました");
                 }
-                let age = r.txn.max_age(rules);
+                let age = r.txn.age_to_check(rules);
                 r.txn.required_age = age;
                 r.txn.verified_age = None;
                 r.txn.age_method = None;
@@ -3232,8 +3257,8 @@ impl Store {
             keep
         });
         r.txn.verified_age = Some(age);
-        r.txn.required_age = r.txn.max_age(rules);
-        r.txn.age_lines = r.txn.age_line_ids(rules);
+        r.txn.mark_ages_done(rules);
+        r.txn.required_age = r.txn.age_to_check(rules);
         r.txn.age_early = false;
         if r.txn.lines.is_empty() {
             r.txn.paying = false;
@@ -3260,7 +3285,7 @@ impl Store {
             .iter_mut()
             .find(|r| r.id == register)
             .ok_or("レジがありません")?;
-        let age = r.txn.max_age(rules);
+        let age = r.txn.age_to_check(rules);
         r.txn.paying = true;
         r.txn.age_early = false;
         r.txn.required_age = age;
@@ -3917,7 +3942,7 @@ impl Store {
                 line: l.clone(),
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
-                age_checked: t.line_age_checked(l.id),
+                age_checked: t.line_age_checked(self.age_rules.age_for(l.code, l.category)),
                 limit: self.age_rules.limit_for(l.code),
                 fresh: l.is_fresh(),
                 expired: l.is_expired(),
@@ -3937,7 +3962,7 @@ impl Store {
                 ff_base: l.ff_base,
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
-                age_checked: t.line_age_checked(l.id),
+                age_checked: t.line_age_checked(self.age_rules.age_for(l.code, l.category)),
                 limit: self.age_rules.limit_for(l.code),
                 cash_only: l.cash_only,
                 pickup: l.is_pickup(),

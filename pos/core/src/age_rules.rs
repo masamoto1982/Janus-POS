@@ -71,7 +71,7 @@ impl Default for AgeRules {
         for p in catalog::CATALOG {
             let age = match p.category {
                 Category::SmokingGoods => 20,
-                Category::AdultBook | Category::AdultGoods => 18,
+                Category::AdultBook | Category::AdultGoods | Category::Fireworks => 18,
                 _ => continue,
             };
             r.push(

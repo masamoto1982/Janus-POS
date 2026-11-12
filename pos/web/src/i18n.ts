@@ -273,7 +273,7 @@ const DICT: Record<string, string> = {
   印紙貼付前: "Stamp needed",
   印紙: "Stamp",
   たばこカートン: "Cigarette carton",
-  USBメモリ: "USB flash drive",
+  花火: "Fireworks",
   化粧品: "Cosmetics",
   レシート: "Receipt",
   "金額（税抜）": "Amount (excl. tax)",

@@ -1642,12 +1642,12 @@ fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
 #[test]
 fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
     let mut s = Store::new(1, 2, 1);
-    // USBメモリ 1,980円×28＝55,440円（税抜 50,400円）
-    scan(&mut s, 1, "customer", "4910000000052");
+    // 化粧品 2,200円×25＝55,000円（税抜 50,000円）
+    scan(&mut s, 1, "customer", "4910000000069");
     let id = reg(&s, 1).customer.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":28}),
+        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":25}),
     );
     ok(
         &mut s,
@@ -1662,7 +1662,7 @@ fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
         &mut s,
         json!({"type":"tap_emoney","register":1,"method":"qr"}),
     );
-    assert_eq!(reg(&s, 1).receipt_stamp.map(|r| r.base), Some(50_400));
+    assert_eq!(reg(&s, 1).receipt_stamp.map(|r| r.base), Some(50_000));
     assert!(s
         .snapshot()
         .calls
@@ -3914,4 +3914,70 @@ fn self_operated_expired_scan_calls_staff() {
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Expired));
+}
+
+const CARTON: &str = "4900000000158";
+const FIREWORKS: &str = "4910000000076";
+
+#[test]
+fn goods_needing_an_age_already_checked_do_not_redo_the_check() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", LIGHTER);
+    ok(
+        &mut s,
+        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+    );
+    no_id_check(&mut s, 1);
+    scan(&mut s, 1, "staff", CARTON);
+    let v = reg(&s, 1);
+    assert!(
+        v.staff.lines.iter().all(|l| l.age_checked),
+        "20 is already checked"
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    assert!(
+        !reg(&s, 1).staff.age_choice_pending,
+        "a carton after a lighter (both 20) does not redo the check"
+    );
+}
+
+#[test]
+fn an_18_item_after_a_20_check_redoes_the_check_for_18() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BEER);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    no_id_check(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+    );
+    scan(&mut s, 1, "staff", FIREWORKS);
+    let v = reg(&s, 1);
+    let fw = v.staff.lines.iter().find(|l| l.age == Some(18)).unwrap();
+    assert!(!fw.age_checked);
+    assert!(
+        v.staff
+            .lines
+            .iter()
+            .find(|l| l.age == Some(20))
+            .unwrap()
+            .age_checked
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.staff.age_choice_pending);
+    assert_eq!(v.staff.required_age, Some(18));
+    no_id_check(&mut s, 1);
+    assert!(reg(&s, 1).staff.lines.iter().all(|l| l.age_checked));
 }

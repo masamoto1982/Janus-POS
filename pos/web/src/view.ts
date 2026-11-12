@@ -1119,7 +1119,7 @@ function cashBackNote(side: Side, amount: number): string {
 function cashOnlyNote(r: RegisterView): string {
   if (!r.cash_only || r.prepaid) return "";
   return r.cashless_due
-    ? `<p>切手・チケット・お支払いの <b>${yen(r.cash_only)}</b> は現金のみ（併用できるのは電子マネー）</p>`
+    ? `<p>うち <b>${yen(r.cash_only)}</b> は現金でお支払いください</p>`
     : `<p>${CASH_ONLY_NOTE}</p>`;
 }
 

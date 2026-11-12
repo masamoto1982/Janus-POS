@@ -452,7 +452,6 @@ const DICT: Record<string, string> = {
   ポイントカードの確認が済んでいません: "Point card has not been checked",
   ポイントカードの確認は済んでいます: "Point card already checked",
   スタッフが公共料金の内容を確認していません: "Staff has not checked the bills",
-  "切手・チケット・お支払いは現金のみです": "Stamps, tickets and bills are cash only",
   スタッフがお預かりします: "Staff will take your cash",
   セルフレジでは現金を使えません: "Cash can't be used at self checkout",
   "ほかの支払方法を選ぶか、スタッフをお呼びください": "Choose another method or call a staff member",
@@ -484,8 +483,7 @@ const DICT: Record<string, string> = {
   "現金が投入済みです": "Cash has been inserted",
   "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）":
     "No items can be paid with points (not parcels, COD, bills, tickets, stamps or tobacco)",
-  "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）":
-    "Credit card and barcode pay can't be combined with cash (stamps, tickets and bills are cash only)",
+  クレジットカード・バーコード決済は現金と併用できません: "Credit card and barcode pay can't be combined with cash",
   "このレジは休止中です（スタッフバーコードで再開）": "This register is closed (scan a staff barcode to reopen)",
   店舗メニューはログインしたスタッフだけが使えます: "Only logged-in staff can use the store menu",
   取引中は店舗メニューを開けません: "The store menu can't be opened during a transaction",
@@ -679,7 +677,7 @@ const HTML_RULES: HtmlRule[] = [
   [/^(.+?)で (.+?) お支払い済み、残り <b>(.+?)<\/b> を現金で$/, (m) => `${yenify(m[2])} paid by ${t(m[1]).toLowerCase()}. Please pay the remaining <b>${yenify(m[3])}</b> in cash`],
   [/^現金 <b>(.+?)<\/b> を出金ボックスからお返しください$/, (m) => `Return <b>${yenify(m[1])}</b> in cash from the outlet`],
   [/^現金 <b>(.+?)<\/b> をお返しします$/, (m) => `We'll return <b>${yenify(m[1])}</b> in cash`],
-  [/^切手・チケット・お支払いの <b>(.+?)<\/b> は現金のみ（併用できるのは電子マネー）$/, (m) => `Stamps, tickets and bills (<b>${yenify(m[1])}</b>) are cash only (only e-money can be combined)`],
+  [/^うち <b>(.+?)<\/b> は現金でお支払いください$/, (m) => `Please pay <b>${yenify(m[1])}</b> of this in cash`],
   [
     /^(.+?)で <b>(.+?)<\/b>、切手・チケット・お支払いの <b>(.+?)<\/b> はそのあと現金で$/,
     (m) => `<b>${yenify(m[2])}</b> by ${t(m[1]).toLowerCase()}, then stamps, tickets and bills (<b>${yenify(m[3])}</b>) in cash`,

@@ -30,7 +30,7 @@ const FF_RECEIVED_SELF: &str =
 pub const FRESH_ONE_BY_ONE: &str = "日配食品は数量を増やせません\n一点ずつスキャンしてください";
 const CASH_ONLY: &str = "現金でお支払いください";
 const NO_CASH_MIX: &str =
-    "クレジットカード・バーコード決済は現金と併用できません（切手・チケット・お支払いは現金のみ）";
+    "クレジットカード・バーコード決済は現金と併用できません";
 const TICKETS_FIRST: &str = "チケットのお渡しが済むまで、次の取引は始められません";
 const TICKET_ALONE: &str =
     "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）";

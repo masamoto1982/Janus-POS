@@ -3006,7 +3006,7 @@ impl Store {
                 }
                 r.txn.push(p, 1, LineKind::Item, tax);
                 if p.expired() {
-                    // 販売期限切れ：明細に「期限切れ」のフラグを出し、取り消すまでお会計に進めない
+                    // 販売期限切れ：明細に「期限切れ」のフラグを出し、回収（取り消す）までお会計に進めない
                     if r.staff_state() != StaffState::Ready {
                         self.calls.raise(register, CallKind::Expired, now, p.name);
                         return done(format!(
@@ -3015,7 +3015,7 @@ impl Store {
                         ));
                     }
                     return done(format!(
-                        "{}は販売期限が切れています\n新しい商品とお取り替えください{back}",
+                        "{}は販売期限が切れています\n販売期限切れ商品を回収してください{back}",
                         p.name
                     ));
                 }
@@ -4070,7 +4070,7 @@ pub struct StaffLine {
     pub limit: Option<u32>,
     /// 日配食品（数量を増やせない）
     pub fresh: bool,
-    /// 販売期限切れ（取り消すまでお会計に進めない）
+    /// 販売期限切れ（回収（取り消す）までお会計に進めない）
     pub expired: bool,
     /// 販売期限・賞味期限（いまからの分）
     pub dates: Option<catalog::Dates>,

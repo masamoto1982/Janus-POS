@@ -221,12 +221,12 @@ function expiredFlag(reg: number, side: Side, l: { expired: boolean }, operable:
 
 /** 販売期限切れの案内。期限切れの品はレジを通るたびに一点ずつ出てくるので、表にせず直近の一点だけを、
  *  ほかの案内画面と同じく縦横中央の二行（大きなテキスト・小さなテキスト）で出す。
- *  操作できる側には「取り消す」と左下のバック、お客様が見るだけの側は案内だけ */
+ *  操作できる側には「回収しました」と左下のバック、お客様が見るだけの側は案内だけ */
 function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: ActionState | null, staff: boolean): string {
   const l = lines.filter((x) => x.expired).sort((a, b) => b.touched - a.touched)[0];
   if (!l) return "";
-  const sub = staff ? "お客様にお詫びし、売場の新しい商品とお取り替えください" : "申し訳ございません、店員が新しい商品にお取替えいたします";
-  const choices = st ? `<div class="point-choices">${btn("取り消す", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary")}</div>` : "";
+  const sub = staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "申し訳ございません、店員が新しい商品にお取替えいたします";
+  const choices = st ? `<div class="point-choices">${btn("回収しました", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary")}</div>` : "";
   const back = st ? `<div class="back-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>` : "";
   return `<div class="point-screen pair-note expired-screen">${msg(esc(`${l.name}の販売期限が切れています`), esc(sub))}${choices}</div>${back}`;
 }

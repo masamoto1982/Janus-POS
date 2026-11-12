@@ -160,7 +160,6 @@ const DICT: Record<string, string> = {
   "お預かりした現金を入金ボックスに入れるか、支払方法を選んでください": "Put the received cash in the inlet or choose a payment method",
   "お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください": "Put the received cash in the inlet and press \"Done\"",
   スタッフが現金をお預かりします: "Staff will take your cash",
-  "現金のみの商品（切手・チケット・お支払い）は現金でお支払いください": "Please pay for cash-only items (stamps, tickets, bills) in cash",
   投入おわり: "Done",
   お金を入れてください: "Please insert money",
   ありがとうございました: "Thank you",

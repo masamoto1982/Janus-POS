@@ -46,6 +46,9 @@ struct Saved {
     audit: Vec<SavedAudit>,
     receipts: u32,
     emoney_balance: u32,
+    /// ポイントカードの残高（なければシミュレーターの初期値）
+    #[serde(default)]
+    point_balances: Option<Vec<(String, u32)>>,
     /// チケットの発券の列（先頭のレジだけが発券済み）
     #[serde(default)]
     ticket_queue: Vec<u8>,
@@ -167,6 +170,10 @@ struct SavedReceipt {
     items: u32,
     point_card: Option<String>,
     points: u32,
+    #[serde(default)]
+    points_used: u32,
+    #[serde(default)]
+    point_balance: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -411,6 +418,8 @@ impl SavedRegister {
                 items: rc.items,
                 point_card: rc.point_card.clone(),
                 points: rc.points,
+                points_used: rc.points_used,
+                point_balance: rc.point_balance,
             }),
             bill_handover: r.bill_handover,
             pickup_handover: r.pickup_handover.clone(),
@@ -459,6 +468,8 @@ impl SavedRegister {
                 items: rc.items,
                 point_card: rc.point_card,
                 points: rc.points,
+                points_used: rc.points_used,
+                point_balance: rc.point_balance,
             }),
             bill_handover: self.bill_handover,
             pickup_handover: self.pickup_handover,
@@ -584,6 +595,7 @@ impl Store {
                 .collect(),
             receipts: self.receipts,
             emoney_balance: self.emoney_balance,
+            point_balances: Some(self.point_balances.clone()),
             ticket_queue: self.ticket_queue.iter().copied().collect(),
         };
         serde_json::to_string(&saved).expect("saved state is always serializable")
@@ -702,6 +714,7 @@ impl Store {
             presses: s.presses,
             receipts: s.receipts,
             emoney_balance: s.emoney_balance,
+            point_balances: s.point_balances.unwrap_or_else(super::initial_point_balances),
             ticket_queue: s.ticket_queue.into_iter().collect(),
         };
         store.issue_next_tickets();

@@ -22,6 +22,9 @@ describe("screen language", () => {
     expect(trCore("20歳以上の年齢確認をしますか？")).toBe("Check age (20+)?");
     expect(trCore("クレジットカードを決済端末にかざしてください")).toBe("Hold your credit card over the payment terminal");
     expect(trCore("電子マネーの残高が足りません\nどうするか選んでください")).toBe("Not enough e-money balance\nPlease choose what to do");
+    expect(trCore("ポイント 1,250P（今回 +3P）")).toBe("Points 1,250P (+3P this time)");
+    expect(trCore("ご利用 80P、付与 2P、ポイント残高 2P")).toBe("Used 80P, earned 2P, point balance 2P");
+    expect(trCore("付与 3P、ポイント残高 1,253P")).toBe("Earned 3P, point balance 1,253P");
   });
 
   it("keeps surrounding spaces and leaves unknown text as is", () => {

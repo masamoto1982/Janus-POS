@@ -509,6 +509,7 @@ body.dragging .drop-hint { display: inline; }
 .pickup-no { font-size: 26px; font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.points-amount { align-items: center; }
 /* 空のときも数字が入ったときと同じ高さ（空だと潰れて見えるため） */
 .parcel-fields button.pad-field { box-sizing: border-box; width: 84px; height: 40px; font-size: 18px; padding: 6px 8px; }
 .parcel-entry button.parcel-post { justify-content: center; height: auto; min-height: 1.6em; width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }

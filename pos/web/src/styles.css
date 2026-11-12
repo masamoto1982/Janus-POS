@@ -490,6 +490,8 @@ body.dragging .drop-hint { display: inline; }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
 /* ボタン操作で出すガイダンス（案内ボタン・支払方法の選択）は青文字（濃いグレーを青のランプで青にする） */
 .screen p.guide { filter: url(#ramp); }
+/* 操作できない画面（セルフ操作モードのスタッフ側）の案内は青にせず、操作できない部品と同じグレー */
+.screen p.guide.off { filter: grayscale(1); color: var(--off-ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
 .screen.inactive [data-region] select, .screen.inactive [data-region] summary {
   pointer-events: none;

@@ -474,20 +474,34 @@ const firstOf = (cards: string[]): string => cards.find((c) => c) ?? "";
 
 const INSERT_DONE_MS = 30_000;
 
-function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false): string {
+/** 支払方法を選んだときの案内。選んだ側には青文字（p.guide）で出す。
+ *  inert＝その画面からは操作できない（セルフ操作モードのスタッフ側）。青文字にせず、操作できない部品と同じグレー */
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false, inert = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
+  const guide = inert ? `<p class="guide off">` : `<p class="guide">`;
   if (method && method !== "cash" && cashlessDue < due)
-    return `<p class="guide">${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
-  if (method === "points") return `<p class="guide">Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
-  if (method && method !== "cash") return `<p class="guide">Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
+    return `${guide}${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で</p>`;
+  if (method === "points") return `${guide}Wallet のポイントカードかポイントアプリを、決済端末にかざしてください</p>`;
+  if (method && method !== "cash") return `${guide}Wallet の${METHOD_LABEL[method]}を、決済端末にかざしてください</p>`;
   if (selfOperated) return "";
   if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
   if (inserted) return staff ? `<p>${sec}秒の無操作で、お支払いを確定します</p>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
-  if (method === "cash" && staff) return `<p class="guide">お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
-  if (method === "cash") return `<p class="guide">スタッフが現金をお預かりします</p>`;
+  if (method === "cash" && staff) return `${guide}お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
+  if (method === "cash") return `${guide}スタッフが現金をお預かりします</p>`;
   return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
 }
+
+/** スタッフ操作モードのお客様側：スタッフが支払方法を選んだら、その決済の操作を案内する。
+ *  お客様が押したボタンの案内ではないので青文字にせず、大きなテキスト／小さなテキストで出す */
+function customerPayGuide(method: string, cashlessDue: number, due: number): string {
+  if (method === "cash") return msg("スタッフが現金をお預かりします");
+  const split = cashlessDue < due ? `${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で` : "";
+  return msg(`${TAP_THING[method]}を決済端末にかざしてください`, split || (method === "points" ? "ポイントアプリもお使いいただけます" : ""));
+}
+
+/** お客様が決済端末にかざすもの */
+const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "バーコード", credit: "クレジットカード", points: "ポイントカード" };
 
 function methodRow(reg: number, side: Side, method: string | null, inserted: number, st: Gate, cls = "", unavailable: Unavailable[] = [], noCash = false): string {
   if (method === "cash" && inserted) return "";
@@ -873,8 +887,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const pay = payStage
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
-        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r)}
+        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : v.method ? "" : methodList(v.method, v.inserted, r.unavailable)}
+        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : side === "customer" && v.method && !v.inserted && !v.payment_blocker ? customerPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r)}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -1346,7 +1360,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying")
     return screen(`<div class="paybox pay-stage">
         <div class="big">お支払い方法を選択してください</div>
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true)}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : r.cash_only && !c.method && !c.inserted && !c.payment_blocker ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true, side === "staff")}
       </div>${cashCorner(reg, side, c.method, a("select_payment"))}`);
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));

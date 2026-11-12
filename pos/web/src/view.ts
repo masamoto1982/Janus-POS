@@ -307,7 +307,7 @@ function parcelAsk(reg: number, lines: StaffLine[], st: Gate): string {
   const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
   const p = last?.parcel;
   return `<div class="point-screen parcel-ask">
-      ${msg("次の荷物はありますか？", p && last ? `${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b class="parcel-fee">${p.collect ? "着払い" : yen(last.amount)}</b>` : "")}
+      ${msg("同じお届け先の荷物はありますか？", p && last ? `${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b class="parcel-fee">${p.collect ? "着払い" : yen(last.amount)}</b>` : "")}
       <div class="point-choices">
         ${btn("ある", { type: "parcel_next", register: reg, more: true }, st)}
         ${btn("ない", { type: "parcel_next", register: reg, more: false }, st, "primary")}
@@ -964,7 +964,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
         ? parcelStep(reg, parcel, a("complete_service"), v.lines.filter((l) => l.parcel).length)
         : parcelNote(reg, parcel),
     );
-  if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("ほかにお送りする荷物はございますか？"));
+  if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("同じお届け先にお送りする荷物はございますか？"));
   const slips = v.bills.length;
   if (paying && slips && v.bill_unchecked)
     return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "スタッフが払込票を確認しています"));

@@ -216,7 +216,7 @@ impl Context {
 pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
-const PARCEL_ASK: Denial = "次の荷物があるか選んでください";
+const PARCEL_ASK: Denial = "同じお届け先の荷物があるか選んでください";
 pub const EXPIRED: Denial = "販売期限切れの商品があります\n取り消してから、お会計に進んでください";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
 const COUPON_UNMATCHED: Denial =
@@ -437,7 +437,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
         Action::CheckFf => check_ff(c),
         Action::CompleteService => require(c.service_pending, "受付待ちのサービス商品はありません"),
-        Action::ParcelNext => require(c.parcel_ask, "次の荷物をお尋ねする場面ではありません"),
+        Action::ParcelNext => require(c.parcel_ask, "同じお届け先の荷物をお尋ねする場面ではありません"),
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")

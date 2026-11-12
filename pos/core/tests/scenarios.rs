@@ -548,15 +548,16 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
         json!({"type":"parcel_next","register":2,"more":true}),
     );
     let id2 = pending_parcel(&s, 2);
+    // 複数口：同じお届け先なので、サイズを決めるだけで受付が済む
     ok(
         &mut s,
         json!({"type":"parcel_size","register":2,"line_id":id2,"sum_cm":58,"weight_g":1500}),
     );
-    ok(
-        &mut s,
-        json!({"type":"parcel_postal","register":2,"line_id":id2,"postal":"1000001"}),
-    );
+    assert!(reg(&s, 2).staff.parcel_ask);
     assert!(pc(&s, 1).collect);
+    assert_eq!(pc(&s, 1).postal, pc(&s, 0).postal);
+    assert_eq!(pc(&s, 1).fee, 940);
+    assert_ne!(pc(&s, 1).slip, pc(&s, 0).slip);
     let slip = pc(&s, 0).slip.replace('-', "");
     assert_eq!(slip.len(), 12);
     assert!(run(
@@ -616,6 +617,36 @@ fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
     let rc = v.last_receipt.unwrap();
     assert_eq!((rc.total, rc.paid, rc.change_total), (0, 0, 0));
     assert_eq!(rc.method, "着払い");
+}
+
+#[test]
+fn a_parcel_for_another_address_is_scanned_even_while_asking_for_more() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 2, "customer", PARCEL_COLLECT);
+    login_as(&mut s, 2, "ST001");
+    let id = pending_parcel(&s, 2);
+    ok(
+        &mut s,
+        json!({"type":"parcel_size","register":2,"line_id":id,"sum_cm":58,"weight_g":1500}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
+    );
+    assert!(reg(&s, 2).staff.parcel_ask);
+    scan(&mut s, 2, "staff", PARCEL_COLLECT);
+    let v = reg(&s, 2);
+    assert!(!v.staff.parcel_ask);
+    let id2 = pending_parcel(&s, 2);
+    assert_ne!(id, id2);
+    let p2 = v
+        .staff
+        .lines
+        .iter()
+        .find(|l| l.line.id == id2)
+        .and_then(|l| l.line.parcel.clone())
+        .unwrap();
+    assert_eq!(p2.postal, None, "新しく読んだ荷物の届け先は改めて入力する");
 }
 
 #[test]
@@ -777,8 +808,10 @@ fn parcel_fee_comes_from_size_and_postal_code() {
     assert!(!allowed(&v, Side::Staff, Action::Checkout));
     ok(
         &mut s,
-        json!({"type":"parcel_next","register":2,"more":true}),
+        json!({"type":"parcel_next","register":2,"more":false}),
     );
+    // お届け先の違う荷物は、その荷物の伝票を新しく読んで受け付ける
+    scan(&mut s, 2, "staff", PARCEL);
     let id2 = pending_parcel(&s, 2);
     assert_ne!(id, id2);
     ok(
@@ -4290,4 +4323,20 @@ fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
     start(&mut s);
     use_points(&mut s, 1, "all", None);
     assert_eq!(reg(&s, 1).prepaid, 480);
+}
+
+#[test]
+fn a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment() {
+    let mut s = Store::new(1, 2, 1);
+    login_as(&mut s, 2, "ST001");
+    scan(&mut s, 2, "staff", "4900000000035");
+    scan(&mut s, 2, "staff", "CP0001");
+    assert_eq!(reg(&s, 2).customer.total, 0);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"staff"}),
+    );
+    let v = reg(&s, 2);
+    assert!(v.staff.lines.is_empty(), "決済手段を選ばずに取引が終わる");
+    assert_eq!(v.last_receipt.unwrap().method, "お支払いなし");
 }

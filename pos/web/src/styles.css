@@ -569,11 +569,13 @@ body.dragging .drop-hint { display: inline; }
 /* 決済端末とスキャナは同じボックス。電子マネー・クレジットカードを読むときだけ「決済端末」：青白い光がゆったり明滅し、二重枠は操作色。
    それ以外はずっと「スキャナ」：赤い読み取り光が早めに明滅（赤はレジ画面内の「危険・否定」とは別の、周辺機器の演出）。
    どちらも淡く、明滅は背景だけ（文字・枠は動かさない） */
-.money-io .terminal { --glow: transparent; --glow-ms: 1s; animation: terminal-glow var(--glow-ms) ease-in-out infinite alternate; }
+.money-io .terminal { --glow: transparent; --glow-ms: 1s; --scan-red: oklch(0.6 0.2 27); animation: terminal-glow var(--glow-ms) ease-in-out infinite alternate; }
 @keyframes terminal-glow { from { background: transparent; } to { background: var(--glow); } }
 .money-io .terminal.reader { --glow: oklch(0.94 0.04 240); --glow-ms: 1.6s; border-color: var(--accent); outline-color: var(--accent); }
-.money-io .terminal.reader .placeholder { color: var(--ink); font-weight: 700; }
-.money-io .terminal.scanner { --glow: oklch(0.9 0.06 25); --glow-ms: 0.45s; }
+/* 文字の濃さは決済端末・スキャナで同じ（以前の 黒・太字 と グレー・細字 の中間） */
+.money-io .terminal .placeholder { color: color-mix(in oklch, var(--ink) 50%, var(--muted)); font-weight: 500; }
+/* スキャナの二重枠は、読み取り時に走る赤帯と同じ濃い赤 */
+.money-io .terminal.scanner { --glow: oklch(0.9 0.06 25); --glow-ms: 0.45s; border-color: var(--scan-red); outline-color: var(--scan-red); }
 /* 読み取った瞬間の演出（一回きり）。決済端末：電子マネー・クレジットカードをかざすと中心から青白い光が広がる。
    スキャナ：商品・決済用バーコードを読む（レジ画面に商品を入れるのも同じ）と、濃いめの赤帯が左から右へ走る */
 .money-io .terminal { position: relative; overflow: hidden; }
@@ -586,7 +588,7 @@ body.dragging .drop-hint { display: inline; }
 @keyframes terminal-tap { from { transform: scale(0.05); opacity: 1; } 60% { opacity: 0.9; } to { transform: scale(1.8); opacity: 0; } }
 .money-io .terminal.fx-scan::before {
   top: 0; bottom: 0; left: -24%; width: 24%;
-  background: linear-gradient(90deg, transparent, oklch(0.6 0.2 27 / 0.75) 50%, transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--scan-red) 75%, transparent) 50%, transparent);
   animation: terminal-scan 0.5s linear forwards;
 }
 @keyframes terminal-scan { to { left: 100%; } }

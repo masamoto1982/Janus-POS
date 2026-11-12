@@ -279,6 +279,7 @@ impl SavedLine {
 
     fn restore(self) -> Result<Line, String> {
         let p = product(&self.code)?;
+        let multi = p.parcel_multi;
         Ok(Line {
             id: self.id,
             touched: self.touched,
@@ -302,6 +303,7 @@ impl SavedLine {
                 region: p.region.map(leak),
                 slip: p.slip,
                 collect: p.collect,
+                multi,
                 fee: p.fee,
             }),
             pickup: self.pickup,

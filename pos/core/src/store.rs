@@ -1010,14 +1010,18 @@ impl Txn {
         names.join("・")
     }
 
-    /// 着払いの荷物だけの取引。レジで受け取るお金はない
-    fn collect_only(&self) -> bool {
-        !self.lines.is_empty()
-            && self
-                .lines
-                .iter()
-                .all(|l| l.parcel.as_ref().is_some_and(|p| p.collect))
-            && self.due() == 0
+    /// 取引金額が0円（着払いの荷物だけ、クーポンで0円になったなど）。決済手段を選ぶ必要がない
+    fn free(&self) -> bool {
+        !self.lines.is_empty() && self.total() == 0 && self.prepaid == 0
+    }
+
+    /// 0円の取引で、会計に進んで年齢確認なども済んだ：決済手段を選ばずにそのまま取引を終えてよい
+    fn free_settle_ready(&self) -> bool {
+        self.paying
+            && self.free()
+            && !self.age_choice_pending()
+            && !self.id_pending()
+            && !self.coupon_unmatched()
     }
 
     fn bill_slips(&self) -> u32 {
@@ -1185,6 +1189,7 @@ impl Txn {
             stamped: false,
             parcel: p.parcel_send.then(|| Parcel {
                 collect: p.parcel_collect,
+                multi: p.parcel_multi,
                 ..Parcel::default()
             }),
             pickup: None,
@@ -1821,7 +1826,14 @@ impl Store {
             }
         }
         let screen = cmd.screen().zip(cmd.register());
-        let res = self.apply(cmd);
+        let reg_id = cmd.register();
+        let mut res = self.apply(cmd);
+        // 取引金額が0円なら、会計に進んだ（年齢確認なども済んだ）時点で決済手段を選ばずに取引を終える
+        if let (Ok(_), Some(id)) = (&res, reg_id) {
+            if self.reg(id).is_some_and(|r| r.txn.free_settle_ready()) {
+                res = self.settle(id, PaymentMethod::Cash, 0, Cash::default());
+            }
+        }
         if let (Ok(_), Some((side, id))) = (&res, screen) {
             let now = self.now;
             if let Ok(r) = self.reg_mut(id) {
@@ -1928,6 +1940,10 @@ impl Store {
                 pc.sum_cm = sum_cm;
                 pc.weight_g = weight_g;
                 pc.size = Some(size);
+                // 複数口（同じお届け先）の2個目からは、届け先を引き継いでサイズだけで料金が決まる
+                if let Some(code) = pc.postal.as_deref().map(|p| p.replace('-', "")) {
+                    return self.fix_parcel(register, line_id, &code);
+                }
                 done(format!(
                     "{size} サイズに決まりました\n届け先の郵便番号を入力してください"
                 ))
@@ -1960,7 +1976,12 @@ impl Store {
                 let now = self.now;
                 let r = self.reg_mut(register)?;
                 r.txn.lines.retain(|l| l.id != line_id);
-                r.txn.parcel_ask = r.txn.lines.iter().any(|l| l.is_parcel());
+                // 複数口の続きをやめたときは、同じお届け先の荷物を尋ねる画面に戻る
+                r.txn.parcel_ask = r
+                    .txn
+                    .lines
+                    .iter()
+                    .any(|l| l.parcel.as_ref().is_some_and(|p| p.multi && p.postal.is_some()));
                 if !r.txn.service_pending() {
                     self.calls.resolve(register, CallKind::Service, now);
                 }
@@ -1973,31 +1994,7 @@ impl Store {
             } => {
                 self.check_active(register, Action::CompleteService)?;
                 let code = parcel::normalize_postal(&postal)?;
-                let region = parcel::region(&code)?;
-                let pc = self.pending_parcel(register, line_id)?;
-                let size = pc.size.ok_or("先に取り扱いサイズを決めてください")?;
-                let fee = parcel::fee(size, region);
-                pc.postal = Some(format!("{}-{}", &code[..3], &code[3..]));
-                pc.region = Some(region.label());
-                pc.fee = fee;
-                let charge = if pc.collect { 0 } else { fee };
-                let now = self.now;
-                let r = self.reg_mut(register)?;
-                if let Some(l) = r.txn.lines.iter_mut().find(|l| l.id == line_id) {
-                    l.unit_price = charge;
-                    l.kind = LineKind::Service {
-                        done: true,
-                        confirm_pending: false,
-                    };
-                }
-                r.txn.parcel_ask = true;
-                if !r.txn.service_pending() {
-                    self.calls.resolve(register, CallKind::Service, now);
-                }
-                done(format!(
-                    "{size} サイズ・{}あて：料金 {fee}円",
-                    region.label()
-                ))
+                self.fix_parcel(register, line_id, &code)
             }
             C::ParcelNext { register, more } => {
                 self.check_active(register, Action::ParcelNext)?;
@@ -2009,13 +2006,17 @@ impl Store {
                 if r.txn.item_count() >= MAX_ITEMS {
                     return Err(ITEMS_FULL.into());
                 }
-                let code = r
+                // 複数口：直前の荷物と同じ種類（発払い／着払い）・同じお届け先
+                let last = r
                     .txn
                     .lines
                     .iter()
                     .filter(|l| l.is_parcel())
-                    .max_by_key(|l| l.touched)
-                    .map_or(PARCEL_CODE, |l| l.code);
+                    .max_by_key(|l| l.touched);
+                let code = last.map_or(PARCEL_CODE, |l| l.code);
+                let dest = last
+                    .and_then(|l| l.parcel.as_ref())
+                    .map(|p| (p.postal.clone(), p.region));
                 let p = catalog::find(code).ok_or("荷物の商品が見つかりません")?;
                 let tax = self.tax_for(p.code);
                 let now = self.now;
@@ -2032,8 +2033,12 @@ impl Store {
                 let seed = now ^ (u64::from(register) << 56) ^ (u64::from(r.txn.next_line) << 40);
                 if let Some(pc) = r.txn.lines.last_mut().and_then(|l| l.parcel.as_mut()) {
                     pc.slip = parcel_slip(seed);
+                    if let Some((postal, region)) = dest {
+                        pc.postal = postal;
+                        pc.region = region;
+                    }
                 }
-                done("次の荷物：取り扱いサイズを決定してください".to_string())
+                done("同じお届け先の荷物：取り扱いサイズを決定してください".to_string())
             }
             C::PickupHandover { register } => {
                 let now = self.now;
@@ -2941,6 +2946,34 @@ impl Store {
         Ok(auth::account(id).map_or("?", |a| a.name))
     }
 
+    /// 取り扱いサイズと届け先の郵便番号（7桁）で料金を決め、荷物の受付を済ませる
+    fn fix_parcel(&mut self, register: u8, line_id: u32, code: &str) -> Result<Outcome, String> {
+        let region = parcel::region(code)?;
+        let pc = self.pending_parcel(register, line_id)?;
+        let size = pc.size.ok_or("先に取り扱いサイズを決めてください")?;
+        let fee = parcel::fee(size, region);
+        pc.postal = Some(format!("{}-{}", &code[..3], &code[3..]));
+        pc.region = Some(region.label());
+        pc.fee = fee;
+        let charge = if pc.collect { 0 } else { fee };
+        let multi = pc.multi;
+        let now = self.now;
+        let r = self.reg_mut(register)?;
+        if let Some(l) = r.txn.lines.iter_mut().find(|l| l.id == line_id) {
+            l.unit_price = charge;
+            l.kind = LineKind::Service {
+                done: true,
+                confirm_pending: false,
+            };
+        }
+        // 複数口の伝票だけ、同じお届け先の荷物があるか尋ねる。ほかは伝票ごとに受付が済む
+        r.txn.parcel_ask = multi;
+        if !r.txn.service_pending() {
+            self.calls.resolve(register, CallKind::Service, now);
+        }
+        done(format!("{size} サイズ・{}あて：料金 {fee}円", region.label()))
+    }
+
     fn pending_parcel(&mut self, register: u8, line_id: u32) -> Result<&mut Parcel, String> {
         self.reg_mut(register)?
             .txn
@@ -3573,12 +3606,9 @@ impl Store {
         r.txn.point_checked = r.txn.point_card.is_some()
             || r.txn.point_declined
             || r.txn.bill_slips() > 0
+            || r.txn.free()
             || !r.txn.lines.iter().any(Line::earns_points);
         r.txn.customer_turn = r.mode == Mode::SelfOperated;
-        // 着払いの荷物だけなら払う額がないので、決済手段を選ばずにそのまま取引を終える
-        if r.txn.collect_only() {
-            return self.settle(register, PaymentMethod::Cash, 0, Cash::default());
-        }
         let ready = r.staff_state() == StaffState::Ready;
         let pending = r.txn.age_choice_pending();
         let mode = r.mode;
@@ -3897,7 +3927,8 @@ impl Store {
                 (Some(PaymentMethod::Emoney), _) => "電子マネー・現金",
                 (Some(PaymentMethod::Qr), _) => "バーコード決済・現金",
                 (Some(PaymentMethod::Credit), _) => "クレジットカード・現金",
-                _ if txn.collect_only() => "着払い",
+                _ if txn.free() && txn.lines.iter().any(|l| l.parcel.as_ref().is_some_and(|p| p.collect)) => "着払い",
+                _ if txn.free() => "お支払いなし",
                 _ => method.label(),
             },
             paid,

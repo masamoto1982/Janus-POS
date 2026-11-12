@@ -155,6 +155,8 @@ pub struct Parcel {
     pub region: Option<&'static str>,
     pub slip: String,
     pub collect: bool,
+    /// 複数口の伝票：受け付けるたびに同じお届け先の荷物があるか尋ねる
+    pub multi: bool,
     pub fee: u32,
 }
 

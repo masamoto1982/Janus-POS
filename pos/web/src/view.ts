@@ -307,7 +307,7 @@ function parcelAsk(reg: number, lines: StaffLine[], st: Gate): string {
   const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
   const p = last?.parcel;
   return `<div class="point-screen parcel-ask">
-      ${msg("次の荷物はありますか？", p && last ? `${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b class="parcel-fee">${p.collect ? "着払い" : yen(last.amount)}</b>` : "")}
+      ${msg("同じお届け先の荷物はありますか？", p && last ? `${p.size}サイズ・${esc(p.region ?? "")}あて（〒${esc(p.postal ?? "")}）<b class="parcel-fee">${p.collect ? "着払い" : yen(last.amount)}</b>` : "")}
       <div class="point-choices">
         ${btn("ある", { type: "parcel_next", register: reg, more: true }, st)}
         ${btn("ない", { type: "parcel_next", register: reg, more: false }, st, "primary")}
@@ -964,7 +964,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
         ? parcelStep(reg, parcel, a("complete_service"), v.lines.filter((l) => l.parcel).length)
         : parcelNote(reg, parcel),
     );
-  if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("ほかにお送りする荷物はございますか？"));
+  if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("同じお届け先にお送りする荷物はございますか？"));
   const slips = v.bills.length;
   if (paying && slips && v.bill_unchecked)
     return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "スタッフが払込票を確認しています"));
@@ -1616,7 +1616,7 @@ const SHELVES: Shelf[] = [
   { label: "オプション", match: (p) => p.category === "bag" },
 ];
 
-const PARCEL_CODES = ["2100000000014", "2100000000045"];
+const PARCEL_CODES = ["2100000000014", "2100000000045", "2100000000081"];
 
 const PICKUP_CODE = "2100000000038";
 
@@ -1650,6 +1650,7 @@ const PURPOSE: Record<string, string> = {
   "2000000000053": "お弁当などに添える付属品、オプションの登録を試す",
   "2100000000014": "宅配便の受付（サイズ・お届け先の郵便番号・送料）、ほかの商品と一緒にお会計できない",
   "2100000000045": "送料をお届け先が払う宅配便の受付、代金0円で受け付けだけを行う",
+  "2100000000081": "同じお届け先に複数の荷物を送る受付、2個目からは届け先を引き継ぎ、サイズを決めるだけで送料が決まる",
   "2100000000038": "荷物の受け取り、受取番号の表示、保管場所の荷物の照合、サインからお渡しまで",
   "2100000000021": "5万円以上の払込票、現金のみで、収入印紙の貼り付け確認が済むまでお会計に進めない",
   "2100000000043": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",

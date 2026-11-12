@@ -85,6 +85,8 @@ pub struct Product {
     pub parcel_send: bool,
     pub parcel_pickup: bool,
     pub parcel_collect: bool,
+    /// 複数口の伝票。同じお届け先の荷物を続けて受け付ける
+    pub parcel_multi: bool,
     /// 税金（公金）の払込票。領収証に収入印紙が要らない（印紙税の非課税）
     pub stamp_exempt: bool,
     /// チケットの申込券。支払いが済むとこの枚数のチケットを発券する（チケットでなければ 0）
@@ -171,6 +173,7 @@ const fn p(
         parcel_send: false,
         parcel_pickup: false,
         parcel_collect: false,
+        parcel_multi: false,
         stamp_exempt: false,
         tickets: 0,
         fresh: false,
@@ -257,6 +260,11 @@ pub const CATALOG: &[Product] = &[
         parcel_send: true,
         parcel_collect: true,
         ..p("2100000000045", "荷物を送る 着払い", 0, Standard10, Service)
+    },
+    Product {
+        parcel_send: true,
+        parcel_multi: true,
+        ..p("2100000000081", "荷物を送る 複数口", 0, Standard10, Service)
     },
     Product {
         parcel_pickup: true,

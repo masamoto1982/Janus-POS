@@ -94,7 +94,11 @@ export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" 
 
 export type Mode = "staff_operated" | "self_operated";
 
-export type Parcel = { sum_cm: number, weight_g: number, size: number | null, postal: string | null, region: string | null, slip: string, collect: boolean, fee: number, };
+export type Parcel = { sum_cm: number, weight_g: number, size: number | null, postal: string | null, region: string | null, slip: string, collect: boolean, 
+/**
+ * 複数口の伝票：受け付けるたびに同じお届け先の荷物があるか尋ねる
+ */
+multi: boolean, fee: number, };
 
 export type PaymentMethod = "cash" | "emoney" | "qr" | "credit" | "points";
 

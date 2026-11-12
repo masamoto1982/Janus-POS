@@ -451,6 +451,18 @@ export function billHandover(reg: number, side: Side, count: number, st: Gate): 
     </div>`;
 }
 
+/** 宅配便の決済のあと：お客様控えの伝票のお渡し。伝票ごとに1枚、複数口は何個口でも1枚。枚数は両画面に出す */
+export function parcelHandover(reg: number, side: Side, count: number, st: Gate): string {
+  if (side === "customer")
+    return `<div class="point-screen bill-done">
+      ${msg(`控え伝票${billN(count)}`, "控え伝票をお受け取りください")}
+    </div>`;
+  return `<div class="point-screen bill-done">
+      ${msg(`控え伝票${billN(count)}`, "お客様控えの伝票をお渡しください")}
+      <div class="point-choices">${btn("お渡し済", { type: "hand_over_bills", register: reg, side }, st, "primary")}</div>
+    </div>`;
+}
+
 /** 決済後のチケットのお渡し。スタッフはお渡しした枚数、お客様は受け取った枚数を、それぞれ入力欄に入力する（発券枚数は見せない）。
  *  どちらの入力も発券枚数とだけ比べ（スタッフとお客様の入力どうしは比べない）、一致しない側にだけ警告を出す。
  *  両方が一致したらお渡し完了。それまでレシートもお釣りも出さず、完了するとお釣り・お礼の画面に進む */
@@ -905,6 +917,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const reg = r.id;
   const a = (n: Action) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.parcel_handover && !v.lines.length) return confirm(parcelHandover(reg, side, r.parcel_handover, a("hand_over_bills")));
   if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
@@ -1404,6 +1417,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const reg = r.id;
   const a = (n: Action) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.parcel_handover && !c.lines.length) return confirm(parcelHandover(reg, side, r.parcel_handover, a("hand_over_bills")));
   if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
   if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks(r.last_receipt)));

@@ -279,6 +279,8 @@ const DICT: Record<string, string> = {
   現金のみ取り扱いいたします: "Cash only",
   "払込票とレシート、お釣りをお受け取りください": "Please take your slips, receipt and change",
   払込票に収納印を押してお渡しください: "Stamp the slips and hand them over",
+  控え伝票をお受け取りください: "Please take your customer copy",
+  お客様控えの伝票をお渡しください: "Hand over the customer copies",
   スタッフが払込票を確認しています: "Staff is checking your slips",
   "お客様に受付点数、合計金額をお伝えください": "Tell the customer the number of slips and the total",
   払込票の内容を確認いたします: "Staff will check your slips",
@@ -682,6 +684,8 @@ const HTML_RULES: HtmlRule[] = [
   [/^公共料金(<span class="bill-n">)(\d+)枚(<\/span>)を受け付けます$/, (m) => `Accepting ${m[1]}${plural(m[2], "utility bill")}${m[3]}`],
   [/^公共料金(<span class="bill-n">)(\d+)枚(<\/span>)　支払いが完了しました$/, (m) => `${m[1]}${plural(m[2], "utility bill")}${m[3]} paid`],
   [/^公共料金(<span class="bill-n">)(\d+)枚(<\/span>)$/, (m) => `Utility bills ${m[1]}${plural(m[2], "slip")}${m[3]}`],
+  [/^控え伝票(<span class="bill-n">)(\d+)枚(<\/span>)$/, (m) => `Customer copies ${m[1]}${plural(m[2], "slip")}${m[3]}`],
+  [/^控え伝票 (\d+)枚をお渡ししました$/, (m) => `Handed over ${plural(m[1], "customer copy slip")}`],
   [/^受付 (<span class="bill-n">)(\d+)枚(<\/span>)<span class="bill-sum">合計 (.+)<\/span>$/, (m) => `Accepted ${m[1]}${plural(m[2], "slip")}${m[3]}<span class="bill-sum">Total ${yenify(m[4])}</span>`],
   [
     /^電子マネーの残高 <b>(.+?)<\/b> を引き出し、残り <b>(.+?)<\/b> を現金でお支払いいただきます$/,

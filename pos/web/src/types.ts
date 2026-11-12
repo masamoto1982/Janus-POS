@@ -52,6 +52,8 @@ export type Dates = { sell_by_min: number; best_before_min: number };
 
 export type StaffLine = LineKind & {
   id: number;
+  /** チケットの発券枚数（チケットでなければ 0） */
+  tickets: number;
   touched: number;
   code: string;
   name: string;
@@ -73,7 +75,7 @@ export type StaffLine = LineKind & {
   pickup?: Pickup;
 };
 
-export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; ff_base: number; amount: number; age: number | null; age_checked: boolean; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean; fresh: boolean; expired: boolean; dates: Dates | null };
+export type CustomerLine = LineKind & { id: number; touched: number; name: string; qty: number; ff_base: number; amount: number; age: number | null; age_checked: boolean; limit: number | null; cash_only: boolean; pickup: boolean; parcel: boolean; fresh: boolean; expired: boolean; dates: Dates | null; tickets: number };
 
 export interface Call {
   id: number;
@@ -213,6 +215,7 @@ export interface RegisterView {
   tickets_issued: boolean;
   /** お客様が入力した受け取り枚数 */
   tickets_received: number | null;
+  tickets_handed: number | null;
   /** 発券の列でこのレジより先に並んでいるレジの数 */
   tickets_ahead: number;
   /** 決済後、レシートに収入印紙を貼る確認待ち（stamp＝印紙の額、base＝税抜の受取金額） */

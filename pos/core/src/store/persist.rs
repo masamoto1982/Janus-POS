@@ -140,6 +140,8 @@ struct SavedRegister {
     held_change: Cash,
     #[serde(default)]
     tickets_received: Option<u32>,
+    #[serde(default)]
+    tickets_handed: Option<u32>,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -420,6 +422,7 @@ impl SavedRegister {
                 .collect(),
             held_change: r.held_change.clone(),
             tickets_received: r.tickets_received,
+            tickets_handed: r.tickets_handed,
             last_op: r.last_op,
             outlet: r.outlet.clone(),
             outlet_since: r.outlet_since,
@@ -463,6 +466,7 @@ impl SavedRegister {
             tickets_issued: false,
             held_change: self.held_change,
             tickets_received: self.tickets_received,
+            tickets_handed: self.tickets_handed,
             ticket_handover: self
                 .ticket_handover
                 .into_iter()

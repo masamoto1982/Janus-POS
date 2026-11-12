@@ -291,7 +291,15 @@ pub enum Command {
         #[serde(default = "staff_side")]
         side: Side,
     },
-    /// お客様が受け取ったチケットの枚数を入力する（申込数と一致したらお渡し完了）
+    /// スタッフがお渡ししたチケットの枚数を入力する（発券枚数と照合）
+    HandTickets {
+        register: u8,
+        #[serde(default = "staff_side")]
+        side: Side,
+        handed: u32,
+    },
+    /// お客様が受け取ったチケットの枚数を入力する（発券枚数と照合）。
+    /// 両方が発券枚数と一致したらお渡し完了
     ReceiveTickets {
         register: u8,
         #[serde(default = "customer_side")]
@@ -473,6 +481,7 @@ impl Command {
             | C::AffixReceiptStamp { register, .. }
             | C::HandOverBills { register, .. }
             | C::ReceiveTickets { register, .. }
+            | C::HandTickets { register, .. }
             | C::InsertCash { register, .. }
             | C::FinishInsert { register }
             | C::TapEmoney { register, .. }
@@ -512,6 +521,7 @@ impl Command {
             | C::AffixReceiptStamp { side, .. }
             | C::HandOverBills { side, .. }
             | C::ReceiveTickets { side, .. }
+            | C::HandTickets { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
             | C::ResolveEmoneyShort { side, .. }
@@ -1076,8 +1086,10 @@ struct Register {
     tickets_issued: bool,
     /// チケットのお釣り。お渡しの確認が済むまで出金ボックスに出さずに留めておく
     held_change: Cash,
-    /// お客様が入力した受け取り枚数（まだなら None）。発券した枚数の合計と合ってお渡し完了
+    /// お客様が入力した受け取り枚数（まだなら None）
     tickets_received: Option<u32>,
+    /// スタッフが入力したお渡し枚数（まだなら None）。両方が発券枚数と一致してお渡し完了
+    tickets_handed: Option<u32>,
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
@@ -1346,6 +1358,7 @@ impl Store {
                 tickets_issued: false,
                 held_change: Cash::default(),
                 tickets_received: None,
+                tickets_handed: None,
                 pickup_handover: None,
                 receipt_stamp: None,
                 last_op: 0,
@@ -2171,11 +2184,35 @@ impl Store {
                 self.check(register, side, Action::ReceiveTickets)?;
                 let now = self.now;
                 let r = self.reg_mut(register)?;
+                let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
                 r.tickets_received = Some(received);
                 if let Some(m) = self.finish_tickets(register, now) {
                     return done(m);
                 }
-                done("申込数と受け取り数が一致しません\n再度ご確認ください")
+                done(if received == n {
+                    "受け取り枚数を入力しました"
+                } else {
+                    "申込数と受け取り数が一致しません\n再度ご確認ください"
+                })
+            }
+            C::HandTickets {
+                register,
+                side,
+                handed,
+            } => {
+                self.check(register, side, Action::HandTickets)?;
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
+                r.tickets_handed = Some(handed);
+                if let Some(m) = self.finish_tickets(register, now) {
+                    return done(m);
+                }
+                done(if handed == n {
+                    "お渡し枚数を入力しました"
+                } else {
+                    "発券枚数とお渡し枚数が一致しません\n再度ご確認ください"
+                })
             }
             C::InsertCash {
                 register,
@@ -2752,17 +2789,22 @@ impl Store {
         }
     }
 
-    /// お客様の受け取り枚数が申込数と一致したら、お渡しを終える。
+    /// スタッフのお渡し枚数とお客様の受け取り枚数が、どちらも発券枚数と一致したらお渡しを終える
+    /// （スタッフとお客様の入力どうしは比べない）。
     /// 留めていたお釣りとレシートを出し、発券の列の次のレジに発券させる
     fn finish_tickets(&mut self, register: u8, now: u64) -> Option<String> {
         let r = self.registers.iter_mut().find(|r| r.id == register)?;
         let n: u32 = r.ticket_handover.iter().map(|t| t.issued).sum();
-        if r.ticket_handover.is_empty() || r.tickets_received != Some(n) {
+        if r.ticket_handover.is_empty()
+            || r.tickets_received != Some(n)
+            || r.tickets_handed != Some(n)
+        {
             return None;
         }
         r.ticket_handover.clear();
         r.tickets_issued = false;
         r.tickets_received = None;
+        r.tickets_handed = None;
         let held = std::mem::take(&mut r.held_change);
         r.outlet.merge(&held);
         if let Some(rc) = r.last_receipt.as_mut() {
@@ -3879,6 +3921,7 @@ impl Store {
                 fresh: l.is_fresh(),
                 expired: l.is_expired(),
                 dates: catalog::find(l.code).and_then(|p| p.dates),
+                tickets: l.tickets(),
             })
             .collect();
 
@@ -3901,6 +3944,7 @@ impl Store {
                 fresh: l.is_fresh(),
                 expired: l.is_expired(),
                 dates: catalog::find(l.code).and_then(|p| p.dates),
+                tickets: l.tickets(),
                 kind: l.kind,
             })
             .collect();
@@ -4042,6 +4086,7 @@ impl Store {
             ticket_handover: r.ticket_handover.clone(),
             tickets_issued: r.tickets_issued,
             tickets_received: r.tickets_received,
+            tickets_handed: r.tickets_handed,
             tickets_ahead: self
                 .ticket_queue
                 .iter()
@@ -4074,6 +4119,8 @@ pub struct StaffLine {
     pub expired: bool,
     /// 販売期限・賞味期限（いまからの分）
     pub dates: Option<catalog::Dates>,
+    /// チケットの発券枚数（チケットでなければ 0）
+    pub tickets: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -4093,6 +4140,7 @@ pub struct CustomerLine {
     pub fresh: bool,
     pub expired: bool,
     pub dates: Option<catalog::Dates>,
+    pub tickets: u32,
     #[serde(flatten)]
     pub kind: LineKind,
 }
@@ -4199,6 +4247,8 @@ pub struct RegisterView {
     pub tickets_issued: bool,
     /// お客様が入力した受け取り枚数
     pub tickets_received: Option<u32>,
+    /// スタッフが入力したお渡し枚数
+    pub tickets_handed: Option<u32>,
     /// 発券の列で、このレジより先に並んでいるレジの数
     pub tickets_ahead: usize,
     pub pickup_handover: Option<String>,

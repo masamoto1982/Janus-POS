@@ -236,8 +236,8 @@ function buildSkeleton(): void {
       <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます<br>OFF の端末は鳴らず、不通かどうかの判定にも含めません<br>据え付け端末は常に ON です</p>
       <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
-    <dialog class="rules-dlg picker-dlg" id="picker-dlg" aria-labelledby="picker-title">
-      <div class="dlg-head"><h2 id="picker-title">選ぶ</h2><button class="small ghost" data-close-picker>閉じる</button></div>
+    <dialog class="rules-dlg picker-dlg" id="picker-dlg" aria-label="読ませるものを選ぶ">
+      <div class="dlg-head"><button class="small ghost" data-close-picker>閉じる</button></div>
       <div id="picker-body"></div>
     </dialog>
     <div class="drag-ghost" id="ghost" hidden></div>
@@ -1162,9 +1162,7 @@ const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg")
  *  入金ボックス（現金）と決済端末（かざす）は Wallet だけ */
 function openPicker(dest: Dest): void {
   pickFor = dest;
-  const { register, side, device, cashBox } = dest;
-  const where = cashBox ? "入金ボックス" : device === "terminal" ? "決済端末" : device === "scanner" ? "スキャナ" : side === "staff" ? "スタッフ側の画面" : "お客様側の画面";
-  document.getElementById("picker-title")!.textContent = `レジ${register}の${where}で読む`;
+  const { device, cashBox } = dest;
   const area = (label: string, html: string) => `<section class="picker-area"><h3 class="picker-area-head">${label}</h3>${html}</section>`;
   const items = area("Item", shelfPanel(snap));
   const wallet = area("Wallet", walletPanel(snap.emoney_balance));

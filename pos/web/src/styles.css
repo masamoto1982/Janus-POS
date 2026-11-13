@@ -669,6 +669,7 @@ body.dragging .drop-hint { display: inline; }
 .picker-dlg { width: min(720px, calc(100vw - 16px)); max-height: calc(100dvh - 32px); overflow: auto; }
 .picker-dlg .item { cursor: pointer; touch-action: manipulation; }
 .picker-dlg .tip { display: none; }
+.picker-dlg .dlg-head { justify-content: flex-end; }
 /* 長押しピッカーの Item・Wallet の見出し（デスクトップの右側の見出しと同じ大きさ） */
 .picker-area + .picker-area { margin-top: 16px; }
 .picker-area-head { margin: 0 0 8px; font-size: 16px; }

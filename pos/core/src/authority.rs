@@ -82,6 +82,7 @@ pub enum Action {
     ConfirmPointCard,
     ChooseAgeCheck,
     EarlyAgeCheck,
+    CheckLimit,
     CheckId,
     CheckBill,
     AffixStamp,
@@ -116,6 +117,7 @@ pub const ACTIONS: &[Action] = &[
     Action::ConfirmPointCard,
     Action::ChooseAgeCheck,
     Action::EarlyAgeCheck,
+    Action::CheckLimit,
     Action::CheckId,
     Action::CheckBill,
     Action::AffixStamp,
@@ -174,6 +176,8 @@ pub struct Context {
     pub cash_only_goods: bool,
     /// 販売期限切れの明細がある
     pub expired: bool,
+    /// 販売個数に制限のある商品で、スタッフが販売数量を確認していない明細がある
+    pub limit_pending: bool,
 }
 
 pub const MAX_ITEMS: u32 = 100;
@@ -187,6 +191,8 @@ impl Context {
             Some(EMONEY_SHORT)
         } else if self.expired {
             Some(EXPIRED)
+        } else if self.limit_pending {
+            Some(LIMIT_UNCHECKED)
         } else if self.bill_unchecked {
             Some(BILL_UNCHECKED)
         } else if self.stamp_pending {
@@ -219,6 +225,7 @@ pub type Denial = &'static str;
 
 const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
 const PARCEL_ASK: Denial = "同じお届け先の荷物があるか選んでください";
+pub const LIMIT_UNCHECKED: Denial = "販売個数に制限のある商品の販売数量を確認していません";
 pub const EXPIRED: Denial = "販売期限切れの商品があります\n取り消してから、お会計に進んでください";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
 const COUPON_UNMATCHED: Denial =
@@ -273,6 +280,7 @@ pub fn is_staff_only(action: Action) -> bool {
         action,
         Action::ChooseAgeCheck
             | Action::EarlyAgeCheck
+            | Action::CheckLimit
             | Action::CheckId
             | Action::CheckBill
             | Action::AffixStamp
@@ -301,6 +309,11 @@ pub fn fixed_side(action: Action) -> Option<Side> {
 fn choose_age_check(c: &Context) -> Result<(), Denial> {
     require(c.phase == Phase::Paying || c.age_early, "お会計前です")?;
     require(c.age_choice_pending || c.id_pending, "年齢確認は不要です")
+}
+
+fn check_limit(c: &Context) -> Result<(), Denial> {
+    require(c.phase == Phase::Registering, "お会計中です")?;
+    require(c.limit_pending, "販売数量を確認する商品はありません")
 }
 
 fn early_age_check(c: &Context) -> Result<(), Denial> {
@@ -360,6 +373,8 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Err("収入印紙の貼り付け確認はスタッフ側の画面で行います")
         } else if action == Action::CheckFf {
             Err("FF のお渡し確認はスタッフ側の画面で行います")
+        } else if action == Action::CheckLimit {
+            Err("販売数量の確認はスタッフ側の画面で行います")
         } else if action == Action::HandTickets {
             Err("チケットのお渡し枚数はスタッフ側の画面で入力します")
         } else if action == Action::ReceiveTickets {
@@ -453,6 +468,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
             require(!c.expired, EXPIRED)?;
+            require(!c.limit_pending, LIMIT_UNCHECKED)?;
             require(!c.ff_waiting, FF_UNCHECKED)?;
             require(!c.service_pending, "サービス商品の受付が済んでいません")?;
             require(!c.parcel_ask, PARCEL_ASK)
@@ -465,6 +481,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         Action::ConfirmPointCard => confirm_point(c),
         Action::ChooseAgeCheck => choose_age_check(c),
         Action::EarlyAgeCheck => early_age_check(c),
+        Action::CheckLimit => check_limit(c),
         Action::CheckId => check_id(c),
         Action::CheckBill => check_bill(c),
         Action::AffixStamp => affix_stamp(c),
@@ -498,6 +515,7 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "すでにお会計中です")?;
             require(c.has_lines, "商品を登録してください")?;
             require(!c.expired, EXPIRED)?;
+            require(!c.limit_pending, LIMIT_UNCHECKED)?;
             require(!c.ff_waiting, FF_UNCHECKED)?;
             require(
                 !c.service_pending,
@@ -510,6 +528,10 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
             require(!c.point_pending, POINT_UNCONFIRMED)
         }
         Action::ConfirmPointCard => confirm_point(c),
+        Action::CheckLimit => {
+            check_limit(c)?;
+            Err("販売数量の確認はスタッフがログインしてから行います")
+        }
         Action::ChooseAgeCheck | Action::CheckId | Action::EarlyAgeCheck => {
             if action == Action::EarlyAgeCheck {
                 early_age_check(c)?;
@@ -598,6 +620,7 @@ mod tests {
                                             has_bills: bill_unchecked,
                                             bill_unchecked,
                                             has_stamps: false,
+                                            limit_pending: false,
                                             stamp_pending: false,
                                             bill_handover: false,
                                             receipt_stamp: false,

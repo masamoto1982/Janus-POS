@@ -4464,3 +4464,51 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
     scan(&mut s, 1, "customer", BREAD);
     assert!(reg(&s, 1).limit_alert.is_none());
 }
+
+#[test]
+fn staff_confirms_how_many_limited_items_to_sell() {
+    let mut s = Store::new(1, 2, 1);
+    let card = janus_pos_core::catalog::TRADING_CARD;
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", card);
+    let line = reg(&s, 1).staff.lines[0].clone();
+    assert!(!line.line.limit_ok);
+    // 個数制限フラグが立っているあいだはお会計に進めない
+    assert!(run(&mut s, json!({"type":"checkout","register":1,"side":"staff"})).is_err());
+    // お客様側からは確認できない
+    assert!(run(
+        &mut s,
+        json!({"type":"limit_check","register":1,"side":"customer","line_id":line.line.id})
+    )
+    .is_err());
+    ok(
+        &mut s,
+        json!({"type":"limit_check","register":1,"side":"staff","line_id":line.line.id}),
+    );
+    let check = reg(&s, 1).limit_check.unwrap();
+    assert_eq!((check.name, check.limit, check.over), ("トレカ", 3, None));
+    // 上限を超える数は登録せず、スタッフ側に警告
+    let confirm = |qty: u32| json!({"type":"confirm_limit","register":1,"side":"staff","line_id":line.line.id,"qty":qty});
+    ok(&mut s, confirm(5));
+    assert_eq!(reg(&s, 1).limit_check.unwrap().over, Some(5));
+    assert_eq!(reg(&s, 1).staff.lines[0].line.qty, 1);
+    ok(&mut s, confirm(3));
+    let r = reg(&s, 1);
+    assert!(r.limit_check.is_none());
+    assert_eq!(r.staff.lines[0].line.qty, 3);
+    assert!(r.staff.lines[0].line.limit_ok);
+    assert!(r.customer.lines[0].limit_ok);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+}
+
+#[test]
+fn trading_cards_scanned_at_a_self_register_call_staff() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", janus_pos_core::catalog::TRADING_CARD);
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.register == 1 && c.kind == CallKind::Voucher));
+    assert!(run(&mut s, json!({"type":"checkout","register":1,"side":"customer"})).is_err());
+}

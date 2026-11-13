@@ -109,7 +109,7 @@ describe("view helpers", () => {
       customer: { staff_called: true },
     } as unknown as RegisterView;
     const staff = callScreen(r, 6000);
-    expect(staff).toContain("FF＆煙草");
+    expect(staff).toContain("FF＆たばこ");
     expect(staff).toContain("5秒経過");
   });
 

@@ -183,6 +183,8 @@ struct SavedReceipt {
 struct SavedTxn {
     parcel_ask: bool,
     tobacco_asked: bool,
+    #[serde(default)]
+    answered: Vec<CallKind>,
     lines: Vec<SavedLine>,
     next_line: u32,
     paying: bool,
@@ -323,6 +325,7 @@ impl SavedTxn {
         SavedTxn {
             parcel_ask: t.parcel_ask,
             tobacco_asked: t.tobacco_asked,
+            answered: t.answered.clone(),
             lines: t.lines.iter().map(SavedLine::from).collect(),
             next_line: t.next_line,
             paying: t.paying,
@@ -373,6 +376,7 @@ impl SavedTxn {
         Ok(Txn {
             parcel_ask: self.parcel_ask,
             tobacco_asked: self.tobacco_asked,
+            answered: self.answered,
             lines: self
                 .lines
                 .into_iter()
@@ -725,9 +729,13 @@ impl Store {
             signal,
             seen_raised: s.seen_raised,
             presses: s.presses,
+            rung_at: 0,
+            rung_presses: 0,
             receipts: s.receipts,
             emoney_balance: s.emoney_balance,
-            point_balances: s.point_balances.unwrap_or_else(super::initial_point_balances),
+            point_balances: s
+                .point_balances
+                .unwrap_or_else(super::initial_point_balances),
             ticket_queue: s.ticket_queue.into_iter().collect(),
         };
         store.issue_next_tickets();

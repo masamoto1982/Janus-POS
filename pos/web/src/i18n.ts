@@ -331,6 +331,16 @@ const DICT: Record<string, string> = {
   お預かりの荷物が見つかりませんでした: "We couldn't find your parcel",
   荷物をお持ちします: "We'll bring your parcel",
   少々お待ちください: "Please wait a moment",
+  ただいまスタッフをお呼びしています: "Calling a staff member",
+  取り消し: "Cancel",
+  二千円札を返却しました: "The ¥2,000 bill was returned",
+  取り扱い対象外の紙幣です: "This bill is not accepted",
+  出金ボックスからお客様にお返しください: "Return it to the customer from the outlet",
+  二千円札はご利用いただけません: "¥2,000 bills cannot be used",
+  スタッフがお返しいたします: "Staff will return it to you",
+  西暦8桁で入力してください: "Enter 8 digits, year first",
+  存在しない日付です: "This date does not exist",
+  生年月日が今日より後です: "The date of birth is after today",
   "同じお届け先にお送りする荷物はございますか？": "Do you have another parcel to the same address?",
   お届け先を入力しています: "Entering the destination",
   重さを計測しています: "Weighing the parcel",
@@ -567,10 +577,14 @@ const DICT: Record<string, string> = {
   スタッフ002: "Staff 002",
 };
 
+const TOPIC_EN: Record<string, string> = { FF: "FF", サービス: "service", 金券: "vouchers", たばこ: "tobacco" };
+const topicsEn = (s: string): string => s.split("・").map((x) => TOPIC_EN[x] ?? x).join(", ");
 type Rule = [RegExp, (m: RegExpExecArray) => string];
 
 const RULES: Rule[] = [
   [/^(\d{4})年(\d{1,2})月(\d{1,2})日 (.)曜日 (\d{2}:\d{2})$/, (m) => `${WEEKDAY[m[4]] ?? m[4]}, ${MONTH[Number(m[2]) - 1]} ${m[3]}, ${m[1]} ${m[5]}`],
+  [/^ご用件：(.+) 少々お待ちください$/, (m) => `For: ${topicsEn(m[1])}. Please wait a moment`],
+  [/^用件：(.+)$/, (m) => `Called for: ${topicsEn(m[1])}`],
   [/^(\d+)歳以上の年齢確認をしますか？$/, (m) => `Check age (${m[1]}+)?`],
   [/^(\d+)歳前後のお客様は身分証をご準備ください$/, (m) => `If you are around ${m[1]}, please have your ID ready`],
   [/^(\d+)歳以上$/, (m) => `Age ${m[1]}+`],
@@ -697,10 +711,10 @@ const HTML_RULES: HtmlRule[] = [
   [/^不足額 <b>(.+?)<\/b>$/, (m) => `Short by <b>${yenify(m[1])}</b>`],
   [/^電子マネーの残高<span class="emoney-balance">(.+?)<\/span>$/, (m) => `E-money balance<span class="emoney-balance">${yenify(m[1])}</span>`],
   [
-    /^(.+?)で (.+?) お支払い済み、残り <b>(.+?)<\/b> のお支払い方法をお選びください$/,
-    (m) => `${yenify(m[2])} paid by ${t(m[1]).toLowerCase()}. Please choose how to pay the remaining <b>${yenify(m[3])}</b>`,
+    /^(.+?)で (.+?) お支払い済み<br>残り <b>(.+?)<\/b> のお支払い方法をお選びください$/,
+    (m) => `${yenify(m[2])} paid by ${t(m[1]).toLowerCase()}<br>Please choose how to pay the remaining <b>${yenify(m[3])}</b>`,
   ],
-  [/^(.+?)で (.+?) お支払い済み、残り <b>(.+?)<\/b> を現金で$/, (m) => `${yenify(m[2])} paid by ${t(m[1]).toLowerCase()}. Please pay the remaining <b>${yenify(m[3])}</b> in cash`],
+  [/^(.+?)で (.+?) お支払い済み<br>残り <b>(.+?)<\/b> を現金でお支払いいただきます$/, (m) => `${yenify(m[2])} paid by ${t(m[1]).toLowerCase()}<br>Please pay the remaining <b>${yenify(m[3])}</b> in cash`],
   [/^現金 <b>(.+?)<\/b> を出金ボックスからお返しください$/, (m) => `Return <b>${yenify(m[1])}</b> in cash from the outlet`],
   [/^現金 <b>(.+?)<\/b> をお返しします$/, (m) => `We'll return <b>${yenify(m[1])}</b> in cash`],
   [/^うち <b>(.+?)<\/b> は現金のみ取り扱いいたします$/, (m) => `<b>${yenify(m[1])}</b> of this is cash only`],

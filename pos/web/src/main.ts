@@ -580,11 +580,25 @@ function toast(where: string, text: string, error: boolean): void {
   );
 }
 
+/** テンキーの「決定」でそのまま送る入力欄（画面側に決定・判定ボタンを置かない）。
+ *  テンキーの「決定」が画面の決定ボタンとほぼ同じ位置に重なり、二度押しが要るように見えたため（動作試験 第2回） */
+const SUBMIT: Partial<Record<PadTarget, (register: number, side: Side, digits: string, line?: number) => Command | null>> = {
+  birth: (register, side, birth) => ({ type: "check_id", register, side, birth, today: isoDate(new Date()) }),
+  pcm: (register, _side, digits, line) => ({ type: "parcel_length", register, line_id: line!, sum_cm: Number(digits) }),
+  pkg: (register, _side, digits, line) => {
+    const sum = snap.registers.find((r) => r.id === register)?.staff.lines.find((l) => l.id === line)?.parcel?.sum_cm;
+    return sum === undefined || sum === null ? null : { type: "parcel_size", register, line_id: line!, sum_cm: sum, weight_g: Math.round(Number(digits) * 1000) };
+  },
+  post: (register, _side, postal, line) => ({ type: "parcel_postal", register, line_id: line!, postal }),
+  ppt: (register, side, digits) => ({ type: "use_points", register, side, how: "amount", points: Number(digits) }),
+};
+
 function padKey(key: string, k: string): void {
   const e = padEntry.get(key);
   if (!e) return;
   const d = PAD[e.target];
   const register = Number(key.split(":")[0]);
+  if (k !== "ok") e.error = undefined;
   if (k === "cancel") padEntry.delete(key);
   else if (k === "back") e.digits = e.digits.slice(0, -1);
   else if (k === "ok") {
@@ -609,6 +623,16 @@ function padKey(key: string, k: string): void {
       const ffKey = `${register}:${side}:${e.line}`;
       ffvInput.set(ffKey, String(value));
       send({ type: "check_ff", register, side: side as Side, line_id: e.line!, handed: value });
+    } else if (e.target in SUBMIT) {
+      // 入力欄ひとつの画面：テンキーの「決定」でそのまま送る。受け付けられなければ理由を出してテンキーを開いたままにする
+      if (e.digits === "") return;
+      const cmd = SUBMIT[e.target]!(register, side as Side, e.digits, e.line);
+      if (!cmd || !send(cmd)) {
+        e.error = lastError ?? "受け付けられません";
+        frame();
+        return;
+      }
+      padValue.delete(padValueKey(register, e.target, e.line));
     } else {
       if (e.digits === "" || (!d.code && value <= 0)) return;
       padValue.set(padValueKey(register, e.target, e.line), d.code ? e.digits : String(value));
@@ -673,10 +697,14 @@ function deviceFx(cmd: Command): (() => void) | null {
   };
 }
 
+/** 直前の send が受け付けられなかった理由 */
+let lastError: string | undefined;
+
 function send(cmd: Command): boolean {
   const fx = deviceFx(cmd);
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
+  lastError = res.ok ? undefined : res.error;
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {
@@ -751,27 +779,6 @@ function form(b: HTMLElement): void {
   switch (b.dataset.form) {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
-      break;
-    case "points-amount":
-      if (send({ type: "use_points", register: reg, side: b.dataset.side as Side, how: "amount", points: Number(padValue.get(padValueKey(reg, "ppt")) ?? 0) })) padValue.delete(padValueKey(reg, "ppt"));
-      break;
-    case "parcel-length":
-      send({ type: "parcel_length", register: reg, line_id: Number(b.dataset.line), sum_cm: Number(padValue.get(padValueKey(reg, "pcm", Number(b.dataset.line))) ?? 0) });
-      break;
-    case "parcel-size":
-      send({
-        type: "parcel_size",
-        register: reg,
-        line_id: Number(b.dataset.line),
-        sum_cm: Number(b.dataset.cm),
-        weight_g: Math.round(Number(padValue.get(padValueKey(reg, "pkg", Number(b.dataset.line))) ?? 0) * 1000),
-      });
-      break;
-    case "parcel-postal":
-      send({ type: "parcel_postal", register: reg, line_id: Number(b.dataset.line), postal: padValue.get(padValueKey(reg, "post", Number(b.dataset.line))) ?? "" });
-      break;
-    case "birth":
-      if (send({ type: "check_id", register: reg, side: "staff", birth: padValue.get(padValueKey(reg, "birth")) ?? "", today: isoDate(new Date()) })) padValue.delete(padValueKey(reg, "birth"));
       break;
     case "cashout":
       if (

@@ -35,7 +35,6 @@ import {
   bellSettings,
   ownerPanel,
   shelfPanel,
-  readableCardsShelves,
   walletPanel,
   sideOf,
   sharedScreen,
@@ -1092,21 +1091,7 @@ function setupDrag(): void {
     if (!t) return;
     const el = t as HTMLElement;
     const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "staff" : "customer"];
-    const register = Number(reg);
-    // 決済端末は電子マネー・クレジットカードだけ、スキャナはバーコード（商品・決済用）とポイントカードだけを読む
-    const device = el.dataset.device;
-    const toScanner = !!d.code || d.wallet === "pay:qr" || d.wallet === "pay:points";
-    if (device === "terminal" && toScanner) return toast("toast-store", "商品・決済用バーコード・ポイントカードは、スキャナにかざしてください", false);
-    if (device === "scanner" && !toScanner && !d.wallet?.startsWith("cash")) return toast("toast-store", "電子マネー・クレジットカードは、決済端末にかざしてください", false);
-    if (d.code) return void send({ type: "scan", register, side: side as Side, code: d.code });
-    const [kind, value] = d.wallet!.split(":");
-    if (kind === "cash") {
-      if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
-      send(cashDrop(register, Number(value)));
-    } else {
-      if (el.dataset.cashDrop) return toast("toast-store", "キャッシュレスは、お客様側の決済端末かスキャナにかざしてください", false);
-      send({ type: "tap_emoney", register, method: value as PaymentMethod });
-    }
+    deliver({ register: Number(reg), side: side as Side, device: el.dataset.device as Device | undefined, cashBox: !!el.dataset.cashDrop }, d.code, d.wallet);
   });
 
   window.addEventListener("pointercancel", end);
@@ -1143,33 +1128,56 @@ function setupDrag(): void {
   });
 }
 
+type Device = "terminal" | "scanner";
+/** Item・Wallet のものをどこに「読ませた」か。ドラッグ＆ドロップとモバイルの長押しピッカーの共通の行き先 */
+type Dest = { register: number; side: Side; device?: Device; cashBox?: boolean };
+
+/** レジ画面に落とす＝スキャナに読ませる。決済端末は電子マネー・クレジットカードだけ、スキャナはバーコード（商品・決済用）とポイントカードだけを読む */
+function deliver({ register, side, device, cashBox }: Dest, code?: string, wallet?: string): void {
+  const toScanner = !!code || wallet === "pay:qr" || wallet === "pay:points";
+  if (device === "terminal" && toScanner) return toast("toast-store", "商品・決済用バーコード・ポイントカードは、スキャナにかざしてください", false);
+  if (device === "scanner" && !toScanner && !wallet?.startsWith("cash")) return toast("toast-store", "電子マネー・クレジットカードは、決済端末にかざしてください", false);
+  if (code) return void send({ type: "scan", register, side, code });
+  const [kind, value] = wallet!.split(":");
+  if (kind === "cash") {
+    if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
+    send(cashDrop(register, Number(value)));
+  } else {
+    if (cashBox) return toast("toast-store", "キャッシュレスは、お客様側の決済端末かスキャナにかざしてください", false);
+    send({ type: "tap_emoney", register, method: value as PaymentMethod });
+  }
+}
+
 const MOBILE = window.matchMedia("(max-width: 760px)");
 const isMobile = (): boolean => MOBILE.matches;
 const LONG_PRESS_MS = 500;
 let longPress: { timer: number; x: number; y: number; id: number } | null = null;
 let swallowClick = false;
-let pickFor: { register: number; side: Side; kind: "item" | "wallet" } | null = null;
+let pickFor: Dest | null = null;
 
 const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg") as HTMLDialogElement;
 
-function openPicker(register: number, side: Side, kind: "item" | "wallet"): void {
-  pickFor = { register, side, kind };
-  const title = kind === "item" ? `レジ${register}・${side === "staff" ? "スタッフ側" : "お客様側"}で読む商品` : `レジ${register}の${side === "staff" ? "入金ボックス（現金）" : "決済端末・スキャナ（かざす）"}`;
-  document.getElementById("picker-title")!.textContent = title;
-  const body = document.getElementById("picker-body")!;
-  body.innerHTML = kind === "item" ? shelfPanel(snap, readableCardsShelves()) : walletPanel(snap.emoney_balance);
+/** モバイルの長押しピッカー。デスクトップの「レジ画面＝スキャナ」をそのまま写す：
+ *  レジ画面は Item を上・Wallet を下、スキャナは Wallet を上・Item を下に並べ、どちらからでも全部を読ませられる。
+ *  入金ボックス（現金）と決済端末（かざす）は Wallet だけ */
+function openPicker(dest: Dest): void {
+  pickFor = dest;
+  const { register, side, device, cashBox } = dest;
+  const where = cashBox ? "入金ボックス" : device === "terminal" ? "決済端末" : device === "scanner" ? "スキャナ" : side === "staff" ? "スタッフ側の画面" : "お客様側の画面";
+  document.getElementById("picker-title")!.textContent = `レジ${register}の${where}で読む`;
+  const area = (label: string, html: string) => `<section class="picker-area"><h3 class="picker-area-head">${label}</h3>${html}</section>`;
+  const items = area("Item", shelfPanel(snap));
+  const wallet = area("Wallet", walletPanel(snap.emoney_balance));
+  document.getElementById("picker-body")!.innerHTML = cashBox || device === "terminal" ? wallet : device === "scanner" ? wallet + items : items + wallet;
   pickerDlg().showModal();
 }
 
 function pick(code?: string, wallet?: string): void {
   if (!pickFor) return;
-  const { register, side } = pickFor;
+  const dest = pickFor;
   pickerDlg().close();
   pickFor = null;
-  if (code) return void send({ type: "scan", register, side, code });
-  const [kind, value] = wallet!.split(":");
-  if (kind === "cash") send(cashDrop(register, Number(value)));
-  else send({ type: "tap_emoney", register, method: value as PaymentMethod });
+  deliver(dest, code, wallet);
 }
 
 /** Wallet のお金を入金ボックスに入れる。ふだんは金額の入力と同じ（大きい金種から崩したものとみなす）。
@@ -1275,10 +1283,15 @@ function wireSwipe(): void {
       longPress = null;
       swallowClick = true;
       if (inlet) {
-        openPicker(Number(inlet.dataset.inlet ?? inlet.dataset.terminal ?? inlet.dataset.scanner), inlet.dataset.inlet ? "staff" : "customer", "wallet");
+        const register = Number(inlet.dataset.inlet ?? inlet.dataset.terminal ?? inlet.dataset.scanner);
+        openPicker(
+          inlet.dataset.inlet
+            ? { register, side: "staff", cashBox: true }
+            : { register, side: "customer", device: inlet.dataset.terminal ? "terminal" : "scanner" },
+        );
       } else {
         const [reg, side] = screen!.dataset.drop!.split(":");
-        openPicker(Number(reg), side as Side, "item");
+        openPicker({ register: Number(reg), side: side as Side });
       }
     }, LONG_PRESS_MS);
     longPress = { timer, x: e.clientX, y: e.clientY, id: e.pointerId };

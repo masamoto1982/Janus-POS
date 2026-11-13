@@ -1752,14 +1752,6 @@ function slipShelf(s: Snapshot): string {
   return slips.length ? `<div class="shelf"><h3>荷物の伝票（取り消し用）</h3><div class="items uniform">${slips.join("")}</div></div>` : "";
 }
 
-export function readableCardsShelves(): string {
-  const shelf = (label: string, items: string[]) => `<div class="shelf"><h3>${label}</h3><div class="items uniform">${items.join("")}</div></div>`;
-  return (
-    shelf("ポイント", [item("PC12345678", "ポイントカード", "", "card"), item("PC87654321", "ポイントアプリ", "", "card")]) +
-    shelf("クーポン", [item("CP0001", "引換券", "ソフトドリンク", "coupon"), item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon")])
-  );
-}
-
 /** Wallet のボタンのホバー：そのお金・カードが何のデモンストレーションのために置いてあるか。
  *  使い方（どこに落とすか）は Wallet の見出しのホバーにまとめてあるので、ここには書かない */
 const WALLET_PURPOSE: Record<string, string> = {

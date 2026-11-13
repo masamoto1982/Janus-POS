@@ -1546,7 +1546,7 @@ pub const ANSWERED_CALLS: [CallKind; 4] = [
     CallKind::Voucher,
     CallKind::Tobacco,
 ];
-/// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す（未決定の値の暫定、user に確認中）
+/// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す（user 2026-11-14 に30秒で確定）
 pub const BELL_REMIND_MS: u64 = 30 * 1000;
 
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;

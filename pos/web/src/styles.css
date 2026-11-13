@@ -669,6 +669,9 @@ body.dragging .drop-hint { display: inline; }
 .picker-dlg { width: min(720px, calc(100vw - 16px)); max-height: calc(100dvh - 32px); overflow: auto; }
 .picker-dlg .item { cursor: pointer; touch-action: manipulation; }
 .picker-dlg .tip { display: none; }
+/* 長押しピッカーの Item・Wallet の見出し（デスクトップの右側の見出しと同じ大きさ） */
+.picker-area + .picker-area { margin-top: 16px; }
+.picker-area-head { margin: 0 0 8px; font-size: 16px; }
 @media (max-width: 760px) {
   .top { padding-block: 6px; }
   .top .logo { width: 36px; height: 36px; }
@@ -695,7 +698,7 @@ body.dragging .drop-hint { display: inline; }
   .screens::-webkit-scrollbar { display: none; }
   .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
   .screen-cap { display: none; }
-  .screen, [data-inlet], [data-terminal] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+  .screen, [data-inlet], [data-terminal], [data-scanner] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .money-io { margin-top: 6px; }
   .money-io.face-staff .money-io-cust, .money-io.face-customer .money-io-staff { display: none; }
   .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }

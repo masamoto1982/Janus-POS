@@ -985,8 +985,9 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const ffFirst = !paying && v.lines.some((l) => l.kind === "ff" && l.state === "waiting") && a("check_ff").allowed;
   // 販売期限切れの品を回収するまで会計は押せないので、会計ボタンはグレーアウト（core の checkout が理由つきで拒む）
   const expiredAny = v.lines.some((l) => l.expired);
+  // 一部を払ったあと（電子マネーの残高を使い切って残りを現金で払うときなど）は、合計を残りのお支払い額にする
   const top = regTop(
-    v.total,
+    v.total - r.prepaid,
     itemCount(v.lines),
     (paying && v.method === "cash" && !ro
       ? finishInsert(reg, v.inserted, v.due, a("insert_cash"))
@@ -1497,7 +1498,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
   const top = regTop(
-    c.total,
+    c.total - r.prepaid,
     itemCount(c.lines),
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")

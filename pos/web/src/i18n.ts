@@ -289,6 +289,7 @@ const DICT: Record<string, string> = {
   たばこカートン: "Cigarette carton",
   花火: "Fireworks",
   化粧品: "Cosmetics",
+  トレカ: "Trading cards",
   レシート: "Receipt",
   "金額（税抜）": "Amount (excl. tax)",
   "レシートに収入印紙を貼り付けたら、チェックを入れてください": "Tick once the receipt has a revenue stamp",

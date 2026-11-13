@@ -220,9 +220,12 @@ button.seg { padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: var(--gap); }
 
+/* 入力フォーム：角丸なし・背景なし。枠線は消極ボタンと同じ濃いグレー（--msg-strong）で、操作できるときは青のランプで
+   操作可能部品と同じ青になる。押せない入力欄の枠線はグレー（--border） */
 input, select, button.pad-field {
-  padding: 6px 8px; border-radius: 0; border: 1.5px solid var(--border); background: transparent; color: var(--ink); min-width: 0;
+  padding: 6px 8px; border-radius: 0; border: 1.5px solid var(--msg-strong); background: transparent; color: var(--ink); min-width: 0;
 }
+input:disabled, select:disabled { border-color: var(--border); }
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
 input::placeholder { color: var(--line); opacity: 1; }
 button.pad-field .placeholder { color: var(--line); font-weight: 400; }
@@ -713,8 +716,10 @@ body.dragging .drop-hint { display: inline; }
 
 .staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }
 /* 呼び鈴：操作可能部品の青でベルを描き、背景は注意喚起の黄＝呼び出し中のヘッダーと同じ黄（--call-soft）。押せないときはグレー。
-   呼び出し中のヘッダーと重なっても、青い縁取りで呼び鈴の形がわかる */
-:root { --bell-bg: var(--call-soft); --bell-ink: oklch(0.44 0.11 245); --bell-ring: oklch(0.625 0.15 245); }
+   呼び出し中のヘッダーと重なっても、青い縁取りで呼び鈴の形がわかる。
+   呼び鈴は黄背景を保つため青のランプ（#ramp）を通さないので、ベルも縁も青のランプが濃いグレー（--msg-strong）を
+   写す先の青（main.ts RAMP_STEPS の 0x53）を直接使い、操作可能部品の青と一致させる */
+:root { --operable-blue: oklch(0.4415 0.11 245); --bell-bg: var(--call-soft); --bell-ink: var(--operable-blue); --bell-ring: var(--operable-blue); }
 .bell-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .screen .bell-btn, .screen .bell-btn:disabled { filter: none !important; opacity: 1 !important; }
 .screen .bell-btn:not(:disabled) { background: var(--bell-bg); color: var(--bell-ink); border: 1.5px solid var(--bell-ring); }

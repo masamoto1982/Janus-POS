@@ -380,6 +380,11 @@ pub enum Command {
         register: u8,
         side: Side,
     },
+    /// 販売個数の上限の案内を閉じる
+    CloseLimitAlert {
+        register: u8,
+        side: Side,
+    },
     ResolveEmoneyShort {
         register: u8,
         side: Side,
@@ -555,6 +560,7 @@ impl Command {
             | C::TapEmoney { register, .. }
             | C::StartEmoney { register, .. }
             | C::CloseEmoney { register, .. }
+            | C::CloseLimitAlert { register, .. }
             | C::ResolveEmoneyShort { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
@@ -594,6 +600,7 @@ impl Command {
             | C::HandTickets { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
+            | C::CloseLimitAlert { side, .. }
             | C::ResolveEmoneyShort { side, .. }
             | C::Claim { side, .. } => Some(*side),
             C::CallStaff {
@@ -830,6 +837,9 @@ struct Txn {
     emoney_short: bool,
     emoney_partial: bool,
     emoney_partial_ok: bool,
+    /// 販売個数の上限を超えて登録を断った商品と上限。両画面の登録の代わりに案内を出し、
+    /// バックか次の登録で閉じる（年齢確認と同じくレジの機能）
+    limit_alert: Option<(&'static str, u32)>,
 }
 
 impl Txn {
@@ -2593,6 +2603,11 @@ impl Store {
                     }
                 })
             }
+            C::CloseLimitAlert { register, side } => {
+                self.check(register, side, Action::RemoveLine)?;
+                self.reg_mut(register)?.txn.limit_alert = None;
+                Ok(Outcome::default())
+            }
             C::CloseEmoney { register, side } => {
                 self.check(register, side, Action::Emoney)?;
                 let r = self.reg_mut(register)?;
@@ -2995,16 +3010,19 @@ impl Store {
             .ok_or_else(|| "受付中の荷物が見つかりません".to_string())
     }
 
-    fn check_limit(&self, register: u8, code: &str, add: u32) -> Result<(), String> {
-        let Some(limit) = self.age_rules.limit_for(code) else {
+    /// 販売個数の上限。超える分は登録せず、レジ画面に案内を出す（ブラウザのアラートではない）。
+    /// 上限内の登録は出ている案内を閉じる
+    fn check_limit(&mut self, register: u8, code: &str, add: u32) -> Result<(), String> {
+        let limit = self.age_rules.limit_for(code);
+        let have = self.reg(register).map_or(0, |r| r.txn.qty_of(code));
+        let r = self.reg_mut(register)?;
+        let Some(limit) = limit.filter(|&n| have + add > n) else {
+            r.txn.limit_alert = None;
             return Ok(());
         };
-        let have = self.reg(register).map_or(0, |r| r.txn.qty_of(code));
-        if have + add > limit {
-            let name = catalog::find(code).map_or(code, |p| p.name);
-            return Err(format!("{name}は1回のお会計で{limit}点までです"));
-        }
-        Ok(())
+        let name = catalog::find(code).map_or("この商品", |p| p.name);
+        r.txn.limit_alert = Some((name, limit));
+        Err(format!("{name}は1回のお会計で{limit}点までです"))
     }
 
     /// セルフ操作モードで電子マネーの残高が足りず、お客様が「チャージまたは現金併用」を選んだとき：
@@ -4472,6 +4490,7 @@ impl Store {
                 .unwrap_or(0),
             pickup_handover: r.pickup_handover.clone(),
             receipt_stamp: r.receipt_stamp,
+            limit_alert: r.txn.limit_alert.map(|(name, limit)| LimitAlert { name, limit }),
         }
     }
 }
@@ -4658,6 +4677,15 @@ pub struct RegisterView {
     pub tickets_ahead: usize,
     pub pickup_handover: Option<String>,
     pub receipt_stamp: Option<ReceiptStamp>,
+    /// 販売個数の上限を超えて登録を断った（案内を閉じるまで）
+    pub limit_alert: Option<LimitAlert>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct LimitAlert {
+    pub name: &'static str,
+    pub limit: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

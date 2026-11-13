@@ -4441,4 +4441,20 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
         .map(|l| l.qty)
         .sum();
     assert_eq!(qty, 3);
+    // ブラウザのアラートではなく、レジの機能として両画面に案内を出す
+    let alert = reg(&s, 1).limit_alert.unwrap();
+    assert_eq!((alert.name, alert.limit), ("トレカ", 3));
+    ok(
+        &mut s,
+        json!({"type":"close_limit_alert","register":1,"side":"customer"}),
+    );
+    assert!(reg(&s, 1).limit_alert.is_none());
+    // 上限内の登録でも案内は閉じる
+    let _ = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":card}),
+    );
+    assert!(reg(&s, 1).limit_alert.is_some());
+    scan(&mut s, 1, "customer", BREAD);
+    assert!(reg(&s, 1).limit_alert.is_none());
 }

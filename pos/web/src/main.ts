@@ -675,7 +675,6 @@ function send(cmd: Command): boolean {
   }
   if (!res.ok) {
     if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
-    if (res.error?.includes("1回のお会計で")) setTimeout(() => alert(res.error), 0);
   }
   if (cmd.type.startsWith("parcel_")) {
     if (res.ok) parcelError.delete("register" in cmd ? cmd.register : 0);

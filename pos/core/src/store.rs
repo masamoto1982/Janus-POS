@@ -385,23 +385,6 @@ pub enum Command {
         register: u8,
         side: Side,
     },
-    /// 個数制限フラグを押して販売数量の確認を始める（line_id なしで閉じる）
-    LimitCheck {
-        register: u8,
-        #[serde(default = "staff_side")]
-        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
-        side: Side,
-        line_id: Option<u32>,
-    },
-    /// お客様に伺った販売数量を入力する。上限内なら明細の数量にして個数制限フラグを外す
-    ConfirmLimit {
-        register: u8,
-        #[serde(default = "staff_side")]
-        #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
-        side: Side,
-        line_id: u32,
-        qty: u32,
-    },
     ResolveEmoneyShort {
         register: u8,
         side: Side,
@@ -578,8 +561,6 @@ impl Command {
             | C::StartEmoney { register, .. }
             | C::CloseEmoney { register, .. }
             | C::CloseLimitAlert { register, .. }
-            | C::LimitCheck { register, .. }
-            | C::ConfirmLimit { register, .. }
             | C::ResolveEmoneyShort { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
@@ -620,8 +601,6 @@ impl Command {
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
             | C::CloseLimitAlert { side, .. }
-            | C::LimitCheck { side, .. }
-            | C::ConfirmLimit { side, .. }
             | C::ResolveEmoneyShort { side, .. }
             | C::Claim { side, .. } => Some(*side),
             C::CallStaff {
@@ -740,8 +719,6 @@ pub struct Line {
     /// 払込票の領収証に収入印紙を貼り付けたのを確認した
     #[serde(skip)]
     pub stamped: bool,
-    /// 販売個数に制限のある商品で、スタッフが販売数量を確認した（個数制限フラグが外れる）
-    pub limit_ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub parcel: Option<Parcel>,
@@ -866,10 +843,8 @@ struct Txn {
     /// 販売個数の上限を超えて登録を断った商品と上限。両画面の登録の代わりに案内を出し、
     /// バックか次の登録で閉じる（年齢確認と同じくレジの機能）
     limit_alert: Option<(&'static str, u32)>,
-    /// スタッフが個数制限フラグを押して販売数量を確認している明細
-    limit_check: Option<u32>,
-    /// 販売数量の確認で、上限を超える数が入力された（スタッフ側に警告）
-    limit_over: Option<u32>,
+    /// 販売個数の上限を超えて登録しようとした商品（明細に個数制限のフラグを出す。お会計は止めない）
+    limit_hit: Vec<&'static str>,
 }
 
 impl Txn {
@@ -1089,15 +1064,6 @@ impl Txn {
         self.lines.iter().any(Self::needs_stamp)
     }
 
-    /// 販売個数に制限のある商品で、スタッフが販売数量を確認していない明細がある
-    fn limit_pending(&self, rules: &AgeRules) -> bool {
-        self.lines.iter().any(|l| Self::needs_limit_check(l, rules))
-    }
-
-    fn needs_limit_check(l: &Line, rules: &AgeRules) -> bool {
-        l.kind == LineKind::Item && !l.limit_ok && rules.limit_for(l.code).is_some()
-    }
-
     fn stamp_pending(&self) -> bool {
         self.lines
             .iter()
@@ -1236,7 +1202,6 @@ impl Txn {
             kind,
             slip_no: None,
             stamped: false,
-            limit_ok: false,
             parcel: p.parcel_send.then(|| Parcel {
                 collect: p.parcel_collect,
                 multi: p.parcel_multi,
@@ -1414,7 +1379,6 @@ impl Register {
             has_stamps: t.has_stamps(),
             stamp_pending: t.stamp_pending(),
             expired: t.lines.iter().any(Line::is_expired),
-            limit_pending: t.limit_pending(rules),
             bill_handover: self.bill_handover.is_some() || self.parcel_handover.is_some(),
             receipt_stamp: self.receipt_stamp.is_some(),
             ticket_handover: self.tickets_issued && !self.ticket_handover.is_empty(),
@@ -2644,32 +2608,6 @@ impl Store {
                     }
                 })
             }
-            C::LimitCheck {
-                register,
-                side,
-                line_id,
-            } => {
-                let rules = &self.age_rules;
-                if let Some(id) = line_id {
-                    self.check(register, side, Action::CheckLimit)?;
-                    let r = self.reg(register).ok_or("レジがありません")?;
-                    r.txn
-                        .lines
-                        .iter()
-                        .find(|l| l.id == id && Txn::needs_limit_check(l, rules))
-                        .ok_or("販売数量を確認する明細が見つかりません")?;
-                }
-                let r = self.reg_mut(register)?;
-                r.txn.limit_check = line_id;
-                r.txn.limit_over = None;
-                Ok(Outcome::default())
-            }
-            C::ConfirmLimit {
-                register,
-                side,
-                line_id,
-                qty,
-            } => self.confirm_limit(register, side, line_id, qty),
             C::CloseLimitAlert { register, side } => {
                 self.check(register, side, Action::RemoveLine)?;
                 self.reg_mut(register)?.txn.limit_alert = None;
@@ -3077,52 +3015,6 @@ impl Store {
             .ok_or_else(|| "受付中の荷物が見つかりません".to_string())
     }
 
-    /// 個数制限フラグの販売数量の確認。お客様に伺った数が上限内なら明細の数量にしてフラグを外す。
-    /// 上限を超える数はスタッフ側に警告を出し、入力をやり直してもらう
-    fn confirm_limit(
-        &mut self,
-        register: u8,
-        side: Side,
-        line_id: u32,
-        qty: u32,
-    ) -> Result<Outcome, String> {
-        self.check(register, side, Action::CheckLimit)?;
-        if qty == 0 {
-            return Err("販売数量は1以上で入力してください".into());
-        }
-        let rules = &self.age_rules;
-        let r = self.reg(register).ok_or("レジがありません")?;
-        let l = r
-            .txn
-            .lines
-            .iter()
-            .find(|l| l.id == line_id && Txn::needs_limit_check(l, rules))
-            .ok_or("販売数量を確認する明細が見つかりません")?;
-        let (code, name, old) = (l.code, l.name, l.qty);
-        let limit = rules.limit_for(code).unwrap_or(u32::MAX);
-        let others = r.txn.qty_of(code) - old;
-        if r.txn.item_count() - old + qty > MAX_ITEMS {
-            return Err(ITEMS_FULL.into());
-        }
-        let r = self.reg_mut(register)?;
-        if others + qty > limit {
-            r.txn.limit_over = Some(qty);
-            return done(format!("{name}は1回のお会計で{limit}点までです"));
-        }
-        let l = r
-            .txn
-            .lines
-            .iter_mut()
-            .find(|l| l.id == line_id)
-            .ok_or("明細が見つかりません")?;
-        l.qty = qty;
-        l.limit_ok = true;
-        r.txn.limit_check = None;
-        r.txn.limit_over = None;
-        r.txn.limit_alert = None;
-        done(format!("{name} {qty}点を登録しました"))
-    }
-
     /// 販売個数の上限。超える分は登録せず、レジ画面に案内を出す（ブラウザのアラートではない）。
     /// 上限内の登録は出ている案内を閉じる
     fn check_limit(&mut self, register: u8, code: &str, add: u32) -> Result<(), String> {
@@ -3133,8 +3025,12 @@ impl Store {
             r.txn.limit_alert = None;
             return Ok(());
         };
-        let name = catalog::find(code).map_or("この商品", |p| p.name);
+        let p = catalog::find(code);
+        let name = p.map_or("この商品", |p| p.name);
         r.txn.limit_alert = Some((name, limit));
+        if let Some(p) = p.filter(|p| !r.txn.limit_hit.contains(&p.code)) {
+            r.txn.limit_hit.push(p.code);
+        }
         Err(format!("{name}は1回のお会計で{limit}点までです"))
     }
 
@@ -3363,7 +3259,6 @@ impl Store {
             Scanned::Product(p) => self.tax_for(p.code),
             _ => (String::new(), 0),
         };
-        let limited = matches!(&scanned, Scanned::Product(p) if self.age_rules.limit_for(p.code).is_some());
         let now = self.now;
         let r = self.reg_mut(register)?;
         r.last_receipt = None;
@@ -3525,19 +3420,6 @@ impl Store {
                     r.txn.tobacco_asked = false;
                 }
                 r.txn.push(p, 1, LineKind::Item, tax);
-                if limited
-                    && r.txn.lines.iter().any(|l| l.code == p.code && !l.limit_ok)
-                {
-                    // 個数制限：明細に「個数制限」のフラグ。スタッフが販売数量を確認するまでお会計に進めない
-                    if r.staff_state() != StaffState::Ready {
-                        self.calls.raise(register, CallKind::Voucher, now, p.name);
-                        return done(format!("{}：スタッフをお呼びしました{back}", p.name));
-                    }
-                    return done(format!(
-                        "{}：個数制限のフラグを押して販売数量を確認してください{back}",
-                        p.name
-                    ));
-                }
                 if p.expired() {
                     // 販売期限切れ：明細に「期限切れ」のフラグを出し、回収（取り消す）までお会計に進めない
                     if r.staff_state() != StaffState::Ready {
@@ -4426,6 +4308,7 @@ impl Store {
                 age: self.age_rules.age_for(l.code, l.category),
                 age_checked: t.line_age_checked(self.age_rules.age_for(l.code, l.category)),
                 limit: self.age_rules.limit_for(l.code),
+                limit_hit: t.limit_hit.contains(&l.code),
                 fresh: l.is_fresh(),
                 expired: l.is_expired(),
                 dates: catalog::find(l.code).and_then(|p| p.dates),
@@ -4446,7 +4329,7 @@ impl Store {
                 age: self.age_rules.age_for(l.code, l.category),
                 age_checked: t.line_age_checked(self.age_rules.age_for(l.code, l.category)),
                 limit: self.age_rules.limit_for(l.code),
-                limit_ok: l.limit_ok,
+                limit_hit: t.limit_hit.contains(&l.code),
                 cash_only: l.cash_only,
                 pickup: l.is_pickup(),
                 parcel: l.is_parcel(),
@@ -4619,15 +4502,6 @@ impl Store {
             pickup_handover: r.pickup_handover.clone(),
             receipt_stamp: r.receipt_stamp,
             limit_alert: r.txn.limit_alert.map(|(name, limit)| LimitAlert { name, limit }),
-            limit_check: r.txn.limit_check.and_then(|id| {
-                let l = r.txn.lines.iter().find(|l| l.id == id)?;
-                Some(LimitCheck {
-                    line_id: id,
-                    name: l.name,
-                    limit: self.age_rules.limit_for(l.code)?,
-                    over: r.txn.limit_over,
-                })
-            }),
         }
     }
 }
@@ -4649,6 +4523,8 @@ pub struct StaffLine {
     pub age: Option<u8>,
     pub age_checked: bool,
     pub limit: Option<u32>,
+    /// 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
+    pub limit_hit: bool,
     /// 日配食品（数量を増やせない）
     pub fresh: bool,
     /// 販売期限切れ（回収（取り消す）までお会計に進めない）
@@ -4671,7 +4547,8 @@ pub struct CustomerLine {
     pub age: Option<u8>,
     pub age_checked: bool,
     pub limit: Option<u32>,
-    pub limit_ok: bool,
+    /// 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
+    pub limit_hit: bool,
     pub cash_only: bool,
     pub pickup: bool,
     pub parcel: bool,
@@ -4817,18 +4694,6 @@ pub struct RegisterView {
     pub receipt_stamp: Option<ReceiptStamp>,
     /// 販売個数の上限を超えて登録を断った（案内を閉じるまで）
     pub limit_alert: Option<LimitAlert>,
-    /// スタッフが個数制限フラグを押して販売数量を確認している（両画面に案内、スタッフ側に入力フォーム）
-    pub limit_check: Option<LimitCheck>,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct LimitCheck {
-    pub line_id: u32,
-    pub name: &'static str,
-    pub limit: u32,
-    /// 上限を超えて入力された数（警告を出す）
-    pub over: Option<u32>,
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]

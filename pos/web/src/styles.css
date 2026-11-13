@@ -7,6 +7,7 @@
   --flag-caution: oklch(0.575 0.13 59); --flag-safe: oklch(0.55 0.12 154); --flag-plain: oklch(0.565 0 0);
   /* 阻害因子のある明細の行（淡いオレンジ） */
   --flag-row: color-mix(in oklch, oklch(0.68 0.14 50) 45%, white);
+  --flag-flash: color-mix(in oklch, oklch(0.68 0.14 50) 80%, white);
   --base-pink: oklch(0.883 0.063 32);
   --base-cream: oklch(0.975 0.149 109);
   --base-lime: oklch(0.914 0.180 118);
@@ -626,8 +627,11 @@ body.dragging .drop-hint { display: inline; }
 @keyframes line-flash { from { background: var(--flash); } to { background: transparent; } }
 .lines tr.flash td { animation: line-flash .9s ease-out; }
 @media (prefers-reduced-motion: reduce) { .lines tr.flash td { animation: none; background: var(--flash); } }
-/* フラグのある明細は登録時の灰色を出さず、はじめからフラグの色で塗る（灰色のあとに色が遅れて付いて見えるため） */
-.lines tr.flagged.flash > td { animation: none; background: var(--flag-row); }
+/* フラグのある明細は灰色のフラッシュの代わりに、濃いめのフラグ色を一瞬出してフラグ行の色に戻す（追加・数量の増減とも）。
+   灰色のあとに色が遅れて付いて見えないよう、行の色は最初からフラグ色 */
+@keyframes flag-flash { from { background: var(--flag-flash); } to { background: var(--flag-row); } }
+.lines tr.flagged.flash > td { animation: flag-flash .9s ease-out; background: var(--flag-row); }
+@media (prefers-reduced-motion: reduce) { .lines tr.flagged.flash > td { animation: none; background: var(--flag-flash); } }
 
 /* 数量フォームのある明細：見出し「数量」・数字・入力欄を列の中央に揃える（−・入力欄・＋は同じ幅なので入力欄が列の中心） */
 .lines.cols3:has(.qty-step) :is(th, td):nth-child(2) { text-align: center; }

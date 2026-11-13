@@ -28,6 +28,7 @@ pub enum Category {
     Bag,
     Service,
     Stamp,
+    Voucher,
 }
 
 impl Category {
@@ -49,6 +50,7 @@ impl Category {
             Category::Bag => "レジ袋",
             Category::Service => "サービス",
             Category::Stamp => "切手",
+            Category::Voucher => "金券",
         }
     }
 
@@ -68,6 +70,7 @@ impl Category {
         Category::FastFood,
         Category::Bag,
         Category::Service,
+        Category::Voucher,
     ];
 }
 
@@ -249,8 +252,9 @@ pub const CATALOG: &[Product] = &[
     // 年確18。20歳の確認を済ませたあとに加わると、確認をやり直すデモ
     p("4910000000076", "花火", 980, Standard10, Fireworks),
     p("4910000000069", "化粧品", 2200, Standard10, Daily),
-    // トレーディングカード（1パック）。品薄になりやすく、販売規則の個数制限で1回のお会計3パックまで
-    p(TRADING_CARD, "トレカ", 180, Standard10, Daily),
+    // トレーディングカード（1パック）。金券の扱いで、スタッフ操作モードでだけ売る。
+    // 品薄になりやすく、販売規則の個数制限で1回のお会計3パックまで（スタッフが販売数量を確認する）
+    p(TRADING_CARD, "トレカ", 180, Standard10, Voucher),
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
     p("4900000000141", "切手", 110, Standard10, Stamp),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),

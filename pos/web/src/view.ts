@@ -3,6 +3,7 @@ import type {
   ActionState,
   EmoneyKind,
   LimitAlert,
+  LimitCheck,
   ShortChoice,
   BillRow,
   Parcel,
@@ -196,6 +197,27 @@ function serviceFlag(l: { kind: string; done?: boolean; cash_only: boolean; parc
   if (l.pickup) return flagSpan(typeof l.pickup === "object" && l.pickup.missing ? "見つかりません" : "照合待ち");
   if (l.parcel) return flagSpan(typeof l.parcel === "object" && l.parcel.size ? "届け先未定" : "受付中");
   return flagSpan("受付待ち");
+}
+
+/** 個数制限フラグ（年確フラグと同じかたち）。スタッフが販売数量を確認するまで出て、お会計に進めない。
+ *  スタッフ側では押すと販売数量の確認（両画面に案内、スタッフ側に入力フォーム） */
+function limitFlag(l: { kind: string; limit: number | null; limit_ok: boolean }, cmd?: Command, st?: Gate): string {
+  if (!l.limit || l.limit_ok || l.kind !== "item") return "";
+  return cmd && st?.allowed ? btn(`限定${l.limit}`, cmd, st, "flag") : flagSpan(`限定${l.limit}`);
+}
+
+/** 個数制限フラグを押したときの販売数量の確認。両画面に上限の案内、スタッフ側にはお伺いした数の入力フォームと左下のバック。
+ *  上限を超える数を入れると、スタッフ側にだけ警告を出す */
+function limitCheckScreen(reg: number, side: Side, chk: LimitCheck, st: Gate | null): string {
+  const head = esc(`${chk.name}は1回のお会計で${chk.limit}点までです`);
+  if (!st) return `<div class="point-screen pair-note limit-screen">${msg(head, "ご購入数量をスタッフにお伝えください")}</div>`;
+  const field = padField(reg, side, "lmt", "", "", "販売数量", chk.line_id);
+  const over = chk.over === null ? "" : `<p class="ticket-alert">${chk.over}点は販売制限を超えています<br>${chk.limit}点以下で入力してください</p>`;
+  return `<div class="point-screen limit-screen staff-only">
+      ${msg(head, "お客様に販売数量をお伺いし、入力してください")}
+      <div class="parcel-fields"><label>${field}<span>点</span></label></div>
+      ${over}
+    </div>${backCorner({ type: "limit_check", register: reg, side, line_id: null }, st)}`;
 }
 
 function ageFlag(l: { age: number | null; age_checked?: boolean }, cmd?: Command, st?: Gate): string {
@@ -591,6 +613,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
     stampFlag(reg, side, v.bills.find((b) => b.line_id === l.id), find(v.actions, "affix_stamp"), ro),
     serviceFlag(l),
     ro ? ageFlag(l) : ageFlag(l, { type: "early_age_check", register: reg, side: "staff", start: true }, find(v.actions, "early_age_check")),
+    ro ? limitFlag(l) : limitFlag(l, { type: "limit_check", register: reg, side: "staff", line_id: l.id }, find(v.actions, "check_limit")),
   ].filter(Boolean);
   const remove = find(v.actions, "remove_line");
   let svc = "";
@@ -655,7 +678,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "lmt" | "inlet" | "mamt" | "mpw" | "ppt";
 export type PadEntry = { target: PadTarget; line?: number; digits: string };
 export const padEntry = new Map<string, PadEntry>();
 export const padValue = new Map<string, string>();
@@ -668,6 +691,7 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   ffv: { title: "お渡し数", unit: "", max: 3, code: true },
   tkh: { title: "お渡し枚数", unit: "枚", max: 3, code: true },
   tkr: { title: "受け取り枚数", unit: "枚", max: 3, code: true },
+  lmt: { title: "販売数量", unit: "点", max: 2, code: true },
   inlet: { title: "入金", unit: "円", max: 6 },
   mamt: { title: "出金する金額", unit: "円", max: 6 },
   mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
@@ -1023,6 +1047,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
+  if (!paying && r.limit_check)
+    return screen(limitCheckScreen(reg, side, r.limit_check, ro ? null : a("check_limit")));
   if (!paying && r.limit_alert)
     return screen(limitScreen(reg, side, r.limit_alert, ro || !a("remove_line").allowed ? null : a("remove_line"), side === "staff"));
   if (!ro && !paying && a("remove_line").allowed && expiredOpen(reg, side, v.lines))
@@ -1440,7 +1466,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks(r.last_receipt)));
 
   const lineRows = c.lines.map((l): Row => {
-      const tags = [expiredFlag(reg, side, l, a("remove_line").allowed), stampFlag(reg, side, c.bills.find((b) => b.line_id === l.id), a("affix_stamp"), true), serviceFlag(l), ageFlag(l)].filter(Boolean);
+      const tags = [expiredFlag(reg, side, l, a("remove_line").allowed), stampFlag(reg, side, c.bills.find((b) => b.line_id === l.id), a("affix_stamp"), true), serviceFlag(l), ageFlag(l), limitFlag(l)].filter(Boolean);
       const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
       const n = l.tickets || l.qty;
       const qty =
@@ -1474,6 +1500,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   // セルフ操作モードで「現金」を選ぶと店員呼び出し、お客様側は支払方法の選択から案内画面に切り替わる
   if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
+  if (c.phase === "registering" && r.limit_check)
+    return screen(limitCheckScreen(reg, side, r.limit_check, side === "staff" && a("check_limit").allowed ? a("check_limit") : null));
   if (c.phase === "registering" && r.limit_alert)
     return screen(limitScreen(reg, side, r.limit_alert, a("remove_line").allowed ? a("remove_line") : null, side === "staff"));
   if (c.phase === "registering" && a("remove_line").allowed && expiredOpen(reg, side, c.lines))
@@ -1688,7 +1716,7 @@ const PURPOSE: Record<string, string> = {
   "4900000000158": "コンビニでは高額な品、まとめ買いで税抜5万円を超え、レシートの収入印紙の確認を再現する",
   "4910000000076": "年齢確認（18歳）、20歳の年齢確認を済ませたあとに登録すると、18歳の確認をやり直すことを確かめる",
   "4910000000069": "コンビニでは高額な品、たばこカートンと合わせて、またはセルフ操作モードでも25個で税抜5万円になり、収入印紙の確認を再現する",
-  "4910000000090": "コンビニの販売制限商品の代表格、販売規則の個数制限で1回のお会計3パックまで、4パック目はスキャンしても登録されないことを確かめる",
+  "4910000000090": "コンビニの販売制限商品の代表格（金券の扱い）、スタッフがログインしているレジでのみ扱え、個数制限フラグからお客様に伺った販売数量を入力し、1回のお会計3パックまでに抑える",
   "4900000000134": "法令ではなく店舗の判断で年齢確認（20歳）を行う例",
   "4900000000141": "現金でしか買えない商品、スタッフがログインしているレジでのみ扱える",
   "2000000000015": "有料のレジ袋、待ち受けの「レジ袋」案内と対になる登録",
@@ -1716,9 +1744,9 @@ function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
-/** スタッフがログインしているレジ（スタッフ操作モード）でだけ扱えるカテゴリ（たばこ・切手）。
+/** スタッフがログインしているレジ（スタッフ操作モード）でだけ扱えるカテゴリ（たばこ・切手・金券）。
  *  どのレジにもスタッフがいないあいだは Item エリアでグレーアウトし、ドラッグできない */
-const STAFF_ONLY_SHELF = ["tobacco", "stamp"];
+const STAFF_ONLY_SHELF = ["tobacco", "stamp", "voucher"];
 const STAFF_ONLY_OFF = "スタッフがログインしているレジでのみ扱えます";
 
 export function shelfPanel(s: Snapshot, extra = ""): string {
@@ -1739,11 +1767,11 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
             PARCEL_CODES.includes(p.code)
             ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
             : STAFF_ONLY_SHELF.includes(p.category) && !staffOperated
-              ? item(p.code, p.name, `${yen(p.price)}${p.age ? ` ・<b>年確${p.age}</b>` : ""}`, "off", STAFF_ONLY_OFF)
+              ? item(p.code, p.name, `${yen(p.price)}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}`, "off", STAFF_ONLY_OFF)
               : item(
                 p.code,
                 p.name,
-                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${datesSub(p)}`,
+                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}${datesSub(p)}`,
                 p.category === "tobacco" && asked ? "call-blink" : "",
               ),
       )

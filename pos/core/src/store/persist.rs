@@ -227,6 +227,8 @@ struct SavedLine {
     slip_no: Option<String>,
     #[serde(default)]
     stamped: bool,
+    #[serde(default)]
+    limit_ok: bool,
     parcel: Option<SavedParcel>,
     pickup: Option<Pickup>,
 }
@@ -268,6 +270,7 @@ impl SavedLine {
             kind: l.kind,
             slip_no: l.slip_no.clone(),
             stamped: l.stamped,
+            limit_ok: l.limit_ok,
             parcel: l.parcel.as_ref().map(|p| SavedParcel {
                 sum_cm: p.sum_cm,
                 weight_g: p.weight_g,
@@ -301,6 +304,7 @@ impl SavedLine {
             kind: self.kind,
             slip_no: self.slip_no,
             stamped: self.stamped,
+            limit_ok: self.limit_ok,
             parcel: self.parcel.map(|p| Parcel {
                 sum_cm: p.sum_cm,
                 weight_g: p.weight_g,
@@ -406,6 +410,8 @@ impl SavedTxn {
             emoney_partial: self.emoney_partial,
             emoney_partial_ok: self.emoney_partial_ok,
             limit_alert: None,
+            limit_check: None,
+            limit_over: None,
         })
     }
 }

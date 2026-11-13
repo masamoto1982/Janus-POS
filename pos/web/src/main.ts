@@ -600,6 +600,9 @@ function padKey(key: string, k: string): void {
     } else if (e.target === "tkh") {
       if (e.digits === "") return;
       send({ type: "hand_tickets", register, side: "staff", handed: value });
+    } else if (e.target === "lmt") {
+      if (e.digits === "") return;
+      send({ type: "confirm_limit", register, side: "staff", line_id: e.line!, qty: value });
     } else if (e.target === "tkr") {
       if (e.digits === "") return;
       send({ type: "receive_tickets", register, side: "customer", received: value });

@@ -29,8 +29,7 @@ const FF_RECEIVED_SELF: &str =
 /// 一つを読んで数量を増やすと、期限切れの品がお客様に渡ってしまう（ポカヨケ）
 pub const FRESH_ONE_BY_ONE: &str = "日配食品は数量を増やせません\n一点ずつスキャンしてください";
 const CASH_ONLY: &str = "現金のみ取り扱いいたします";
-const NO_CASH_MIX: &str =
-    "クレジットカード・バーコード決済は現金と併用できません";
+const NO_CASH_MIX: &str = "クレジットカード・バーコード決済は現金と併用できません";
 const TICKETS_FIRST: &str = "チケットのお渡しが済むまで、次の取引は始められません";
 const TICKET_ALONE: &str =
     "チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）";
@@ -413,6 +412,10 @@ pub enum Command {
     ReleaseCall {
         register: u8,
     },
+    /// お客様が自分で呼んだ呼び出し（呼び鈴・FF・サービス・金券・たばこ）を取り消す（押し間違い用）
+    CancelCall {
+        register: u8,
+    },
     VoidTransaction {
         register: u8,
     },
@@ -564,6 +567,7 @@ impl Command {
             | C::ResolveEmoneyShort { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
+            | C::CancelCall { register }
             | C::ConfirmPointCard { register, .. }
             | C::UsePoints { register, .. }
             | C::VoidTransaction { register, .. }
@@ -607,7 +611,7 @@ impl Command {
                 topic: Some(CallTopic::Sos),
                 ..
             } => None,
-            C::FfButton { .. } | C::CallStaff { .. } => Some(Side::Customer),
+            C::FfButton { .. } | C::CallStaff { .. } | C::CancelCall { .. } => Some(Side::Customer),
             C::CashOut { .. } | C::CashIn { .. } => Some(Side::Staff),
             C::OpenMenu { .. } => Some(Side::Staff),
             C::CompleteService { .. }
@@ -811,6 +815,8 @@ impl Line {
 struct Txn {
     parcel_ask: bool,
     tobacco_asked: bool,
+    /// スタッフのログインで応答した、お客様の呼び出しの用件（取引が終わるまでスタッフ側に出す）
+    answered: Vec<CallKind>,
     lines: Vec<Line>,
     next_line: u32,
     paying: bool,
@@ -1425,6 +1431,9 @@ pub struct Store {
     signal: BellSignal,
     seen_raised: u64,
     presses: u64,
+    /// 呼び鈴が最後に鳴った時刻と、そのときの presses（応答のない呼び出しの鳴らし直し用、保存しない）
+    rung_at: u64,
+    rung_presses: u64,
     receipts: u32,
     emoney_balance: u32,
     /// ポイントカードの番号ごとの残高（ポイント）
@@ -1492,7 +1501,11 @@ fn ymd(s: &str) -> Option<(u32, u32, u32)> {
 }
 
 pub fn age_on(birth: &str, today: &str) -> Result<u8, String> {
-    let (by, bm, bd) = ymd(birth).ok_or("生年月日を西暦 8 桁で入力してください（例：19821002）")?;
+    let birth = birth.trim();
+    if birth.len() != 8 || !birth.bytes().all(|b| b.is_ascii_digit()) {
+        return Err("西暦8桁で入力してください".into());
+    }
+    let (by, bm, bd) = ymd(birth).ok_or("存在しない日付です")?;
     let (ty, tm, td) = ymd(today).ok_or("日付が正しくありません")?;
     if (by, bm, bd) > (ty, tm, td) {
         return Err("生年月日が今日より後です".into());
@@ -1517,6 +1530,24 @@ pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 /// 呼び鈴が EMERGENCY_WINDOW_MS 以上鳴らしっぱなし、または EMERGENCY_WINDOW_MS 以内に EMERGENCY_PRESSES 回以上鳴らされた
 pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
 pub const EMERGENCY_PRESSES: usize = 10;
+
+/// お客様が呼び鈴・最下段のボタンで呼べる用件。呼び出し中はお客様側に案内と「取り消し」を出す
+pub const CUSTOMER_CALLS: [CallKind; 5] = [
+    CallKind::CustomerHelp,
+    CallKind::FastFood,
+    CallKind::Service,
+    CallKind::Voucher,
+    CallKind::Tobacco,
+];
+/// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはスタッフ側に残す（取引が終わるまで）
+pub const ANSWERED_CALLS: [CallKind; 4] = [
+    CallKind::FastFood,
+    CallKind::Service,
+    CallKind::Voucher,
+    CallKind::Tobacco,
+];
+/// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す（未決定の値の暫定、user に確認中）
+pub const BELL_REMIND_MS: u64 = 30 * 1000;
 
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
@@ -1579,6 +1610,8 @@ impl Store {
             signal: BellSignal::default(),
             seen_raised: 0,
             presses: 0,
+            rung_at: 0,
+            rung_presses: 0,
             receipts: 0,
             emoney_balance: EMONEY_INITIAL,
             point_balances: initial_point_balances(),
@@ -1630,6 +1663,17 @@ impl Store {
         if self.calls.raised > self.seen_raised {
             self.seen_raised = self.calls.raised;
             self.presses += 1;
+        }
+        // 応答のない呼び出しが残っていれば、最後に鳴ってから BELL_REMIND_MS ごとに鳴らし直す
+        // （エマージェンシーモードの回数には数えない：press_log はお客様が押したときだけ増える）
+        if self.presses != self.rung_presses {
+            self.rung_presses = self.presses;
+            self.rung_at = now;
+        } else if !self.calls.open.is_empty() && now.saturating_sub(self.rung_at) >= BELL_REMIND_MS
+        {
+            self.presses += 1;
+            self.rung_presses = self.presses;
+            self.rung_at = now;
         }
         let mut signal = self.signal;
         signal.held = self.registers.iter().filter(|r| r.pressing).count();
@@ -1798,7 +1842,9 @@ impl Store {
         done(if cash {
             format!("ポイントで {used}円 お支払いしました\n残り {rest}円を現金でお支払いください")
         } else {
-            format!("ポイントで {used}円 お支払いしました\n残り {rest}円のお支払い方法を選んでください")
+            format!(
+                "ポイントで {used}円 お支払いしました\n残り {rest}円のお支払い方法を選んでください"
+            )
         })
     }
 
@@ -1999,11 +2045,11 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 r.txn.lines.retain(|l| l.id != line_id);
                 // 複数口の続きをやめたときは、同じお届け先の荷物を尋ねる画面に戻る
-                r.txn.parcel_ask = r
-                    .txn
-                    .lines
-                    .iter()
-                    .any(|l| l.parcel.as_ref().is_some_and(|p| p.multi && p.postal.is_some()));
+                r.txn.parcel_ask = r.txn.lines.iter().any(|l| {
+                    l.parcel
+                        .as_ref()
+                        .is_some_and(|p| p.multi && p.postal.is_some())
+                });
                 if !r.txn.service_pending() {
                     self.calls.resolve(register, CallKind::Service, now);
                 }
@@ -2640,7 +2686,9 @@ impl Store {
                 let r = self.reg_mut(register)?;
                 if choice == ShortChoice::Staff {
                     if r.mode != Mode::SelfOperated {
-                        return Err("スタッフ操作モードでは、その場でチャージ・現金併用を選べます".into());
+                        return Err(
+                            "スタッフ操作モードでは、その場でチャージ・現金併用を選べます".into(),
+                        );
                     }
                     self.call_emoney_short(register);
                     return done("スタッフをお呼びしました\nチャージまたは現金併用はスタッフがお手伝いします");
@@ -2782,6 +2830,21 @@ impl Store {
                 r.pressing = false;
                 r.press_since = None;
                 done("")
+            }
+            C::CancelCall { register } => {
+                self.check_active(register, Action::CallStaff)?;
+                let kinds = self.customer_calls(register);
+                if kinds.is_empty() {
+                    return Err("取り消す呼び出しはありません".into());
+                }
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                r.pressing = false;
+                r.press_since = None;
+                for k in kinds {
+                    self.calls.resolve(register, k, now);
+                }
+                done("呼び出しを取り消しました")
             }
             C::VoidTransaction { register } => {
                 self.check_active(register, Action::VoidTransaction)?;
@@ -3002,7 +3065,10 @@ impl Store {
         if !r.txn.service_pending() {
             self.calls.resolve(register, CallKind::Service, now);
         }
-        done(format!("{size} サイズ・{}あて：料金 {fee}円", region.label()))
+        done(format!(
+            "{size} サイズ・{}あて：料金 {fee}円",
+            region.label()
+        ))
     }
 
     fn pending_parcel(&mut self, register: u8, line_id: u32) -> Result<&mut Parcel, String> {
@@ -3039,9 +3105,24 @@ impl Store {
     /// 他の決済を使うならスタッフの無駄足になるため）。スタッフがログインすると、スタッフ操作モードの
     /// 「電子マネーの残高が足りません」（不足額を現金で払う／チャージする）につながる
     fn call_emoney_short(&mut self, register: u8) {
-        if self.reg(register).is_some_and(|r| r.mode == Mode::SelfOperated) {
-            self.calls.raise(register, CallKind::Emoney, self.now, "残高不足");
+        if self
+            .reg(register)
+            .is_some_and(|r| r.mode == Mode::SelfOperated)
+        {
+            self.calls
+                .raise(register, CallKind::Emoney, self.now, "残高不足");
         }
+    }
+
+    /// お客様が自分で呼んだ、まだ応答のない呼び出し（取り消せるもの）。
+    /// サービスは、受付待ちのサービス商品があるときはお客様の取り消しの対象にしない（商品の登録が呼んでいるため）
+    fn customer_calls(&self, register: u8) -> Vec<CallKind> {
+        let service_pending = self.reg(register).is_some_and(|r| r.txn.service_pending());
+        CUSTOMER_CALLS
+            .into_iter()
+            .filter(|&k| self.calls.is_open(register, k))
+            .filter(|&k| !(k == CallKind::Service && service_pending))
+            .collect()
     }
 
     fn call(&mut self, register: u8, kind: CallKind, detail: &str) {
@@ -3210,6 +3291,14 @@ impl Store {
             r.pressing = false;
             r.press_since = None;
             let service_pending = r.txn.service_pending();
+            for k in ANSWERED_CALLS {
+                if self.calls.is_open(register, k) {
+                    let t = &mut self.reg_mut(register)?.txn;
+                    if !t.answered.contains(&k) {
+                        t.answered.push(k);
+                    }
+                }
+            }
             self.calls.resolve(register, CallKind::CustomerHelp, now);
             if self.calls.is_open(register, CallKind::Tobacco) {
                 self.reg_mut(register)?.txn.tobacco_asked = true;
@@ -3711,7 +3800,7 @@ impl Store {
         // （テンキーで 2000 と打った場合は千円札 2 枚とみなすので、これに当たらない）
         if d == 2_000 {
             self.reg_mut(register)?.outlet.merge(&c);
-            return done("二千円札はお取り扱いしていません\n出金ボックスからお受け取りください");
+            return done("二千円札を出金ボックスに返却しました（取り扱い対象外）");
         }
         if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
             return self.charge_cash(register, c);
@@ -3953,7 +4042,12 @@ impl Store {
             .find_map(|l| l.pickup.as_ref())
             .map(|p| p.no.clone());
         // ポイントで払い切ったときも、その分にはポイントを付けない
-        let points_used = txn.points_used() + if method == PaymentMethod::Points { due } else { 0 };
+        let points_used = txn.points_used()
+            + if method == PaymentMethod::Points {
+                due
+            } else {
+                0
+            };
         let earned = if txn.point_card.is_some() {
             txn.point_eligible().saturating_sub(points_used) / YEN_PER_POINT
         } else {
@@ -3973,7 +4067,14 @@ impl Store {
                 (Some(PaymentMethod::Emoney), _) => "電子マネー・現金",
                 (Some(PaymentMethod::Qr), _) => "バーコード決済・現金",
                 (Some(PaymentMethod::Credit), _) => "クレジットカード・現金",
-                _ if txn.free() && txn.lines.iter().any(|l| l.parcel.as_ref().is_some_and(|p| p.collect)) => "着払い",
+                _ if txn.free()
+                    && txn
+                        .lines
+                        .iter()
+                        .any(|l| l.parcel.as_ref().is_some_and(|p| p.collect)) =>
+                {
+                    "着払い"
+                }
                 _ if txn.free() => "お支払いなし",
                 _ => method.label(),
             },
@@ -4352,6 +4453,16 @@ impl Store {
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
             tobacco_asked: r.mode == Mode::StaffOperated && t.tobacco_asked,
+            answered: if r.mode == Mode::StaffOperated {
+                t.answered.clone()
+            } else {
+                vec![]
+            },
+            customer_calls: if r.mode == Mode::SelfOperated {
+                self.customer_calls(r.id)
+            } else {
+                vec![]
+            },
             mode: r.mode,
             mode_label: r.mode.label(),
             outlet: r.outlet.total(),
@@ -4481,7 +4592,9 @@ impl Store {
             .into_iter()
             .filter_map(|m| {
                 let empty = m == PaymentMethod::Points
-                    && t.point_card.as_deref().is_some_and(|no| self.point_balance(no) == 0);
+                    && t.point_card
+                        .as_deref()
+                        .is_some_and(|no| self.point_balance(no) == 0);
                 t.method_refusal(m)
                     .or(empty.then_some(NO_POINT_BALANCE))
                     .map(|reason| Unavailable { method: m, reason })
@@ -4501,7 +4614,10 @@ impl Store {
                 .unwrap_or(0),
             pickup_handover: r.pickup_handover.clone(),
             receipt_stamp: r.receipt_stamp,
-            limit_alert: r.txn.limit_alert.map(|(name, limit)| LimitAlert { name, limit }),
+            limit_alert: r
+                .txn
+                .limit_alert
+                .map(|(name, limit)| LimitAlert { name, limit }),
         }
     }
 }
@@ -4655,6 +4771,10 @@ pub struct RegisterView {
     pub call_waiting_ms: Option<u64>,
     pub ring_volume: f32,
     pub tobacco_asked: bool,
+    /// スタッフのログインで応答した呼び出しの用件（スタッフ操作モードのスタッフ側に出す）
+    pub answered: Vec<CallKind>,
+    /// お客様が呼んだ、まだ応答のない呼び出し（セルフ操作モード）。お客様側に案内と「取り消し」を出す
+    pub customer_calls: Vec<CallKind>,
     pub mode: Mode,
     pub mode_label: &'static str,
     pub outlet: u32,

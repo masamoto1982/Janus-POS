@@ -544,7 +544,10 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     let pc = |s: &Store, i: usize| reg(s, 2).staff.lines[i].line.parcel.clone().unwrap();
     assert!(pc(&s, 0).collect && pc(&s, 0).fee == 940);
     assert_eq!(reg(&s, 2).customer.total, 0);
-    assert!(!reg(&s, 2).staff.parcel_ask, "複数口でなければ伝票ごとに受付が済む");
+    assert!(
+        !reg(&s, 2).staff.parcel_ask,
+        "複数口でなければ伝票ごとに受付が済む"
+    );
     scan(&mut s, 2, "staff", PARCEL_COLLECT);
     let id2 = pending_parcel(&s, 2);
     ok(
@@ -959,8 +962,10 @@ fn bell_rings_despite_loss_and_reports_link_down() {
     assert!(!snap.bells[0].buzzing, "stops once released");
     let before = snap.bells[0].rings;
     advance(&mut s, 60_000);
-    assert_eq!(s.snapshot().bells[0].rings, before);
-    assert!(!s.snapshot().bells[0].buzzing);
+    assert!(
+        s.snapshot().bells[0].rings > before,
+        "rings again while the call is unanswered"
+    );
     assert!(reg(&s, 2).lamp, "the lamp stays on until staff arrives");
 
     ok(
@@ -1454,7 +1459,7 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
             );
             advance(&mut s, 50);
             ok(&mut s, json!({"type":"release_call","register":1}));
-            advance(&mut s, 30_000);
+            advance(&mut s, 20_000);
             let snap = s.snapshot();
             assert_eq!(
                 snap.bells[0].rings,
@@ -2059,7 +2064,10 @@ fn points_pay_only_for_point_eligible_goods() {
     let r = reg(&s, 1).last_receipt.expect("決済済み");
     assert_eq!(r.method, "ポイント利用・クレジットカード");
     assert_eq!(r.points_used, sand);
-    assert_eq!(r.points, 0, "no points on the part paid by points or on tobacco");
+    assert_eq!(
+        r.points, 0,
+        "no points on the part paid by points or on tobacco"
+    );
     assert_eq!(r.point_balance, Some(1_250 - sand));
 
     let mut s = Store::new(1, 2, 1);
@@ -2507,7 +2515,11 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     assert_eq!(v.staff.method, Some(PaymentMethod::Points));
     scan(&mut s, 1, "staff", "PC12345678");
     let v = reg(&s, 1);
-    assert_eq!(v.staff.phase, Phase::Paying, "reading the card keeps the payment screen");
+    assert_eq!(
+        v.staff.phase,
+        Phase::Paying,
+        "reading the card keeps the payment screen"
+    );
     assert_eq!(v.staff.method, Some(PaymentMethod::Points));
     use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
@@ -4059,13 +4071,20 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
-    assert!(reg(&s, 1).staff.calls.is_empty(), "残高不足の時点では呼ばない");
+    assert!(
+        reg(&s, 1).staff.calls.is_empty(),
+        "残高不足の時点では呼ばない"
+    );
     ok(
         &mut s,
         json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"staff"}),
     );
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
-    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
+    assert!(reg(&s, 1)
+        .staff
+        .calls
+        .iter()
+        .any(|c| c.label == "電子マネー"));
     assert!(
         run(
             &mut s,
@@ -4074,7 +4093,11 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
         .is_err(),
         "呼んだあとは他の決済に切り替えない（スタッフの無駄足になる）"
     );
-    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "電子マネー"));
+    assert!(reg(&s, 1)
+        .staff
+        .calls
+        .iter()
+        .any(|c| c.label == "電子マネー"));
 
     // スタッフがログインすると、スタッフ操作モードの残高不足の画面につながり、不足額を現金で払える
     let mut s = Store::new(1, 2, 1);
@@ -4096,7 +4119,10 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
         &mut s,
         json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash_confirmed"}),
     );
-    ok(&mut s, json!({"type":"tap_emoney","register":1,"method":"emoney"}));
+    ok(
+        &mut s,
+        json!({"type":"tap_emoney","register":1,"method":"emoney"}),
+    );
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().method, "電子マネー・現金");
@@ -4133,7 +4159,10 @@ fn points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card() {
     no_id_check(&mut s, 1);
     pay_cash(&mut s, 1);
     let r = reg(&s, 1).last_receipt.expect("決済済み");
-    assert_eq!((r.points, r.points_used, r.point_balance), (3, 0, Some(1_253)));
+    assert_eq!(
+        (r.points, r.points_used, r.point_balance),
+        (3, 0, Some(1_253))
+    );
 
     scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "staff", "PC12345678");
@@ -4161,7 +4190,11 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
     let v = reg(&s, 1);
     assert_eq!((v.prepaid, v.staff.due), (1, 919));
     assert_eq!(v.staff.method, None);
-    assert_eq!(v.points.earn, (320 - 1) / 200, "no points on the part paid by points");
+    assert_eq!(
+        v.points.earn,
+        (320 - 1) / 200,
+        "no points on the part paid by points"
+    );
     ok(
         &mut s,
         json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
@@ -4209,7 +4242,10 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
     );
     use_points(&mut s, 1, "all", None);
     pay_cash(&mut s, 1);
-    assert_eq!(reg(&s, 1).last_receipt.and_then(|r| r.point_balance), Some(0));
+    assert_eq!(
+        reg(&s, 1).last_receipt.and_then(|r| r.point_balance),
+        Some(0)
+    );
     scan(&mut s, 1, "staff", BREAD);
     scan(&mut s, 1, "staff", "PC87654321");
     ok(
@@ -4256,10 +4292,7 @@ fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
         scan(s, 1, "staff", SANDWICH);
         scan(s, 1, "staff", BREAD);
         scan(s, 1, "staff", TOBACCO);
-        ok(
-            s,
-            json!({"type":"checkout","register":1,"side":"staff"}),
-        );
+        ok(s, json!({"type":"checkout","register":1,"side":"staff"}));
         no_id_check(s, 1);
         ok(
             s,
@@ -4426,7 +4459,13 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
     let card = janus_pos_core::catalog::TRADING_CARD;
     // 既定の販売規則：トレカは3点まで、花火は（法令ではなく）店舗の判断で年確18
     let snap = s.snapshot();
-    let find = |code: &str| snap.catalog.iter().find(|p| p.code == code).unwrap().clone();
+    let find = |code: &str| {
+        snap.catalog
+            .iter()
+            .find(|p| p.code == code)
+            .unwrap()
+            .clone()
+    };
     assert_eq!(find(card).limit, Some(3));
     let fireworks = find("4910000000076");
     assert_eq!((fireworks.store_age, fireworks.legal_age), (Some(18), None));
@@ -4462,10 +4501,24 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
     );
     assert!(reg(&s, 1).limit_alert.is_some());
     scan(&mut s, 1, "customer", BREAD);
-    assert!(reg(&s, 1).limit_alert.is_none());    // 上限を超えようとした明細にだけ個数制限のフラグ（お会計は止めない）
+    assert!(reg(&s, 1).limit_alert.is_none()); // 上限を超えようとした明細にだけ個数制限のフラグ（お会計は止めない）
     let r = reg(&s, 1);
-    assert!(r.customer.lines.iter().find(|l| l.name == "トレカ").unwrap().limit_hit);
-    assert!(!r.customer.lines.iter().find(|l| l.name != "トレカ").unwrap().limit_hit);
+    assert!(
+        r.customer
+            .lines
+            .iter()
+            .find(|l| l.name == "トレカ")
+            .unwrap()
+            .limit_hit
+    );
+    assert!(
+        !r.customer
+            .lines
+            .iter()
+            .find(|l| l.name != "トレカ")
+            .unwrap()
+            .limit_hit
+    );
 }
 
 #[test]
@@ -4477,8 +4530,83 @@ fn trading_cards_are_flagged_only_once_over_the_limit() {
         scan(&mut s, 1, "staff", card);
     }
     assert!(!reg(&s, 1).staff.lines[0].limit_hit);
-    assert!(run(&mut s, json!({"type":"scan","register":1,"side":"staff","code":card})).is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"staff","code":card})
+    )
+    .is_err());
     assert!(reg(&s, 1).staff.lines[0].limit_hit);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
 }
 
+#[test]
+fn unanswered_call_rings_again_every_remind_interval() {
+    use janus_pos_core::store::BELL_REMIND_MS;
+    let mut s = Store::new(3, 2, 1);
+    advance(&mut s, 3_000);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    advance(&mut s, 50);
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    advance(&mut s, 2_000);
+    let first = s.snapshot().bells[0].rings;
+    assert_eq!(first, 1);
+    advance(&mut s, BELL_REMIND_MS - 3_000);
+    assert_eq!(
+        s.snapshot().bells[0].rings,
+        first,
+        "not before the interval"
+    );
+    advance(&mut s, 3_000);
+    assert_eq!(
+        s.snapshot().bells[0].rings,
+        first + 1,
+        "rings again after the interval"
+    );
+    advance(&mut s, BELL_REMIND_MS);
+    assert_eq!(s.snapshot().bells[0].rings, first + 2);
+    assert!(!reg(&s, 1).emergency, "reminders are not customer presses");
+    login_as(&mut s, 1, "ST001");
+    let r = s.snapshot().bells[0].rings;
+    advance(&mut s, BELL_REMIND_MS * 2);
+    assert_eq!(s.snapshot().bells[0].rings, r, "stops once staff logs in");
+}
+
+#[test]
+fn customer_can_cancel_own_call_and_staff_sees_answered_topic() {
+    let mut s = Store::new(3, 2, 1);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.customer_calls, vec![CallKind::Tobacco]);
+    ok(&mut s, json!({"type":"cancel_call","register":1}));
+    let v = reg(&s, 1);
+    assert!(v.customer_calls.is_empty());
+    assert!(
+        v.staff.calls.is_empty(),
+        "staff side call screen clears too"
+    );
+    assert!(run(&mut s, json!({"type":"cancel_call","register":1})).is_err());
+
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    login_as(&mut s, 1, "ST001");
+    let v = reg(&s, 1);
+    assert!(v.customer_calls.is_empty());
+    assert_eq!(
+        v.answered,
+        vec![CallKind::Tobacco],
+        "staff still sees why they were called"
+    );
+}

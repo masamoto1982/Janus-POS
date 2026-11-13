@@ -104,6 +104,8 @@ button { touch-action: manipulation; }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
 .staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; }
+/* スタッフがログインして応答した呼び出しの用件（たばこ など）。担当スタッフ名の右に */
+.staff-head .answered-topic { margin-left: 8px; font-weight: 700; color: var(--msg-strong); white-space: nowrap; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }
 .screen-head .clock { font-size: 11px; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
@@ -615,6 +617,10 @@ body.dragging .drop-hint { display: inline; }
 .first-welcome .mode-sub { color: var(--msg-weak); font-size: min(4.5cqi, 27px); font-weight: 400; line-height: 1.35; }
 .first-welcome .mode-big { color: var(--msg-strong); font-size: min(16cqi, 96px); font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: var(--gap); }
+/* 呼び出し中の最下段：左に「取り消し」、残りの幅の中央に案内 */
+.call-row.calling { display: flex; align-items: center; justify-content: flex-start; gap: var(--gap); padding: 0 var(--gap); }
+.call-row.calling .msg { flex: 1; min-width: 0; }
+.call-row.calling button.back-btn { flex: 0 0 auto; }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(1px, 2px); }
 .call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
@@ -645,6 +651,7 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-name .muted { font-size: 12px; white-space: nowrap; }
 .qty-pop-value { border: 1.5px solid var(--msg-strong); border-radius: 0; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
 .qty-pop-value .muted { font-size: 13px; font-weight: 400; }
+.qty-pop .pad-error { color: var(--alert-ink); font-size: 13px; line-height: 1.4; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); flex: 1 1 auto; min-height: 0; }
 .qty-pop-keys .pad-key { height: var(--btn-md-h); padding: 0; font-size: 16px; font-weight: 600; min-height: 0; }
 .qty-pop-keys .zero { grid-column: span 2; }

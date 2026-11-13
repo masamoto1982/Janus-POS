@@ -13,7 +13,9 @@ import type {
   CouponView as Coupon,
   Dates,
   ReturnedCoupon as Returned,
+  CallKind,
   Command,
+  PaymentMethod,
   CustomerView,
   FfState,
   MenuScreen,
@@ -155,10 +157,7 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: Action) => Gate):
   const st = a("check_id");
   return `<div class="point-screen id-entry">
       <div class="big">身分証の生年月日を入力してください</div>
-      ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "西暦8桁　例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field")}
-      <div class="point-choices">
-        <button class="primary" data-form="birth" data-reg="${reg}" ${st.allowed ? "" : `disabled title="${esc(st.reason ?? "")}"`}>判定</button>
-      </div>
+      ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "西暦8桁　例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field", st)}
     </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
 }
 
@@ -297,31 +296,25 @@ function parcelWait(): string {
 
 function parcelStep(reg: number, l: StaffLine, st: Gate, count: number): string {
   const p = l.parcel as Parcel;
-  const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
   const back = () => backCorner({ type: "parcel_back", register: reg, line_id: l.id }, st);
   const field = (target: PadTarget, placeholder: string, aria: string) =>
-    padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`);
+    padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`, st);
   if (!p.size && !p.sum_cm) {
     return `<div class="point-screen parcel-entry">
         ${msg(`${no}取り扱いサイズを決定してください`, parcelErr(reg) || "三辺の長さの合計を入力してください")}
         <div class="parcel-fields"><label>長さ${field("pcm", "", "荷物の三辺の合計（cm）")}<span>cm</span></label></div>
-        <div class="point-choices"><button class="primary" data-form="parcel-length" data-reg="${reg}" data-line="${l.id}"${off}>決定</button></div>
       </div>${back()}`;
   }
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
         ${msg(`${no}取り扱いサイズを決定してください`, parcelErr(reg) || "重量を入力してください")}
         <div class="parcel-fields"><label>重さ${field("pkg", "", "荷物の重さ（kg）")}<span>kg</span></label></div>
-        <div class="point-choices"><button class="primary" data-form="parcel-size" data-reg="${reg}" data-line="${l.id}" data-cm="${p.sum_cm}"${off}>決定</button></div>
       </div>${back()}`;
   }
   return `<div class="point-screen parcel-entry">
       ${msg(`${no}お届け先の郵便番号を入力してください`, parcelErr(reg))}
       ${field("post", "例 100-0001", "お届け先の郵便番号（7桁）")}
-      <div class="point-choices">
-        <button class="primary" data-form="parcel-postal" data-reg="${reg}" data-line="${l.id}"${off}>決定</button>
-      </div>
     </div>${back()}`;
 }
 
@@ -671,7 +664,8 @@ export function qtyPopup(r: RegisterView, side: Side): string {
 }
 
 export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt";
-export type PadEntry = { target: PadTarget; line?: number; digits: string };
+/** error：テンキーの「決定」で送った入力が受け付けられなかった理由。テンキーを開いたまま表示し、次のキーで消す */
+export type PadEntry = { target: PadTarget; line?: number; digits: string; error?: string };
 export const padEntry = new Map<string, PadEntry>();
 export const padValue = new Map<string, string>();
 export const padValueKey = (reg: number, target: PadTarget, line?: number): string => `${reg}:${target}:${line ?? ""}`;
@@ -691,11 +685,13 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
 export const padShow = (target: PadTarget, digits: string): string =>
   target === "mpw" ? "●".repeat(digits.length) : target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits;
 
-function padField(reg: number, side: Side, target: PadTarget, value: string, placeholder: string, aria: string, line?: number, cls = ""): string {
+/** 入力欄。st を渡した欄はテンキーの「決定」でそのまま送信する（画面側に決定ボタンを置かない）ので、操作できないときは欄ごと押せなくする */
+function padField(reg: number, side: Side, target: PadTarget, value: string, placeholder: string, aria: string, line?: number, cls = "", st?: Gate): string {
   const typing = padEntry.get(`${reg}:${side}`);
   const on = typing?.target === target && typing.line === line;
   const shown = padShow(target, value);
-  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-padopen="${reg}:${side}:${target}:${line ?? ""}" aria-label="${esc(aria)}（押すとテンキーで入力）">${
+  const off = st && !st.allowed ? ` disabled title="${esc(st.reason ?? "")}"` : "";
+  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-padopen="${reg}:${side}:${target}:${line ?? ""}" aria-label="${esc(aria)}（押すとテンキーで入力）"${off}>${
     shown ? esc(shown) : `<span class="placeholder">${esc(placeholder)}</span>`
   }</button>`;
 }
@@ -719,6 +715,7 @@ export function padPopup(r: RegisterView, side: Side): string {
       <div class="qty-pop-box" role="dialog" aria-label="${esc(title)}">
         <div class="qty-pop-name">${esc(title)}${now}</div>
         <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
+        ${e.error ? `<div class="pad-error" role="alert">${esc(e.error)}</div>` : ""}
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}${k("back", "←", "pad-key neg")}</div>
         <div class="qty-pop-foot">${k("cancel", "バック", "md ghost back-btn")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
@@ -727,7 +724,7 @@ export function padPopup(r: RegisterView, side: Side): string {
 
 const CALL_SHORT: Record<string, string> = {
   fast_food: "FF",
-  tobacco: "煙草",
+  tobacco: "たばこ",
   service: "サービス",
   voucher: "金券",
   customer_help: "呼び出し",
@@ -737,6 +734,16 @@ const CALL_SHORT: Record<string, string> = {
   emoney: "電子マネー",
   receipt_stamp: "収入印紙",
 };
+
+/** 二千円札は取り扱わないので、自動釣銭機がそのまま出金ボックスに返す。なぜ戻ってきたかを両画面に出し、出金ボックスから取り出すと消える。
+ *  現金は自動釣銭機のあるスタッフ側で扱うので、お客様にはスタッフが返す */
+function returned2000(side: Side): string {
+  return confirm(
+    side === "staff"
+      ? msg("二千円札を返却しました", "取り扱い対象外の紙幣です<br>出金ボックスからお客様にお返しください")
+      : msg("二千円札はご利用いただけません", "スタッフがお返しいたします"),
+  );
+}
 
 /** 呼び鈴が不通（セルフ操作モード）：呼び出しが届かないので、お客様に店員へ直接声をかけてもらう */
 function bellDeadScreen(): string {
@@ -969,7 +976,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : v.method ? "" : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due) : side === "customer" && v.method && !v.inserted && !v.payment_blocker ? customerPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r) + pointNote(r)}
+        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due, v.method) : side === "customer" && v.method && !v.inserted && !v.payment_blocker ? customerPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r) + pointNote(r)}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -1051,7 +1058,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   stampVerifying.delete(`${reg}:${side}`);
   return `${top}
     <div class="staff-head">
-      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
+      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}${answeredTopic(r, side)}</span>
       ${taxNote(v)}
     </div>
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">${qtyHead(v.lines)}</th><th class="num">小計</th></tr></thead>
@@ -1124,6 +1131,7 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
       side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します",
     )}</div>`);
   if (r.emergency) return emergencyScreen();
+  if (!r.menu && r.outlet_detail.some(([d]) => d === 2000)) return returned2000(side);
   if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
   if (r.mode === "self_operated" && side === "customer" && r.bell_dead && r.staff.calls.length) return bellDeadScreen();
   if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return confirm(emoneyScreen(r, side));
@@ -1192,11 +1200,13 @@ function emoneyScreen(r: RegisterView, side: Side): string {
     </div>${close("バック")}`;
 }
 
-function prepaidNote(r: RegisterView, due: number): string {
-  const rest = r.cashless_due ? "のお支払い方法をお選びください" : "を現金で";
+/** 一部を払ったあとの残り。現金が選ばれている（電子マネーの残高不足で「不足額を現金で払う」を選んだときなど）か、
+ *  残りが現金でしか払えないときは「現金で」、まだ選べるときは支払方法を選んでもらう。スタッフ側で選んだ支払方法とお客様側の案内を揃える */
+function prepaidNote(r: RegisterView, due: number, method: PaymentMethod | null): string {
+  const rest = r.cashless_due && method !== "cash" ? "のお支払い方法をお選びください" : "を現金でお支払いいただきます";
   // ポイントは「ポイントで 80P」と、ポイント数で出す（1ポイント＝1円）
   const [by, amount] = r.prepaid_method === "ポイント利用" ? ["ポイント", pt(r.prepaid)] : [esc(r.prepaid_method ?? ""), yen(r.prepaid)];
-  return `<p>${by}で ${amount} お支払い済み、残り <b>${yen(due)}</b> ${rest}</p>`;
+  return `<p>${by}で ${amount} お支払い済み<br>残り <b>${yen(due)}</b> ${rest}</p>`;
 }
 
 function cashBackNote(side: Side, amount: number): string {
@@ -1212,14 +1222,12 @@ function pointsUse(r: RegisterView, side: Side, st: Gate, head: string | null): 
   if (head === null) return `<div class="point-screen pair-note">${msg("ポイントのご利用方法をお申しつけください", sub)}</div>`;
   const use = (how: "all" | "fraction"): Command => ({ type: "use_points", register: reg, side, how });
   const amount = padValue.get(padValueKey(reg, "ppt")) ?? "";
-  const n = Number(amount || 0);
-  const okAmount = st.allowed && n > 0 && n <= p.usable;
   // 端数がない、またはご利用可能なポイントが端数に満たないときは「端数を払う」を出さない。
   // ご利用可能なポイントが 1P だけなら、指定しても「全部使う」と同じなので指定欄を出さない
   const fraction = p.fraction > 0 && p.fraction <= p.usable ? btn(`端数を払う\n${pt(p.fraction)}`, use("fraction"), st, "primary") : "";
   const specify =
     p.usable > 1
-      ? `<div class="parcel-fields points-amount"><label>ポイント数を指定${padField(reg, side, "ppt", amount, "", "使うポイント数")}<span>P</span></label><button type="button" class="primary" data-form="points-amount" data-reg="${reg}" data-side="${side}"${okAmount ? "" : " disabled"}>決定</button></div>`
+      ? `<div class="parcel-fields points-amount"><label>ポイント数を指定${padField(reg, side, "ppt", amount, "", "使うポイント数", undefined, "", st)}<span>P</span></label></div>`
       : "";
   return `<div class="point-screen points-use">
       ${msg(head, sub)}
@@ -1291,9 +1299,10 @@ export type FfUi = { tab: string; page: number };
  *  セール情報や詐欺防止の呼びかけを順番に表示する（シミュレーターの見本）。最下段を両モードで揃え、モード切り替え時の画面の変化を抑える。
  *  現物では広告を画像で流す想定なので、どのモードでも言語切り替えの対象外（data-i18n-skip） */
 export const SIGNAGE: readonly (readonly [string, string])[] = [
-  ["揚げ物 2個目半額", "11月30日まで・フライヤーの全商品"],
+  // 値引きを約束する広告は出さない（シミュレーターに値引きの仕組みがなく、会計と食い違うため）。販促は告知の枠だけを見本にする
+  ["販促キャンペーン告知", "揚げ物・中華まんなど、店舗のキャンペーンをお知らせする枠です"],
   ["電話で電子マネーの購入を求められたら詐欺です", "ご心配なときはスタッフにお声がけください"],
-  ["中華まん 全品10円引き", "肉まん・ピザまん・あんまん・カレーまん"],
+  ["販促キャンペーン告知", "新商品・季節の商品をお知らせする枠です"],
 ];
 export const SIGNAGE_MS = 8000;
 
@@ -1321,6 +1330,24 @@ export function menuPaused(): string {
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */
 export const isWelcome = (main: string): boolean => main.includes("welcome-band");
 
+const CALL_TOPIC: Partial<Record<CallKind, string>> = { fast_food: "FF", service: "サービス", voucher: "金券", tobacco: "たばこ" };
+const callTopics = (kinds: CallKind[]): string => kinds.map((k) => CALL_TOPIC[k]).filter(Boolean).join("・");
+
+/** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。左に「取り消し」（戻る側の中ボタン）、中央に案内 */
+function callingRow(r: RegisterView, st: Gate): string {
+  const topics = callTopics(r.customer_calls);
+  return `<div class="call-row calling">${btn("取り消し", { type: "cancel_call", register: r.id }, st, "md ghost back-btn")}${msg(
+    "ただいまスタッフをお呼びしています",
+    topics ? `ご用件：${esc(topics)}　少々お待ちください` : "少々お待ちください",
+  )}</div>`;
+}
+
+/** スタッフがログインして応答した呼び出しの用件。取引が終わるまでスタッフ側の担当スタッフ名の右に出す */
+export function answeredTopic(r: RegisterView, side: Side): string {
+  const topics = side === "staff" ? callTopics(r.answered) : "";
+  return topics ? `<span class="answered-topic" title="お客様の呼び出しの用件">用件：${esc(topics)}</span>` : "";
+}
+
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
   if (r.menu && side === "customer" && !r.paused) return signage(now);
@@ -1328,6 +1355,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (first) return signage(now);
   if (r.mode === "self_operated") {
     const a = (n: Action) => find(r.customer.actions, n);
+    // お客様が呼んで、まだスタッフが来ていない：最下段の呼び出しボタンを、呼び出し中の案内と「取り消し」（押し間違い用）に置き換える。
+    // 三段目（明細）は残すので、待つあいだも商品の登録を続けられる。スタッフがログインすると消える
+    if (r.customer_calls.length) return callingRow(r, a("call_staff"));
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     return `<div class="call-row">${[
@@ -1505,7 +1535,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying")
     return screen(`<div class="paybox pay-stage">
         <div class="big">お支払い方法を選択してください</div>
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due) : !c.method && !c.inserted && !c.payment_blocker && (r.cash_only || r.points.usable) ? cashOnlyNote(r) + pointNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true, side === "staff")}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due, c.method) : !c.method && !c.inserted && !c.payment_blocker && (r.cash_only || r.points.usable) ? cashOnlyNote(r) + pointNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true, side === "staff")}
       </div>${cashCorner(reg, side, c.method, a("select_payment"))}`);
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));

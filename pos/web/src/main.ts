@@ -12,6 +12,7 @@ import {
   expiredClosed,
   ffvInput,
   qtyEntry,
+  lineMax,
   flashing,
   type FfUi,
   itemsPanel,
@@ -600,9 +601,6 @@ function padKey(key: string, k: string): void {
     } else if (e.target === "tkh") {
       if (e.digits === "") return;
       send({ type: "hand_tickets", register, side: "staff", handed: value });
-    } else if (e.target === "lmt") {
-      if (e.digits === "") return;
-      send({ type: "confirm_limit", register, side: "staff", line_id: e.line!, qty: value });
     } else if (e.target === "tkr") {
       if (e.digits === "") return;
       send({ type: "receive_tickets", register, side: "customer", received: value });
@@ -636,7 +634,16 @@ function qtyKey(key: string, k: string): void {
     const [register, side] = key.split(":");
     send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
     qtyEntry.delete(key);
-  } else if (/^[0-9]$/.test(k) && e.digits.length < 2) e.digits = (e.digits + k).replace(/^0+/, "");
+  } else if (/^[0-9]$/.test(k) && e.digits.length < 2) {
+    // 販売個数の上限を超える数はテンキーでも打てない
+    const [register, side] = key.split(":");
+    const r = snap.registers.find((x) => x.id === Number(register));
+    const lines = side === "staff" ? r?.staff.lines ?? [] : r?.customer.lines ?? [];
+    const l = lines.find((x) => x.id === e.id);
+    const max = l ? lineMax(l, lines) : undefined;
+    const next = (e.digits + k).replace(/^0+/, "");
+    if (max === undefined || Number(next) <= max) e.digits = next;
+  }
   frame();
 }
 

@@ -1753,13 +1753,18 @@ const PURPOSE: Record<string, string> = {
   "2100000000074": "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券し、スタッフのお渡し枚数とお客様の受け取り枚数をそれぞれ発券枚数と照合する",
 };
 
-function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[code] ?? ""): string {
+/** Item・Wallet のボタン。back（裏面）があれば、表は商品名と価格だけにして、それ以外の情報は裏に回す。
+ *  クリック（モバイルのピッカーではタップ）でカードを裏返すように表と裏を入れ替える */
+function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[code] ?? "", back = ""): string {
+  const face = `<span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}`;
+  const body = back ? `<span class="item-face item-front">${face}</span><span class="item-face item-back">${back}</span>` : face;
+  const flip = back ? ` data-flip="${esc(code)}"` : "";
   if (cls.split(" ").includes("off"))
-    return `<button type="button" class="item ${cls}" aria-disabled="true" title="${esc(hint)}" aria-label="${esc(name)}（${esc(hint)}）">
-    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
+    return `<button type="button" class="item ${cls}"${flip} aria-disabled="true" title="${esc(hint)}" aria-label="${esc(name)}（${esc(hint)}）">
+    ${body}</button>`;
   const tip = hint ? ` data-hint="${esc(hint)}"` : "";
-  return `<button type="button" class="item ${cls}" data-code="${esc(code)}"${tip} aria-label="${esc(name)}${hint ? `、${esc(hint)}` : ""}">
-    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
+  return `<button type="button" class="item ${cls}" data-code="${esc(code)}"${flip}${tip} aria-label="${esc(name)}${hint ? `、${esc(hint)}` : ""}">
+    ${body}</button>`;
 }
 
 /** スタッフがログインしているレジ（スタッフ操作モード）でだけ扱えるカテゴリ（たばこ・切手・金券）。
@@ -1775,34 +1780,33 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
-        BILL_CODES.includes(p.code)
-          ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
-          : TAX_CODES.includes(p.code)
-            ? item(p.code, "税金", `${esc(p.name)} ${yen(p.price)}`)
-          : TICKET_CODES.includes(p.code)
-            ? item(p.code, p.name, `${p.tickets}枚 ${yen(p.price)}`)
-          :
-            PARCEL_CODES.includes(p.code)
-            ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
-            : STAFF_ONLY_SHELF.includes(p.category) && !staffOperated
-              ? item(p.code, p.name, `${yen(p.price)}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}`, "off", STAFF_ONLY_OFF)
-              : item(
-                p.code,
-                p.name,
-                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}${datesSub(p)}`,
-                p.category === "tobacco" && asked ? "call-blink" : "",
-              ),
+        PARCEL_CODES.includes(p.code)
+          ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
+          : item(
+              p.code,
+              p.name,
+              p.code === PICKUP_CODE ? "" : p.price ? yen(p.price) : "金額は受付時",
+              STAFF_ONLY_SHELF.includes(p.category) && !staffOperated ? "off" : p.category === "tobacco" && asked ? "call-blink" : "",
+              STAFF_ONLY_SHELF.includes(p.category) && !staffOperated ? STAFF_ONLY_OFF : undefined,
+              backOf(p),
+            ),
       )
       .join("")}</div></div>`;
   }).join("") + extra + slipShelf(s);
 }
 
-/** 日配食品・加工食品の販売期限（販売期限切れは警告色）。ボタンの大きさは変えず、名前・値段の下に三行目として足す。
- *  賞味期限はボタンには載せず、期限切れの取り替え画面で販売期限と並べる */
-function datesSub(p: { fresh: boolean; dates: Dates | null }): string {
-  if (!p.dates) return "";
-  const sell = `販売 ${expiryLabel(p.dates.sell_by_min, p.fresh)}`;
-  return `</span><span class="item-sub item-date">${p.dates.sell_by_min < 0 ? `<b>${sell}</b>` : sell}`;
+/** Item の商品ボタンの裏面：商品名と価格のほかの情報（年確・限定・販売期限・種別・枚数など）。何もなければ空（裏返らない）。
+ *  販売期限切れは警告色。賞味期限はボタンには載せず、期限切れの案内にだけ使う */
+export function backOf(p: { code: string; age: number | null; limit: number | null; fresh: boolean; dates: Dates | null; tickets: number }): string {
+  const marks = [p.age ? `<b>年確${p.age}</b>` : "", p.limit ? `<b>限定${p.limit}</b>` : ""].filter(Boolean).join(" ・");
+  const kind = BILL_CODES.includes(p.code) ? "公共料金" : TAX_CODES.includes(p.code) ? "税金" : p.code === PICKUP_CODE ? "受取用バーコード" : "";
+  const lines = [
+    kind,
+    TICKET_CODES.includes(p.code) ? `${p.tickets}枚` : "",
+    marks,
+    p.dates ? (p.dates.sell_by_min < 0 ? `<b>販売 ${expiryLabel(p.dates.sell_by_min, p.fresh)}</b>` : `販売 ${expiryLabel(p.dates.sell_by_min, p.fresh)}`) : "",
+  ].filter(Boolean);
+  return lines.map((l) => `<span class="item-sub">${l}</span>`).join("");
 }
 
 function slipShelf(s: Snapshot): string {

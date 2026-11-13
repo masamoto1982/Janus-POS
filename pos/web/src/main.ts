@@ -66,6 +66,7 @@ async function boot(): Promise<void> {
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
   start();
   setupDrag();
+  wireFlip();
   window.addEventListener("pagehide", save);
   window.setInterval(frame, 100);
 }
@@ -530,6 +531,7 @@ function render(): void {
   setRegion("bell-settings", bellSettings(snap));
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("shelf", shelfPanel(snap));
+  applyFlips(app.querySelector('[data-region="shelf"]'));
   setRegion("wallet", walletPanel(snap.emoney_balance));
 }
 
@@ -1063,7 +1065,7 @@ const READER_METHODS = new Set(["emoney", "credit"]);
 
 function setupDrag(): void {
   const ghost = document.getElementById("ghost")!;
-  let drag: { code?: string; wallet?: string; label: string; x: number; y: number; moved: boolean; id: number } | null = null;
+  let drag: { code?: string; wallet?: string; flip: boolean; label: string; x: number; y: number; moved: boolean; id: number } | null = null;
 
   const target = (x: number, y: number): Element | null => document.elementFromPoint(x, y)?.closest("[data-drop], [data-cash-drop], [data-pay-drop]") ?? null;
   const end = () => {
@@ -1076,7 +1078,7 @@ function setupDrag(): void {
     const b = (e.target as Element).closest<HTMLElement>("[data-code], [data-wallet]");
     if (!b || e.button !== 0 || b.closest("#picker-dlg")) return;
     e.preventDefault();
-    drag = { code: b.dataset.code, wallet: b.dataset.wallet, label: b.querySelector(".item-name")?.textContent ?? "", x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+    drag = { code: b.dataset.code, wallet: b.dataset.wallet, flip: !!b.dataset.flip, label: b.querySelector(".item-name")?.textContent ?? "", x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
   });
 
   window.addEventListener("pointermove", (e) => {
@@ -1100,7 +1102,10 @@ function setupDrag(): void {
     const d = drag;
     const t = target(e.clientX, e.clientY);
     end();
+    if (d.moved) dragMoved = true;
     if (!d.moved) {
+      // 裏のある商品ボタンは、クリックで裏返す（click で受ける）。ドラッグでしか登録できないことの案内は、裏のないボタンだけ
+      if (d.flip) return;
       toast("toast-store", "ドラッグして、レジのスタッフ側の画面・お客様画面（現金は入金ボックス、キャッシュレスは決済端末にも）に落としてください", false);
       return;
     }
@@ -1144,6 +1149,38 @@ function setupDrag(): void {
   });
 }
 
+/** 裏返している Item の商品ボタン（商品コード）。描き直しても裏返したまま */
+const flipped = new Set<string>();
+const FLIP_MS = 280;
+let dragMoved = false;
+
+function applyFlips(root: ParentNode | null): void {
+  root?.querySelectorAll<HTMLElement>("[data-flip]").forEach((b) => b.classList.toggle("flipped", flipped.has(b.dataset.flip!)));
+}
+
+/** カードを裏返すように、表（商品名・価格）と裏（それ以外）を入れ替える。半分回ったところで面を替える */
+function flip(b: HTMLElement): void {
+  const code = b.dataset.flip!;
+  if (flipped.has(code)) flipped.delete(code);
+  else flipped.add(code);
+  const swap = () => b.classList.toggle("flipped", flipped.has(code));
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { swap(); return; }
+  b.classList.remove("flipping");
+  void b.offsetWidth;
+  b.classList.add("flipping");
+  window.setTimeout(swap, FLIP_MS / 2);
+  window.setTimeout(() => b.classList.remove("flipping"), FLIP_MS);
+}
+
+function wireFlip(): void {
+  window.addEventListener("pointerdown", () => (dragMoved = false), true);
+  app.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-flip]");
+    if (!b || b.closest("#picker-dlg") || dragMoved) return;
+    flip(b);
+  });
+}
+
 type Device = "terminal" | "scanner";
 /** Item・Wallet のものをどこに「読ませた」か。ドラッグ＆ドロップとモバイルの長押しピッカーの共通の行き先 */
 type Dest = { register: number; side: Side; device?: Device; cashBox?: boolean };
@@ -1182,7 +1219,9 @@ function openPicker(dest: Dest): void {
   const area = (label: string, html: string) => `<section class="picker-area"><h3 class="picker-area-head">${label}</h3>${html}</section>`;
   const items = area("Item", shelfPanel(snap));
   const wallet = area("Wallet", walletPanel(snap.emoney_balance));
-  document.getElementById("picker-body")!.innerHTML = cashBox || device === "terminal" ? wallet : device === "scanner" ? wallet + items : items + wallet;
+  const body = document.getElementById("picker-body")!;
+  body.innerHTML = cashBox || device === "terminal" ? wallet : device === "scanner" ? wallet + items : items + wallet;
+  applyFlips(body);
   pickerDlg().showModal();
 }
 
@@ -1328,7 +1367,32 @@ function wireSwipe(): void {
   app.addEventListener("contextmenu", (e) => {
     if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-terminal], [data-scanner]")) e.preventDefault();
   });
+  // ピッカーの商品・決済ボタンは長押しで読ませる。タップは空けておき、裏のある商品ボタンを裏返す
   const dlg = pickerDlg();
+  let pickHold: { timer: number; x: number; y: number; id: number } | null = null;
+  const cancelPickHold = () => {
+    if (pickHold) clearTimeout(pickHold.timer);
+    pickHold = null;
+  };
+  dlg.addEventListener("pointerdown", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-code], [data-wallet]");
+    if (!b || e.button !== 0) return;
+    cancelPickHold();
+    const timer = window.setTimeout(() => {
+      pickHold = null;
+      swallowClick = true;
+      pick(b.dataset.code, b.dataset.wallet);
+    }, LONG_PRESS_MS);
+    pickHold = { timer, x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  dlg.addEventListener("pointermove", (e) => {
+    if (pickHold && e.pointerId === pickHold.id && Math.hypot(e.clientX - pickHold.x, e.clientY - pickHold.y) > 10) cancelPickHold();
+  });
+  for (const ev of ["pointerup", "pointercancel"] as const) dlg.addEventListener(ev, cancelPickHold);
+  dlg.addEventListener("close", cancelPickHold);
+  dlg.addEventListener("contextmenu", (e) => {
+    if ((e.target as Element).closest("[data-code], [data-wallet]")) e.preventDefault();
+  });
   dlg.addEventListener("click", (e) => {
     const t = e.target as Element;
     if (t.closest("[data-close-picker]") || t === dlg) {
@@ -1336,8 +1400,8 @@ function wireSwipe(): void {
       pickFor = null;
       return;
     }
-    const b = t.closest<HTMLElement>("[data-code], [data-wallet]");
-    if (b) pick(b.dataset.code, b.dataset.wallet);
+    const b = t.closest<HTMLElement>("[data-flip]");
+    if (b) flip(b);
   });
 }
 

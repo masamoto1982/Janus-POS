@@ -17,7 +17,8 @@ use crate::parcel::{Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
 
-pub const SCHEMA: u32 = 2;
+/// 保存の形式。既定の販売規則（年齢制限・個数制限）や商品を変えたら上げ、古い保存を捨てて新しい既定値で始める
+pub const SCHEMA: u32 = 3;
 
 fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())

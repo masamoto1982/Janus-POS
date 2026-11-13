@@ -4424,6 +4424,12 @@ fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
 fn trading_cards_sell_at_most_three_packs_by_default() {
     let mut s = Store::new(1, 2, 1);
     let card = janus_pos_core::catalog::TRADING_CARD;
+    // 既定の販売規則：トレカは3点まで、花火は（法令ではなく）店舗の判断で年確18
+    let snap = s.snapshot();
+    let find = |code: &str| snap.catalog.iter().find(|p| p.code == code).unwrap().clone();
+    assert_eq!(find(card).limit, Some(3));
+    let fireworks = find("4910000000076");
+    assert_eq!((fireworks.store_age, fireworks.legal_age), (Some(18), None));
     for _ in 0..3 {
         scan(&mut s, 1, "customer", card);
     }

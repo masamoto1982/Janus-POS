@@ -4419,3 +4419,26 @@ fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
     );
     assert!(!reg(&s, 1).customer.point_card);
 }
+
+#[test]
+fn trading_cards_sell_at_most_three_packs_by_default() {
+    let mut s = Store::new(1, 2, 1);
+    let card = janus_pos_core::catalog::TRADING_CARD;
+    for _ in 0..3 {
+        scan(&mut s, 1, "customer", card);
+    }
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":card}),
+    )
+    .unwrap_err();
+    assert!(e.contains("3点まで"), "{e}");
+    let qty: u32 = reg(&s, 1)
+        .customer
+        .lines
+        .iter()
+        .filter(|l| l.name == "トレカ")
+        .map(|l| l.qty)
+        .sum();
+    assert_eq!(qty, 3);
+}

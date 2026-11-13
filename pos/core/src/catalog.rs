@@ -193,6 +193,10 @@ const fn bill(code: &'static str, name: &'static str, price: u32) -> Product {
 use Category::*;
 use TaxRate::*;
 
+/// トレカ。1回のお会計で買えるのは既定で3パックまで（販売規則の設定 → 個数制限で変えられる）
+pub const TRADING_CARD: &str = "4910000000090";
+pub const TRADING_CARD_LIMIT: u32 = 3;
+
 pub const CATALOG: &[Product] = &[
     // 日配食品：販売期限・賞味期限は時刻まで。数量はレジ画面で増やせない
     fresh("4900000000028", "サンドイッチ", 320, Food, 6 * H, 10 * H),
@@ -245,6 +249,8 @@ pub const CATALOG: &[Product] = &[
     // 年確18。20歳の確認を済ませたあとに加わると、確認をやり直すデモ
     p("4910000000076", "花火", 980, Standard10, Fireworks),
     p("4910000000069", "化粧品", 2200, Standard10, Daily),
+    // トレーディングカード（1パック）。品薄になりやすく、販売規則の個数制限で1回のお会計3パックまで
+    p(TRADING_CARD, "トレカ", 180, Standard10, Daily),
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
     p("4900000000141", "切手", 110, Standard10, Stamp),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),

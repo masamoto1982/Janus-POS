@@ -55,7 +55,10 @@ impl Default for AgeRules {
         let mut r = AgeRules {
             rules: vec![],
             history: vec![],
-            limits: BTreeMap::new(),
+            limits: BTreeMap::from([(
+                catalog::TRADING_CARD.to_string(),
+                catalog::TRADING_CARD_LIMIT,
+            )]),
             next_id: 1,
         };
         r.push(

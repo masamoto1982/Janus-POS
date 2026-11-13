@@ -2,6 +2,7 @@ import type {
   Action,
   ActionState,
   EmoneyKind,
+  LimitAlert,
   ShortChoice,
   BillRow,
   Parcel,
@@ -243,6 +244,16 @@ function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate |
   const choices = st ? `<div class="point-choices">${btn("回収しました", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary")}</div>` : "";
   const back = st ? `<div class="back-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>` : "";
   return `<div class="point-screen pair-note expired-screen">${msg(esc(`${l.name}の販売期限が切れています`), esc(sub))}${choices}</div>${back}`;
+}
+
+/** 販売個数の上限を超えて登録を断ったときの案内（年齢確認と同じくレジの機能）。
+ *  ほかの案内画面と同じ縦横中央の二行、操作できる側には左下のバック。次の登録でも閉じる */
+function limitScreen(reg: number, side: Side, alert: LimitAlert, st: Gate | null, staff: boolean): string {
+  const sub = staff
+    ? `${alert.limit}点を超える分はお売りできないことをお客様にお伝えください`
+    : `申し訳ございません、${alert.limit}点を超える分はお売りできません`;
+  const back = st ? backCorner({ type: "close_limit_alert", register: reg, side }, st) : "";
+  return `<div class="point-screen pair-note limit-screen">${msg(esc(`${alert.name}は1回のお会計で${alert.limit}点までです`), esc(sub))}</div>${back}`;
 }
 
 export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
@@ -1012,6 +1023,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
+  if (!paying && r.limit_alert)
+    return screen(limitScreen(reg, side, r.limit_alert, ro || !a("remove_line").allowed ? null : a("remove_line"), side === "staff"));
   if (!ro && !paying && a("remove_line").allowed && expiredOpen(reg, side, v.lines))
     return screen(expiredScreen(reg, side, v.lines, a("remove_line"), true));
   if (ro && !paying && v.lines.some((l) => l.expired)) return screen(expiredScreen(reg, side, v.lines, null, false));
@@ -1461,6 +1474,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   // セルフ操作モードで「現金」を選ぶと店員呼び出し、お客様側は支払方法の選択から案内画面に切り替わる
   if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
+  if (c.phase === "registering" && r.limit_alert)
+    return screen(limitScreen(reg, side, r.limit_alert, a("remove_line").allowed ? a("remove_line") : null, side === "staff"));
   if (c.phase === "registering" && a("remove_line").allowed && expiredOpen(reg, side, c.lines))
     return screen(expiredScreen(reg, side, c.lines, side === "staff" ? a("remove_line") : null, side === "staff"));
   const card = firstOf([

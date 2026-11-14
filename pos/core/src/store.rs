@@ -412,10 +412,6 @@ pub enum Command {
     ReleaseCall {
         register: u8,
     },
-    /// お客様が自分で呼んだ呼び出し（呼び鈴・FF・サービス・金券・たばこ）を取り消す（押し間違い用）
-    CancelCall {
-        register: u8,
-    },
     VoidTransaction {
         register: u8,
     },
@@ -567,7 +563,6 @@ impl Command {
             | C::ResolveEmoneyShort { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
-            | C::CancelCall { register }
             | C::ConfirmPointCard { register, .. }
             | C::UsePoints { register, .. }
             | C::VoidTransaction { register, .. }
@@ -611,7 +606,7 @@ impl Command {
                 topic: Some(CallTopic::Sos),
                 ..
             } => None,
-            C::FfButton { .. } | C::CallStaff { .. } | C::CancelCall { .. } => Some(Side::Customer),
+            C::FfButton { .. } | C::CallStaff { .. } => Some(Side::Customer),
             C::CashOut { .. } | C::CashIn { .. } => Some(Side::Staff),
             C::OpenMenu { .. } => Some(Side::Staff),
             C::CompleteService { .. }
@@ -1531,7 +1526,7 @@ pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
 pub const EMERGENCY_PRESSES: usize = 10;
 
-/// お客様が呼び鈴・最下段のボタンで呼べる用件。呼び出し中はお客様側に案内と「取り消し」を出す
+/// お客様が呼び鈴・最下段のボタンで呼べる用件。呼び出し中はお客様側の最下段に案内を出す
 pub const CUSTOMER_CALLS: [CallKind; 5] = [
     CallKind::CustomerHelp,
     CallKind::FastFood,
@@ -2831,21 +2826,6 @@ impl Store {
                 r.press_since = None;
                 done("")
             }
-            C::CancelCall { register } => {
-                self.check_active(register, Action::CallStaff)?;
-                let kinds = self.customer_calls(register);
-                if kinds.is_empty() {
-                    return Err("取り消す呼び出しはありません".into());
-                }
-                let now = self.now;
-                let r = self.reg_mut(register)?;
-                r.pressing = false;
-                r.press_since = None;
-                for k in kinds {
-                    self.calls.resolve(register, k, now);
-                }
-                done("呼び出しを取り消しました")
-            }
             C::VoidTransaction { register } => {
                 self.check_active(register, Action::VoidTransaction)?;
                 let now = self.now;
@@ -3114,8 +3094,8 @@ impl Store {
         }
     }
 
-    /// お客様が自分で呼んだ、まだ応答のない呼び出し（取り消せるもの）。
-    /// サービスは、受付待ちのサービス商品があるときはお客様の取り消しの対象にしない（商品の登録が呼んでいるため）
+    /// お客様が自分で呼んだ、まだ応答のない呼び出し（最下段に呼び出し中の案内を出す）。
+    /// サービスは、受付待ちのサービス商品があるときは含めない（商品の登録が呼んでいて、その案内は別に出すため）
     fn customer_calls(&self, register: u8) -> Vec<CallKind> {
         let service_pending = self.reg(register).is_some_and(|r| r.txn.service_pending());
         CUSTOMER_CALLS
@@ -4773,7 +4753,7 @@ pub struct RegisterView {
     pub tobacco_asked: bool,
     /// スタッフのログインで応答した呼び出しの用件（スタッフ操作モードのスタッフ側に出す）
     pub answered: Vec<CallKind>,
-    /// お客様が呼んだ、まだ応答のない呼び出し（セルフ操作モード）。お客様側に案内と「取り消し」を出す
+    /// お客様が呼んだ、まだ応答のない呼び出し（セルフ操作モード）。お客様側の最下段に案内を出す
     pub customer_calls: Vec<CallKind>,
     pub mode: Mode,
     pub mode_label: &'static str,

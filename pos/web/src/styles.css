@@ -174,6 +174,29 @@ button { touch-action: manipulation; }
   .reg-top .sum { font-size: 13px; }
 }
 .reg-top .count .full { margin-left: 8px; font-weight: 700; }
+/* 現金の投入中：合計・お預かり・お釣り（不足）を並べる（B-4）。お客様側は一行、スタッフ側は投入おわりを残して二段 */
+.reg-top .tender { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.reg-top .tender-row { display: flex; align-items: baseline; justify-content: center; gap: 0 12px; white-space: nowrap; }
+.reg-top .tender-cell { display: inline-flex; align-items: baseline; gap: 0 2px; font-variant-numeric: tabular-nums; }
+.reg-top .tender-cell small { margin-right: 4px; font-size: 12px; }
+.reg-top .tender-cell b { font-size: 22px; }
+.reg-top .tender.two-rows .tender-row { gap: 0 8px; }
+.reg-top .tender.two-rows .tender-cell small { margin-right: 2px; font-size: 11px; }
+.reg-top .tender.two-rows .tender-cell b { font-size: 16px; }
+.reg-top .tendering { grid-template-columns: auto minmax(0, 1fr) auto; }
+.reg-top .tender-cell.short { color: var(--alert-ink); }
+@container (max-width: 340px) {
+  .reg-top .tender-row { gap: 0 8px; }
+  .reg-top .tender-cell small { margin-right: 2px; font-size: 11px; }
+  .reg-top .tender-cell b { font-size: 17px; }
+  .reg-top .tender.two-rows .tender-cell b { font-size: 15px; }
+}
+@container (max-width: 420px) {
+  .reg-top .tender.two-rows .tender-row { gap: 0 6px; }
+  .reg-top .tender.two-rows .tender-cell small { margin-right: 1px; font-size: 10px; }
+  .reg-top .tender.two-rows .tender-cell b { font-size: 14px; }
+  .reg-top .tender.two-rows .tender-cell .yen { font-size: 11px; }
+}
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
 .screen-main .lines button { font-size: 11px; padding: 1px 8px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }

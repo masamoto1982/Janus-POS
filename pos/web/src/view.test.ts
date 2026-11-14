@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, withRejection } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, withRejection } from "./view";
 import { trCore } from "./i18n";
 
 describe("view helpers", () => {
@@ -173,6 +173,17 @@ describe("view helpers", () => {
     expect(withRejection(screen, undefined)).toBe(screen);
     // 英語の画面では英語で出る
     expect(trCore(reason)).toBe("Parcels to send can't be paid with other items (any number of parcels can be paid together)");
+  });
+
+  it("shows total, tendered and change (or a red shortage) while cash goes in (B-4)", () => {
+    const ok = tenderSum(640, 1000, false);
+    expect(ok).toContain("<small>お預かり</small><b>1,000</b>");
+    expect(ok).toContain("<small>お釣り</small><b>360</b>");
+    const short = tenderSum(640, 500, true);
+    expect(short).toContain('class="tender-cell short"><small>不足</small><b>140</b>');
+    expect(short).toContain("two-rows");
+    // 先に払った分を引いた残りが合計
+    expect(regTop(1200, 3, "", Infinity, undefined, "", "", tenderSum(1200, 2000, true))).toContain("<b>800</b>");
   });
 });
 

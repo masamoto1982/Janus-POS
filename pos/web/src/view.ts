@@ -773,10 +773,7 @@ function emergencyScreen(r: RegisterView, side: Side): string {
   if (side === "customer") return `<div class="confirm change-alert emergency">${body}</div>`;
   const ready = r.staff.state === "ready";
   const end = btn("解除", { type: "end_emergency", register: r.id }, { allowed: ready, reason: "スタッフがログインすると解除できます" }, "primary");
-  return `<div class="confirm change-alert emergency">${msg(
-    "非常事態モードを解除します",
-    `解除後、非常事態モードの発動時刻と解除時刻を<br>印字したレシートを出力します${ready ? "" : "<br>スタッフがログインすると解除できます"}`,
-  )}${end}</div>`;
+  return `<div class="confirm change-alert emergency">${msg("非常事態モードを解除します")}${end}</div>`;
 }
 
 /** 非常事態モード中のスタッフ側の最下段：オーナーと担当スーパーバイザーの連絡先（ヘッダーと同じ赤で点滅） */

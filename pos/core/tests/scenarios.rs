@@ -3682,6 +3682,12 @@ fn emergency_lasts_until_staff_log_in() {
     assert!(log.ended_at > since);
     advance(&mut s, 10_000);
     assert!(reg(&s, 1).emergency_log.is_none());
+    // レシートを出したら通常運転：スタッフ操作モードが続き、無操作が続けばセルフ操作モードへ
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+    advance(&mut s, janus_pos_core::store::IDLE_REVERT_MS);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert!(!v.emergency);
 }
 
 #[test]

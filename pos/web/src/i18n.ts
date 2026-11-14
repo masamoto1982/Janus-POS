@@ -183,8 +183,6 @@ const DICT: Record<string, string> = {
   "オーナー：": "Owner: ",
   "担当スーパーバイザー：": "Supervisor: ",
   非常事態モードを解除します: "End emergency mode",
-  "解除後、非常事態モードの発動時刻と解除時刻を": "After you end it, a receipt with the start and end times",
-  印字したレシートを出力します: "of emergency mode will be printed",
   解除: "End",
   スタッフがログインすると解除できます: "A logged-in staff member can end it",
   非常事態モードを解除しました: "Emergency mode has ended",

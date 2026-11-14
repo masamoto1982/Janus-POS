@@ -810,8 +810,9 @@ impl Line {
 struct Txn {
     parcel_ask: bool,
     tobacco_asked: bool,
-    /// スタッフのログインで応答した、お客様の呼び出しの用件（取引が終わるまでスタッフ側に出す）
-    answered: Vec<CallKind>,
+    /// スタッフのログインで応答した、お客様の呼び出しの用件（取引が終わるまでスタッフ側に出す）。
+    /// 最初の一件だけ。残りはスタッフがお客様との対話で聞ける（user 2026-11-14）
+    answered: Option<String>,
     lines: Vec<Line>,
     next_line: u32,
     paying: bool,
@@ -2296,7 +2297,7 @@ impl Store {
                             register,
                             CallKind::CashOnly,
                             self.now,
-                            "現金でのお支払い",
+                            crate::calls::CASH_CHOSEN,
                         );
                         return done(
                             "スタッフをお呼びしました\n現金はスタッフがお預かりいたします",
@@ -2760,7 +2761,7 @@ impl Store {
                     return done("仲間のスタッフを呼んでいます");
                 }
                 let (kind, detail) = match topic {
-                    Some(CallTopic::Service) => (CallKind::Service, "お支払い・荷物"),
+                    Some(CallTopic::Service) => (CallKind::Service, crate::calls::SERVICE_BUTTON),
                     Some(CallTopic::Voucher) => (CallKind::Voucher, "ギフトカード・印紙"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
                     Some(CallTopic::Emoney) => (CallKind::Emoney, "チャージ・残高確認"),
@@ -3280,13 +3281,16 @@ impl Store {
             r.pressing = false;
             r.press_since = None;
             let service_pending = r.txn.service_pending();
-            for k in ANSWERED_CALLS {
-                if self.calls.is_open(register, k) {
-                    let t = &mut self.reg_mut(register)?.txn;
-                    if !t.answered.contains(&k) {
-                        t.answered.push(k);
-                    }
-                }
+            let first = self
+                .calls
+                .for_register(register)
+                .into_iter()
+                .filter(|c| ANSWERED_CALLS.contains(&c.kind))
+                .min_by_key(|c| (c.created_at, c.id))
+                .map(|c| c.topic);
+            let t = &mut self.reg_mut(register)?.txn;
+            if t.answered.is_none() {
+                t.answered = first;
             }
             self.calls.resolve(register, CallKind::CustomerHelp, now);
             if self.calls.is_open(register, CallKind::Tobacco) {
@@ -4445,7 +4449,7 @@ impl Store {
             answered: if r.mode == Mode::StaffOperated {
                 t.answered.clone()
             } else {
-                vec![]
+                None
             },
             waiting_calls: if r.mode == Mode::SelfOperated {
                 self.waiting_calls(r.id)
@@ -4760,8 +4764,8 @@ pub struct RegisterView {
     pub call_waiting_ms: Option<u64>,
     pub ring_volume: f32,
     pub tobacco_asked: bool,
-    /// スタッフのログインで応答した呼び出しの用件（スタッフ操作モードのスタッフ側に出す）
-    pub answered: Vec<CallKind>,
+    /// スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのスタッフ側に出す）
+    pub answered: Option<String>,
     /// まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
     pub waiting_calls: Vec<CallKind>,
     pub mode: Mode,

@@ -578,7 +578,7 @@ const DICT: Record<string, string> = {
   スタッフ002: "Staff 002",
 };
 
-const TOPIC_EN: Record<string, string> = { FF: "FF", サービス: "service", 金券: "vouchers", たばこ: "tobacco", 電子マネー: "e-money" };
+const TOPIC_EN: Record<string, string> = { FF: "FF", サービス: "service", 金券: "vouchers", たばこ: "tobacco", 電子マネー: "e-money", お支払い: "bill payment", 宅配便: "parcel" };
 const topicsEn = (s: string): string => s.split("・").map((x) => TOPIC_EN[x] ?? x).join(", ");
 type Rule = [RegExp, (m: RegExpExecArray) => string];
 

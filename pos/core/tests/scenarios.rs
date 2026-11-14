@@ -4612,8 +4612,8 @@ fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
     let v = reg(&s, 1);
     assert!(v.waiting_calls.is_empty());
     assert_eq!(
-        v.answered,
-        vec![CallKind::Tobacco],
+        v.answered.as_deref(),
+        Some("たばこ"),
         "staff still sees why they were called"
     );
 }
@@ -4630,22 +4630,78 @@ fn self_emoney_charge_call_waits_like_other_waiting_calls() {
     login_as(&mut s, 1, "ST001");
     let v = reg(&s, 1);
     assert!(v.waiting_calls.is_empty());
-    assert_eq!(v.answered, vec![CallKind::Emoney]);
+    assert_eq!(v.answered.as_deref(), Some("電子マネー"));
 }
 
 #[test]
 fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
     // 年確
     let mut s = Store::new(3, 2, 1);
-    ok(&mut s, json!({"type":"scan","register":1,"side":"customer","code":"4900000000103"}));
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"customer"}));
+    ok(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":"4900000000103"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
     assert!(reg(&s, 1).waiting_calls.contains(&CallKind::AgeCheck));
     login_as(&mut s, 1, "ST001");
     let v = reg(&s, 1);
     assert!(v.waiting_calls.is_empty());
-    assert!(v.answered.contains(&CallKind::AgeCheck));
-    // 宅配便（受付中のサービス商品が呼ぶサービス）
+    assert_eq!(v.answered.as_deref(), Some("年確"));
+    // 宅配便（受付中のサービス商品が呼ぶサービス）。用件は「サービス」ではなく「宅配便」
     let mut s = Store::new(3, 2, 1);
-    ok(&mut s, json!({"type":"scan","register":1,"side":"customer","code":"2100000000014"}));
+    ok(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":"2100000000014"}),
+    );
     assert_eq!(reg(&s, 1).waiting_calls, vec![CallKind::Service]);
+    assert_eq!(reg(&s, 1).staff.calls[0].topic, "宅配便");
+    login_as(&mut s, 1, "ST001");
+    assert_eq!(reg(&s, 1).answered.as_deref(), Some("宅配便"));
+}
+
+#[test]
+fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
+    // 公共料金の払込票は「お支払い」
+    let mut s = Store::new(3, 2, 1);
+    ok(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":"2100000000043"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    assert_eq!(reg(&s, 1).staff.calls[0].topic, "お支払い");
+    // 最下段のボタンはボタンの文言そのまま
+    for (topic, want) in [
+        ("service", "サービス"),
+        ("voucher", "金券"),
+        ("tobacco", "たばこ"),
+    ] {
+        let mut s = Store::new(3, 2, 1);
+        ok(
+            &mut s,
+            json!({"type":"call_staff","register":1,"topic":topic}),
+        );
+        ok(&mut s, json!({"type":"release_call","register":1}));
+        assert_eq!(reg(&s, 1).staff.calls[0].topic, want);
+    }
+    // 二つ呼んでも、ログイン後の用件は最初の一件だけ
+    let mut s = Store::new(3, 2, 1);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"voucher"}),
+    );
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    advance(&mut s, 1_000);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    login_as(&mut s, 1, "ST001");
+    assert_eq!(reg(&s, 1).answered.as_deref(), Some("金券"));
 }

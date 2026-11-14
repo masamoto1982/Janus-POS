@@ -30,7 +30,11 @@ stamp: number,
  */
 stamped: boolean, };
 
-export type Call = { id: number, register: number, kind: CallKind, label: string, created_at: number, detail: string, };
+export type Call = { id: number, register: number, kind: CallKind, label: string, 
+/**
+ * 用件（[`CallKind::topic`]）
+ */
+topic: string, created_at: number, detail: string, };
 
 export type CallKind = "age_check" | "fast_food" | "service" | "tobacco" | "voucher" | "customer_help" | "change_left" | "bill" | "emoney" | "cash_only" | "receipt_stamp" | "expired";
 
@@ -181,9 +185,9 @@ bell_dead: boolean,
  */
 emergency: boolean, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, 
 /**
- * スタッフのログインで応答した呼び出しの用件（スタッフ操作モードのスタッフ側に出す）
+ * スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのスタッフ側に出す）
  */
-answered: Array<CallKind>, 
+answered: string | null, 
 /**
  * まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
  */

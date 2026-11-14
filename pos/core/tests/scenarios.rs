@@ -4104,15 +4104,93 @@ fn self_operated_expired_scan_calls_staff() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     )
     .is_err());
-    ok(
+    // セルフのお客様側には、期限切れの明細を消す手段がない（B-3）
+    assert!(run(
         &mut s,
         json!({"type":"remove_line","register":1,"side":"customer","line_id":id}),
+    )
+    .is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":0}),
+    )
+    .is_err());
+    assert_eq!(reg(&s, 1).customer.lines.len(), 1);
+    // 消せるのはスタッフ側の「回収しました」だけ
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
     );
-    assert!(!s
-        .snapshot()
-        .calls
-        .iter()
-        .any(|c| c.kind == CallKind::Expired));
+    assert!(reg(&s, 1).staff.lines.is_empty());
+}
+
+fn open_calls(s: &Store, r: u8) -> Vec<CallKind> {
+    reg(s, r).waiting_calls
+}
+
+/// 仕様 4.1：販売期限切れを読み、ログインして回収せずにログアウトすると「販売期限切れ」の呼び出しが立ち直る（B-3）
+#[test]
+fn expired_call_comes_back_after_logout_without_collecting() {
+    let mut s = Store::new(1, 1, 1);
+    scan(&mut s, 1, "customer", ONIGIRI);
+    assert_eq!(open_calls(&s, 1), vec![CallKind::Expired]);
+    login(&mut s, 1);
+    assert!(open_calls(&s, 1).is_empty());
+    ok(
+        &mut s,
+        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert_eq!(v.waiting_calls, vec![CallKind::Expired]);
+    assert!(v.lamp, "the customer side shows the staff call");
+}
+
+/// 仕様 4.1：会計後の年齢確認も、ログインして確認せずにログアウトすると「年確」の呼び出しが立ち直る（B-3）
+#[test]
+fn age_check_call_comes_back_after_logout_without_checking() {
+    let mut s = Store::new(1, 1, 1);
+    scan(&mut s, 1, "customer", BEER);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    assert!(open_calls(&s, 1).contains(&CallKind::AgeCheck));
+    login(&mut s, 1);
+    assert!(open_calls(&s, 1).is_empty());
+    ok(
+        &mut s,
+        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+    );
+    assert!(open_calls(&s, 1).contains(&CallKind::AgeCheck));
+}
+
+/// 仕様 4.1：公共料金・受付待ちのサービス商品も、取引に残っていればログアウトで立ち直る（B-3）
+#[test]
+fn bill_and_service_calls_come_back_after_logout() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", WATER_BILL);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"customer"}),
+    );
+    assert!(open_calls(&s, 1).contains(&CallKind::Bill));
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+    );
+    assert!(open_calls(&s, 1).contains(&CallKind::Bill));
+
+    scan(&mut s, 2, "customer", PARCEL);
+    assert!(open_calls(&s, 2).contains(&CallKind::Service));
+    login(&mut s, 2);
+    ok(
+        &mut s,
+        json!({"type":"end_staff_mode","register":2,"side":"staff"}),
+    );
+    assert!(open_calls(&s, 2).contains(&CallKind::Service));
 }
 
 const CARTON: &str = "4900000000158";

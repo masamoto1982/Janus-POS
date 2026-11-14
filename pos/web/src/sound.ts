@@ -43,6 +43,13 @@ export function chimePay(): void {
   });
 }
 
+/** 照合OK（年確・FFのお渡し）の「ピンポン」：上がる二音で、確かめられたことを耳でも伝える */
+export function chimeOk(): void {
+  if (!ready()) return;
+  tone(1319, 0, 0.18, "sine", 0.09);
+  tone(1760, 0.16, 0.32, "sine", 0.09);
+}
+
 export function beepPress(): void {
   if (!ready()) return;
   tone(900, 0, 0.04, "triangle", 0.05);

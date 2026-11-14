@@ -4705,3 +4705,67 @@ fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
     login_as(&mut s, 1, "ST001");
     assert_eq!(reg(&s, 1).answered.as_deref(), Some("金券"));
 }
+
+#[test]
+fn passing_age_or_ff_check_is_shown_until_staff_moves_on() {
+    use janus_pos_core::store::Passed;
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BEER);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"side":"staff","id_check":true}),
+    );
+    assert_eq!(reg(&s, 1).staff.passed, None);
+    ok(
+        &mut s,
+        json!({"type":"check_id","register":1,"birth":"19900101","today":"2026-11-14"}),
+    );
+    assert_eq!(reg(&s, 1).staff.passed, Some(Passed::Age { age: 20 }));
+    ok(&mut s, json!({"type":"dismiss_passed","register":1}));
+    assert_eq!(reg(&s, 1).staff.passed, None);
+
+    // 年齢が足りないときは照合OKではなく回収
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"side":"staff","id_check":true}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"check_id","register":1,"birth":"20100101","today":"2026-11-14"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.passed, None);
+    assert_eq!(v.staff.confiscated.len(), 1);
+
+    // FF：最後の一品が一致したときだけ照合OK
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":2}),
+    );
+    let ff = reg(&s, 1).staff.lines[0].line.id;
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":ff,"handed":1}),
+    );
+    assert_eq!(reg(&s, 1).staff.passed, None);
+    ok(
+        &mut s,
+        json!({"type":"check_ff","register":1,"side":"staff","line_id":ff,"handed":2}),
+    );
+    assert_eq!(reg(&s, 1).staff.passed, Some(Passed::Ff));
+}

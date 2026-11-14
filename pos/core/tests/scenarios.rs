@@ -5020,3 +5020,45 @@ fn tendered_cash_and_change_are_shown_on_both_sides() {
     let rc = v.last_receipt.unwrap();
     assert_eq!((rc.paid, rc.change_total), (1000, 360));
 }
+
+/// 仕様 12.2：呼び出し中は無操作の残り時間が減らず、片付いたら止まった値から続きを数える（B-5）
+#[test]
+fn idle_countdown_pauses_while_a_call_is_open() {
+    use janus_pos_core::store::IDLE_REVERT_MS;
+    let mut s = Store::new(1, 1, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    advance(&mut s, 60_000);
+    let left = reg(&s, 1).idle_revert_in.unwrap();
+    assert_eq!(left, IDLE_REVERT_MS - 60_000);
+    // ログアウトしてお客様がベルを押す（ログアウトも操作なので、ここから数え直す）
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    ok(&mut s, json!({"type":"call_staff","register":1}));
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    advance(&mut s, 200);
+    let held = reg(&s, 1).idle_revert_in.unwrap();
+    advance(&mut s, 120_000);
+    assert_eq!(reg(&s, 1).idle_revert_in.unwrap(), held, "frozen while calling");
+    // ログインで片付くと、止まった値から続きを数える（ログインも操作なので満タンに戻る）
+    login(&mut s, 1);
+    let after = reg(&s, 1).idle_revert_in.unwrap();
+    advance(&mut s, 10_000);
+    assert_eq!(reg(&s, 1).idle_revert_in.unwrap(), after - 10_000);
+}
+
+/// 仕様 12.2：セルフ操作モードの呼び出しのあいだも残り時間は変わらない（B-5）
+#[test]
+fn idle_countdown_is_frozen_for_a_self_operated_call() {
+    let mut s = Store::new(1, 1, 1);
+    scan(&mut s, 1, "customer", BREAD);
+    advance(&mut s, 10_000);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    let held = reg(&s, 1).idle_revert_in.unwrap();
+    advance(&mut s, 200_000);
+    assert_eq!(reg(&s, 1).idle_revert_in.unwrap(), held);
+    assert_eq!(reg(&s, 1).customer.lines.len(), 1, "the transaction is not voided");
+}

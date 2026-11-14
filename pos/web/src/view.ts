@@ -764,15 +764,15 @@ function simClock(snap: Snapshot, t: number): string {
 /** 非常事態モード（旧 エマージェンシーモード）：セルフ操作モードでスタッフがログインしないまま、呼び鈴が3分以上鳴らしっぱなし、
  *  または3分以内に10回以上鳴らされた。両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。
  *  スタッフ側は帯（二段目）を出さず、「非常事態モードを解除します」の案内と解除ボタンだけ。オーナーと担当スーパーバイザーの連絡先は最下段
- *  （emergencyContactsRow）。解除はログインしたスタッフがこのボタンで（ログインだけでは解除しない、user 2026-11-14） */
+ *  （emergencyContactsRow）。解除はログインなしで誰でも押せる（駆け付けた警察官・救急隊が解除する、user 2026-11-14）。ログインだけでは解除しない */
 function emergencyScreen(r: RegisterView, side: Side): string {
   const body = `${msg(
     "スタッフの応答がありません",
     "事件または事故の可能性があります<br>ご自身の安全を確保の上、通報をお願いいたします",
   )}<div class="sos-contact"><p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p><p class="small">緊急連絡先と店舗住所を記載したレシートを出力します</p></div>`;
   if (side === "customer") return `<div class="confirm change-alert emergency">${body}</div>`;
-  const ready = r.staff.state === "ready";
-  const end = btn("解除", { type: "end_emergency", register: r.id }, { allowed: ready, reason: "スタッフがログインすると解除できます" }, "primary");
+  // 解除はログインなしで誰でも押せる（駆け付けた警察官・救急隊も、user 2026-11-14）。表示のみの側でも押せるよう staff-only に入れる
+  const end = `<span class="staff-only">${btn("解除", { type: "end_emergency", register: r.id }, undefined, "primary")}</span>`;
   return `<div class="confirm change-alert emergency">${msg("非常事態モードを解除します")}${end}</div>`;
 }
 

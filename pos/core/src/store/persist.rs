@@ -156,9 +156,9 @@ struct SavedRegister {
     touch: Option<(Side, u64)>,
     emoney: Option<EmoneyTask>,
     #[serde(default)]
-    press_log: Vec<u64>,
-    #[serde(default)]
     emergency_since: Option<u64>,
+    #[serde(default)]
+    emergency_ended: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -459,8 +459,8 @@ impl SavedRegister {
             paused: r.paused,
             touch: r.touch,
             emoney: r.emoney.clone(),
-            press_log: r.press_log.clone(),
             emergency_since: r.emergency,
+            emergency_ended: r.emergency_ended,
         }
     }
 
@@ -520,8 +520,7 @@ impl SavedRegister {
             touch: self.touch,
             pressing: false,
             emoney: self.emoney,
-            press_log: self.press_log,
-            press_since: None,
+            emergency_ended: self.emergency_ended,
             emergency: self.emergency_since,
             emergency_log: None,
         };

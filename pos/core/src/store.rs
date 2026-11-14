@@ -416,6 +416,10 @@ pub enum Command {
     ReleaseCall {
         register: u8,
     },
+    /// 非常事態モードを解除する（ログインしたスタッフがスタッフ側の帯のボタンで）
+    EndEmergency {
+        register: u8,
+    },
     VoidTransaction {
         register: u8,
     },
@@ -568,6 +572,7 @@ impl Command {
             | C::ResolveEmoneyShort { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
+            | C::EndEmergency { register }
             | C::ConfirmPointCard { register, .. }
             | C::UsePoints { register, .. }
             | C::VoidTransaction { register, .. }
@@ -1233,6 +1238,14 @@ impl Txn {
     }
 }
 
+/// 非常事態モードの解除で出すレシートの中身
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct EmergencyLog {
+    pub started_at: u64,
+    pub ended_at: u64,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Receipt {
@@ -1303,8 +1316,12 @@ struct Register {
     press_log: Vec<u64>,
     /// 呼び鈴を押し始めた時刻（押している間だけ）。鳴らしっぱなしの判定用
     press_since: Option<u64>,
-    /// エマージェンシーモード。一度入ったらスタッフがログインするまで続く
-    emergency: bool,
+    /// 非常事態モード（旧 エマージェンシーモード）に入った時刻。一度入ったら、ログインしたスタッフが
+    /// スタッフ側の帯の「非常事態モードを解除」を押すまで続く（ログインだけでは解除しない）
+    emergency: Option<u64>,
+    /// 直前に解除した非常事態モードの（発動時刻, 解除時刻）。解除と同時にこの二つを印字したレシートを出し、
+    /// スタッフ側に EMERGENCY_LOG_MS のあいだ案内する
+    emergency_log: Option<(u64, u64)>,
 }
 
 impl Register {
@@ -1555,6 +1572,8 @@ pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 /// 呼び鈴が EMERGENCY_WINDOW_MS 以上鳴らしっぱなし、または EMERGENCY_WINDOW_MS 以内に EMERGENCY_PRESSES 回以上鳴らされた
 pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
 pub const EMERGENCY_PRESSES: usize = 10;
+/// 非常事態モードの解除のあと、スタッフ側に「レシートを出力しました」と発動・解除時刻を出しておく時間
+pub const EMERGENCY_LOG_MS: u64 = 10_000;
 
 /// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはスタッフ側に残す（取引が終わるまで）。
 /// 呼び鈴（用件なし）と釣銭忘れ（ログインでは片付かない）以外のすべての呼び出し（user 2026-11-14：あらゆる呼び出しで挙動を揃える）
@@ -1619,7 +1638,8 @@ impl Store {
                 emoney: None,
                 press_log: vec![],
                 press_since: None,
-                emergency: false,
+                emergency: None,
+                emergency_log: None,
             })
             .collect();
         Store {
@@ -1721,8 +1741,11 @@ impl Store {
             m.tick(now, self.signal, self.bell_loss, &mut self.rng);
         }
         for r in &mut self.registers {
-            if !r.emergency && r.emergency_due(now) {
-                r.emergency = true;
+            if r.emergency.is_none() && r.emergency_due(now) {
+                r.emergency = Some(now);
+            }
+            if r.emergency_log.is_some_and(|(_, end)| end + EMERGENCY_LOG_MS <= now) {
+                r.emergency_log = None;
             }
             if r.outlet.total() > 0 {
                 let since = *r.outlet_since.get_or_insert(now);
@@ -1921,8 +1944,13 @@ impl Store {
         }
         if let Some(id) = cmd.register() {
             let now = self.now;
+            // 解除のレシートの案内は、そのレジで次の操作があれば閉じる（待たせない）
+            let keep_log = matches!(cmd, Command::EndEmergency { .. } | Command::ReleaseCall { .. });
             if let Ok(r) = self.reg_mut(id) {
                 r.last_op = now;
+                if !keep_log {
+                    r.emergency_log = None;
+                }
             }
         }
         let screen = cmd.screen().zip(cmd.register());
@@ -2885,6 +2913,21 @@ impl Store {
                 r.press_since = None;
                 done("")
             }
+            C::EndEmergency { register } => {
+                let now = self.now;
+                let r = self.reg_mut(register)?;
+                let Some(since) = r.emergency else {
+                    return Err("非常事態モードではありません".into());
+                };
+                if r.staff_state() != StaffState::Ready {
+                    return Err("非常事態モードの解除はスタッフがログインして行います".into());
+                }
+                r.emergency = None;
+                r.emergency_log = Some((since, now));
+                r.press_log.clear();
+                r.press_since = None;
+                done("非常事態モードを解除しました")
+            }
             C::VoidTransaction { register } => {
                 self.check_active(register, Action::VoidTransaction)?;
                 let now = self.now;
@@ -3324,7 +3367,6 @@ impl Store {
             let took_over = r.txn.customer_turn;
             r.staff = Some(StaffSession { account: acc });
             r.press_log.clear();
-            r.emergency = false;
             r.touch = None;
             r.txn.customer_turn = false;
             r.pressing = false;
@@ -4490,7 +4532,9 @@ impl Store {
         RegisterView {
             id: r.id,
             bell_dead,
-            emergency: r.emergency,
+            emergency: r.emergency.is_some(),
+            emergency_since: r.emergency,
+            emergency_log: r.emergency_log.map(|(started_at, ended_at)| EmergencyLog { started_at, ended_at }),
             active_side: active_side(&c),
             max_items: MAX_ITEMS,
             lamp: waiting.is_some(),
@@ -4812,8 +4856,12 @@ pub struct RegisterView {
     pub id: u8,
     /// ON の Bell がどれも通じず、呼び出しが誰にも届かない
     pub bell_dead: bool,
-    /// エマージェンシーモード（セルフ操作モードで呼び鈴に応答がない）
+    /// 非常事態モード（セルフ操作モードで呼び鈴に応答がない）
     pub emergency: bool,
+    /// 非常事態モードに入った時刻
+    pub emergency_since: Option<u64>,
+    /// 直前に解除した非常事態モードの発動・解除時刻（解除のレシートの中身、しばらくのあいだだけ）
+    pub emergency_log: Option<EmergencyLog>,
     pub active_side: Option<Side>,
     pub max_items: u32,
     pub lamp: bool,

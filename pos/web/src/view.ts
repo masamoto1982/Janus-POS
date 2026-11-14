@@ -749,13 +749,41 @@ function bellDeadScreen(): string {
   return confirm(msg("呼び出し端末が動作していません", "お手数ですが、店員に直接お声かけください"));
 }
 
-/** エマージェンシーモード：セルフ操作モードでスタッフがログインしないまま、呼び鈴が3分以上鳴らしっぱなし、または3分以内に10回以上鳴らされた
- * 両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。スタッフがログインすると解除 */
-function emergencyScreen(): string {
-  return `<div class="confirm change-alert emergency">${msg(
+/** 店舗の緊急連絡先：オーナーと担当スーパーバイザー（シミュレーターの架空の番号） */
+const STORE_CONTACTS = [
+  ["オーナー：", "090-0000-0000"],
+  ["担当スーパーバイザー：", "090-0000-0001"],
+] as const;
+
+/** シミュレーターの時刻（snap.now の時間軸）を壁時計の時刻にして「11月14日 13:52:10」 */
+function simClock(snap: Snapshot, t: number): string {
+  const d = new Date(Date.now() - (snap.now - t));
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/** 非常事態モード（旧 エマージェンシーモード）：セルフ操作モードでスタッフがログインしないまま、呼び鈴が3分以上鳴らしっぱなし、
+ *  または3分以内に10回以上鳴らされた。両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。
+ *  スタッフ側は二段目（帯）に「非常事態モード解除」、通報先の下にオーナーと担当スーパーバイザーの連絡先も出す。
+ *  解除はログインしたスタッフが帯のボタンで（ログインだけでは解除しない、user 2026-11-14） */
+function emergencyScreen(r: RegisterView, side: Side): string {
+  const body = `${msg(
     "スタッフの応答がありません",
     "事件または事故の可能性があります<br>ご自身の安全を確保の上、通報をお願いいたします",
-  )}<div class="sos-contact"><p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p><p class="small">緊急連絡先と店舗住所を記載したレシートを出力します</p></div></div>`;
+  )}<div class="sos-contact"><p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p><p class="small">緊急連絡先と店舗住所を記載したレシートを出力します</p></div>`;
+  if (side === "customer") return `<div class="confirm change-alert emergency">${body}</div>`;
+  const end = btn(
+    "非常事態モード解除",
+    { type: "end_emergency", register: r.id },
+    { allowed: r.staff.state === "ready", reason: "スタッフがログインすると解除できます" },
+    "primary",
+  );
+  const contacts = `<p class="sos-tel sos-store">${STORE_CONTACTS.map(([who, tel]) => `<span>${who}<b>${tel}</b></span>`).join("")}</p>`;
+  return `<div class="reg-top emergency-band"><span class="void"></span><span class="mid"></span><span class="action">${end}</span></div><div class="confirm change-alert emergency">${body}${contacts}</div>`;
+}
+
+/** 非常事態モードを解除した直後のスタッフ側：発動時刻と解除時刻を印字したレシートを出した案内（次の操作か10秒で閉じる） */
+function emergencyEnded(snap: Snapshot, log: { started_at: number; ended_at: number }): string {
+  return confirm(`${msg("非常事態モードを解除しました", "発動時刻と解除時刻を記載したレシートを出力しました")}<p class="sos-log"><span>発動：${simClock(snap, log.started_at)}</span><span>解除：${simClock(snap, log.ended_at)}</span></p>`);
 }
 
 export function callScreen(r: RegisterView): string {
@@ -1139,13 +1167,14 @@ export function itemCount(lines: { qty: number }[]): number {
   return lines.reduce((n, l) => n + l.qty, 0);
 }
 
-export function sharedScreen(r: RegisterView, _snap: Snapshot, side: Side): string {
+export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
   if (r.paused)
     return confirm(`<div class="point-screen paused-screen">${msg(
       "レジ休止中",
       side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します",
     )}</div>`);
-  if (r.emergency) return emergencyScreen();
+  if (r.emergency) return emergencyScreen(r, side);
+  if (r.emergency_log && side === "staff") return emergencyEnded(snap, r.emergency_log);
   if (!r.menu && r.outlet_detail.some(([d]) => d === 2000)) return returned2000(side);
   if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r);
   if (r.mode === "self_operated" && side === "customer" && r.bell_dead && r.staff.calls.length) return bellDeadScreen();
@@ -1296,7 +1325,7 @@ function bellBtn(r: RegisterView, side: Side): string {
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bell = bellBtn(r, side);
-  const mode = r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
+  const mode = r.emergency ? `<span class="mode-title emergency">非常事態モード</span>` : r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
   return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock">${clockText(now)}</time></span>`;
 }
 
@@ -1363,6 +1392,8 @@ export function answeredTopic(r: RegisterView, side: Side): string {
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
   if (r.menu && side === "customer" && !r.paused) return signage(now);
+  // 非常事態モード中のお客様側の最下段：英語で「警戒してください」「通報をお願いします」（ヘッダーと同じ赤で点滅）
+  if (r.emergency && side === "customer") return `<div class="call-row calling" data-i18n-skip>${msg("Stay alert", "Please call emergency services")}</div>`;
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
   // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
   if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length) return callingRow(r, side, snap.now);

@@ -158,7 +158,7 @@ struct SavedRegister {
     #[serde(default)]
     press_log: Vec<u64>,
     #[serde(default)]
-    emergency: bool,
+    emergency_since: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -460,7 +460,7 @@ impl SavedRegister {
             touch: r.touch,
             emoney: r.emoney.clone(),
             press_log: r.press_log.clone(),
-            emergency: r.emergency,
+            emergency_since: r.emergency,
         }
     }
 
@@ -522,7 +522,8 @@ impl SavedRegister {
             emoney: self.emoney,
             press_log: self.press_log,
             press_since: None,
-            emergency: self.emergency,
+            emergency: self.emergency_since,
+            emergency_log: None,
         };
         r.sync_mode();
         Ok(r)

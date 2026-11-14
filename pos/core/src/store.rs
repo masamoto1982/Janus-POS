@@ -20,7 +20,9 @@ use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 
 mod persist;
 
+/// 作れるレジの台数の上限
 pub const MAX_REGISTERS: u8 = 10;
+/// 作れる Bell の台数の上限
 pub const MAX_BELLS: u8 = 5;
 
 const FF_RECEIVED_SELF: &str =
@@ -164,7 +166,9 @@ pub enum ShortChoice {
     Staff,
 }
 
+/// 電子マネーの残高の上限
 pub const EMONEY_MAX: u32 = 20_000;
+/// 財布の電子マネーの最初の残高
 pub const EMONEY_INITIAL: u32 = 1_000;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -190,11 +194,13 @@ pub enum CallTopic {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
+    /// バーコードを読む（商品・ポイントカード・クーポン・スタッフバーコード・荷物・伝票）。操作側に関係なく受け付ける機器の操作
     Scan {
         register: u8,
         side: Side,
         code: String,
     },
+    /// FF をタブから登録する（スタッフ操作モードのスタッフ側）。`force` は欠品の長押し＝予約注文
     RegisterFf {
         register: u8,
         #[serde(default = "staff_side")]
@@ -206,84 +212,102 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(as = "Option<bool>", optional))]
         force: bool,
     },
+    /// 最下段の「FF」ボタンでスタッフを呼ぶ（セルフ操作モード）
     FfButton {
         register: u8,
     },
+    /// FF のお渡し数を入れて照合する
     CheckFf {
         register: u8,
         side: Side,
         line_id: u32,
         handed: u32,
     },
+    /// サービス商品の受付を済ませる
     CompleteService {
         register: u8,
         line_id: u32,
         amount: u32,
     },
+    /// 荷物を送る：三辺の合計を決める
     ParcelLength {
         register: u8,
         line_id: u32,
         sum_cm: u32,
     },
+    /// 荷物を送る：重さを入れてサイズを決める
     ParcelSize {
         register: u8,
         line_id: u32,
         sum_cm: u32,
         weight_g: u32,
     },
+    /// 荷物を送る：届け先の郵便番号を入れて料金を決める
     ParcelPostal {
         register: u8,
         line_id: u32,
         postal: String,
     },
+    /// 荷物を送るの入力を一段階戻る（三辺の合計から戻ると受付をやめる）
     ParcelBack {
         register: u8,
         line_id: u32,
     },
+    /// 「同じお届け先の荷物はありますか？」に答える
     ParcelNext {
         register: u8,
         more: bool,
     },
+    /// 荷物を受取る：お渡しを済ませる
     PickupHandover {
         register: u8,
     },
+    /// 荷物を受取る：保管場所に荷物があったか（`null` で探し直す）
     PickupFound {
         register: u8,
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         found: Option<bool>,
     },
+    /// 明細を取り消す（販売期限切れの「回収しました」も）
     RemoveLine {
         register: u8,
         side: Side,
         line_id: u32,
     },
+    /// 明細の数量を変える
     SetQty {
         register: u8,
         side: Side,
         line_id: u32,
         qty: u32,
     },
+    /// クーポンを取り消す
     RemoveCoupon {
         register: u8,
         side: Side,
         coupon_id: u32,
     },
+    /// 取り消したクーポンの返却の案内を閉じる
     DismissReturned {
         register: u8,
     },
+    /// 会計に進む
     Checkout {
         register: u8,
         side: Side,
     },
+    /// 会計から登録画面に戻る
     BackToRegistering {
         register: u8,
         side: Side,
     },
+    /// 支払方法を選ぶ（選択中をもう一度押すと外す）
     SelectPayment {
         register: u8,
         side: Side,
         method: PaymentMethod,
     },
+    /// 年齢確認を「する」（生年月日の入力）か「スキップ」か選ぶ
     ChooseAgeCheck {
         register: u8,
         #[serde(default = "staff_side")]
@@ -291,6 +315,7 @@ pub enum Command {
         side: Side,
         id_check: bool,
     },
+    /// 登録中に年確フラグから年齢確認を始める・やめる
     EarlyAgeCheck {
         register: u8,
         #[serde(default = "staff_side")]
@@ -298,6 +323,7 @@ pub enum Command {
         side: Side,
         start: bool,
     },
+    /// 身分証の生年月日で年齢を判定する
     CheckId {
         register: u8,
         #[serde(default = "staff_side")]
@@ -306,16 +332,20 @@ pub enum Command {
         birth: String,
         today: String,
     },
+    /// 年齢に届かない商品の回収の案内を閉じる
     DismissConfiscated {
         register: u8,
     },
+    /// お渡し済み FF の回収の案内を閉じる
     DismissFfCollect {
         register: u8,
     },
     /// 照合が済んだ案内（年確OK・FFのお渡しOK）を閉じて先へ進む
+    /// 照合イベントの済んだ案内を閉じる（「次へ」）
     DismissPassed {
         register: u8,
     },
+    /// 払込票の内容の確認のチェックを付ける・外す
     CheckBill {
         register: u8,
         #[serde(default = "staff_side")]
@@ -324,12 +354,14 @@ pub enum Command {
         line_id: u32,
         checked: bool,
     },
+    /// レシートへの収入印紙の貼り付けを確認する
     AffixReceiptStamp {
         register: u8,
         #[serde(default = "staff_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
     },
+    /// 払込票（領収証）への収入印紙の貼り付けを確認する
     AffixStamp {
         register: u8,
         #[serde(default = "staff_side")]
@@ -338,6 +370,7 @@ pub enum Command {
         line_id: u32,
         affixed: bool,
     },
+    /// 払込票・荷物の控えのお渡しを済ませる
     HandOverBills {
         register: u8,
         #[serde(default = "staff_side")]
@@ -345,6 +378,7 @@ pub enum Command {
         side: Side,
     },
     /// スタッフがお渡ししたチケットの枚数を入力する（発券枚数と照合）
+    /// チケットのお渡し枚数を入れる（スタッフ側）
     HandTickets {
         register: u8,
         #[serde(default = "staff_side")]
@@ -354,6 +388,7 @@ pub enum Command {
     },
     /// お客様が受け取ったチケットの枚数を入力する（発券枚数と照合）。
     /// 両方が発券枚数と一致したらお渡し完了
+    /// チケットの受け取り枚数を入れる（お客様側）
     ReceiveTickets {
         register: u8,
         #[serde(default = "customer_side")]
@@ -361,50 +396,60 @@ pub enum Command {
         side: Side,
         received: u32,
     },
+    /// 入金ボックスに金種と枚数で現金を入れる
     InsertCash {
         register: u8,
         denomination: u32,
         count: u32,
     },
+    /// 現金の投入を終えて決済する（「投入おわり」）
     FinishInsert {
         register: u8,
     },
+    /// 決済端末にかざす・スキャナで読む（電子マネー・クレジットカード・バーコード決済・ポイント）
     TapEmoney {
         register: u8,
         #[serde(default)]
         #[cfg_attr(feature = "ts", ts(optional))]
         method: Option<PaymentMethod>,
     },
+    /// 電子マネーのチャージ・残高確認を始める
     StartEmoney {
         register: u8,
         side: Side,
         kind: EmoneyKind,
     },
+    /// 電子マネーの手続きを閉じる
     CloseEmoney {
         register: u8,
         side: Side,
     },
     /// 販売個数の上限の案内を閉じる
+    /// 販売個数の上限の案内を閉じる
     CloseLimitAlert {
         register: u8,
         side: Side,
     },
+    /// 電子マネーの残高不足にどうするか答える
     ResolveEmoneyShort {
         register: u8,
         side: Side,
         choice: ShortChoice,
     },
+    /// 呼び出しボタンを押す（ベル・サービス・金券・たばこ・電子マネー、スタッフ側の応援）
     CallStaff {
         register: u8,
         #[serde(default)]
         #[cfg_attr(feature = "ts", ts(optional))]
         topic: Option<CallTopic>,
     },
+    /// ポイントカードなしで進む（「スキップ」）
     ConfirmPointCard {
         register: u8,
         side: Side,
     },
     /// 「ポイント利用」を選んだあと、ポイントの使い方を決めて充てる
+    /// ポイントの使い方（全部・端数・指定）を決めて払う
     UsePoints {
         register: u8,
         side: Side,
@@ -414,22 +459,28 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional))]
         points: Option<u32>,
     },
+    /// 呼び出しボタンから指を離す
     ReleaseCall {
         register: u8,
     },
     /// 非常事態モードを解除する（スタッフ側の解除ボタンで。ログインは要らない）
+    /// 非常事態モードを解除する（ログイン不要）
     EndEmergency {
         register: u8,
     },
+    /// 取引を中止する
     VoidTransaction {
         register: u8,
     },
+    /// ログアウトしてセルフ操作モードに戻る
     EndStaffMode {
         register: u8,
     },
+    /// レジ休止中にする
     Pause {
         register: u8,
     },
+    /// 店舗メニュー：お金を抜く（返品返金・緊急出金・経費支出など、店舗パスワードが要る）
     CashOut {
         register: u8,
         kind: CashOutKind,
@@ -438,11 +489,13 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(as = "Option<String>", optional))]
         password: String,
     },
+    /// 店舗メニュー：取引外入金・両替などでお金を入れる
     CashIn {
         register: u8,
         kind: CashInKind,
         amount: u32,
     },
+    /// 店舗メニューを開く・項目を選ぶ・閉じる
     OpenMenu {
         register: u8,
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
@@ -451,28 +504,34 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional))]
         exchange_to: Option<u32>,
     },
+    /// 入金ボックスに金額で現金を入れる（テンキー）
     Insert {
         register: u8,
         amount: u32,
     },
+    /// 出金ボックスのお金を取り出す
     TakeOutlet {
         register: u8,
     },
+    /// その側の画面が操作できるか確かめる（操作側でなければ理由を返す。状態は変えない）
     Claim {
         register: u8,
         side: Side,
     },
+    /// 販売規則：分類単位の年確ルールを足す（オーナー）
     AddAgeRule {
         owner_id: String,
         password: String,
         target: RuleTarget,
         min_age: u8,
     },
+    /// 販売規則：年確ルールを外す（オーナー）
     RemoveAgeRule {
         owner_id: String,
         password: String,
         rule_id: u32,
     },
+    /// 販売規則：商品ごとの年確の年齢を決める（オーナー）
     SetProductAge {
         owner_id: String,
         password: String,
@@ -480,6 +539,7 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         min_age: Option<u8>,
     },
+    /// 販売規則：商品ごとの販売個数の上限を決める（オーナー）
     SetSaleLimit {
         owner_id: String,
         password: String,
@@ -487,16 +547,19 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         limit: Option<u32>,
     },
+    /// 販売規則の設定を開くときのオーナー認証
     VerifyOwner {
         owner_id: String,
         password: String,
     },
+    /// 販売規則：税区分の税率を変える（オーナー）
     SetTaxRate {
         owner_id: String,
         password: String,
         class_id: String,
         rate_bp: u32,
     },
+    /// 販売規則：税区分を足す（オーナー）
     AddTaxClass {
         owner_id: String,
         password: String,
@@ -504,25 +567,30 @@ pub enum Command {
         kind: TaxKind,
         rate_bp: u32,
     },
+    /// 販売規則：商品の税区分を付け替える（オーナー）
     SetProductTax {
         owner_id: String,
         password: String,
         code: String,
         class_id: String,
     },
+    /// 販売規則：インボイスの登録番号と端数処理（オーナー）
     SetInvoice {
         owner_id: String,
         password: String,
         invoice_no: String,
         rounding: Rounding,
     },
+    /// シミュレーター：Bell との通信ロス率
     SetBellLoss {
         percent: u8,
     },
+    /// シミュレーター：Bell を不通にする
     SetBellOffline {
         bell: usize,
         offline: bool,
     },
+    /// Bell の呼び鈴機能の ON/OFF
     SetBellOn {
         bell: usize,
         on: bool,
@@ -1611,9 +1679,12 @@ fn customer_side() -> Side {
     Side::Customer
 }
 
+/// 決済後の「ありがとうございました」の画面
 pub const THANKS_MS: u64 = 3000;
+/// 足りた状態で最後の投入からこの時間入れなければ、投入おわりとみなして決済する
 pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
+/// 無操作で取引を中止し、セルフ操作モードに戻る
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 /// 非常事態モード：セルフ操作モードでスタッフがログインしないまま、最も古い未解決の呼び出し（釣銭忘れを除く）が
 /// この時間応答されない。24 時間 365 日の店舗で社員やオーナーが即座に対処することはできないので、通知は送らない。
@@ -1636,17 +1707,23 @@ pub const ANSWERED_CALLS: [CallKind; 10] = [
     CallKind::ReceiptStamp,
     CallKind::Expired,
 ];
-/// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す（user 2026-11-14 に30秒で確定）
+/// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す
 pub const BELL_REMIND_MS: u64 = 30 * 1000;
-/// 鳴らし直しは、呼び出し（押されたとき・新しい呼び出し）ごとに最大この回数まで（user 2026-11-14）。
+/// 鳴らし直しは、呼び出し（押されたとき・新しい呼び出し）ごとに最大この回数まで。
 /// 鳴り続けるとレジ台数が増えたときの騒音になり、繰り返される音に人は鈍くなって、かえって呼び出しに気づきにくくなるため
 pub const BELL_REMINDS: u8 = 3;
 
+/// セルフ操作モードで出金ボックスにお金が残ったまま、お客様側に「釣り銭が残っています」を出すまで
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
+/// セルフ操作モードで出金ボックスにお金が残ったまま、釣銭忘れの呼び出しをかけるまで
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
+/// スタッフ操作モードで「釣り銭が残っています」を出すまで
 pub const STAFF_OP_CHANGE_REMIND_MS: u64 = 30 * 1000;
+/// スタッフ操作モードで釣銭忘れの呼び出しをかけるまで
 pub const STAFF_OP_CHANGE_CALL_MS: u64 = 60 * 1000;
+/// 呼び出しの音量の最小（最も長く待たせている呼び出しの放置時間で 1 まで大きくなる）
 pub const RING_MIN: f32 = 0.25;
+/// 呼び出しの音量が最大になる放置時間
 pub const RING_FULL_MS: u64 = 60 * 1000;
 
 pub fn ring_volume(waiting_ms: u64) -> f32 {

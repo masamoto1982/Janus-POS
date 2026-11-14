@@ -2,9 +2,13 @@ use serde::Serialize;
 
 use crate::rng::Rng;
 
+/// Bell の返事が最新に追いつくまで鳴動状態を再送する間隔
 pub const RETRY_MS: u64 = 200;
+/// 変化がなくても鳴動状態を送る間隔
 pub const HEARTBEAT_MS: u64 = 2_000;
+/// 返事がなければ不通とみなす時間
 pub const LINK_TIMEOUT_MS: u64 = 5_000;
+/// 押した回数が増えたことを受け取ったときに鳴らす最短の時間
 pub const MIN_RING_MS: u64 = 1_000;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, serde::Deserialize)]

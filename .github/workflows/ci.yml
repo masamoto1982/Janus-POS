@@ -26,6 +26,14 @@ jobs:
         working-directory: pos/core
         run: cargo test --features ts --test ts_bindings
 
+      - name: docs/spec.md generated sections match the code
+        working-directory: pos/core
+        run: |
+          cargo test --features spec --test spec_tables || {
+            echo "::error::docs/spec.md の生成箇所がコードと食い違っています。cd pos && npm run gen:spec で作り直してください"
+            exit 1
+          }
+
       - name: Cache wasm-pack
         uses: actions/cache@v4
         with:

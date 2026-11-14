@@ -706,7 +706,8 @@ function deviceFx(cmd: Command): (() => void) | null {
 let lastError: string | undefined;
 /** レジが受け付けなかった理由（B-2）。操作した側の画面に、次に操作が受け付けられるか REJECT_SHOW_MS たつまで出す */
 const rejected = new Map<string, { text: string; at: number }>();
-/** 理由をほかの場所で出すコマンド（荷物の入力欄・入力欄ひとつの画面のテンキー）は、帯の下には出さない */
+/** 理由をほかの場所で出すコマンド（荷物の入力欄・入力欄ひとつの画面のテンキー）は、帯の下には出さない。
+ *  点数の上限（ブラウザの警告）と販売個数の上限（レジ画面の案内）も、それぞれの場所に出す */
 const OWN_ERROR = new Set(["parcel_length", "parcel_size", "parcel_postal", "parcel_back", "parcel_next"]);
 
 function rejection(reg: number, side: Side): string | undefined {
@@ -735,7 +736,7 @@ function send(cmd: Command): boolean {
     if (res.ok) {
       rejected.delete(`${cmd.register}:staff`);
       rejected.delete(`${cmd.register}:customer`);
-    } else if (side !== "store" && !OWN_ERROR.has(cmd.type) && !res.error?.includes("買い物点数の上限")) {
+    } else if (side !== "store" && !OWN_ERROR.has(cmd.type) && !res.error?.includes("買い物点数の上限") && !/は1回のお会計で\d+点までです$/.test(res.error ?? "")) {
       rejected.set(`${cmd.register}:${side}`, { text: res.error ?? "操作できません", at: Date.now() });
     }
   }

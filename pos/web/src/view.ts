@@ -253,7 +253,8 @@ function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate |
   return (
     collectScreen(
       "販売期限が切れています",
-      [{ name: l.name, qty: l.qty }],
+      // 期限切れの品はスキャンした瞬間に一点ずつ止まるので、回収は常に一点。点数は出さず、販売期限を出す
+      [{ name: l.name, note: l.dates ? `販売期限 ${expiryLabel(l.dates.sell_by_min, l.fresh)}` : "" }],
       staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "申し訳ございません、店員が新しい商品にお取替えいたします",
       st ? btn("回収しました", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary") : "",
     ) + back
@@ -261,11 +262,11 @@ function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate |
 }
 
 /** 回収イベント（年確で販売できない商品・お渡し済みFFの取り消し・販売期限切れ）の共通の画面。
- *  縦横中央に、大きなテキスト＝なぜ回収するか／回収する品の一覧／小さなテキスト＝スタッフへの指示またはお客様へのお詫び、
+ *  縦横中央に、大きなテキスト＝なぜ回収するか／回収する品の一覧（点数、販売期限切れは販売期限）／小さなテキスト＝スタッフへの指示またはお客様へのお詫び、
  *  スタッフ側だけ「回収しました」 */
-function collectScreen(head: string, items: { name: string; qty: number }[], sub: string, action = ""): string {
+function collectScreen(head: string, items: { name: string; qty?: number; note?: string }[], sub: string, action = ""): string {
   const list = items.length
-    ? `<ul class="collect-list">${items.map((c) => `<li><b>${esc(c.name)}</b><span>${c.qty}点</span></li>`).join("")}</ul>`
+    ? `<ul class="collect-list">${items.map((c) => `<li><b>${esc(c.name)}</b><span>${esc(c.note ?? `${c.qty}点`)}</span></li>`).join("")}</ul>`
     : "";
   return `<div class="point-screen collect">${msg(esc(head), esc(sub))}${list}${action ? `<div class="point-choices">${action}</div>` : ""}</div>`;
 }

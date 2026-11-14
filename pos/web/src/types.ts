@@ -185,9 +185,9 @@ emergency: boolean, active_side: Side | null, max_items: number, lamp: boolean, 
  */
 answered: Array<CallKind>, 
 /**
- * お客様が呼んだ、まだ応答のない呼び出し（セルフ操作モード）。お客様側の最下段に案内を出す
+ * まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
  */
-customer_calls: Array<CallKind>, mode: Mode, mode_label: string, outlet: number, outlet_detail: Array<[number, number]>, menu: Menu | null, paused: boolean, idle_revert_in: number | null, idle_voids: boolean, change_left: boolean, staff: StaffView, customer: CustomerView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 
+waiting_calls: Array<CallKind>, mode: Mode, mode_label: string, outlet: number, outlet_detail: Array<[number, number]>, menu: Menu | null, paused: boolean, idle_revert_in: number | null, idle_voids: boolean, change_left: boolean, staff: StaffView, customer: CustomerView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 
 /**
  * ポイント：付与対象の商品があるか・カードの残高・いま充てられる分・このお会計で付与する分
  */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, withRejection } from "./view";
+import { trCore } from "./i18n";
 
 describe("view helpers", () => {
   it("keeps the signage out of the language switch", () => {
@@ -156,4 +157,22 @@ describe("view helpers", () => {
     expect(signage(SIGNAGE_MS * SIGNAGE.length)).toContain(SIGNAGE[0][0]);
     expect(signage(0)).not.toContain("<button");
   });
+
+  it("puts a rejected reason in red under the band, in place of the tax row (B-2)", () => {
+    const reason = "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
+    const band = regTop(150, 1, "");
+    const screen = `${band}<div class="staff-head"><span class="muted tax-note">内税 8% 11円</span></div><table></table>`;
+    const html = withRejection(screen, reason);
+    expect(html).toContain(`<p class="reject-note" role="status">${reason}</p>`);
+    expect(html).not.toContain("tax-note");
+    expect(html.indexOf("reject-note")).toBeGreaterThan(html.indexOf("reg-top"));
+    expect(html).toContain("<table>");
+    // 帯だけの画面では帯の直下、帯のない画面では一番上
+    expect(withRejection(`${band}<div class="confirm"></div>`, reason).indexOf("reject-note")).toBeGreaterThan(0);
+    expect(withRejection(`<div class="confirm"></div>`, reason).startsWith('<p class="reject-note"')).toBe(true);
+    expect(withRejection(screen, undefined)).toBe(screen);
+    // 英語の画面では英語で出る
+    expect(trCore(reason)).toBe("Parcels to send can't be paid with other items (any number of parcels can be paid together)");
+  });
 });
+

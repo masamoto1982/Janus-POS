@@ -4899,3 +4899,18 @@ fn store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids() {
     ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
     assert!(reg(&s, 1).staff.age_official_id, "alcohol is a legal rule");
 }
+
+/// 仕様 15.3：受け付けなかった操作は理由を返し、続く操作は妨げない（ソフトドリンクの後の荷物の伝票）（B-2）
+#[test]
+fn a_rejected_scan_returns_its_reason_and_the_next_scan_goes_through() {
+    let mut s = Store::new(1, 1, 1);
+    scan(&mut s, 1, "customer", TEA);
+    let err = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"customer","code":PARCEL}),
+    )
+    .unwrap_err();
+    assert!(err.contains("荷物の発送は、ほかの商品と一緒に会計できません"), "{err}");
+    scan(&mut s, 1, "customer", BREAD);
+    assert_eq!(reg(&s, 1).customer.lines.len(), 2);
+}

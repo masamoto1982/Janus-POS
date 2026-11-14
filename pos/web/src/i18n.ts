@@ -609,6 +609,74 @@ const DICT: Record<string, string> = {
   スタッフ002: "Staff 002",
 };
 
+
+/** レジが受け付けなかった理由（コアの拒否の文言、B-2）。DICT にないものだけ */
+const REJECT_EN: Record<string, string> = {
+  "FF の商品が見つかりません": "FF item not found",
+  "FF の回収の確認はスタッフが行います": "Staff confirm taking back FF",
+  "FF の明細が見つかりません": "FF line not found",
+  "「ポイント利用」が選ばれていません": "\"Points\" is not selected",
+  "お会計中です（登録に戻ってから伝票を読み取ってください）": "Checking out (go back to registration, then scan the slip)",
+  "お会計中です（登録に戻ってから選び直してください）": "Checking out (go back to registration, then choose again)",
+  "お受け取りの手続き中ではありません": "No parcel pickup in progress",
+  "お受け取りの手続き中ではありません（先にお客様の受取用バーコードを読み取ってください）": "No parcel pickup in progress (scan the customer's pickup barcode first)",
+  "お支払いをやめるときは取引中止にしてください": "To stop paying, void the transaction",
+  "お渡し済みの FF の数量はスタッフが変更します": "Staff change the quantity of FF already handed over",
+  "お金の出し入れは、スタッフ側の画面の店舗メニューで行います": "Cash in and out is done from the store menu on the staff screen",
+  "お預かりの荷物のバーコードは、スタッフがスタッフ側で読み取ります": "Staff scan the stored parcel's barcode on the staff side",
+  "この取引で受け付けた荷物の伝票ではありません": "This slip is not from this transaction",
+  "この画面ではお金を受け付けません": "This screen does not accept money",
+  "クーポンが見つかりません": "Coupon not found",
+  "サービス商品の個数は変えられません": "Service items' quantity can't be changed",
+  "チャージか残高確認を選んでください": "Choose top-up or balance check",
+  "チャージは千円札・紙幣で入れてください": "Top up with ¥1,000 or larger notes",
+  "チャージを選ぶと、お金を受け付けます": "Choose top-up to insert money",
+  "ポイントカードが読まれていません": "No point card has been read",
+  "ポイントカードを読み取ってください": "Please scan your point card",
+  "レジがありません": "No such register",
+  "一点ずつスキャンしてください": "Scan them one at a time",
+  "使うポイント数を入力してください": "Enter the points to use",
+  "使えない金種です": "This denomination can't be used",
+  "先にチャージする紙幣を入金ボックスに入れてください": "First put the notes to top up into the inlet",
+  "先に保管場所の荷物を照合してください": "First match the parcel in storage",
+  "公共料金のお支払いは、ほかの商品と一緒に登録できません": "Bill payments can't be registered with other items",
+  "公共料金の払込票は取り消せません": "Bill slips can't be removed",
+  "出金ボックスにお金はありません": "There's no money in the outlet",
+  "収入印紙が必要な払込票が見つかりません": "No slip needs a revenue stamp",
+  "収入印紙が必要な払込票はありません": "No slip needs a revenue stamp",
+  "収入印紙の貼り付け確認はスタッフがログインしてから行います": "Staff check the revenue stamp after logging in",
+  "収入印紙の貼り付け確認はスタッフ側の画面で行います": "The revenue stamp is checked on the staff screen",
+  "収入印紙を貼るレシートはありません": "No receipt needs a revenue stamp",
+  "取り消してから、お会計に進んでください": "Remove it, then go to checkout",
+  "取り消すときは「取り消し」を押してください": "Press \"Remove\" to remove it",
+  "受付中の荷物が見つかりません": "No parcel is being accepted",
+  "受付待ちのサービス商品が見つかりません": "No service item is waiting",
+  "回収の確認はスタッフが行います": "Staff confirm taking items back",
+  "宅配便の取り消しは、スタッフがスタッフ側で伝票を読み取って行います": "To cancel a parcel, staff scan its slip on the staff side",
+  "宅配便を取り消すときは、取り消す荷物の伝票のバーコードを読み取ってください": "To cancel a parcel, scan the barcode on its slip",
+  "払込票が見つかりません": "Slip not found",
+  "日付が正しくありません": "Invalid date",
+  "日配食品は数量を増やせません": "Fresh food quantity can't be increased",
+  "明細が見つかりません": "Line not found",
+  "照合の確認はスタッフが行います": "Staff confirm the match",
+  "登録されていないスタッフバーコードです": "Unknown staff barcode",
+  "登録されていないバーコードです": "Unknown barcode",
+  "荷物のお受け取りは一件ずつ、ほかの商品と別にお取り扱いします（お受け取りが済んでから登録してください）": "Parcel pickups are handled one at a time, apart from other items (register them after the pickup)",
+  "荷物のお受け取りをやめるときは取引中止にしてください": "To stop the pickup, void the transaction",
+  "荷物のバーコードを読んで照合してから、お渡しください": "Scan the parcel's barcode to match it before handing it over",
+  "荷物の商品が見つかりません": "Parcel item not found",
+  "荷物の料金は、サイズと届け先の郵便番号で決まります": "The parcel fee depends on its size and postal code",
+  "荷物の照合と引き渡しは、スタッフがログインしてから行います": "Staff match and hand over parcels after logging in",
+  "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）": "Parcels to send can't be paid with other items (any number of parcels can be paid together)",
+  "販売期限切れの商品があります": "There is an item past its sell-by date",
+  "金額を入力してください": "Enter an amount",
+  "釣銭機の在高が不足しています": "The change machine is short of change",
+  "電子マネーの手続きはしていません": "No e-money task in progress",
+  "電子マネーの手続き中です": "E-money task in progress",
+  "電子マネーをかざしてください": "Hold your e-money card over the terminal",
+  "非常事態モードではありません": "Not in emergency mode",
+};
+
 const TOPIC_EN: Record<string, string> = { FF: "FF", サービス: "service", 金券: "vouchers", たばこ: "tobacco", 電子マネー: "e-money", お支払い: "bill payment", 宅配便: "parcel" };
 const topicsEn = (s: string): string => s.split("・").map((x) => TOPIC_EN[x] ?? x).join(", ");
 type Rule = [RegExp, (m: RegExpExecArray) => string];
@@ -677,6 +745,11 @@ const RULES: Rule[] = [
   [/^ポイント残高 ([\d,]+P)、ご利用可能 ([\d,]+P)$/, (m) => `Point balance ${m[1]}, usable ${m[2]}`],
   [/^(?:ご利用 ([\d,]+P)、)?付与 ([\d,]+P)、ポイント残高 ([\d,]+P)$/, (m) => `${m[1] ? `Used ${m[1]}, earned` : "Earned"} ${m[2]}, point balance ${m[3]}`],
   [/^ポイントで払った ([\d,]+P) は残高に戻ります$/, (m) => `The ${m[1]} paid with points go back to the card`],
+  [/^([\d,]+)円が足りません$/, (m) => `¥${m[1]} short`],
+  [/^([\d,]+)円単位で入れてください$/, (m) => `Insert in units of ¥${m[1]}`],
+  [/^ご利用可能なポイントは ([\d,]+)P までです$/, (m) => `You can use up to ${m[1]}P`],
+  [/^レジ(\d+)はありません$/, (m) => `No register ${m[1]}`],
+  [/^スタッフをお呼びください$/, () => "Please call a staff member"],
 ];
 
 function t(s: string): string {
@@ -691,6 +764,7 @@ export function trCore(raw: string): string | null {
   const s = raw.replace(/\s+/g, " ").trim();
   if (!JP.test(s)) return yenify(s);
   if (Object.hasOwn(DICT, s)) return DICT[s];
+  if (Object.hasOwn(REJECT_EN, s)) return REJECT_EN[s];
   for (const [re, f] of RULES) {
     const m = re.exec(s);
     if (!m) continue;

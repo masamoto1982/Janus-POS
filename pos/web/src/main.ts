@@ -38,6 +38,8 @@ import {
   walletPanel,
   sideOf,
   sharedScreen,
+  withRejection,
+  REJECT_SHOW_MS,
 } from "./view";
 
 declare global {
@@ -499,8 +501,8 @@ function render(): void {
           : ""
       }`,
     );
-    setRegion(`staff-${r.id}`, staffMain, langOf(r.id, "staff"));
-    setRegion(`cust-${r.id}`, custMain, langOf(r.id, "customer"));
+    setRegion(`staff-${r.id}`, withRejection(staffMain, rejection(r.id, "staff")), langOf(r.id, "staff"));
+    setRegion(`cust-${r.id}`, withRejection(custMain, rejection(r.id, "customer")), langOf(r.id, "customer"));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -631,6 +633,7 @@ function padKey(key: string, k: string): void {
       const cmd = SUBMIT[e.target]!(register, side as Side, e.digits, e.line);
       if (!cmd || !send(cmd)) {
         e.error = lastError ?? "受け付けられません";
+        rejected.delete(`${register}:${side}`);
         frame();
         return;
       }
@@ -701,6 +704,18 @@ function deviceFx(cmd: Command): (() => void) | null {
 
 /** 直前の send が受け付けられなかった理由 */
 let lastError: string | undefined;
+/** レジが受け付けなかった理由（B-2）。操作した側の画面に、次に操作が受け付けられるか REJECT_SHOW_MS たつまで出す */
+const rejected = new Map<string, { text: string; at: number }>();
+/** 理由をほかの場所で出すコマンド（荷物の入力欄・入力欄ひとつの画面のテンキー）は、帯の下には出さない。
+ *  点数の上限（ブラウザの警告）と販売個数の上限（レジ画面の案内）も、それぞれの場所に出す */
+const OWN_ERROR = new Set(["parcel_length", "parcel_size", "parcel_postal", "parcel_back", "parcel_next"]);
+
+function rejection(reg: number, side: Side): string | undefined {
+  const key = `${reg}:${side}`;
+  const r = rejected.get(key);
+  if (r && Date.now() - r.at >= REJECT_SHOW_MS) rejected.delete(key);
+  return rejected.get(key)?.text;
+}
 
 function send(cmd: Command): boolean {
   const fx = deviceFx(cmd);
@@ -715,6 +730,15 @@ function send(cmd: Command): boolean {
   }
   if (!res.ok) {
     if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
+  }
+  if (!where && "register" in cmd) {
+    const side = sideOf(cmd);
+    if (res.ok) {
+      rejected.delete(`${cmd.register}:staff`);
+      rejected.delete(`${cmd.register}:customer`);
+    } else if (side !== "store" && !OWN_ERROR.has(cmd.type) && !res.error?.includes("買い物点数の上限") && !/は1回のお会計で\d+点までです$/.test(res.error ?? "")) {
+      rejected.set(`${cmd.register}:${side}`, { text: res.error ?? "操作できません", at: Date.now() });
+    }
   }
   if (cmd.type.startsWith("parcel_")) {
     if (res.ok) parcelError.delete("register" in cmd ? cmd.register : 0);

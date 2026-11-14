@@ -265,6 +265,9 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 /* エマージェンシーモード：通報先の番号は数字の強調（赤・大きく） */
 .screen .sos-tel { display: flex; gap: 24px; justify-content: center; margin: 0; color: var(--alert-ink); font-size: var(--msg-big); font-weight: 700; }
 .screen .sos-tel b { font-size: 32px; font-variant-numeric: tabular-nums; }
+/* 番号の下に小さなテキスト（オレンジ）でレシートの出力を添える。大小の間は 4px（pos-text-tiers） */
+.screen .sos-contact { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.screen .sos-contact p.small { margin: 0; }
 .bell-sub { margin: 16px 0 4px; font-size: 14px; }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -632,6 +635,10 @@ body.dragging .drop-hint { display: inline; }
 .call-row.calling .msg { flex: 1; min-width: 0; }
 /* 呼び出し中の最下段の背景は、ヘッダーの呼び出しの点滅と同じ拍（--blink-on）で、薄い黄（--alert-bg）と濃い黄（--call-soft）を行き来する（user 2026-11-14） */
 .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--call-soft) calc(var(--blink-on) * 100%), var(--alert-bg)); }
+/* エマージェンシーモード中は、点滅するところをすべてスタッフ側ヘッダーと同じ色・同じ拍に揃える（user 2026-11-14）：
+   点いているあいだは赤 --sos-head＋白文字、消えているあいだはその段のふだんの色 */
+.screen.sos .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--sos-head) calc(var(--blink-on) * 100%), var(--tier-deep)); }
+.screen.sos .call-row.calling :is(.big, p.small) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(1px, 2px); }
 .call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
@@ -753,6 +760,12 @@ body.dragging .drop-hint { display: inline; }
 .screen .bell-btn:not(:disabled) { background: var(--bell-bg); color: var(--bell-ink); border: 1.5px solid var(--bell-ring); }
 /* 呼び出し中は呼び鈴の黄もヘッダーと同じ拍で切り替える：ヘッダーが黄のときは同じ黄、ヘッダーが戻るときはやわらかい黄（--alert-bg） */
 .screen.lamp .bell-btn:not(:disabled) { background: color-mix(in oklch, var(--call-soft) calc(var(--blink-on) * 100%), var(--alert-bg)); }
+/* エマージェンシー中の呼び鈴：ヘッダーが赤のときは同じ赤に白いベルと白い縁、ヘッダーが戻るときはふだんの呼び鈴 */
+.screen.sos .bell-btn:not(:disabled) {
+  background: color-mix(in oklch, var(--sos-head) calc(var(--blink-on) * 100%), var(--bell-bg));
+  color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--bell-ink));
+  border-color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--bell-ring));
+}
 .screen .bell-btn:disabled { background: var(--off-bg) !important; color: var(--off-ink) !important; border: 1.5px solid var(--border); }
 .bell-btn .bell-svg { width: 62%; height: 62%; display: block; }
 .bell-btn.pressing { transform: translate(1px, 2px); }

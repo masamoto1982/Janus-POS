@@ -179,6 +179,7 @@ const DICT: Record<string, string> = {
   "消防救急：": "Fire / ambulance: ",
   事件または事故の可能性があります: "There may have been an incident or accident",
   "ご自身の安全を確保の上、通報をお願いいたします": "Please make sure you are safe, then call for help",
+  緊急連絡先と店舗住所を記載したレシートを出力します: "A receipt with emergency contacts and the store address will be printed",
   スタッフをお呼びしました: "We have called a staff member",
   そのままお待ちください: "Please wait a moment",
 

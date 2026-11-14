@@ -755,7 +755,7 @@ function emergencyScreen(): string {
   return `<div class="confirm change-alert emergency">${msg(
     "スタッフの応答がありません",
     "事件または事故の可能性があります<br>ご自身の安全を確保の上、通報をお願いいたします",
-  )}<p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p></div>`;
+  )}<div class="sos-contact"><p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p><p class="small">緊急連絡先と店舗住所を記載したレシートを出力します</p></div></div>`;
 }
 
 export function callScreen(r: RegisterView): string {

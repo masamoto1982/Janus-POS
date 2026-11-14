@@ -456,6 +456,7 @@ function render(): void {
       el?.classList.toggle("calling", side === "staff" && r.lamp);
       el?.classList.toggle("head-blink", r.lamp || r.emergency);
       el?.classList.toggle("lamp", r.lamp && !r.emergency);
+      el?.classList.toggle("sos", r.emergency);
       app.querySelector(`[data-swipe-to="${r.id}:${side}"]`)?.classList.toggle("operable", operable);
       const wrap = el?.parentElement;
       wrap?.classList.toggle("inactive", locked);

@@ -4601,7 +4601,7 @@ fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
     );
     ok(&mut s, json!({"type":"release_call","register":1}));
     let v = reg(&s, 1);
-    assert_eq!(v.customer_calls, vec![CallKind::Tobacco]);
+    assert_eq!(v.waiting_calls, vec![CallKind::Tobacco]);
 
     ok(
         &mut s,
@@ -4610,7 +4610,7 @@ fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
     ok(&mut s, json!({"type":"release_call","register":1}));
     login_as(&mut s, 1, "ST001");
     let v = reg(&s, 1);
-    assert!(v.customer_calls.is_empty());
+    assert!(v.waiting_calls.is_empty());
     assert_eq!(
         v.answered,
         vec![CallKind::Tobacco],
@@ -4619,16 +4619,33 @@ fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
 }
 
 #[test]
-fn self_emoney_charge_call_waits_like_other_customer_calls() {
+fn self_emoney_charge_call_waits_like_other_waiting_calls() {
     let mut s = Store::new(3, 2, 1);
     ok(
         &mut s,
         json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.customer_calls, vec![CallKind::Emoney]);
+    assert_eq!(v.waiting_calls, vec![CallKind::Emoney]);
     login_as(&mut s, 1, "ST001");
     let v = reg(&s, 1);
-    assert!(v.customer_calls.is_empty());
+    assert!(v.waiting_calls.is_empty());
     assert_eq!(v.answered, vec![CallKind::Emoney]);
+}
+
+#[test]
+fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
+    // 年確
+    let mut s = Store::new(3, 2, 1);
+    ok(&mut s, json!({"type":"scan","register":1,"side":"customer","code":"4900000000103"}));
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"customer"}));
+    assert!(reg(&s, 1).waiting_calls.contains(&CallKind::AgeCheck));
+    login_as(&mut s, 1, "ST001");
+    let v = reg(&s, 1);
+    assert!(v.waiting_calls.is_empty());
+    assert!(v.answered.contains(&CallKind::AgeCheck));
+    // 宅配便（受付中のサービス商品が呼ぶサービス）
+    let mut s = Store::new(3, 2, 1);
+    ok(&mut s, json!({"type":"scan","register":1,"side":"customer","code":"2100000000014"}));
+    assert_eq!(reg(&s, 1).waiting_calls, vec![CallKind::Service]);
 }

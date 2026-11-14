@@ -733,6 +733,7 @@ const CALL_SHORT: Record<string, string> = {
   change_left: "釣銭忘れ",
   emoney: "電子マネー",
   receipt_stamp: "収入印紙",
+  expired: "販売期限切れ",
 };
 
 /** 二千円札は取り扱わないので、自動釣銭機がそのまま出金ボックスに返す。なぜ戻ってきたかを両画面に出し、出金ボックスから取り出すと消える。
@@ -1325,14 +1326,14 @@ export function menuPaused(): string {
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */
 export const isWelcome = (main: string): boolean => main.includes("welcome-band");
 
-const CALL_TOPIC: Partial<Record<CallKind, string>> = { fast_food: "FF", service: "サービス", voucher: "金券", tobacco: "たばこ", emoney: "電子マネー" };
+const CALL_TOPIC: Partial<Record<CallKind, string>> = { ...CALL_SHORT, cash_only: "現金", expired: "販売期限切れ" };
 const callTopics = (kinds: CallKind[]): string => kinds.map((k) => CALL_TOPIC[k]).filter(Boolean).join("・");
 
 /** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。お客様側は「スタッフを呼び出しています」（添え字なし）、
  *  スタッフ側は呼び出しからの経過秒数（取り消しボタンは置かない、user 2026-11-14） */
 function callingRow(r: RegisterView, side: Side, now: number): string {
   if (side === "customer") return `<div class="call-row calling">${msg("スタッフを呼び出しています")}</div>`;
-  const at = r.staff.calls.filter((c) => r.customer_calls.includes(c.kind)).map((c) => c.created_at);
+  const at = r.staff.calls.filter((c) => r.waiting_calls.includes(c.kind)).map((c) => c.created_at);
   return `<div class="call-row calling">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
 }
 
@@ -1345,13 +1346,13 @@ export function answeredTopic(r: RegisterView, side: Side): string {
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
   if (r.menu && side === "customer" && !r.paused) return signage(now);
+  // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
+  // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
+  if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length) return callingRow(r, side, snap.now);
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {
     const a = (n: Action) => find(r.customer.actions, n);
-    // お客様が呼んで、まだスタッフが来ていない：最下段の呼び出しボタンを、呼び出し中の案内に置き換える。
-    // 三段目（明細）は残すので、待つあいだも商品の登録を続けられる。スタッフがログインすると消える
-    if (r.customer_calls.length) return callingRow(r, side, snap.now);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     return `<div class="call-row">${[

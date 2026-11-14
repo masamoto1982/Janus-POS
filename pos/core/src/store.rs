@@ -1528,23 +1528,19 @@ pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
 pub const EMERGENCY_PRESSES: usize = 10;
 
-/// お客様が呼び鈴・最下段のボタンで呼べる用件。呼び出し中はお客様側の最下段に案内を出す
-/// 電子マネー（チャージ・残高照会、残高不足のチャージまたは現金併用）もお客様が選んで呼ぶので同じ扱い（user 2026-11-14）
-pub const CUSTOMER_CALLS: [CallKind; 6] = [
-    CallKind::CustomerHelp,
+/// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはスタッフ側に残す（取引が終わるまで）。
+/// 呼び鈴（用件なし）と釣銭忘れ（ログインでは片付かない）以外のすべての呼び出し（user 2026-11-14：あらゆる呼び出しで挙動を揃える）
+pub const ANSWERED_CALLS: [CallKind; 10] = [
+    CallKind::AgeCheck,
     CallKind::FastFood,
     CallKind::Service,
-    CallKind::Voucher,
     CallKind::Tobacco,
-    CallKind::Emoney,
-];
-/// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはスタッフ側に残す（取引が終わるまで）
-pub const ANSWERED_CALLS: [CallKind; 5] = [
-    CallKind::FastFood,
-    CallKind::Service,
     CallKind::Voucher,
-    CallKind::Tobacco,
+    CallKind::Bill,
     CallKind::Emoney,
+    CallKind::CashOnly,
+    CallKind::ReceiptStamp,
+    CallKind::Expired,
 ];
 /// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す（user 2026-11-14 に30秒で確定）
 pub const BELL_REMIND_MS: u64 = 30 * 1000;
@@ -3107,15 +3103,15 @@ impl Store {
         }
     }
 
-    /// お客様が自分で呼んだ、まだ応答のない呼び出し（最下段に呼び出し中の案内を出す）。
-    /// サービスは、受付待ちのサービス商品があるときは含めない（商品の登録が呼んでいて、その案内は別に出すため）
-    fn customer_calls(&self, register: u8) -> Vec<CallKind> {
-        let service_pending = self.reg(register).is_some_and(|r| r.txn.service_pending());
-        CUSTOMER_CALLS
-            .into_iter()
-            .filter(|&k| self.calls.is_open(register, k))
-            .filter(|&k| !(k == CallKind::Service && service_pending))
-            .collect()
+    /// まだ応答のない呼び出しの種類（どの呼び出しも同じく、お客様側の最下段に呼び出し中の案内を出す。user 2026-11-14）
+    fn waiting_calls(&self, register: u8) -> Vec<CallKind> {
+        let mut kinds: Vec<CallKind> = vec![];
+        for c in self.calls.open.iter().filter(|c| c.register == register) {
+            if !kinds.contains(&c.kind) {
+                kinds.push(c.kind);
+            }
+        }
+        kinds
     }
 
     fn call(&mut self, register: u8, kind: CallKind, detail: &str) {
@@ -4451,8 +4447,8 @@ impl Store {
             } else {
                 vec![]
             },
-            customer_calls: if r.mode == Mode::SelfOperated {
-                self.customer_calls(r.id)
+            waiting_calls: if r.mode == Mode::SelfOperated {
+                self.waiting_calls(r.id)
             } else {
                 vec![]
             },
@@ -4766,8 +4762,8 @@ pub struct RegisterView {
     pub tobacco_asked: bool,
     /// スタッフのログインで応答した呼び出しの用件（スタッフ操作モードのスタッフ側に出す）
     pub answered: Vec<CallKind>,
-    /// お客様が呼んだ、まだ応答のない呼び出し（セルフ操作モード）。お客様側の最下段に案内を出す
-    pub customer_calls: Vec<CallKind>,
+    /// まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
+    pub waiting_calls: Vec<CallKind>,
     pub mode: Mode,
     pub mode_label: &'static str,
     pub outlet: u32,

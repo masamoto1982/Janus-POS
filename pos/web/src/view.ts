@@ -182,10 +182,10 @@ function pickupStep(reg: number, p: Pickup, st: Gate): string {
     </div>`;
 }
 
-function pickupHandover(reg: number, side: Side, no: string): string {
+function pickupHandover(reg: number, side: Side, no: string, change = 0): string {
   if (side === "customer")
     return `<div class="point-screen pickup-step">
-      ${msg("受け取りのサインをお願いします", "レシートとお釣りをお受け取りください")}
+      ${msg("受け取りのサインをお願いします", change ? "レシートとお釣りをお受け取りください" : "レシートをお受け取りください")}
     </div>`;
   return `<div class="point-screen pickup-step">
       <p class="pickup-no">${esc(no)}</p>
@@ -469,10 +469,11 @@ export function billPayCard(count: number, selfOperated = false): string {
     </div>`;
 }
 
-export function billHandover(reg: number, side: Side, count: number, st: Gate): string {
+export function billHandover(reg: number, side: Side, count: number, st: Gate, change = 0): string {
+  // お釣りがないときは「お釣り」を外す（B-6）
   if (side === "customer")
     return `<div class="point-screen bill-done">
-      ${msg(`公共料金${billN(count)}　支払いが完了しました`, "払込票とレシート、お釣りをお受け取りください")}
+      ${msg(`公共料金${billN(count)}　支払いが完了しました`, change ? "払込票とレシート、お釣りをお受け取りください" : "払込票とレシートをお受け取りください")}
     </div>`;
   return `<div class="point-screen bill-done">
       ${msg(`公共料金${billN(count)}`, "払込票に収納印を押してお渡しください")}
@@ -993,10 +994,10 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   const v = r.staff;
   const reg = r.id;
   const a = (n: Action) => find(v.actions, n);
-  if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills"), r.last_receipt?.change_total ?? 0));
   if (r.parcel_handover && !v.lines.length) return confirm(parcelHandover(reg, side, r.parcel_handover, a("hand_over_bills")));
   if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
-  if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
+  if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover, r.last_receipt?.change_total ?? 0));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet, r.last_receipt.method.includes("現金") ? r.last_receipt.paid : 0) : thanks(r.last_receipt)));
   if (!v.lines.length && !v.coupons.length && !v.point_card) voidAsk.delete(reg);
@@ -1088,7 +1089,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);
   if (card) return screen(card);
-  if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk());
+  if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk(scanGuide.get(`${reg}:staff`) === "point"));
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
   if (!paying && r.limit_alert)
@@ -1128,7 +1129,10 @@ const POINT_SERVICES: [string, string][] = [
   ["📱", "ポイントアプリ"],
 ];
 
-function customerPointAsk(): string {
+/** スタッフ操作モードのポイントの確認中のお客様側。スタッフが「付与する」を選ぶまではカードの有無を尋ね、
+ *  選んだ後に「ポイントをお付けします」とカードの絵を出す（スキップした取引では一度も出さない、B-6） */
+function customerPointAsk(reading: boolean): string {
+  if (!reading) return `<div class="point-screen">${msg("ポイントカード・アプリはお持ちですか")}</div>`;
   return `<div class="point-screen">
       <div class="big">ポイントをお付けします</div>
       <div class="point-services">${POINT_SERVICES.map(([icon, name]) => `<span class="point-service"><span class="icon">${icon}</span>${name}</span>`).join("")}</div>
@@ -1557,7 +1561,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   const c: CustomerView = r.customer;
   const reg = r.id;
   const a = (n: Action) => find(c.actions, n);
-  if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills")));
+  if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills"), r.last_receipt?.change_total ?? 0));
   if (r.parcel_handover && !c.lines.length) return confirm(parcelHandover(reg, side, r.parcel_handover, a("hand_over_bills")));
   if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
   if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));

@@ -731,6 +731,7 @@ impl Store {
             presses: s.presses,
             rung_at: 0,
             rung_presses: 0,
+            reminds: 0,
             receipts: s.receipts,
             emoney_balance: s.emoney_balance,
             point_balances: s

@@ -759,24 +759,18 @@ function emergencyScreen(): string {
   )}<p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p></div>`;
 }
 
-function elapsed(calls: { kind: string; created_at: number }[], now: number, before: string, after = ""): string {
-  const timed = calls.filter((c) => c.kind !== "age_check");
-  if (!timed.length) return "";
-  const oldest = Math.min(...timed.map((c) => c.created_at));
-  return `<span class="muted">${before}${secs(now, oldest)}経過${after}</span>`;
-}
-
-export function callScreen(r: RegisterView, now: number): string {
+export function callScreen(r: RegisterView): string {
   const v = r.staff;
   // 現金のみの商品の呼び出しは「現金」ではなく商品名（チケット・切手など）を理由に出す
   const kinds = [...new Set(v.calls.map((c) => (c.kind === "cash_only" && c.detail ? c.detail : CALL_SHORT[c.kind] ?? c.label)))];
-  const details = [...new Set(v.calls.filter((c) => c.kind !== "bill" && c.kind !== "cash_only").map((c) => c.detail).filter(Boolean))];
   const bill = v.calls.find((c) => c.kind === "bill");
+  // 用件だけを第一待ち受けの「セルフレジ」と同じ特大の文字で（呼び鈴の絵・詳細・経過時間は出さない。経過秒数は最下段に出す、user 2026-11-14）。
+  // 公共料金の枚数だけは対応の準備に要るので残す。長い用件は画面の幅に収まるよう文字を小さくする
+  const reason = kinds.join("＆");
   return `<div class="call-screen">
-      <div class="call-reason">🔔 ${esc(kinds.join("＆"))}</div>
+      <b class="call-reason mode-big" style="--len:${[...reason].length}">${esc(reason)}</b>
       ${bill ? `<p class="bill-call"><span class="bill-n">${esc(bill.detail)}</span></p>` : ""}
-      ${details.length ? `<p>${esc(details.join("・"))}</p>` : ""}
-      <p class="muted">${elapsed(v.calls, now, "", "　")}スタッフバーコードでログインすると対応を始めます</p>
+      <p class="small">鳴動を止めるにはログインしてください</p>
     </div>`;
 }
 
@@ -1125,7 +1119,7 @@ export function itemCount(lines: { qty: number }[]): number {
   return lines.reduce((n, l) => n + l.qty, 0);
 }
 
-export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
+export function sharedScreen(r: RegisterView, _snap: Snapshot, side: Side): string {
   if (r.paused)
     return confirm(`<div class="point-screen paused-screen">${msg(
       "レジ休止中",
@@ -1133,7 +1127,7 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
     )}</div>`);
   if (r.emergency) return emergencyScreen();
   if (!r.menu && r.outlet_detail.some(([d]) => d === 2000)) return returned2000(side);
-  if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r, snap.now);
+  if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r);
   if (r.mode === "self_operated" && side === "customer" && r.bell_dead && r.staff.calls.length) return bellDeadScreen();
   if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return confirm(emoneyScreen(r, side));
   return r.mode === "staff_operated" ? staffOperatedScreen(r, side) : selfOperatedScreen(r, side);
@@ -1334,13 +1328,12 @@ export const isWelcome = (main: string): boolean => main.includes("welcome-band"
 const CALL_TOPIC: Partial<Record<CallKind, string>> = { fast_food: "FF", service: "サービス", voucher: "金券", tobacco: "たばこ" };
 const callTopics = (kinds: CallKind[]): string => kinds.map((k) => CALL_TOPIC[k]).filter(Boolean).join("・");
 
-/** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで、呼び出し中の案内だけを出す（取り消しボタンは置かない、user 2026-11-14） */
-function callingRow(r: RegisterView): string {
-  const topics = callTopics(r.customer_calls);
-  return `<div class="call-row calling">${msg(
-    "ただいまスタッフをお呼びしています",
-    topics ? `ご用件：${esc(topics)}　少々お待ちください` : "少々お待ちください",
-  )}</div>`;
+/** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。お客様側は「スタッフを呼び出しています」（添え字なし）、
+ *  スタッフ側は呼び出しからの経過秒数（取り消しボタンは置かない、user 2026-11-14） */
+function callingRow(r: RegisterView, side: Side, now: number): string {
+  if (side === "customer") return `<div class="call-row calling">${msg("スタッフを呼び出しています")}</div>`;
+  const at = r.staff.calls.filter((c) => r.customer_calls.includes(c.kind)).map((c) => c.created_at);
+  return `<div class="call-row calling">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
 }
 
 /** スタッフがログインして応答した呼び出しの用件。取引が終わるまでスタッフ側の担当スタッフ名の右に出す */
@@ -1358,7 +1351,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const a = (n: Action) => find(r.customer.actions, n);
     // お客様が呼んで、まだスタッフが来ていない：最下段の呼び出しボタンを、呼び出し中の案内に置き換える。
     // 三段目（明細）は残すので、待つあいだも商品の登録を続けられる。スタッフがログインすると消える
-    if (r.customer_calls.length) return callingRow(r);
+    if (r.customer_calls.length) return callingRow(r, side, snap.now);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     return `<div class="call-row">${[

@@ -1429,6 +1429,8 @@ pub struct Store {
     /// 呼び鈴が最後に鳴った時刻と、そのときの presses（応答のない呼び出しの鳴らし直し用、保存しない）
     rung_at: u64,
     rung_presses: u64,
+    /// 最後の呼び出し（押された・新しい呼び出し）から鳴らし直した回数
+    reminds: u8,
     receipts: u32,
     emoney_balance: u32,
     /// ポイントカードの番号ごとの残高（ポイント）
@@ -1543,6 +1545,9 @@ pub const ANSWERED_CALLS: [CallKind; 4] = [
 ];
 /// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す（user 2026-11-14 に30秒で確定）
 pub const BELL_REMIND_MS: u64 = 30 * 1000;
+/// 鳴らし直しは、呼び出し（押されたとき・新しい呼び出し）ごとに最大この回数まで（user 2026-11-14）。
+/// 鳴り続けるとレジ台数が増えたときの騒音になり、繰り返される音に人は鈍くなって、かえって呼び出しに気づきにくくなるため
+pub const BELL_REMINDS: u8 = 3;
 
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
@@ -1607,6 +1612,7 @@ impl Store {
             presses: 0,
             rung_at: 0,
             rung_presses: 0,
+            reminds: 0,
             receipts: 0,
             emoney_balance: EMONEY_INITIAL,
             point_balances: initial_point_balances(),
@@ -1659,13 +1665,17 @@ impl Store {
             self.seen_raised = self.calls.raised;
             self.presses += 1;
         }
-        // 応答のない呼び出しが残っていれば、最後に鳴ってから BELL_REMIND_MS ごとに鳴らし直す
+        // 応答のない呼び出しが残っていれば、最後に鳴ってから BELL_REMIND_MS ごとに BELL_REMINDS 回まで鳴らし直す
         // （エマージェンシーモードの回数には数えない：press_log はお客様が押したときだけ増える）
         if self.presses != self.rung_presses {
             self.rung_presses = self.presses;
             self.rung_at = now;
-        } else if !self.calls.open.is_empty() && now.saturating_sub(self.rung_at) >= BELL_REMIND_MS
+            self.reminds = 0;
+        } else if !self.calls.open.is_empty()
+            && self.reminds < BELL_REMINDS
+            && now.saturating_sub(self.rung_at) >= BELL_REMIND_MS
         {
+            self.reminds += 1;
             self.presses += 1;
             self.rung_presses = self.presses;
             self.rung_at = now;

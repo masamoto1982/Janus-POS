@@ -25,7 +25,6 @@ describe("screen language", () => {
     expect(trCore("ポイント 1,250P（今回 +3P）")).toBe("Points 1,250P (+3P this time)");
     expect(trCore("ご利用 80P、付与 2P、ポイント残高 2P")).toBe("Used 80P, earned 2P, point balance 2P");
     expect(trCore("付与 3P、ポイント残高 1,253P")).toBe("Earned 3P, point balance 1,253P");
-    expect(trCore("ご用件：たばこ　少々お待ちください")).toBe("For: tobacco. Please wait a moment");
     expect(trCore("用件：FF・たばこ")).toBe("Called for: FF, tobacco");
   });
 

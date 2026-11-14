@@ -108,9 +108,11 @@ describe("view helpers", () => {
       staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
-    const staff = callScreen(r, 6000);
+    const staff = callScreen(r);
     expect(staff).toContain("FF＆たばこ");
-    expect(staff).toContain("5秒経過");
+    expect(staff).not.toContain("🔔");
+    expect(staff).not.toContain("経過");
+    expect(staff).toContain("鳴動を止めるにはログインしてください");
   });
 
   it("puts no bell-down band on the call screen", () => {
@@ -118,8 +120,8 @@ describe("view helpers", () => {
       staff: { calls: [{ id: 1, register: 1, kind: "customer_help", label: "呼び出し", created_at: 1000, detail: "" }], bell_down: ["据え付け端末"] },
       customer: {},
     } as unknown as RegisterView;
-    expect(callScreen(r, 6000)).not.toContain("不通");
-    expect(callScreen(r, 6000)).not.toContain("banner");
+    expect(callScreen(r)).not.toContain("不通");
+    expect(callScreen(r)).not.toContain("banner");
   });
 
   it("shows no elapsed time for an age-check call", () => {
@@ -127,8 +129,8 @@ describe("view helpers", () => {
       staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "20歳以上" }], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
-    expect(callScreen(r, 6000)).toContain("年確");
-    expect(callScreen(r, 6000)).not.toContain("経過");
+    expect(callScreen(r)).toContain("年確");
+    expect(callScreen(r)).not.toContain("経過");
   });
 
   it("names the goods, not 現金, for a cash-only call", () => {
@@ -136,8 +138,8 @@ describe("view helpers", () => {
       staff: { calls: [{ id: 1, register: 1, kind: "cash_only", label: "現金", created_at: 1000, detail: "チケット" }], bell_down: [] },
       customer: {},
     } as unknown as RegisterView;
-    const staff = callScreen(r, 6000);
-    expect(staff).toContain("🔔 チケット");
+    const staff = callScreen(r);
+    expect(staff).toContain(">チケット<");
     expect(staff).not.toContain("現金");
   });
 

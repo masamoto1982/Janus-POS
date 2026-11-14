@@ -4991,3 +4991,32 @@ fn a_rejected_scan_returns_its_reason_and_the_next_scan_goes_through() {
     scan(&mut s, 1, "customer", BREAD);
     assert_eq!(reg(&s, 1).customer.lines.len(), 2);
 }
+
+/// 仕様 6.5：現金の投入中、両画面の帯に出す合計（残りのお支払い額）・お預かり・お釣り／不足の元になる値（B-4）
+#[test]
+fn tendered_cash_and_change_are_shown_on_both_sides() {
+    let mut s = Store::new(1, 1, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", SANDWICH);
+    scan(&mut s, 1, "staff", SANDWICH);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
+    let v = reg(&s, 1);
+    assert_eq!((v.staff.total - v.prepaid, v.staff.inserted), (640, 500));
+    assert_eq!(v.staff.due, 140, "不足 140 円");
+    ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.inserted, 1000);
+    assert_eq!(v.staff.inserted - (v.staff.total - v.prepaid), 360, "お釣り 360 円");
+    ok(
+        &mut s,
+        json!({"type":"finish_insert","register":1,"side":"staff"}),
+    );
+    let v = reg(&s, 1);
+    let rc = v.last_receipt.unwrap();
+    assert_eq!((rc.paid, rc.change_total), (1000, 360));
+}

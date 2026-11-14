@@ -135,9 +135,10 @@ function changeLeft(): string {
   return `<div class="confirm change-alert">${msg("釣り銭が残っています")}</div>`;
 }
 
-function changeDue(side: Side, amount: number): string {
+function changeDue(side: Side, amount: number, tendered: number): string {
   const msg = side === "staff" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
-  return `<div class="thanks"><div class="big">${msg}</div></div>`;
+  // お預かりを併記する（B-4）
+  return `<div class="thanks"><div class="big">${msg}</div>${tendered ? `<p class="small">お預かり ${yen(tendered)}</p>` : ""}</div>`;
 }
 
 export function isoDate(t: Date): string {
@@ -997,7 +998,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
-  if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet) : thanks(r.last_receipt)));
+  if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet, r.last_receipt.method.includes("現金") ? r.last_receipt.paid : 0) : thanks(r.last_receipt)));
   if (!v.lines.length && !v.coupons.length && !v.point_card) voidAsk.delete(reg);
   // ポイントカード（アプリ）だけ読んだときも取引は始まっているので、登録画面に進む
   if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
@@ -1040,6 +1041,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     r.max_items,
     r.points,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
+    "",
+    paying && v.method === "cash" && v.inserted > 0 ? tenderSum(v.total - r.prepaid, v.inserted, !ro) : "",
   );
   const back = ro
     ? ""
@@ -1172,9 +1175,22 @@ export function withRejection(html: string, reason: string | undefined): string 
   return note + html;
 }
 
-export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = ""): string {
+/** 現金の投入が始まったら、帯の合計の位置に「合計」「お預かり」「お釣り」（足りなければ赤の「不足」）を並べる（B-4）。
+ *  合計は残りのお支払い額（電子マネー・ポイントで先に払った分を引いた額）。両画面に同じ数字を出し、
+ *  お客様側は一行、スタッフ側は右の「投入おわり」を残して中央に二段で組む */
+export function tenderSum(total: number, inserted: number, twoRows: boolean): string {
+  const diff = inserted - total;
+  const cell = (label: string, amount: number, cls = "") => `<span class="tender-cell${cls}"><small>${label}</small><b>${amount.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>`;
+  const rest = `${cell("お預かり", inserted)}${diff >= 0 ? cell("お釣り", diff) : cell("不足", -diff, " short")}`;
+  return twoRows
+    ? `<span class="tender two-rows"><span class="tender-row">${cell("合計", total)}</span><span class="tender-row">${rest}</span></span>`
+    : `<span class="tender"><span class="tender-row">${cell("合計", total)}${rest}</span></span>`;
+}
+
+export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = ""): string {
   // ポイントカードだけ読んだときも、取引中止と読んだポイントを出す
   if (count === 0 && (points?.balance ?? null) === null) return "";
+  if (tender) return `<div class="reg-top tendering"><span class="void">${voidHtml}</span><span class="mid">${tender}</span><span class="action">${action}</span></div>${BAND_END}`;
   const full = count >= max ? `<small class="full">上限</small>` : "";
   const point = pointInfo(points);
   const info = point ? `<small class="info">${point}</small>` : "";

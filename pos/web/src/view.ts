@@ -1325,7 +1325,7 @@ export function menuPaused(): string {
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */
 export const isWelcome = (main: string): boolean => main.includes("welcome-band");
 
-const CALL_TOPIC: Partial<Record<CallKind, string>> = { fast_food: "FF", service: "サービス", voucher: "金券", tobacco: "たばこ" };
+const CALL_TOPIC: Partial<Record<CallKind, string>> = { fast_food: "FF", service: "サービス", voucher: "金券", tobacco: "たばこ", emoney: "電子マネー" };
 const callTopics = (kinds: CallKind[]): string => kinds.map((k) => CALL_TOPIC[k]).filter(Boolean).join("・");
 
 /** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。お客様側は「スタッフを呼び出しています」（添え字なし）、

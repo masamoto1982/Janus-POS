@@ -1529,19 +1529,22 @@ pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
 pub const EMERGENCY_PRESSES: usize = 10;
 
 /// お客様が呼び鈴・最下段のボタンで呼べる用件。呼び出し中はお客様側の最下段に案内を出す
-pub const CUSTOMER_CALLS: [CallKind; 5] = [
+/// 電子マネー（チャージ・残高照会、残高不足のチャージまたは現金併用）もお客様が選んで呼ぶので同じ扱い（user 2026-11-14）
+pub const CUSTOMER_CALLS: [CallKind; 6] = [
     CallKind::CustomerHelp,
     CallKind::FastFood,
     CallKind::Service,
     CallKind::Voucher,
     CallKind::Tobacco,
+    CallKind::Emoney,
 ];
 /// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはスタッフ側に残す（取引が終わるまで）
-pub const ANSWERED_CALLS: [CallKind; 4] = [
+pub const ANSWERED_CALLS: [CallKind; 5] = [
     CallKind::FastFood,
     CallKind::Service,
     CallKind::Voucher,
     CallKind::Tobacco,
+    CallKind::Emoney,
 ];
 /// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す（user 2026-11-14 に30秒で確定）
 pub const BELL_REMIND_MS: u64 = 30 * 1000;

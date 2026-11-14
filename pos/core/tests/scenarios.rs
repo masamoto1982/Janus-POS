@@ -4617,3 +4617,18 @@ fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
         "staff still sees why they were called"
     );
 }
+
+#[test]
+fn self_emoney_charge_call_waits_like_other_customer_calls() {
+    let mut s = Store::new(3, 2, 1);
+    ok(
+        &mut s,
+        json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.customer_calls, vec![CallKind::Emoney]);
+    login_as(&mut s, 1, "ST001");
+    let v = reg(&s, 1);
+    assert!(v.customer_calls.is_empty());
+    assert_eq!(v.answered, vec![CallKind::Emoney]);
+}

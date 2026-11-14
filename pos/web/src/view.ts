@@ -156,7 +156,8 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: Action) => Gate):
   const st = a("check_id");
   // 法令の年齢制限（酒・たばこ）は免許証・マイナンバーカード、店舗が任意で決めた年齢制限だけなら学生証など顔写真付きの身分証も可。
   // デジタル身分証は偽造が容易なので、どちらでも認めない
-  const ids = v.age_official_id ? "運転免許証またはマイナンバーカードで確認してください" : "学生証など顔写真付きの身分証で確認できます<br>デジタル身分証は不可";
+  // 外国人の在留カード・特別永住者証明書・パスポートは法令の年確でも認める
+  const ids = v.age_official_id ? "運転免許証またはマイナンバーカードで確認してください<br>在留カード・特別永住者証明書・パスポートも可" : "学生証など顔写真付きの身分証で確認できます<br>デジタル身分証は不可";
   return `<div class="point-screen id-entry">
       ${msg("身分証の生年月日を入力してください", ids)}
       ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "西暦8桁　例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field", st)}
@@ -791,6 +792,9 @@ function ageWait(age: number): string {
     </div>`;
 }
 
+/** 外国人の身分証（法令の年確でも認める）。並べると日本人にも外国人にも冗長なので、日本語の案内の下に英語で添える */
+const FOREIGN_IDS = `<span lang="en" data-i18n-skip>Also OK: Residence Card, Special Permanent Resident Certificate, Passport</span>`;
+
 /** 年確のあいだのお客様側。スタッフが「する」を選んだら身分証の提示をお願いし、
  *  スタッフが生年月日を打ち始めたら（テンキーを開いたら）判定中であることと、個人情報を残さないことを伝える */
 function ageNote(reg: number, v: StaffView): string {
@@ -798,9 +802,12 @@ function ageNote(reg: number, v: StaffView): string {
   const typing = padEntry.get(`${reg}:staff`)?.target === "birth" || !!padValue.get(padValueKey(reg, "birth"));
   return typing
     ? pairNote("生年月日から年齢を判定しています", "端末は個人情報を保存しません")
-    : v.age_official_id
-      ? pairNote("年齢確認が必要な商品が含まれています", "免許証またはマイナンバーカードの提示をお願いいたします")
-      : `<div class="point-screen pair-note">${msg("年齢確認が必要な商品が含まれています", "学生証など顔写真付きの身分証の提示をお願いいたします<br>デジタル身分証はご利用いただけません")}</div>`;
+    : `<div class="point-screen pair-note">${msg(
+        "年齢確認が必要な商品が含まれています",
+        v.age_official_id
+          ? `免許証またはマイナンバーカードの提示をお願いいたします<br>${FOREIGN_IDS}`
+          : `学生証など顔写真付きの身分証の提示をお願いいたします<br>デジタル身分証はご利用いただけません<br>${FOREIGN_IDS}`,
+      )}</div>`;
 }
 
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: Action) => Gate): string {

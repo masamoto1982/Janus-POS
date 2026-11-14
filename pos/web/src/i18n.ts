@@ -201,6 +201,7 @@ const DICT: Record<string, string> = {
   運転免許証またはマイナンバーカードで確認してください: "Check a driver's licence or My Number Card",
   学生証など顔写真付きの身分証で確認できます: "A photo ID such as a student ID is accepted",
   デジタル身分証は不可: "No digital IDs",
+  "在留カード・特別永住者証明書・パスポートも可": "Residence Card, Special Permanent Resident Certificate or Passport also OK",
   生年月日から年齢を判定しています: "Checking your age from your date of birth",
   端末は個人情報を保存しません: "This terminal does not store personal information",
   身分証をお返しください: "Return the ID",

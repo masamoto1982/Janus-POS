@@ -66,7 +66,7 @@ export type Command = { "type": "scan", register: number, side: Side, code: stri
 /**
  * 使うポイント数（how が amount のときだけ）
  */
-points?: number, } | { "type": "release_call", register: number, } | { "type": "void_transaction", register: number, } | { "type": "end_staff_mode", register: number, } | { "type": "pause", register: number, } | { "type": "cash_out", register: number, kind: CashOutKind, amount: number, password?: string, } | { "type": "cash_in", register: number, kind: CashInKind, amount: number, } | { "type": "open_menu", register: number, screen?: MenuScreen | null, exchange_to?: number, } | { "type": "insert", register: number, amount: number, } | { "type": "take_outlet", register: number, } | { "type": "claim", register: number, side: Side, } | { "type": "add_age_rule", owner_id: string, password: string, target: RuleTarget, min_age: number, } | { "type": "remove_age_rule", owner_id: string, password: string, rule_id: number, } | { "type": "set_product_age", owner_id: string, password: string, code: string, min_age?: number | null, } | { "type": "set_sale_limit", owner_id: string, password: string, code: string, limit?: number | null, } | { "type": "verify_owner", owner_id: string, password: string, } | { "type": "set_tax_rate", owner_id: string, password: string, class_id: string, rate_bp: number, } | { "type": "add_tax_class", owner_id: string, password: string, name: string, kind: TaxKind, rate_bp: number, } | { "type": "set_product_tax", owner_id: string, password: string, code: string, class_id: string, } | { "type": "set_invoice", owner_id: string, password: string, invoice_no: string, rounding: Rounding, } | { "type": "set_bell_loss", percent: number, } | { "type": "set_bell_offline", bell: number, offline: boolean, } | { "type": "set_bell_on", bell: number, on: boolean, };
+points?: number, } | { "type": "release_call", register: number, } | { "type": "end_emergency", register: number, } | { "type": "void_transaction", register: number, } | { "type": "end_staff_mode", register: number, } | { "type": "pause", register: number, } | { "type": "cash_out", register: number, kind: CashOutKind, amount: number, password?: string, } | { "type": "cash_in", register: number, kind: CashInKind, amount: number, } | { "type": "open_menu", register: number, screen?: MenuScreen | null, exchange_to?: number, } | { "type": "insert", register: number, amount: number, } | { "type": "take_outlet", register: number, } | { "type": "claim", register: number, side: Side, } | { "type": "add_age_rule", owner_id: string, password: string, target: RuleTarget, min_age: number, } | { "type": "remove_age_rule", owner_id: string, password: string, rule_id: number, } | { "type": "set_product_age", owner_id: string, password: string, code: string, min_age?: number | null, } | { "type": "set_sale_limit", owner_id: string, password: string, code: string, limit?: number | null, } | { "type": "verify_owner", owner_id: string, password: string, } | { "type": "set_tax_rate", owner_id: string, password: string, class_id: string, rate_bp: number, } | { "type": "add_tax_class", owner_id: string, password: string, name: string, kind: TaxKind, rate_bp: number, } | { "type": "set_product_tax", owner_id: string, password: string, code: string, class_id: string, } | { "type": "set_invoice", owner_id: string, password: string, invoice_no: string, rounding: Rounding, } | { "type": "set_bell_loss", percent: number, } | { "type": "set_bell_offline", bell: number, offline: boolean, } | { "type": "set_bell_on", bell: number, on: boolean, };
 
 export type Confiscated = { name: string, qty: number, };
 
@@ -85,6 +85,11 @@ export type CustomerView = { phase: Phase, lines: Array<CustomerLine>, coupons: 
  * （負の値は期限切れ）。販売期限は賞味期限より前に店が決める売り場から下げる時刻
  */
 export type Dates = { sell_by_min: number, best_before_min: number, };
+
+/**
+ * 非常事態モードの解除で出すレシートの中身
+ */
+export type EmergencyLog = { started_at: number, ended_at: number, };
 
 export type EmoneyKind = "menu" | "charge" | "inquiry";
 
@@ -186,9 +191,17 @@ export type RegisterView = { id: number,
  */
 bell_dead: boolean, 
 /**
- * エマージェンシーモード（セルフ操作モードで呼び鈴に応答がない）
+ * 非常事態モード（セルフ操作モードで呼び鈴に応答がない）
  */
-emergency: boolean, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, 
+emergency: boolean, 
+/**
+ * 非常事態モードに入った時刻
+ */
+emergency_since: number | null, 
+/**
+ * 直前に解除した非常事態モードの発動・解除時刻（解除のレシートの中身、しばらくのあいだだけ）
+ */
+emergency_log: EmergencyLog | null, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, 
 /**
  * スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのスタッフ側に出す）
  */

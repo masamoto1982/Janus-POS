@@ -268,6 +268,12 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 /* 番号の下に小さなテキスト（オレンジ）でレシートの出力を添える。大小の間は 4px（pos-text-tiers） */
 .screen .sos-contact { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .screen .sos-contact p.small { margin: 0; }
+/* 非常事態モードのスタッフ側の最下段：オーナー・担当スーパーバイザーの連絡先を二行で。最下段の点滅（赤＋白）に合わせて文字も白に */
+.screen .sos-store { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0; margin: 0; font-size: var(--msg-small); font-weight: 700; line-height: 1.3; }
+.screen .sos-store b { font-size: var(--msg-big); font-variant-numeric: tabular-nums; }
+.screen.sos .call-row.calling .sos-store { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
+/* 解除のあと：発動・解除の時刻（レシートの中身） */
+.screen .sos-log { display: flex; flex-wrap: wrap; gap: 4px 24px; justify-content: center; margin: 0; color: var(--msg-strong); font-size: var(--msg-small); font-weight: 700; font-variant-numeric: tabular-nums; }
 .bell-sub { margin: 16px 0 4px; font-size: 14px; }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -804,5 +810,8 @@ body.dragging .drop-hint { display: inline; }
 :root { --off-light: color-mix(in oklch, oklch(0.8699 0 0) 45%, oklch(1 0 0)); --off-deep: oklch(0.8699 0 0); }
 :root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--off-light); --tier-deep: var(--off-deep); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
+/* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。
+   ヘッダー・最下段は消えているあいだもこの黄なので、黄と赤（--sos-head）で点滅する（user 2026-11-14） */
+:root .screen.sos.sos.sos { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 商品が登録された行を一瞬だけ染めるエフェクトも、濃いめの段と同じモードの色 */
 :root .screen:is(.mode-staff, .mode-self) { --flash: var(--tier-deep); }

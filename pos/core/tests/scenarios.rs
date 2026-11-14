@@ -3603,6 +3603,8 @@ fn emergency_after_ten_rings_within_three_minutes() {
     ring(&mut s, 1);
     assert!(reg(&s, 1).emergency);
     login(&mut s, 1);
+    assert!(reg(&s, 1).emergency);
+    ok(&mut s, json!({"type":"end_emergency","register":1}));
     assert!(!reg(&s, 1).emergency);
 }
 
@@ -3665,8 +3667,27 @@ fn emergency_lasts_until_staff_log_in() {
     assert!(reg(&s, 1).emergency);
     advance(&mut s, 300_000);
     assert!(reg(&s, 1).emergency);
+    let since = reg(&s, 1).emergency_since.unwrap();
+    // 解除はログインしたスタッフだけ。ログインしただけでは続く
+    assert!(run(&mut s, json!({"type":"end_emergency","register":1})).is_err());
     login(&mut s, 1);
-    assert!(!reg(&s, 1).emergency);
+    assert!(reg(&s, 1).emergency);
+    advance(&mut s, 5_000);
+    ok(&mut s, json!({"type":"end_emergency","register":1}));
+    let v = reg(&s, 1);
+    assert!(!v.emergency);
+    // 発動時刻と解除時刻を印字したレシート
+    let log = v.emergency_log.unwrap();
+    assert_eq!(log.started_at, since);
+    assert!(log.ended_at > since);
+    advance(&mut s, 10_000);
+    assert!(reg(&s, 1).emergency_log.is_none());
+    // レシートを出したら通常運転：スタッフ操作モードが続き、無操作が続けばセルフ操作モードへ
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+    advance(&mut s, janus_pos_core::store::IDLE_REVERT_MS);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert!(!v.emergency);
 }
 
 #[test]

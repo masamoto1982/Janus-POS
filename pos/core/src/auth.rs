@@ -39,7 +39,9 @@ pub const ACCOUNTS: &[StaffAccount] = &[
 
 const STORE_PASSWORD: &str = "7777";
 
+/// オーナー認証・店舗パスワードを続けて間違えるとロックする回数
 pub const MAX_FAILURES: u32 = 3;
+/// パスワードの連続失敗のロック
 pub const LOCKOUT_MS: u64 = 30_000;
 
 pub fn account(id: &str) -> Option<&'static StaffAccount> {

@@ -52,50 +52,60 @@ Janus-POS は、コンビニエンスストア向けのセミセルフ式 POS �
 
 価格はすべて税込。日配食品と加工食品は販売期限と賞味期限を持つ（シミュレーターをいつ開いても同じ状態になるよう、いまからの時間で持つ。日配食品は時刻まで、加工食品は日付まで）。販売期限は賞味期限より前に店が決める、売り場から下げる時刻。
 
-| 棚 | 商品 | コード | 価格 | 分類 | 税率の初期値 | 販売期限 / 賞味期限 |
-| --- | --- | --- | --- | --- | --- | --- |
-| 日配食品 | サンドイッチ | 4900000000028 | 320 | 食品 | 軽減 | 6 時間後 / 10 時間後 |
-| 日配食品 | 牛乳 | 4900000000042 | 198 | 飲料 | 軽減 | 3 日後 / 5 日後 |
-| 日配食品 | パン | 4900000000011 | 160 | 食品 | 軽減 | 1 日後 / 2 日後 |
-| 日配食品 | おにぎり | 4900000000080 | 150 | 食品 | 軽減 | **2 時間前（期限切れ）** / 4 時間後 |
-| 加工食品 | ソフトドリンク | 4900000000035 | 150 | 飲料 | 軽減 | 150 日後 / 180 日後 |
-| 加工食品 | アルコール | 4900000000103 | 248 | 酒類 | 標準 | 240 日後 / 270 日後 |
-| 加工食品 | 袋菓子 | 4900000000073 | 150 | 食品 | 軽減 | 90 日後 / 120 日後 |
-| 加工食品 | 即席麺 | 4900000000066 | 214 | 食品 | 軽減 | 150 日後 / 180 日後 |
-| 非食品 | 新聞 | 4910000000014 | 160 | 新聞 | 標準 |
-| 非食品 | 雑誌 | 4910000000038 | 480 | 雑誌 | 標準 |
-| 非食品 | たばこ | 4900000000127 | 600 | たばこ | 標準 |
-| 非食品 | たばこカートン | 4900000000158 | 6,000 | たばこ | 標準 |
-| 非食品 | 花火 | 4910000000076 | 980 | 花火（年確18） | 標準 |
-| 非食品 | 化粧品 | 4910000000069 | 2,200 | 日用品 | 標準 |
-| 非食品 | ライター | 4900000000134 | 110 | 喫煙具・ライター | 標準 |
-| 非食品 | 切手 | 4900000000141 | 110 | 切手（現金のみ） | 非課税・不課税 |
-| オプション | レジ袋 S / L | 2000000000015 / …022 | 3 / 5 | レジ袋 | 標準 |
-| オプション | フォーク・スプーン・お手拭き | 2000000000039 / …046 / …053 | 3 | レジ袋 | 標準 |
-| サービス | 荷物を送る 発払い | 2100000000014 | 受付時に決定 | サービス | 標準 |
-| サービス | 荷物を送る 着払い | 2100000000045 | 0（着払い） | サービス | 標準 |
-| サービス | 荷物を受取る | 2100000000038 | 代金引換額 | サービス | 標準 |
+<!-- generated:products -->
+| 棚 | 商品 | コード | 価格 | 分類 | 税区分の初期値 | 年確 | 個数制限 | 販売期限 / 賞味期限 | 備考 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 日配食品 | サンドイッチ | 4900000000028 | 320 | 食品 | 軽減税率 |  |  | 6 時間後 / 10 時間後 | 数量を増やせない |
+| 日配食品 | 牛乳 | 4900000000042 | 198 | 飲料 | 軽減税率 |  |  | 3 日後 / 5 日後 | 数量を増やせない |
+| 日配食品 | パン | 4900000000011 | 160 | 食品 | 軽減税率 |  |  | 1 日後 / 2 日後 | 数量を増やせない |
+| 日配食品 | おにぎり | 4900000000080 | 150 | 食品 | 軽減税率 |  |  | **2 時間前（期限切れ）** / 4 時間後 | 数量を増やせない |
+| 加工食品 | ソフトドリンク | 4900000000035 | 150 | 飲料 | 軽減税率 |  |  | 150 日後 / 180 日後 |  |
+| 加工食品 | アルコール | 4900000000103 | 248 | 酒類 | 標準税率 | 20 |  | 240 日後 / 270 日後 |  |
+| 加工食品 | 袋菓子 | 4900000000073 | 150 | 食品 | 軽減税率 |  |  | 90 日後 / 120 日後 |  |
+| 加工食品 | 即席麺 | 4900000000066 | 214 | 食品 | 軽減税率 |  |  | 150 日後 / 180 日後 |  |
+| 非食品 | 新聞 | 4910000000014 | 160 | 新聞 | 標準税率 |  |  |  |  |
+| 非食品 | 雑誌 | 4910000000038 | 480 | 雑誌 | 標準税率 |  |  |  |  |
+| 非食品 | たばこ | 4900000000127 | 600 | たばこ | 標準税率 | 20 |  |  |  |
+| 非食品 | たばこカートン | 4900000000158 | 6,000 | たばこ | 標準税率 | 20 |  |  |  |
+| 非食品 | 花火 | 4910000000076 | 980 | 花火 | 標準税率 | 18 |  |  |  |
+| 非食品 | 化粧品 | 4910000000069 | 2,200 | 日用品 | 標準税率 |  |  |  |  |
+| 非食品 | トレカ | 4910000000090 | 180 | 金券 | 標準税率 |  | 3 点 |  |  |
+| 非食品 | ライター | 4900000000134 | 110 | 喫煙具・ライター | 標準税率 | 20 |  |  |  |
+| 非食品 | 切手 | 4900000000141 | 110 | 切手 | 非課税・不課税 |  |  |  | 現金のみ |
+| オプション | レジ袋 S | 2000000000015 | 3 | レジ袋 | 標準税率 |  |  |  |  |
+| オプション | レジ袋 L | 2000000000022 | 5 | レジ袋 | 標準税率 |  |  |  |  |
+| オプション | フォーク | 2000000000039 | 3 | レジ袋 | 標準税率 |  |  |  |  |
+| オプション | スプーン | 2000000000046 | 3 | レジ袋 | 標準税率 |  |  |  |  |
+| オプション | お手拭き | 2000000000053 | 3 | レジ袋 | 標準税率 |  |  |  |  |
+| サービス | 荷物を送る 発払い | 2100000000014 | 0 | サービス | 標準税率 |  |  |  | 荷物を送る（料金は受付で決まる） |
+| サービス | 荷物を送る 着払い | 2100000000045 | 0 | サービス | 標準税率 |  |  |  | 荷物を送る（着払い、レジでは 0 円） |
+| サービス | 荷物を送る 複数口 | 2100000000081 | 0 | サービス | 標準税率 |  |  |  | 荷物を送る（複数口） |
+| サービス | 荷物を受取る | 2100000000038 | 0 | サービス | 標準税率 |  |  |  | 荷物を受取る（代金引換額） |
+| サービス | 電気料金 | 2100000000021 | 50,000 | サービス | 非課税・不課税 |  |  |  | 払込票・現金のみ |
+| サービス | 水道料金 | 2100000000043 | 4,000 | サービス | 非課税・不課税 |  |  |  | 払込票・現金のみ |
+| サービス | ガス料金 | 2100000000050 | 3,000 | サービス | 非課税・不課税 |  |  |  | 払込票・現金のみ |
+| サービス | チケット | 2100000000074 | 15,600 | サービス | 非課税・不課税 |  |  |  | 現金のみ・申込券 1 枚でチケット 2 枚を発券 |
+| サービス | 自動車税 | 2100000000067 | 50,000 | サービス | 非課税・不課税 |  |  |  | 払込票（税金、収入印紙は要らない）・現金のみ |
+<!-- /generated -->
 
 日配食品と販売期限：
 
 - 日配食品はレジ画面で数量を増やせない（数量の欄は「削除」と数字だけ）。同じ商品でも一点ずつ販売期限が違うので、一つを読んで数量を増やすと、期限切れの品がお客様に渡ってしまう（ポカヨケ）。同じ商品を続けてスキャンしても数量にまとめず、一点ずつ別の行にする（ほかの商品は続けて読むと一行の数量が増える）。販売期限切れのアラートが一点ずつ出るのと揃える。
 - 販売期限切れの品を読むと、正常音（ピッ）ではなく一緒に決済できない商品と同じ異常音（ブブッ）が鳴り、明細に「期限切れ」のフラグが付き、登録画面に代わって案内が開く。期限切れの品はレジを通るたびに一点ずつ出てくるので、表にせず直近の一点を縦横中央の二行で出す。画面は回収イベントの共通の形（9.1）。スタッフ側は「販売期限が切れています」「お客様にお詫びし、販売期限切れ商品を回収してください」・品名と販売期限（期限切れはスキャンした瞬間に一点ずつ止まり回収は常に一点なので、自明な点数は出さない）・「回収しました」（押すと明細から取り消す）と左下のバック（品が明細に残り、フラグを押すと開き直せるので、回収イベントでここだけバックを置く）。お客様側は「この商品は販売期限が切れているためお売りできません」「店員が対応いたします」と品名・販売期限だけ（売り場に新しい商品があるとは限らないので、取り替えを約束しない）。回収するまでお会計に進めないので、会計ボタンはグレーアウトする。売り場に新しい商品があるとは限らないので、スタッフ側は交換ではなく回収を求める。
 - セルフ操作モードでスタッフがいなければ「販売期限切れ」で呼び出す。期限切れの明細を消せるのはスタッフ側の「回収しました」だけで、お客様側には消す手段がない（数量の欄は数字だけ。コアも `remove_line`・`set_qty` を断る）。
-| サービス | 電気料金 | 2100000000021 | 50,000 | 公共料金（現金のみ） | 非課税・不課税 |
-| サービス | 水道料金 | 2100000000043 | 4,000 | 公共料金（現金のみ） | 非課税・不課税 |
-| サービス | ガス料金 | 2100000000050 | 3,000 | 公共料金（現金のみ） | 非課税・不課税 |
-| サービス | 自動車税 | 2100000000067 | 50,000 | 税金（現金のみ、収入印紙は要らない） | 非課税・不課税 |
 
 - たばこは、どこかのレジがスタッフ操作モードのときだけ Item に並ぶ。
 - FF は 5 つのタブに並ぶ。各タブは 1 ページ 4 品、フライヤーとドリンクは 2 ページ。並びは売れ筋順。
 
+<!-- generated:ff -->
 | タブ | 商品（価格・初期在庫） |
 | --- | --- |
-| フライヤー | フライドチキン 220・3／スパイシーチキン 220・2／アメリカンドック 140・4／コロッケ 110・0（売り切れ）／焼き鳥（モモシオ）140・6／焼き鳥（モモタレ）140・6／大学芋 250・3／揚げ餅 200・4 |
-| ドリンク | ホット・アイスコーヒー S/M/L 110/150/190、ホット・アイスカフェラテ S 180。在庫は各 99 |
-| コールド | ミルクソフト（コーン／カップ）300、チョコソフト（コーン／カップ）320。在庫は各 20 |
-| 中華まん | 肉まん 180・5／ピザまん 190・3／あんまん 160・4／カレーまん 190・3 |
-| おでん | 大根 100・10／厚揚げ 120・10／煮卵 100・10／牛筋 150・10 |
+| フライヤー | フライドチキン 220・在庫 12／スパイシーチキン 220・在庫 10／アメリカンドック 140・在庫 15／コロッケ 110・在庫 11／焼き鳥（モモシオ） 140・在庫 6／焼き鳥（モモタレ） 140・在庫 4／大学芋 250・在庫 0／揚げ餅 200・在庫 0 |
+| ドリンク | ホットコーヒー S 110・作り置きなし／ホットコーヒー M 150・作り置きなし／ホットコーヒー L 190・作り置きなし／アイスコーヒー S 110・作り置きなし／アイスコーヒー M 150・作り置きなし／アイスコーヒー L 190・作り置きなし／ホットカフェラテ S 180・作り置きなし／アイスカフェラテ S 180・作り置きなし |
+| コールド | ミルクソフト（コーン） 300・作り置きなし／ミルクソフト（カップ） 300・作り置きなし／チョコソフト（コーン） 320・作り置きなし／チョコソフト（カップ） 320・作り置きなし |
+| 中華まん | 肉まん 180・在庫 12／ピザまん 190・在庫 10／あんまん 160・在庫 3／カレーまん 190・在庫 0 |
+| おでん | 大根 100・在庫 20／煮卵 100・在庫 14／厚揚げ 120・在庫 12／白滝 90・在庫 10／ちくわ 100・在庫 5／ごぼう巻き 120・在庫 3／ウィンナー 130・在庫 4／結び昆布 90・在庫 0 |
+<!-- /generated -->
 
 FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF を取り消すと在庫に戻る（予約注文の分も戻る。理論値と実際の差はスタッフが判断する）。
 
@@ -112,6 +122,15 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 | `CP` + 番号 | クーポン（`CP0001` 引換券：ソフトドリンク 1 個無料、`CP0002` 割引券：サンドイッチ 50 円引き） |
 | 商品コード | 商品（FF のコードは読まない） |
 | それ以外 | 「登録されていないバーコードです」 |
+
+クーポン：
+
+<!-- generated:coupons -->
+| コード | 名前 | 対象 | 値引き |
+| --- | --- | --- | --- |
+| `CP0001` | 引換券：ソフトドリンク | ソフトドリンク | 対象商品 1 個の価格（引換券） |
+| `CP0002` | 割引券：サンドイッチ 50円引き | サンドイッチ | 50 円（割引券、価格が上限） |
+<!-- /generated -->
 
 ### 3.4 状態の保存
 
@@ -416,6 +435,7 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 - 着払いはレジでは 0 円（料金は案内のために持つ）。
 - ポイントカードの確認はしない。
 
+<!-- generated:parcel-sizes -->
 | サイズ | 三辺の合計 | 重さ | 基本料金 | 地域の段階ごとの加算 |
 | --- | --- | --- | --- | --- |
 | 60 | 60cm | 2kg | 940 | 110 |
@@ -426,15 +446,18 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 | 160 | 160cm | 25kg | 2,510 | 160 |
 | 180 | 180cm | 30kg | 2,840 | 170 |
 | 200 | 200cm | 30kg | 3,170 | 180 |
+<!-- /generated -->
 
+<!-- generated:parcel-regions -->
 | 段階 | 地域（郵便番号の上 2 桁） |
 | --- | --- |
-| 0 | 関東（10〜37・40）、信越（38・39・94・95） |
-| 1 | 南東北（96〜99）、北陸（91〜93）、中部（41〜51） |
+| 0 | 関東（10〜37・40）、信越（38〜39・94〜95） |
+| 1 | 中部（41〜51）、北陸（91〜93）、南東北（96〜99） |
 | 2 | 北東北（01〜03）、関西（52〜67） |
 | 3 | 北海道（00・04〜09）、中国（68〜75）、四国（76〜79） |
 | 4 | 九州（80〜89） |
 | 6 | 沖縄（90） |
+<!-- /generated -->
 
 料金 = 基本料金 + 加算 × 段階。郵便番号は全角数字・ハイフン・空白を許す。
 
@@ -609,7 +632,7 @@ Item 見出しの歯車から開く。開くときにオーナーの番号とパ
 - 明細の表：品目｜数量｜小計。表の上に内税の内訳（スタッフ操作モードは担当スタッフ名も）。新しく動いた行を一瞬目立たせ、表を一番上まで戻す。
 - 画面下：スタッフ操作モードのスタッフ側は FF のタブ、セルフ操作モードは呼び出しボタン。確認画面・店舗メニュー・電子マネーの手続き・荷物の取引中は出さない。
 - レジ画面ではトーストやダイアログで覆い隠さない。例外は数量とテンキーのポップアップ、点数上限と販売個数の上限の警告。
-- 受け付けなかった操作の理由は、覆わない表示で出す。レジに送って断られたコマンド（スキャン・FF の登録・決済端末にかざす・現金の投入など）の理由を、操作した側の画面（スキャンは読ませた側）の二段目の帯の直下、内税の行の位置に赤文字で出す（帯のない案内画面では画面の一番上）。何も覆わず、閉じるボタンも置かない。表示中もすべての操作を受け付け、異常音（ブッブー）は今までどおり鳴らす。そのレジで次に操作が受け付けられたとき、または 8 秒（web `REJECT_SHOW_MS`）で消え、新しい理由が来たら置き換える。英語の画面では英語で出す。荷物の入力欄・入力欄ひとつの画面のテンキー・点数の上限・販売個数の上限は、それぞれの場所に理由を出すので対象外。店舗メニュー・販売規則の設定は今までどおりトーストで出す。例：ソフトドリンクの後に「荷物を送る」の伝票を読むと「荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）」
+- 受け付けなかった操作の理由は、覆わない表示で出す。レジに送って断られたコマンド（スキャン・FF の登録・決済端末にかざす・現金の投入など）の理由を、操作した側の画面（スキャンは読ませた側）の二段目の帯の直下、内税の行の位置に赤文字で出す（帯のない案内画面では画面の一番上）。何も覆わず、閉じるボタンも置かない。表示中もすべての操作を受け付け、異常音（ブッブー）は今までどおり鳴らす。そのレジで次に操作が受け付けられたとき、または 8 秒（web `REJECT_SHOW_MS`）で消え、新しい理由が来たら置き換える。英語の画面では英語で出す。荷物の入力欄・入力欄ひとつの画面のテンキーは、それぞれの場所に理由を出すので対象外。店舗メニュー・販売規則の設定は今までどおりトーストで出す。例：ソフトドリンクの後に「荷物を送る」の伝票を読むと「荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）」
 - スタッフ操作モードのお客様側は見るだけで、ボタンを押せない形で映す。
 - 余白：レジ画面の中の部品の間隔・余白は 8px にそろえる（ボタン同士の間隔、帯・確認画面・案内・ポップアップの余白など）。登録画面の左右の 12px のように、8px とはっきり違う値はそのまま。
 
@@ -692,36 +715,117 @@ Item 見出しの歯車から開く。開くときにオーナーの番号とパ
 
 ## 16. 時間の定数
 
-| 名前 | 値 | 意味 |
-| --- | --- | --- |
-| `TOUCH_LOCK_MS` | 1 秒 | 操作した側だけが操作できる時間 |
-| `THANKS_MS` | 3 秒 | 決済後のお礼の画面 |
-| `INSERT_DONE_MS` | 30 秒 | 無投入で投入おわりとみなす |
-| `IDLE_REVERT_MS` | 5 分 | 無操作でセルフ操作モードに戻る |
-| `CHANGE_REMIND_MS` / `STAFF_OP_…` | 1 分 / 30 秒 | 釣り銭が残っていますの表示 |
-| `CHANGE_CALL_MS` / `STAFF_OP_…` | 2 分 / 1 分 | 釣銭忘れの呼び出し |
-| `RING_FULL_MS` | 60 秒 | 呼び出しの音量・色が最大になる放置時間 |
-| `LOCKOUT_MS` | 30 秒 | パスワードの連続失敗のロック |
-| `EMERGENCY_UNANSWERED_MS` | 1 分 | 応答のない呼び出しで非常事態モードに入る（11.4、実機は 5 分） |
-| `EMERGENCY_LOG_MS` | 10 秒 | 非常事態モードの解除のレシートの案内 |
-| Bell の再送・ハートビート・不通 | 200ms / 2 秒 / 5 秒 | 11.3 |
+コードの `pub const`（数値）とその doc コメントから生成する。
+
+<!-- generated:constants -->
+| 名前 | 値 | 場所 | 意味 |
+| --- | --- | --- | --- |
+| `MAX_FAILURES` | 3 | `src/auth.rs` | オーナー認証・店舗パスワードを続けて間違えるとロックする回数 |
+| `LOCKOUT_MS` | 30 秒 | `src/auth.rs` | パスワードの連続失敗のロック |
+| `MAX_ITEMS` | 100 | `src/authority.rs` | 1 取引の買い物点数（数量の合計）の上限。合計が税抜 5 万円を超え、レシートに収入印紙が要るケースを再現できる数 |
+| `TOUCH_LOCK_MS` | 1 秒 | `src/authority.rs` | スタッフ操作モードで、操作した側だけが操作できる時間 |
+| `RETRY_MS` | 200ms | `src/bell.rs` | Bell の返事が最新に追いつくまで鳴動状態を再送する間隔 |
+| `HEARTBEAT_MS` | 2 秒 | `src/bell.rs` | 変化がなくても鳴動状態を送る間隔 |
+| `LINK_TIMEOUT_MS` | 5 秒 | `src/bell.rs` | 返事がなければ不通とみなす時間 |
+| `MIN_RING_MS` | 1 秒 | `src/bell.rs` | 押した回数が増えたことを受け取ったときに鳴らす最短の時間 |
+| `TRADING_CARD_LIMIT` | 3 | `src/catalog.rs` | トレカの 1 回のお会計の販売個数の上限（既定値。販売規則の設定で変えられる） |
+| `SCHEMA` | 3 | `src/store/persist.rs` | 保存の形式。既定の販売規則（年齢制限・個数制限）や商品を変えたら上げ、古い保存を捨てて新しい既定値で始める |
+| `MAX_REGISTERS` | 10 | `src/store.rs` | 作れるレジの台数の上限 |
+| `MAX_BELLS` | 5 | `src/store.rs` | 作れる Bell の台数の上限 |
+| `YEN_PER_POINT` | 200 | `src/store.rs` | ポイントは付与対象の金額（付与対象外の商品・クーポンの値引き・ポイントで払った分を除く）200円につき1ポイント |
+| `FRACTION_UNIT` | 100 | `src/store.rs` | 「端数をポイントで払う」の端数＝お支払い額の 100円未満 |
+| `EMONEY_MAX` | 20,000 | `src/store.rs` | 電子マネーの残高の上限 |
+| `EMONEY_INITIAL` | 1,000 | `src/store.rs` | 財布の電子マネーの最初の残高 |
+| `THANKS_MS` | 3 秒 | `src/store.rs` | 決済後の「ありがとうございました」の画面 |
+| `INSERT_DONE_MS` | 30 秒 | `src/store.rs` | 足りた状態で最後の投入からこの時間入れなければ、投入おわりとみなして決済する |
+| `IDLE_REVERT_MS` | 5 分 | `src/store.rs` | 無操作で取引を中止し、セルフ操作モードに戻る |
+| `EMERGENCY_UNANSWERED_MS` | 1 分 | `src/store.rs` | 非常事態モード：セルフ操作モードでスタッフがログインしないまま、最も古い未解決の呼び出し（釣銭忘れを除く）がこの時間応答されない。24 時間 365 日の店舗で社員やオーナーが即座に対処することはできないので、通知は送らない。実機では 5 分（店内で 5 分応答がないことは通常ありえず、その時点で異常とみなす）。シミュレーターはデモで待たずに確かめられるよう、便宜的に 1 分にしている |
+| `EMERGENCY_LOG_MS` | 10 秒 | `src/store.rs` | 非常事態モードの解除のあと、スタッフ側に「レシートを出力しました」と発動・解除時刻を出しておく時間 |
+| `BELL_REMIND_MS` | 30 秒 | `src/store.rs` | 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す |
+| `BELL_REMINDS` | 3 | `src/store.rs` | 鳴らし直しは、呼び出し（押されたとき・新しい呼び出し）ごとに最大この回数まで。鳴り続けるとレジ台数が増えたときの騒音になり、繰り返される音に人は鈍くなって、かえって呼び出しに気づきにくくなるため |
+| `CHANGE_REMIND_MS` | 1 分 | `src/store.rs` | セルフ操作モードで出金ボックスにお金が残ったまま、お客様側に「釣り銭が残っています」を出すまで |
+| `CHANGE_CALL_MS` | 2 分 | `src/store.rs` | セルフ操作モードで出金ボックスにお金が残ったまま、釣銭忘れの呼び出しをかけるまで |
+| `STAFF_OP_CHANGE_REMIND_MS` | 30 秒 | `src/store.rs` | スタッフ操作モードで「釣り銭が残っています」を出すまで |
+| `STAFF_OP_CHANGE_CALL_MS` | 1 分 | `src/store.rs` | スタッフ操作モードで釣銭忘れの呼び出しをかけるまで |
+| `RING_MIN` | 0.25 | `src/store.rs` | 呼び出しの音量の最小（最も長く待たせている呼び出しの放置時間で 1 まで大きくなる） |
+| `RING_FULL_MS` | 1 分 | `src/store.rs` | 呼び出しの音量が最大になる放置時間 |
+| `FF_PLENTY_STOCK` | 10 | `src/store.rs` | 作り置きがこの数（二桁）以上なら豊富、1〜9 は希薄 |
+<!-- /generated -->
 
 ## 17. コマンド
 
 コアに送るコマンドは `{"type": "...", ...}` の JSON。結果は `{"ok": true, "message": ...}` か `{"ok": false, "error": "..."}`。レジに関わるコマンドは、成否にかかわらずそのレジの無操作の時刻を更新する。
 
-| 分類 | コマンド |
-| --- | --- |
-| 登録 | `scan`・`register_ff`・`ff_button`・`check_ff`・`remove_line`・`set_qty`・`remove_coupon`・`dismiss_returned` |
-| サービス | `complete_service`・`parcel_length`・`parcel_size`・`parcel_postal`・`parcel_back`・`parcel_next`・`pickup_found`・`pickup_handover`・`check_bill`・`hand_over_bills` |
-| 会計 | `checkout`・`back_to_registering`・`confirm_point_card`・`choose_age_check`・`check_id`・`dismiss_confiscated`・`dismiss_ff_collect`・`select_payment` |
-| 支払い | `insert`（金額）・`insert_cash`（金種と枚数）・`finish_insert`・`tap_emoney`・`take_outlet` |
-| 電子マネー | `start_emoney`・`close_emoney`・`resolve_emoney_short` |
-| 呼び出し | `call_staff`・`release_call`・`end_emergency` |
-| レジ | `void_transaction`・`end_staff_mode`・`pause`・`claim` |
-| 店舗メニュー | `open_menu`・`cash_out`・`cash_in` |
-| 販売規則 | `verify_owner`・`add_age_rule`・`remove_age_rule`・`set_product_age`・`set_sale_limit`・`set_tax_rate`・`add_tax_class`・`set_product_tax`・`set_invoice` |
-| Bell | `set_bell_loss`・`set_bell_offline`・`set_bell_on` |
+Command の全バリアント（serde の名前）と doc コメントから生成する。
+
+<!-- generated:commands -->
+| コマンド | 項目 | 説明 |
+| --- | --- | --- |
+| `scan` | `register`・`side`・`code` | バーコードを読む（商品・ポイントカード・クーポン・スタッフバーコード・荷物・伝票）。操作側に関係なく受け付ける機器の操作 |
+| `register_ff` | `register`・`side`・`code`・`qty`・`force` | FF をタブから登録する（スタッフ操作モードのスタッフ側）。`force` は欠品の長押し＝予約注文 |
+| `ff_button` | `register` | 最下段の「FF」ボタンでスタッフを呼ぶ（セルフ操作モード） |
+| `check_ff` | `register`・`side`・`line_id`・`handed` | FF のお渡し数を入れて照合する |
+| `complete_service` | `register`・`line_id`・`amount` | サービス商品の受付を済ませる |
+| `parcel_length` | `register`・`line_id`・`sum_cm` | 荷物を送る：三辺の合計を決める |
+| `parcel_size` | `register`・`line_id`・`sum_cm`・`weight_g` | 荷物を送る：重さを入れてサイズを決める |
+| `parcel_postal` | `register`・`line_id`・`postal` | 荷物を送る：届け先の郵便番号を入れて料金を決める |
+| `parcel_back` | `register`・`line_id` | 荷物を送るの入力を一段階戻る（三辺の合計から戻ると受付をやめる） |
+| `parcel_next` | `register`・`more` | 「同じお届け先の荷物はありますか？」に答える |
+| `pickup_handover` | `register` | 荷物を受取る：お渡しを済ませる |
+| `pickup_found` | `register`・`found` | 荷物を受取る：保管場所に荷物があったか（`null` で探し直す） |
+| `remove_line` | `register`・`side`・`line_id` | 明細を取り消す（販売期限切れの「回収しました」も） |
+| `set_qty` | `register`・`side`・`line_id`・`qty` | 明細の数量を変える |
+| `remove_coupon` | `register`・`side`・`coupon_id` | クーポンを取り消す |
+| `dismiss_returned` | `register` | 取り消したクーポンの返却の案内を閉じる |
+| `checkout` | `register`・`side` | 会計に進む |
+| `back_to_registering` | `register`・`side` | 会計から登録画面に戻る |
+| `select_payment` | `register`・`side`・`method` | 支払方法を選ぶ（選択中をもう一度押すと外す） |
+| `choose_age_check` | `register`・`side`・`id_check` | 年齢確認を「する」（生年月日の入力）か「スキップ」か選ぶ |
+| `early_age_check` | `register`・`side`・`start` | 登録中に年確フラグから年齢確認を始める・やめる |
+| `check_id` | `register`・`side`・`birth`・`today` | 身分証の生年月日で年齢を判定する |
+| `dismiss_confiscated` | `register` | 年齢に届かない商品の回収の案内を閉じる |
+| `dismiss_ff_collect` | `register` | お渡し済み FF の回収の案内を閉じる |
+| `dismiss_passed` | `register` | 照合が済んだ案内（年確OK・FFのお渡しOK）を閉じて先へ進む |
+| `check_bill` | `register`・`side`・`line_id`・`checked` | 払込票の内容の確認のチェックを付ける・外す |
+| `affix_receipt_stamp` | `register`・`side` | レシートへの収入印紙の貼り付けを確認する |
+| `affix_stamp` | `register`・`side`・`line_id`・`affixed` | 払込票（領収証）への収入印紙の貼り付けを確認する |
+| `hand_over_bills` | `register`・`side` | 払込票・荷物の控えのお渡しを済ませる |
+| `hand_tickets` | `register`・`side`・`handed` | スタッフがお渡ししたチケットの枚数を入力する（発券枚数と照合） |
+| `receive_tickets` | `register`・`side`・`received` | お客様が受け取ったチケットの枚数を入力する（発券枚数と照合）。両方が発券枚数と一致したらお渡し完了 |
+| `insert_cash` | `register`・`denomination`・`count` | 入金ボックスに金種と枚数で現金を入れる |
+| `finish_insert` | `register` | 現金の投入を終えて決済する（「投入おわり」） |
+| `tap_emoney` | `register`・`method` | 決済端末にかざす・スキャナで読む（電子マネー・クレジットカード・バーコード決済・ポイント） |
+| `start_emoney` | `register`・`side`・`kind` | 電子マネーのチャージ・残高確認を始める |
+| `close_emoney` | `register`・`side` | 電子マネーの手続きを閉じる |
+| `close_limit_alert` | `register`・`side` | 販売個数の上限の案内を閉じる |
+| `resolve_emoney_short` | `register`・`side`・`choice` | 電子マネーの残高不足にどうするか答える |
+| `call_staff` | `register`・`topic` | 呼び出しボタンを押す（ベル・サービス・金券・たばこ・電子マネー、スタッフ側の応援） |
+| `confirm_point_card` | `register`・`side` | ポイントカードなしで進む（「スキップ」） |
+| `use_points` | `register`・`side`・`how`・`points` | 「ポイント利用」を選んだあと、ポイントの使い方を決めて充てる |
+| `release_call` | `register` | 呼び出しボタンから指を離す |
+| `end_emergency` | `register` | 非常事態モードを解除する（スタッフ側の解除ボタンで。ログインは要らない） |
+| `void_transaction` | `register` | 取引を中止する |
+| `end_staff_mode` | `register` | ログアウトしてセルフ操作モードに戻る |
+| `pause` | `register` | レジ休止中にする |
+| `cash_out` | `register`・`kind`・`amount`・`password` | 店舗メニュー：お金を抜く（返品返金・緊急出金・経費支出など、店舗パスワードが要る） |
+| `cash_in` | `register`・`kind`・`amount` | 店舗メニュー：取引外入金・両替などでお金を入れる |
+| `open_menu` | `register`・`screen`・`exchange_to` | 店舗メニューを開く・項目を選ぶ・閉じる |
+| `insert` | `register`・`amount` | 入金ボックスに金額で現金を入れる（テンキー） |
+| `take_outlet` | `register` | 出金ボックスのお金を取り出す |
+| `claim` | `register`・`side` | その側の画面が操作できるか確かめる（操作側でなければ理由を返す。状態は変えない） |
+| `add_age_rule` | `owner_id`・`password`・`target`・`min_age` | 販売規則：分類単位の年確ルールを足す（オーナー） |
+| `remove_age_rule` | `owner_id`・`password`・`rule_id` | 販売規則：年確ルールを外す（オーナー） |
+| `set_product_age` | `owner_id`・`password`・`code`・`min_age` | 販売規則：商品ごとの年確の年齢を決める（オーナー） |
+| `set_sale_limit` | `owner_id`・`password`・`code`・`limit` | 販売規則：商品ごとの販売個数の上限を決める（オーナー） |
+| `verify_owner` | `owner_id`・`password` | 販売規則の設定を開くときのオーナー認証 |
+| `set_tax_rate` | `owner_id`・`password`・`class_id`・`rate_bp` | 販売規則：税区分の税率を変える（オーナー） |
+| `add_tax_class` | `owner_id`・`password`・`name`・`kind`・`rate_bp` | 販売規則：税区分を足す（オーナー） |
+| `set_product_tax` | `owner_id`・`password`・`code`・`class_id` | 販売規則：商品の税区分を付け替える（オーナー） |
+| `set_invoice` | `owner_id`・`password`・`invoice_no`・`rounding` | 販売規則：インボイスの登録番号と端数処理（オーナー） |
+| `set_bell_loss` | `percent` | シミュレーター：Bell との通信ロス率 |
+| `set_bell_offline` | `bell`・`offline` | シミュレーター：Bell を不通にする |
+| `set_bell_on` | `bell`・`on` | Bell の呼び鈴機能の ON/OFF |
+<!-- /generated -->
 
 スナップショットは、レジごとのビュー（スタッフ側・お客様側・操作の可否と理由・使えない支払方法など）、Bell の状態、呼び出しと履歴、年確ルールと変更履歴、監査ログ、FF の在庫、スタッフ、商品、税設定、電子マネーの残高を持つ。お客様側のビューには商品コード・分類を載せない。
 
@@ -738,6 +842,98 @@ npm run build
 (cd core && cargo test)
 ```
 
-- CI（`.github/workflows/ci.yml`）は push（main）と PR で cargo test・WASM のビルド・Vitest・型検査とビルドを行う。
+- CI（`.github/workflows/ci.yml`）は push（main）と PR で cargo test・types.ts の一致検査・仕様書の生成箇所の一致検査・WASM のビルド・Vitest・型検査とビルドを行う。
+- 仕様書のうち事実の部分（16 章の定数、17 章のコマンド、3.2 の商品・FF・クーポン、10.1 の料金表、付録 A のシナリオ一覧）は `<!-- generated:名前 -->` と `<!-- /generated -->` の印で囲み、コードとデータから生成する（`pos/core/tests/spec_tables.rs`）。印の外は手書き。コードを変えたら `cd pos && npm run gen:spec` で作り直す。食い違うと CI が落ちる。
+- シナリオテストには doc コメントで「/// 仕様 節番号：一行の説明」を書く。付録 A に節ごとに並ぶ。
 - `main` への push で GitHub Pages に `pos/dist` を公開する（`.github/workflows/pages.yml`）。
 - コアの業務ルールのシナリオテストは `pos/core/tests/scenarios.rs`。
+
+## 付録 A. 受け入れシナリオ一覧
+
+シナリオテスト（`pos/core/tests/scenarios.rs`）の doc コメント「仕様 節番号：説明」から生成する。この一覧がベンダーにとっての受け入れ試験項目になる。シナリオがない節も出し、穴が見えるようにする。
+
+<!-- generated:scenarios -->
+- **1 概要**：シナリオなし
+- **2 用語**：シナリオなし
+- **3 店舗の構成**：シナリオなし
+- **3.1 スタッフ**：シナリオなし
+- **3.2 商品マスタ**：シナリオなし
+- **3.3 バーコード**：シナリオなし
+- **3.4 状態の保存**：シナリオなし
+- **4 モードと操作権**：シナリオなし
+- **4.1 モード**
+  - 販売期限切れを読み、ログインして回収せずにログアウトすると「販売期限切れ」の呼び出しが立ち直る（B-3）（`expired_call_comes_back_after_logout_without_collecting`）
+  - 会計後の年齢確認も、ログインして確認せずにログアウトすると「年確」の呼び出しが立ち直る（B-3）（`age_check_call_comes_back_after_logout_without_checking`）
+  - 公共料金・受付待ちのサービス商品も、取引に残っていればログアウトで立ち直る（B-3）（`bill_and_service_calls_come_back_after_logout`）
+- **4.2 操作側**：シナリオなし
+- **4.3 モードごとの操作の可否**：シナリオなし
+- **4.4 画面の言語**：シナリオなし
+- **5 取引**：シナリオなし
+- **5.1 明細**：シナリオなし
+- **5.2 一緒に登録できないもの**：シナリオなし
+- **5.3 取り消しの制限**：シナリオなし
+- **5.4 クーポン**：シナリオなし
+- **5.5 ポイントカード**：シナリオなし
+- **5.6 フラグ**：シナリオなし
+- **6 会計**：シナリオなし
+- **6.1 会計ボタン**：シナリオなし
+- **6.2 確認の順序**：シナリオなし
+- **6.3 決済の関門**：シナリオなし
+- **6.4 支払方法**：シナリオなし
+- **6.5 現金**
+  - 現金の投入中、両画面の帯に出す合計（残りのお支払い額）・お預かり・お釣り／不足の元になる値（B-4）（`tendered_cash_and_change_are_shown_on_both_sides`）
+- **6.6 キャッシュレスで先に払う分**：シナリオなし
+- **6.7 電子マネーの残高不足**：シナリオなし
+- **6.8 決済**：シナリオなし
+- **6.9 釣銭忘れ**：シナリオなし
+- **7 電子マネーのチャージ・残高確認**：シナリオなし
+- **8 FF**：シナリオなし
+- **9 年齢確認**：シナリオなし
+- **9.1 照合イベントと回収イベント**：シナリオなし
+- **10 サービス商品**：シナリオなし
+- **10.1 荷物を送る**：シナリオなし
+- **10.2 荷物を受取る**：シナリオなし
+- **10.3 公共料金**：シナリオなし
+- **11 店員呼び出しと Bell**：シナリオなし
+- **11.1 呼び出し**：シナリオなし
+- **11.2 ベル**：シナリオなし
+- **11.3 Bell**：シナリオなし
+- **11.4 非常事態モード**
+  - 呼び鈴を何度押しても、待たせた時間が足りなければ非常事態モードに入らない（B-1）（`many_rings_do_not_start_emergency_early`）
+  - 最も古い未解決の呼び出しから 59 秒では入らず、1 分（実機は 5 分）で入る。押し直しても数え直さない（B-1）（`emergency_after_a_minute_unanswered`）
+  - 呼び出しの種類は問わない（たばこボタンでも同じ時間で入る）（B-1）（`any_kind_of_call_counts_toward_emergency`）
+  - 4 分でログインして応答し、ログアウトしたら、新しい呼び出しから数え直す（B-1）（`login_answers_and_the_next_call_counts_afresh`）
+  - 釣銭忘れの呼び出しだけが残っても非常事態モードに入らない（お客様はもう立ち去っている）（B-1）（`change_left_alone_is_not_an_emergency`）
+  - 呼び鈴が不通でも入る（スタッフが応答しない状況には違いない）（`emergency_also_while_the_bell_cannot_reach_anyone`）
+  - スタッフ操作モードでは入らない（`no_emergency_in_staff_operated_mode`）
+  - 解除はログインなしで誰でもでき、呼び鈴の呼び出しも片付いて通常運転に戻る（`anyone_can_end_emergency_without_logging_in`）
+  - 解除の前から残っているほかの呼び出しは、解除した時刻から数え直す（`calls_left_after_ending_emergency_count_from_the_end`）
+  - ログインだけでは続き、解除で発動・解除時刻のレシートを出して通常運転に戻る（`emergency_lasts_until_ended`）
+- **12 取引中止・無操作・休止**：シナリオなし
+- **12.1 取引中止**：シナリオなし
+- **12.2 無操作**
+  - 呼び出し中は無操作の残り時間が減らず、片付いたら止まった値から続きを数える（B-5）（`idle_countdown_pauses_while_a_call_is_open`）
+  - セルフ操作モードの呼び出しのあいだも残り時間は変わらない（B-5）（`idle_countdown_is_frozen_for_a_self_operated_call`）
+- **12.3 休止・ログアウト**：シナリオなし
+- **13 店舗メニュー**：シナリオなし
+- **14 販売規則の設定**：シナリオなし
+- **14.1 年齢制限**：シナリオなし
+- **14.2 個数制限**：シナリオなし
+- **14.3 税率**：シナリオなし
+- **15 画面**：シナリオなし
+- **15.1 シミュレーターの配置**：シナリオなし
+- **15.2 ビルド番号**：シナリオなし
+- **15.3 レジ画面**
+  - 受け付けなかった操作は理由を返し、続く操作は妨げない（ソフトドリンクの後の荷物の伝票）（B-2）（`a_rejected_scan_returns_its_reason_and_the_next_scan_goes_through`）
+- **15.4 待ち受け**：シナリオなし
+- **15.5 文言**：シナリオなし
+- **15.6 部品**：シナリオなし
+- **15.7 テンキー**：シナリオなし
+- **15.8 音**：シナリオなし
+- **15.9 モバイル（幅 760px 以下）**：シナリオなし
+- **16 時間の定数**：シナリオなし
+- **17 コマンド**：シナリオなし
+- **18 開発**：シナリオなし
+
+節をまだ書いていないシナリオ（122 件）：`any_barcode_is_accepted_in_any_order`・`scanning_on_payment_screen_returns_to_registering`・`age_check_happens_at_checkout_and_blocks_payment`・`self_operated_age_check_calls_staff`・`ff_button_works_while_age_check_call_is_open`・`only_owner_changes_age_rules`・`customer_cannot_take_over_staff_operated_register`・`fast_food_flow_in_self_operated_mode`・`pickup_matches_the_parcel_then_hands_it_over`・`pickup_can_be_decided_by_found_or_missing`・`collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip`・`collect_parcels_finish_on_checkout_without_choosing_a_payment`・`a_parcel_for_another_address_is_scanned_even_while_asking_for_more`・`prepaid_and_collect_parcels_together_still_ask_for_a_payment`・`parcel_size_is_decided_in_two_steps_and_back_steps_back`・`parcel_fee_comes_from_size_and_postal_code`・`parcel_skips_point_card_check`・`parcel_cannot_be_mixed_with_other_goods`・`cash_out_only_inside_the_store_menu`・`store_menu_opens_only_on_the_staff_side`・`calls_stay_on_originating_register`・`bell_rings_despite_loss_and_reports_link_down`・`customer_view_hides_staff_only_information`・`staff_and_customer_screens_are_exclusive`・`owner_sets_age_rule_per_product`・`mode_follows_staff_badge`・`customer_cannot_register_ff_in_self_operated`・`idle_register_returns_to_self_operated`・`cash_in_and_out_from_the_customer_side_menu`・`inlet_pays_and_change_waits_in_outlet`・`store_menu_uses_inlet_and_outlet`・`staff_operated_screens_lock_only_while_touched`・`called_register_lamp_lights_at_once_until_staff_arrives`・`wallet_card_must_match_chosen_method`・`neglected_calls_ring_louder`・`shortcut_buttons_call_staff`・`staff_bell_calls_colleagues_without_call_screen`・`call_button_rings_only_while_held_and_every_press_rings`・`logout_returns_to_self_operated_even_while_customer_screen_holds`・`checkout_from_held_customer_screen_then_point_card_check`・`either_screen_can_operate_except_age_confirmation`・`staff_skipping_the_age_check_needs_no_customer_button`・`revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_then`・`a_tax_slip_of_the_same_amount_needs_no_revenue_stamp`・`a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt`・`a_self_operated_purchase_needing_a_stamp_calls_staff`・`a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp`・`revenue_stamp_waits_for_staff_in_self_operated_mode`・`utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash`・`self_operated_bill_checkout_calls_staff_to_check_the_slips`・`utility_bills_cannot_share_a_transaction_with_other_goods`・`registered_bill_slips_cannot_be_removed_only_voided`・`points_pay_only_for_point_eligible_goods`・`self_operated_cash_choice_calls_staff`・`self_operated_back_from_cash_choice_withdraws_the_call`・`stamps_are_paid_in_cash_even_with_other_items`・`shopping_is_limited_to_100_items`・`store_menu_cannot_open_during_a_transaction`・`staff_enters_the_birth_date_and_unsellable_items_are_confiscated`・`age_counts_the_birthday`・`coupons_apply_whenever_the_target_is_registered`・`a_coupon_without_its_target_blocks_payment_until_it_is_returned`・`same_item_merges_only_when_scanned_in_a_row`・`staff_or_customer_changes_a_line_quantity`・`coupon_and_line_ids_never_collide`・`points_can_pay_once_staff_chooses_them`・`points_payment_without_a_card_goes_back_to_the_point_card_check`・`handheld_and_store_computer_bells_can_be_turned_off`・`tobacco_call_marks_the_register_until_tobacco_is_scanned`・`change_left_in_the_outlet_reminds_then_calls_staff`・`owner_limits_how_many_of_an_item_one_purchase_can_have`・`tax_rates_are_data_and_owner_only`・`product_tax_class_can_be_changed`・`self_operated_emoney_fan_calls_staff_while_shopping`・`emoney_inquiry_shows_the_balance`・`emoney_charge_takes_bills_up_to_the_limit`・`emoney_short_offers_three_choices`・`customer_voids_and_money_comes_back`・`logout_and_pause_from_either_store_menu`・`changing_handed_ff_rewinds_or_asks_to_collect`・`points_are_not_earned_on_tobacco_stamps_bills_or_parcels`・`staff_alone_is_responsible_for_ff_handover`・`thirty_seconds_without_insert_means_done_inserting`・`ff_handover_cannot_be_confirmed_after_staff_logs_out`・`saved_state_restores_every_register`・`broken_or_old_saved_state_is_refused`・`ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved`・`back_after_inserting_cash_returns_it_and_reopens_methods`・`pressing_the_chosen_payment_method_again_clears_it`・`point_card_is_asked_once_but_can_be_read_until_paid`・`staff_can_check_age_early_and_new_age_goods_need_it_again`・`early_age_check_can_be_cancelled_and_covers_checkout`・`two_thousand_yen_bill_is_returned_to_the_outlet`・`tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matches`・`tickets_cannot_share_a_transaction_with_other_goods`・`self_operated_ticket_checkout_calls_staff_for_cash`・`tickets_are_issued_first_in_first_out_across_registers`・`ticket_queue_survives_save_and_load`・`fresh_food_quantity_cannot_be_raised_on_screen`・`expired_onigiri_blocks_checkout_until_removed`・`self_operated_expired_scan_calls_staff`・`goods_needing_an_age_already_checked_do_not_redo_the_check`・`an_18_item_after_a_20_check_redoes_the_check_for_18`・`self_operated_emoney_short_calls_staff_only_when_asked`・`points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card`・`a_short_point_balance_pays_part_and_the_rest_goes_to_another_method`・`voiding_returns_used_points_and_an_empty_card_cannot_pay`・`only_non_point_goods_skip_the_point_card_check`・`points_can_pay_all_the_odd_yen_or_a_chosen_amount`・`a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment`・`multi_piece_parcels_share_the_address_and_only_ask_for_the_size`・`customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one`・`a_point_card_alone_starts_a_transaction_that_can_be_voided`・`trading_cards_sell_at_most_three_packs_by_default`・`trading_cards_are_flagged_only_once_over_the_limit`・`unanswered_call_rings_again_up_to_three_times`・`customer_call_shows_until_login_and_staff_sees_answered_topic`・`self_emoney_charge_call_waits_like_other_waiting_calls`・`every_self_call_waits_on_the_bottom_row_and_is_named_after_login`・`call_topic_is_concrete_and_only_the_first_one_is_kept`・`passing_age_or_ff_check_is_shown_until_staff_moves_on`・`store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids`
+<!-- /generated -->

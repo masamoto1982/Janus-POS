@@ -176,9 +176,11 @@ pub struct Context {
     pub expired: bool,
 }
 
+/// 1 取引の買い物点数（数量の合計）の上限。合計が税抜 5 万円を超え、レシートに収入印紙が要るケースを再現できる数
 pub const MAX_ITEMS: u32 = 100;
 pub const ITEMS_FULL: Denial = "買い物点数の上限（100点）に達しています";
 
+/// スタッフ操作モードで、操作した側だけが操作できる時間
 pub const TOUCH_LOCK_MS: u64 = 1000;
 
 impl Context {

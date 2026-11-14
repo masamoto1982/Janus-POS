@@ -19,6 +19,7 @@ ts-rs = { version = "12", optional = true }
 default = []
 wasm = ["dep:wasm-bindgen", "dep:console_error_panic_hook"]
 ts = ["dep:ts-rs"]
+spec = []
 
 [profile.release]
 lto = true

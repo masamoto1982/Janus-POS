@@ -8,6 +8,7 @@
   "scripts": {
     "build:wasm": "bash ./scripts/rebuild-wasm.sh",
     "gen:types": "cd core && UPDATE_TYPES=1 cargo test --features ts --test ts_bindings",
+    "gen:spec": "cd core && UPDATE_SPEC=1 cargo test --features spec --test spec_tables",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",

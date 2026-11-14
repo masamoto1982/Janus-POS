@@ -792,7 +792,8 @@ function ageWait(age: number): string {
     </div>`;
 }
 
-/** 外国人の身分証（法令の年確でも認める）。並べると日本人にも外国人にも冗長なので、日本語の案内の下に英語で添える */
+/** 外国人の身分証（法令の年確でも認める）。並べると日本人にも外国人にも冗長なので、日本語の案内の下に英語で添える。
+ *  店舗が任意で決めた年確（花火など）には添えない：日本語を介さない外国人の小中高生が買うのはまれ */
 const FOREIGN_IDS = `<span lang="en" data-i18n-skip>Also OK: Residence Card, Special Permanent Resident Certificate, Passport</span>`;
 
 /** 年確のあいだのお客様側。スタッフが「する」を選んだら身分証の提示をお願いし、
@@ -806,7 +807,7 @@ function ageNote(reg: number, v: StaffView): string {
         "年齢確認が必要な商品が含まれています",
         v.age_official_id
           ? `免許証またはマイナンバーカードの提示をお願いいたします<br>${FOREIGN_IDS}`
-          : `学生証など顔写真付きの身分証の提示をお願いいたします<br>デジタル身分証はご利用いただけません<br>${FOREIGN_IDS}`,
+          : "学生証など顔写真付きの身分証の提示をお願いいたします<br>デジタル身分証はご利用いただけません",
       )}</div>`;
 }
 

@@ -416,7 +416,7 @@ pub enum Command {
     ReleaseCall {
         register: u8,
     },
-    /// 非常事態モードを解除する（ログインしたスタッフがスタッフ側の帯のボタンで）
+    /// 非常事態モードを解除する（スタッフ側の解除ボタンで。ログインは要らない）
     EndEmergency {
         register: u8,
     },
@@ -1316,8 +1316,8 @@ struct Register {
     press_log: Vec<u64>,
     /// 呼び鈴を押し始めた時刻（押している間だけ）。鳴らしっぱなしの判定用
     press_since: Option<u64>,
-    /// 非常事態モード（旧 エマージェンシーモード）に入った時刻。一度入ったら、ログインしたスタッフが
-    /// スタッフ側の帯の「非常事態モードを解除」を押すまで続く（ログインだけでは解除しない）
+    /// 非常事態モード（旧 エマージェンシーモード）に入った時刻。一度入ったら、スタッフ側の「解除」が押されるまで続く。
+    /// 押すのは誰でもよい（駆け付けた警察官・救急隊も）。ログインだけでは解除しない
     emergency: Option<u64>,
     /// 直前に解除した非常事態モードの（発動時刻, 解除時刻）。解除と同時にこの二つを印字したレシートを出し、
     /// スタッフ側に EMERGENCY_LOG_MS のあいだ案内する
@@ -2919,13 +2919,13 @@ impl Store {
                 let Some(since) = r.emergency else {
                     return Err("非常事態モードではありません".into());
                 };
-                if r.staff_state() != StaffState::Ready {
-                    return Err("非常事態モードの解除はスタッフがログインして行います".into());
-                }
+                // 解除は誰でもできる：スタッフに連絡が付かないことが問題なので、駆け付けた警察官や救急隊が解除する（user 2026-11-14）
                 r.emergency = None;
                 r.emergency_log = Some((since, now));
                 r.press_log.clear();
                 r.press_since = None;
+                // 解除したら通常運転：非常事態のもとになった呼び鈴の呼び出しも片付ける（ほかの用件の呼び出しは残す）
+                self.calls.resolve(register, CallKind::CustomerHelp, now);
                 done("非常事態モードを解除しました")
             }
             C::VoidTransaction { register } => {

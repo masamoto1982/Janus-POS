@@ -3609,6 +3609,24 @@ fn emergency_after_ten_rings_within_three_minutes() {
 }
 
 #[test]
+fn anyone_can_end_emergency_without_logging_in() {
+    // スタッフに連絡が付かないので、駆け付けた警察官・救急隊が解除する（user 2026-11-14）
+    let mut s = Store::new(1, 1, 1);
+    for _ in 0..10 {
+        ring(&mut s, 1);
+    }
+    assert!(reg(&s, 1).emergency);
+    ok(&mut s, json!({"type":"end_emergency","register":1}));
+    let v = reg(&s, 1);
+    assert!(!v.emergency);
+    assert!(v.emergency_log.is_some());
+    assert_eq!(v.mode, Mode::SelfOperated);
+    // 呼び鈴の呼び出しも片付き、通常運転に戻る
+    assert!(!v.lamp);
+    assert!(v.waiting_calls.is_empty());
+}
+
+#[test]
 fn emergency_when_the_bell_is_held_for_three_minutes() {
     let mut s = Store::new(1, 1, 1);
     advance(&mut s, 2_000);
@@ -3668,8 +3686,7 @@ fn emergency_lasts_until_staff_log_in() {
     advance(&mut s, 300_000);
     assert!(reg(&s, 1).emergency);
     let since = reg(&s, 1).emergency_since.unwrap();
-    // 解除はログインしたスタッフだけ。ログインしただけでは続く
-    assert!(run(&mut s, json!({"type":"end_emergency","register":1})).is_err());
+    // ログインしただけでは続く
     login(&mut s, 1);
     assert!(reg(&s, 1).emergency);
     advance(&mut s, 5_000);

@@ -184,7 +184,6 @@ const DICT: Record<string, string> = {
   "担当スーパーバイザー：": "Supervisor: ",
   非常事態モードを解除します: "End emergency mode",
   解除: "End",
-  スタッフがログインすると解除できます: "A logged-in staff member can end it",
   非常事態モードを解除しました: "Emergency mode has ended",
   発動時刻と解除時刻を記載したレシートを出力しました: "A receipt with the start and end times has been printed",
   緊急連絡先と店舗住所を記載したレシートを出力します: "A receipt with emergency contacts and the store address will be printed",

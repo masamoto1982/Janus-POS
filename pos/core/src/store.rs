@@ -1308,6 +1308,9 @@ struct Register {
     last_op: u64,
     outlet: Cash,
     outlet_since: Option<u64>,
+    /// 無操作のカウントダウンを止めた時刻。出金ボックスにお金があるあいだと、そのレジに呼び出しがあるあいだは数えない。
+    /// 止めた理由がすべてなくなったら、止まっていた時間だけ last_op を進めて続きから数える（B-5）
+    idle_hold: Option<u64>,
     menu: Option<Menu>,
     paused: bool,
     touch: Option<(Side, u64)>,
@@ -1413,14 +1416,16 @@ impl Register {
             && self.emoney.is_none()
     }
 
-    fn resume_idle_countdown(&mut self, now: u64) {
-        if let Some(since) = self.outlet_since.take() {
+    fn hold_idle_countdown(&mut self, held: bool, now: u64) {
+        if held {
+            self.idle_hold.get_or_insert(now);
+        } else if let Some(since) = self.idle_hold.take() {
             self.last_op = (self.last_op + now.saturating_sub(since)).min(now);
         }
     }
 
     fn idle_revert_in(&self, now: u64) -> u64 {
-        let counted_until = self.outlet_since.unwrap_or(now).max(self.last_op);
+        let counted_until = self.idle_hold.unwrap_or(now).max(self.last_op);
         IDLE_REVERT_MS.saturating_sub(counted_until - self.last_op)
     }
 
@@ -1674,6 +1679,7 @@ impl Store {
                 last_op: 0,
                 outlet: Cash::default(),
                 outlet_since: None,
+                idle_hold: None,
                 menu: None,
                 paused: false,
                 touch: None,
@@ -1799,18 +1805,18 @@ impl Store {
                     );
                 }
             } else {
-                r.resume_idle_countdown(now);
+                r.outlet_since = None;
                 self.calls.resolve(r.id, CallKind::ChangeLeft, now);
             }
         }
         self.raise_required_calls();
+        self.hold_idle_countdowns();
         let due: Vec<u8> = self
             .registers
             .iter()
             .filter(|r| {
                 (r.mode != Mode::SelfOperated || !r.idle())
-                    && r.outlet_since.is_none()
-                    && !self.calls.open.iter().any(|c| c.register == r.id)
+                    && r.idle_hold.is_none()
                     && now.saturating_sub(r.last_op) >= IDLE_REVERT_MS
             })
             .map(|r| r.id)
@@ -2014,7 +2020,17 @@ impl Store {
             r.sync_mode();
         }
         self.raise_required_calls();
+        self.hold_idle_countdowns();
         res
+    }
+
+    /// 出金ボックスにお金があるか呼び出しがあるあいだ、無操作のカウントダウンを止める（B-5）。コマンドと tick のたびに行う
+    fn hold_idle_countdowns(&mut self) {
+        let now = self.now;
+        for r in &mut self.registers {
+            let held = r.outlet.total() > 0 || self.calls.open.iter().any(|c| c.register == r.id);
+            r.hold_idle_countdown(held, now);
+        }
     }
 
     /// スタッフの対応が要るのに呼び出しが立っていないものを立てる（B-3）。コマンドと tick のたびに行う。
@@ -3044,7 +3060,7 @@ impl Store {
                 if let Some(rc) = r.last_receipt.as_mut() {
                     rc.at = now;
                 }
-                r.resume_idle_countdown(now);
+                r.outlet_since = None;
                 self.calls.resolve(register, CallKind::ChangeLeft, now);
                 done(format!("{total}円を取り出しました"))
             }

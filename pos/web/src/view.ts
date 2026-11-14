@@ -107,7 +107,7 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
     })
     .join("");
   return `<div class="ffv-screen">
-      <div class="big">お渡しの確認</div>
+      <div class="big">${customer ? "お受け取りした数を入力してください" : "お渡しした数を入力してください"}</div>
       <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-ffverify-close="${reg}:${side}" >バック</button></div>
     </div>`;
@@ -244,16 +244,45 @@ function expiredFlag(reg: number, side: Side, l: { expired: boolean }, operable:
   return `<button type="button" class="flag" data-expiredview="${reg}:${side}" title="押して新しい商品との取り替えを案内">期限切れ</button>`;
 }
 
-/** 販売期限切れの案内。期限切れの品はレジを通るたびに一点ずつ出てくるので、表にせず直近の一点だけを、
- *  ほかの案内画面と同じく縦横中央の二行（大きなテキスト・小さなテキスト）で出す。
- *  操作できる側には「回収しました」と左下のバック、お客様が見るだけの側は案内だけ */
+/** 販売期限切れの案内（回収イベント）。期限切れの品はレジを通るたびに一点ずつ出てくるので、直近の一点だけを出す。
+ *  操作できる側には「回収しました」と左下のバック（明細のフラグで開き直せる）、お客様が見るだけの側は案内だけ */
 function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate | null, staff: boolean): string {
   const l = lines.filter((x) => x.expired).sort((a, b) => b.touched - a.touched)[0];
   if (!l) return "";
-  const sub = staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "申し訳ございません、店員が新しい商品にお取替えいたします";
-  const choices = st ? `<div class="point-choices">${btn("回収しました", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary")}</div>` : "";
   const back = st ? `<div class="back-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>` : "";
-  return `<div class="point-screen pair-note expired-screen">${msg(esc(`${l.name}の販売期限が切れています`), esc(sub))}${choices}</div>${back}`;
+  return (
+    collectScreen(
+      "販売期限が切れています",
+      [{ name: l.name, qty: l.qty }],
+      staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "申し訳ございません、店員が新しい商品にお取替えいたします",
+      st ? btn("回収しました", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary") : "",
+    ) + back
+  );
+}
+
+/** 回収イベント（年確で販売できない商品・お渡し済みFFの取り消し・販売期限切れ）の共通の画面。
+ *  縦横中央に、大きなテキスト＝なぜ回収するか／回収する品の一覧／小さなテキスト＝スタッフへの指示またはお客様へのお詫び、
+ *  スタッフ側だけ「回収しました」 */
+function collectScreen(head: string, items: { name: string; qty: number }[], sub: string, action = ""): string {
+  const list = items.length
+    ? `<ul class="collect-list">${items.map((c) => `<li><b>${esc(c.name)}</b><span>${c.qty}点</span></li>`).join("")}</ul>`
+    : "";
+  return `<div class="point-screen collect">${msg(esc(head), esc(sub))}${list}${action ? `<div class="point-choices">${action}</div>` : ""}</div>`;
+}
+
+/** 照合イベント（年確・FFのお渡し）が済んだ。スタッフ側にはシステムのお墨付き（緑の照合OK）と「次へ」、
+ *  お客様側には完了とご協力へのお礼。年確は責任の重い作業なので、手ごたえなしに次の画面へ進めない */
+function passedCard(reg: number, side: Side, v: StaffView): string {
+  const p = v.passed;
+  if (!p) return "";
+  const mark = `<div class="pass-mark" aria-hidden="true">✓</div>`;
+  const next = `<div class="point-choices">${btn("次へ", { type: "dismiss_passed", register: reg }, { allowed: true, reason: null }, "primary")}</div>`;
+  if (p.kind === "age")
+    return side === "staff"
+      ? `<div class="point-screen passed">${mark}${msg(`${p.age}歳以上であることを確認しました`, "身分証をお返しください")}${next}</div>`
+      : `<div class="point-screen passed">${mark}${msg("年齢確認が完了しました", "ご協力ありがとうございました")}</div>`;
+  // FF はスタッフが取り仕切るので、スタッフ操作モードのお客様側には出さない
+  return side === "staff" ? `<div class="point-screen passed">${mark}${msg("FFのお渡しを確認しました", "お渡し数がすべて注文数と一致しています")}${next}</div>` : "";
 }
 
 /** 販売個数の上限を超えて登録を断ったときの案内（年齢確認と同じくレジの機能）。
@@ -345,44 +374,23 @@ function parcelAsk(reg: number, lines: StaffLine[], st: Gate): string {
     </div>`;
 }
 
-export const collected = new Map<number, Set<number>>();
-
-function confiscatedCard(reg: number, v: StaffView): string {
-  if (!v.confiscated.length) {
-    collected.delete(reg);
-    return "";
-  }
-  const done = collected.get(reg) ?? new Set<number>();
-  const items = v.confiscated
-    .map(
-      (c, i) =>
-        `<li><label><input type="checkbox" data-collect="${reg}:${i}"${done.has(i) ? " checked" : ""} aria-label="${esc(c.name)}を回収" /><b>${esc(c.name)}</b> × ${c.qty}</label></li>`,
-    )
-    .join("");
-  const all = v.confiscated.every((_, i) => done.has(i));
-  const st = { action: "dismiss_confiscated", allowed: all, reason: all ? null : "回収した商品にチェックを入れてください" };
-  return `<div class="point-screen collect">
-      <div class="big">販売できない商品について回収してください</div>
-      <ul class="collect-list">${items}</ul>
-      <div class="point-choices">${btn("回収しました", { type: "dismiss_confiscated", register: reg }, st, "primary")}</div>
-    </div>`;
+function confiscatedCard(reg: number, side: Side, v: StaffView): string {
+  if (!v.confiscated.length) return "";
+  return side === "staff"
+    ? collectScreen("年齢制限により販売できない商品があります", v.confiscated, "お客様にお詫びし、商品を回収してください", btn("回収しました", { type: "dismiss_confiscated", register: reg }, { allowed: true, reason: null }, "primary"))
+    : collectScreen("年齢制限によりお売りできない商品があります", v.confiscated, "申し訳ございません、こちらの商品はお会計から外させていただきます");
 }
 
 function ffCollectCard(reg: number, v: StaffView): string {
   if (!v.ff_collect.length) return "";
-  const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}を${c.qty}点回収してください</div>`).join("");
-  return `<div class="point-screen collect">
-      ${lines}
-      <div class="point-choices">${btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { allowed: true, reason: null }, "primary")}</div>
-    </div>`;
+  return collectScreen("お渡し済みのFFが取り消されました", v.ff_collect, "お客様からFFを回収してください", btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { allowed: true, reason: null }, "primary"));
 }
 
+/** お客様側には回収の案内を出さない（FF はスタッフがリードする、user 2026-11-09） */
 function ffReturnCard(v: StaffView): string {
   if (!v.ff_collect.length) return "";
-  const lines = v.ff_collect.map((c) => `<div class="big">${esc(c.name)}の数量を変更しました</div>`).join("");
-  return `<div class="point-screen pair-note"><div class="msg">${lines}</div></div>`;
+  return collectScreen(v.ff_collect.map((c) => `${c.name}の数量を変更しました`).join("、"), [], "");
 }
-
 
 function backFoot(reg: number, side: Side, st: Gate): string {
   return backCorner({ type: "back_to_registering", register: reg, side }, st);
@@ -779,6 +787,16 @@ function ageWait(age: number): string {
     </div>`;
 }
 
+/** 年確のあいだのお客様側。スタッフが「する」を選んだら身分証の提示をお願いし、
+ *  スタッフが生年月日を打ち始めたら（テンキーを開いたら）判定中であることと、個人情報を残さないことを伝える */
+function ageNote(reg: number, v: StaffView): string {
+  if (!v.id_pending) return pairNote("年齢確認が必要な商品が含まれています");
+  const typing = padEntry.get(`${reg}:staff`)?.target === "birth" || !!padValue.get(padValueKey(reg, "birth"));
+  return typing
+    ? pairNote("生年月日から年齢を判定しています", "端末は個人情報を保存しません")
+    : pairNote("年齢確認が必要な商品が含まれています", "免許証またはマイナンバーカードの提示をお願いいたします");
+}
+
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: Action) => Gate): string {
   const age = v.required_age;
   if (!age || side === "customer") return "";
@@ -1016,10 +1034,11 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (paying && slips && v.stamp_pending)
     return screen(side === "staff" ? stampVerifyScreen(reg, side, v.bills, a("affix_stamp"), false) : billNote(slips, "スタッフが領収証に収入印紙を貼り付けています"));
   if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : billNote(slips, "お客様に受付点数、合計金額をお伝えください"));
-  if (agePending) return screen(side === "staff" ? pay : pairNote(v.id_pending ? "身分証を確認しています" : "年齢確認が必要な商品が含まれています"));
+  if (agePending) return screen(side === "staff" ? pay : ageNote(reg, v));
+  // 回収イベント・照合の済んだ案内は、それぞれのボタン（回収しました・次へ）だけで閉じる（バックで登録画面に戻っても同じ案内が残るだけなので出さない）
+  const held = firstOf([confiscatedCard(reg, side, v), passedCard(reg, side, v), side === "staff" ? ffCollectCard(reg, v) : ffReturnCard(v)]);
+  if (held) return `${top}${confirm(held)}`;
   const card = firstOf([
-    side === "staff" ? confiscatedCard(reg, v) : v.confiscated.length ? pairNote("販売できない商品があります", "販売不可商品を回収いたします") : "",
-    side === "staff" ? ffCollectCard(reg, v) : ffReturnCard(v),
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
     returnedCard(reg, side, v.returned, side === "staff"),
   ]);

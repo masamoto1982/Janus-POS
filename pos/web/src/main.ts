@@ -1,7 +1,7 @@
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { CashOutKind, Command, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { GuideKind, RulesTab } from "./view";
-import { beepError, beepPress, beepScan, chimePay, setBellRinging, unlockAudio } from "./sound";
+import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
 import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
 import {
@@ -30,7 +30,6 @@ import {
   isoDate,
   scanGuide,
   voidAsk,
-  collected,
   parcelError,
   bellPanel,
   bellSettings,
@@ -727,6 +726,8 @@ function send(cmd: Command): boolean {
   // 電子マネーの残高不足は払えていないので決済音を鳴らさず異常音（ブブッ）：同じ音だと支払いが済んだと勘違いして退店してしまう
   const emoneyShort = cmd.type === "tap_emoney" && !!res.message?.startsWith("電子マネーの残高が足りません");
   if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired && !emoneyShort ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
+  // 照合イベント（年確・FFのお渡し）が済んだら「ピンポン」
+  if (res.ok && ((cmd.type === "check_id" && !!res.message?.includes("年齢確認が済みました")) || (cmd.type === "check_ff" && !!res.message?.includes("すべてのFFのお渡しを確認しました")))) chimeOk();
   frame();
   fx?.();
   if (res.ok) save();
@@ -837,16 +838,6 @@ app.addEventListener("change", (e) => {
     const line = Number(box.dataset.ffcheck);
     ffvInput.set(`${reg}:${side}:${line}`, "1");
     if (!send({ type: "check_ff", register: Number(reg), side: side as Side, line_id: line, handed: 1 })) box.checked = false;
-    return;
-  }
-  if (sel.dataset.collect) {
-    const box = sel as unknown as HTMLInputElement;
-    const [reg, i] = box.dataset.collect!.split(":").map(Number);
-    const set = collected.get(reg) ?? new Set<number>();
-    if (box.checked) set.add(i);
-    else set.delete(i);
-    collected.set(reg, set);
-    frame();
     return;
   }
   if (sel.dataset.taxRate && ownerAuth) {

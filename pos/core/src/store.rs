@@ -311,6 +311,10 @@ pub enum Command {
     DismissFfCollect {
         register: u8,
     },
+    /// 照合が済んだ案内（年確OK・FFのお渡しOK）を閉じて先へ進む
+    DismissPassed {
+        register: u8,
+    },
     CheckBill {
         register: u8,
         #[serde(default = "staff_side")]
@@ -548,6 +552,7 @@ impl Command {
             | C::CheckId { register, .. }
             | C::DismissConfiscated { register }
             | C::DismissFfCollect { register }
+            | C::DismissPassed { register }
             | C::CheckBill { register, .. }
             | C::AffixStamp { register, .. }
             | C::AffixReceiptStamp { register, .. }
@@ -829,6 +834,9 @@ struct Txn {
     age_early: bool,
     confiscated: Vec<(&'static str, u32)>,
     ff_collect: Vec<(&'static str, u32)>,
+    /// 照合イベント（年確・FFのお渡し）が済んだ。スタッフが「次へ」で閉じるまで、
+    /// スタッフ側にお墨付き、お客様側に完了とお礼を出す
+    passed: Option<Passed>,
     method: Option<PaymentMethod>,
     point_checked: bool,
     /// 「ポイントカードなし」を選んだ。確認は一度の取引で一度きりなので、
@@ -1464,6 +1472,15 @@ pub struct ReturnedCoupon {
     pub unmatched: bool,
 }
 
+/// 照合イベントの結果（済んだもの）。年確＝身分証の生年月日で確かめた年齢、FF＝すべてのお渡し数が一致
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Passed {
+    Age { age: u8 },
+    Ff,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Confiscated {
@@ -1963,6 +1980,19 @@ impl Store {
                         FfState::Waiting
                     },
                 };
+                // スタッフがお渡しした FF がすべて一致したら、照合が済んだことをはっきり示す
+                let all = !r.txn.lines.iter().any(|l| {
+                    matches!(
+                        l.kind,
+                        LineKind::Ff {
+                            state: FfState::Waiting
+                        }
+                    )
+                });
+                if matched && all && side == Side::Staff {
+                    r.txn.passed = Some(Passed::Ff);
+                    return done(format!("{name}：照合 OK\nすべてのFFのお渡しを確認しました"));
+                }
                 done(if matched {
                     format!("{name}：照合 OK")
                 } else {
@@ -2365,6 +2395,7 @@ impl Store {
                 r.txn.verified_age = None;
                 r.txn.age_method = None;
                 r.txn.age_early = true;
+                r.txn.passed = None;
                 done(format!("{}歳以上の年齢確認をします", age.unwrap_or(0)))
             }
             C::CheckId {
@@ -2417,6 +2448,14 @@ impl Store {
                 }
                 r.txn.confiscated.clear();
                 done("販売できない商品を回収しました")
+            }
+            C::DismissPassed { register } => {
+                let r = self.reg_mut(register)?;
+                if r.staff_state() != StaffState::Ready {
+                    return Err("照合の確認はスタッフが行います".into());
+                }
+                r.txn.passed = None;
+                done("照合の案内を閉じました")
             }
             C::DismissFfCollect { register } => {
                 let r = self.reg_mut(register)?;
@@ -3674,6 +3713,7 @@ impl Store {
             .iter_mut()
             .find(|r| r.id == register)
             .ok_or("レジがありません")?;
+        let need = r.txn.required_age;
         let mut removed: Vec<(&'static str, u32)> = vec![];
         r.txn.lines.retain(|l| {
             let keep = rules.age_for(l.code, l.category).is_none_or(|a| a <= age);
@@ -3695,6 +3735,7 @@ impl Store {
             r.txn.customer_turn = false;
         }
         if removed.is_empty() {
+            r.txn.passed = need.map(|a| Passed::Age { age: a });
             return done(format!("{age}歳です\n年齢確認が済みました"));
         }
         let list = removed
@@ -4491,6 +4532,7 @@ impl Store {
                     .iter()
                     .map(|&(name, qty)| Confiscated { name, qty })
                     .collect(),
+                passed: t.passed,
                 id_pending: c.id_pending,
                 coupon_unmatched: c.coupon_unmatched,
                 returned: returned.clone(),
@@ -4686,6 +4728,7 @@ pub struct StaffView {
     pub age_early: bool,
     pub confiscated: Vec<Confiscated>,
     pub ff_collect: Vec<Confiscated>,
+    pub passed: Option<Passed>,
     pub coupon_unmatched: bool,
     pub returned: Vec<ReturnedCoupon>,
     pub id_pending: bool,

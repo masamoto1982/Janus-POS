@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    bell_name, AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, Receipt, ReceiptStamp,
-    Register, StaffSession, Store, TicketRow, Txn,
+    bell_name, AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, Passed, Receipt,
+    ReceiptStamp, Register, StaffSession, Store, TicketRow, Txn,
 };
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
 use crate::auth::{self, Authenticator, Guard};
@@ -200,6 +200,8 @@ struct SavedTxn {
     age_early: bool,
     confiscated: Vec<(String, u32)>,
     ff_collect: Vec<(String, u32)>,
+    #[serde(default)]
+    passed: Option<Passed>,
     method: Option<PaymentMethod>,
     point_checked: bool,
     #[serde(default)]
@@ -347,6 +349,7 @@ impl SavedTxn {
             age_early: t.age_early,
             confiscated: named(&t.confiscated),
             ff_collect: named(&t.ff_collect),
+            passed: t.passed,
             method: t.method,
             point_checked: t.point_checked,
             point_declined: t.point_declined,
@@ -398,6 +401,7 @@ impl SavedTxn {
             age_early: self.age_early,
             confiscated: unnamed(self.confiscated),
             ff_collect: unnamed(self.ff_collect),
+            passed: self.passed,
             method: self.method,
             point_checked: self.point_checked,
             point_declined: self.point_declined,

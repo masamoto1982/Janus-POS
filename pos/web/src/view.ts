@@ -763,22 +763,22 @@ function simClock(snap: Snapshot, t: number): string {
 
 /** 非常事態モード（旧 エマージェンシーモード）：セルフ操作モードでスタッフがログインしないまま、呼び鈴が3分以上鳴らしっぱなし、
  *  または3分以内に10回以上鳴らされた。両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。
- *  スタッフ側は二段目（帯）に「非常事態モード解除」、通報先の下にオーナーと担当スーパーバイザーの連絡先も出す。
- *  解除はログインしたスタッフが帯のボタンで（ログインだけでは解除しない、user 2026-11-14） */
+ *  スタッフ側は帯（二段目）を出さず、「非常事態モードを解除します」の案内と解除ボタンだけ。オーナーと担当スーパーバイザーの連絡先は最下段
+ *  （emergencyContactsRow）。解除はログインしたスタッフがこのボタンで（ログインだけでは解除しない、user 2026-11-14） */
 function emergencyScreen(r: RegisterView, side: Side): string {
   const body = `${msg(
     "スタッフの応答がありません",
     "事件または事故の可能性があります<br>ご自身の安全を確保の上、通報をお願いいたします",
   )}<div class="sos-contact"><p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p><p class="small">緊急連絡先と店舗住所を記載したレシートを出力します</p></div>`;
   if (side === "customer") return `<div class="confirm change-alert emergency">${body}</div>`;
-  const end = btn(
-    "非常事態モード解除",
-    { type: "end_emergency", register: r.id },
-    { allowed: r.staff.state === "ready", reason: "スタッフがログインすると解除できます" },
-    "primary",
-  );
-  const contacts = `<p class="sos-tel sos-store">${STORE_CONTACTS.map(([who, tel]) => `<span>${who}<b>${tel}</b></span>`).join("")}</p>`;
-  return `<div class="reg-top emergency-band"><span class="void"></span><span class="mid"></span><span class="action">${end}</span></div><div class="confirm change-alert emergency">${body}${contacts}</div>`;
+  const ready = r.staff.state === "ready";
+  const end = btn("解除", { type: "end_emergency", register: r.id }, { allowed: ready, reason: "スタッフがログインすると解除できます" }, "primary");
+  return `<div class="confirm change-alert emergency">${msg("非常事態モードを解除します", ready ? "" : "スタッフがログインすると解除できます")}${end}</div>`;
+}
+
+/** 非常事態モード中のスタッフ側の最下段：オーナーと担当スーパーバイザーの連絡先（ヘッダーと同じ赤で点滅） */
+function emergencyContactsRow(): string {
+  return `<div class="call-row calling"><p class="sos-store">${STORE_CONTACTS.map(([who, tel]) => `<span>${who}<b>${tel}</b></span>`).join("")}</p></div>`;
 }
 
 /** 非常事態モードを解除した直後のスタッフ側：発動時刻と解除時刻を印字したレシートを出した案内（次の操作か10秒で閉じる） */
@@ -1394,6 +1394,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.menu && side === "customer" && !r.paused) return signage(now);
   // 非常事態モード中のお客様側の最下段：英語で「警戒してください」「通報をお願いします」（ヘッダーと同じ赤で点滅）
   if (r.emergency && side === "customer") return `<div class="call-row calling" data-i18n-skip>${msg("Stay alert", "Please call emergency services")}</div>`;
+  if (r.emergency) return emergencyContactsRow();
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
   // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
   if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length) return callingRow(r, side, snap.now);

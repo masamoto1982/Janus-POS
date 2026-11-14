@@ -1,5 +1,10 @@
 use serde::Serialize;
 
+/// 最下段の「サービス」ボタンで呼んだときの詳細
+pub const SERVICE_BUTTON: &str = "お支払い・荷物";
+/// セルフでお支払い方法に「現金」を選んで呼んだときの詳細
+pub const CASH_CHOSEN: &str = "現金でのお支払い";
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
@@ -19,6 +24,32 @@ pub enum CallKind {
 }
 
 impl CallKind {
+    /// 呼び出し画面とログイン後の「用件：〇〇」に出す短い用件。お客様が押したボタンの呼び出しはボタンの文言そのまま、
+    /// 商品登録やお会計から発動した呼び出しは「お支払い」「宅配便」など具体的に（user 2026-11-14）
+    pub fn topic(self, detail: &str) -> String {
+        let s = match self {
+            CallKind::AgeCheck => "年確",
+            CallKind::FastFood => "FF",
+            // 最下段の「サービス」ボタンは detail が「お支払い・荷物」。商品登録から発動するのは荷物の伝票だけ
+            CallKind::Service if detail == SERVICE_BUTTON => "サービス",
+            CallKind::Service => "宅配便",
+            CallKind::Tobacco => "たばこ",
+            CallKind::Voucher => "金券",
+            CallKind::CustomerHelp => "呼び出し",
+            CallKind::ChangeLeft => "釣銭忘れ",
+            CallKind::Bill => "お支払い",
+            CallKind::Emoney => "電子マネー",
+            // 現金のみの商品は商品名（チケット・切手）、複数なら最初の一つ。お支払い方法で現金を選んだときは「現金」
+            CallKind::CashOnly => match detail.split('・').next() {
+                Some(n) if !n.is_empty() && detail != CASH_CHOSEN => n,
+                _ => "現金",
+            },
+            CallKind::ReceiptStamp => "収入印紙",
+            CallKind::Expired => "販売期限切れ",
+        };
+        s.to_string()
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             CallKind::AgeCheck => "年齢確認",
@@ -44,6 +75,8 @@ pub struct Call {
     pub register: u8,
     pub kind: CallKind,
     pub label: &'static str,
+    /// 用件（[`CallKind::topic`]）
+    pub topic: String,
     pub created_at: u64,
     pub detail: String,
 }
@@ -82,13 +115,15 @@ impl Calls {
             return false;
         }
         self.next_id += 1;
+        let detail = detail.into();
         self.open.push(Call {
             id: self.next_id,
             register,
             kind,
             label: kind.label(),
+            topic: kind.topic(&detail),
             created_at: now,
-            detail: detail.into(),
+            detail,
         });
         self.raised += 1;
         true
@@ -145,5 +180,19 @@ mod tests {
         c.resolve(1, CallKind::CustomerHelp, 3);
         assert!(c.is_open(2, CallKind::FastFood));
         assert!(!c.is_open(1, CallKind::CustomerHelp));
+    }
+}
+
+#[cfg(test)]
+mod tests_topic {
+    use super::*;
+
+    #[test]
+    fn topic_is_concrete() {
+        assert_eq!(CallKind::Service.topic(SERVICE_BUTTON), "サービス");
+        assert_eq!(CallKind::Service.topic("荷物を送る 発払い"), "宅配便");
+        assert_eq!(CallKind::Bill.topic("3枚"), "お支払い");
+        assert_eq!(CallKind::CashOnly.topic("チケット・切手"), "チケット");
+        assert_eq!(CallKind::CashOnly.topic(CASH_CHOSEN), "現金");
     }
 }

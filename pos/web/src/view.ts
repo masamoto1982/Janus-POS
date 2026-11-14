@@ -13,7 +13,6 @@ import type {
   CouponView as Coupon,
   Dates,
   ReturnedCoupon as Returned,
-  CallKind,
   Command,
   PaymentMethod,
   CustomerView,
@@ -722,20 +721,6 @@ export function padPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-const CALL_SHORT: Record<string, string> = {
-  fast_food: "FF",
-  tobacco: "たばこ",
-  service: "サービス",
-  voucher: "金券",
-  customer_help: "呼び出し",
-  age_check: "年確",
-  bill: "公共料金",
-  change_left: "釣銭忘れ",
-  emoney: "電子マネー",
-  receipt_stamp: "収入印紙",
-  expired: "販売期限切れ",
-};
-
 /** 二千円札は取り扱わないので、自動釣銭機がそのまま出金ボックスに返す。なぜ戻ってきたかを両画面に出し、出金ボックスから取り出すと消える。
  *  現金は自動釣銭機のあるスタッフ側で扱うので、お客様にはスタッフが返す */
 function returned2000(side: Side): string {
@@ -762,12 +747,13 @@ function emergencyScreen(): string {
 
 export function callScreen(r: RegisterView): string {
   const v = r.staff;
-  // 現金のみの商品の呼び出しは「現金」ではなく商品名（チケット・切手など）を理由に出す
-  const kinds = [...new Set(v.calls.map((c) => (c.kind === "cash_only" && c.detail ? c.detail : CALL_SHORT[c.kind] ?? c.label)))];
-  const bill = v.calls.find((c) => c.kind === "bill");
+  // 用件は最初の呼び出しの一件だけ（「＆」で繋がない）。スタッフがレジに着けば、残りはお客様との対話でわかる（user 2026-11-14）。
+  // 用件はコアが決める：ボタンの呼び出しはボタンの文言、商品登録・お会計からの呼び出しは「お支払い」「宅配便」など具体的に
+  const first = [...v.calls].sort((a, b) => a.created_at - b.created_at || a.id - b.id)[0];
+  const reason = first?.topic ?? "";
+  const bill = first?.kind === "bill" ? first : undefined;
   // 用件だけを第一待ち受けの「セルフレジ」と同じ特大の文字で（呼び鈴の絵・詳細・経過時間は出さない。経過秒数は最下段に出す、user 2026-11-14）。
   // 公共料金の枚数だけは対応の準備に要るので残す。長い用件は画面の幅に収まるよう文字を小さくする
-  const reason = kinds.join("＆");
   return `<div class="call-screen">
       <b class="call-reason mode-big" style="--len:${[...reason].length}">${esc(reason)}</b>
       ${bill ? `<p class="bill-call"><span class="bill-n">${esc(bill.detail)}</span></p>` : ""}
@@ -1326,8 +1312,6 @@ export function menuPaused(): string {
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */
 export const isWelcome = (main: string): boolean => main.includes("welcome-band");
 
-const CALL_TOPIC: Partial<Record<CallKind, string>> = { ...CALL_SHORT, cash_only: "現金", expired: "販売期限切れ" };
-const callTopics = (kinds: CallKind[]): string => kinds.map((k) => CALL_TOPIC[k]).filter(Boolean).join("・");
 
 /** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。お客様側は「スタッフを呼び出しています」（添え字なし）、
  *  スタッフ側は呼び出しからの経過秒数（取り消しボタンは置かない、user 2026-11-14） */
@@ -1337,9 +1321,9 @@ function callingRow(r: RegisterView, side: Side, now: number): string {
   return `<div class="call-row calling">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
 }
 
-/** スタッフがログインして応答した呼び出しの用件。取引が終わるまでスタッフ側の担当スタッフ名の右に出す */
+/** スタッフがログインして応答した呼び出しの用件（最初の一件）。取引が終わるまでスタッフ側の担当スタッフ名の右に出す */
 export function answeredTopic(r: RegisterView, side: Side): string {
-  const topics = side === "staff" ? callTopics(r.answered) : "";
+  const topics = side === "staff" ? (r.answered ?? "") : "";
   return topics ? `<span class="answered-topic" title="お客様の呼び出しの用件">用件：${esc(topics)}</span>` : "";
 }
 

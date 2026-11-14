@@ -103,13 +103,15 @@ describe("view helpers", () => {
   });
 
   it("shows the open calls only on the self-operated staff screen", () => {
-    const call = (kind: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, created_at, detail: "" });
+    const call = (kind: string, topic: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, topic, created_at, detail: "" });
     const r = {
-      staff: { calls: [call("fast_food", 1000), call("tobacco", 2000), call("fast_food", 3000)], bell_down: [] },
+      staff: { calls: [call("tobacco", "たばこ", 2000), call("fast_food", "FF", 1000), call("bill", "お支払い", 3000)], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
     const staff = callScreen(r);
-    expect(staff).toContain("FF＆たばこ");
+    expect(staff).toContain(">FF<");
+    expect(staff).not.toContain("たばこ");
+    expect(staff).not.toContain("＆");
     expect(staff).not.toContain("🔔");
     expect(staff).not.toContain("経過");
     expect(staff).toContain("鳴動を止めるにはログインしてください");
@@ -126,7 +128,7 @@ describe("view helpers", () => {
 
   it("shows no elapsed time for an age-check call", () => {
     const r = {
-      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", created_at: 1000, detail: "20歳以上" }], bell_down: [] },
+      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", topic: "年確", created_at: 1000, detail: "20歳以上" }], bell_down: [] },
       customer: { staff_called: true },
     } as unknown as RegisterView;
     expect(callScreen(r)).toContain("年確");
@@ -135,7 +137,7 @@ describe("view helpers", () => {
 
   it("names the goods, not 現金, for a cash-only call", () => {
     const r = {
-      staff: { calls: [{ id: 1, register: 1, kind: "cash_only", label: "現金", created_at: 1000, detail: "チケット" }], bell_down: [] },
+      staff: { calls: [{ id: 1, register: 1, kind: "cash_only", label: "現金", topic: "チケット", created_at: 1000, detail: "チケット" }], bell_down: [] },
       customer: {},
     } as unknown as RegisterView;
     const staff = callScreen(r);

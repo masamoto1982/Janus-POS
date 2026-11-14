@@ -184,7 +184,7 @@ struct SavedTxn {
     parcel_ask: bool,
     tobacco_asked: bool,
     #[serde(default)]
-    answered: Vec<CallKind>,
+    answered: Option<String>,
     lines: Vec<SavedLine>,
     next_line: u32,
     paying: bool,
@@ -677,6 +677,7 @@ impl Store {
                         register: c.register,
                         kind: c.kind,
                         label: c.kind.label(),
+                        topic: c.kind.topic(&c.detail),
                         created_at: c.created_at,
                         detail: c.detail,
                     })

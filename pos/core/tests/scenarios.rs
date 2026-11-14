@@ -1,6 +1,8 @@
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
-use janus_pos_core::store::{Command, FfState, LineKind, RegisterView, Store};
+use janus_pos_core::store::{
+    Command, FfState, LineKind, RegisterView, Store, EMERGENCY_LOG_MS, EMERGENCY_UNANSWERED_MS,
+};
 use serde_json::{json, Value};
 
 const BREAD: &str = "4900000000011";
@@ -3591,61 +3593,108 @@ fn ring(s: &mut Store, r: u8) {
     advance(s, 200);
 }
 
+/// 呼び鈴を押して、未解決の呼び出しを 5 分放置したところ（非常事態モードに入る）
+fn enter_emergency(s: &mut Store, r: u8) {
+    ring(s, r);
+    advance(s, EMERGENCY_UNANSWERED_MS);
+    assert!(reg(s, r).emergency);
+}
+
+/// 仕様 11.4：呼び鈴を何度押しても、待たせた時間が 5 分未満なら非常事態モードに入らない（B-1）
 #[test]
-fn emergency_after_ten_rings_within_three_minutes() {
+fn many_rings_do_not_start_emergency_before_five_minutes() {
     let mut s = Store::new(1, 1, 1);
     advance(&mut s, 2_000);
     assert!(!reg(&s, 1).bell_dead);
-    for _ in 0..9 {
-        ring(&mut s, 1);
-    }
-    assert!(!reg(&s, 1).emergency);
-    ring(&mut s, 1);
-    assert!(reg(&s, 1).emergency);
-    login(&mut s, 1);
-    assert!(reg(&s, 1).emergency);
-    ok(&mut s, json!({"type":"end_emergency","register":1}));
-    assert!(!reg(&s, 1).emergency);
-}
-
-#[test]
-fn anyone_can_end_emergency_without_logging_in() {
-    // スタッフに連絡が付かないので、駆け付けた警察官・救急隊が解除する（user 2026-11-14）
-    let mut s = Store::new(1, 1, 1);
     for _ in 0..10 {
         ring(&mut s, 1);
     }
-    assert!(reg(&s, 1).emergency);
-    ok(&mut s, json!({"type":"end_emergency","register":1}));
-    let v = reg(&s, 1);
-    assert!(!v.emergency);
-    assert!(v.emergency_log.is_some());
-    assert_eq!(v.mode, Mode::SelfOperated);
-    // 呼び鈴の呼び出しも片付き、通常運転に戻る
-    assert!(!v.lamp);
-    assert!(v.waiting_calls.is_empty());
+    assert!(!reg(&s, 1).emergency, "10 rings");
+    for _ in 0..20 {
+        ring(&mut s, 1);
+    }
+    assert!(!reg(&s, 1).emergency, "30 rings");
 }
 
+/// 仕様 11.4：最も古い未解決の呼び出しから 4 分 59 秒では入らず、5 分で入る。押し直しても数え直さない（B-1）
 #[test]
-fn emergency_when_the_bell_is_held_for_three_minutes() {
+fn emergency_after_five_minutes_unanswered() {
     let mut s = Store::new(1, 1, 1);
     advance(&mut s, 2_000);
     ok(&mut s, json!({"type":"call_staff","register":1}));
-    advance(&mut s, 170_000);
+    let since = s.now();
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    advance(&mut s, 120_000);
+    ring(&mut s, 1);
+    let left = EMERGENCY_UNANSWERED_MS - (s.now() - since);
+    advance(&mut s, left - 1_000);
+    assert!(!reg(&s, 1).emergency, "4:59");
+    advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert!(v.emergency, "5:00");
+    assert_eq!(v.emergency_since, Some(since + EMERGENCY_UNANSWERED_MS));
+}
+
+/// 仕様 11.4：呼び出しの種類は問わない（たばこボタンでも 5 分で入る）（B-1）
+#[test]
+fn any_kind_of_call_counts_toward_emergency() {
+    let mut s = Store::new(1, 1, 1);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    advance(&mut s, EMERGENCY_UNANSWERED_MS);
+    assert!(reg(&s, 1).emergency);
+}
+
+/// 仕様 11.4：4 分でログインして応答し、ログアウトしたら、新しい呼び出しから数え直す（B-1）
+#[test]
+fn login_answers_and_the_next_call_counts_afresh() {
+    let mut s = Store::new(1, 1, 1);
+    ring(&mut s, 1);
+    advance(&mut s, 240_000);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+    );
+    advance(&mut s, 120_000);
     assert!(!reg(&s, 1).emergency);
+    ring(&mut s, 1);
+    advance(&mut s, EMERGENCY_UNANSWERED_MS - 10_000);
+    assert!(!reg(&s, 1).emergency, "counts from the new call");
     advance(&mut s, 10_000);
     assert!(reg(&s, 1).emergency);
 }
 
+/// 仕様 11.4：釣銭忘れの呼び出しだけが残っても非常事態モードに入らない（お客様はもう立ち去っている）（B-1）
 #[test]
-fn a_short_ring_left_unanswered_is_not_an_emergency() {
+fn change_left_alone_is_not_an_emergency() {
     let mut s = Store::new(1, 1, 1);
-    advance(&mut s, 2_000);
-    ring(&mut s, 1);
-    advance(&mut s, 200_000);
-    assert!(!reg(&s, 1).emergency);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"staff"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
+    ok(
+        &mut s,
+        json!({"type":"finish_insert","register":1,"side":"staff"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+    );
+    advance(&mut s, 10 * 60 * 1000);
+    let v = reg(&s, 1);
+    assert_eq!(v.waiting_calls, vec![CallKind::ChangeLeft]);
+    assert!(!v.emergency);
 }
 
+/// 仕様 11.4：呼び鈴が不通でも入る（スタッフが応答しない状況には違いない）
 #[test]
 fn emergency_also_while_the_bell_cannot_reach_anyone() {
     let mut s = Store::new(1, 1, 1);
@@ -3655,12 +3704,10 @@ fn emergency_also_while_the_bell_cannot_reach_anyone() {
     );
     advance(&mut s, 20_000);
     assert!(reg(&s, 1).bell_dead);
-    for _ in 0..10 {
-        ring(&mut s, 1);
-    }
-    assert!(reg(&s, 1).emergency);
+    enter_emergency(&mut s, 1);
 }
 
+/// 仕様 11.4：スタッフ操作モードでは入らない
 #[test]
 fn no_emergency_in_staff_operated_mode() {
     let mut s = Store::new(1, 1, 1);
@@ -3673,33 +3720,63 @@ fn no_emergency_in_staff_operated_mode() {
         advance(&mut s, 200);
         ok(&mut s, json!({"type":"release_call","register":1}));
     }
+    advance(&mut s, EMERGENCY_UNANSWERED_MS);
     assert!(!reg(&s, 1).emergency);
 }
 
+/// 仕様 11.4：解除はログインなしで誰でもでき、呼び鈴の呼び出しも片付いて通常運転に戻る
 #[test]
-fn emergency_lasts_until_staff_log_in() {
+fn anyone_can_end_emergency_without_logging_in() {
     let mut s = Store::new(1, 1, 1);
-    for _ in 0..10 {
-        ring(&mut s, 1);
-    }
+    enter_emergency(&mut s, 1);
+    ok(&mut s, json!({"type":"end_emergency","register":1}));
+    let v = reg(&s, 1);
+    assert!(!v.emergency);
+    assert!(v.emergency_log.is_some());
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert!(!v.lamp);
+    assert!(v.waiting_calls.is_empty());
+}
+
+/// 仕様 11.4：解除の前から残っているほかの呼び出しは、解除した時刻から数え直す
+#[test]
+fn calls_left_after_ending_emergency_count_from_the_end() {
+    let mut s = Store::new(1, 1, 1);
+    ok(
+        &mut s,
+        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
+    );
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    advance(&mut s, EMERGENCY_UNANSWERED_MS);
     assert!(reg(&s, 1).emergency);
+    ok(&mut s, json!({"type":"end_emergency","register":1}));
+    advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert!(!v.emergency, "the tobacco call is still open but counts afresh");
+    assert_eq!(v.waiting_calls, vec![CallKind::Tobacco]);
+    advance(&mut s, EMERGENCY_UNANSWERED_MS);
+    assert!(reg(&s, 1).emergency);
+}
+
+/// 仕様 11.4：ログインだけでは続き、解除で発動・解除時刻のレシートを出して通常運転に戻る
+#[test]
+fn emergency_lasts_until_ended() {
+    let mut s = Store::new(1, 1, 1);
+    enter_emergency(&mut s, 1);
     advance(&mut s, 300_000);
     assert!(reg(&s, 1).emergency);
     let since = reg(&s, 1).emergency_since.unwrap();
-    // ログインしただけでは続く
     login(&mut s, 1);
     assert!(reg(&s, 1).emergency);
     advance(&mut s, 5_000);
     ok(&mut s, json!({"type":"end_emergency","register":1}));
     let v = reg(&s, 1);
     assert!(!v.emergency);
-    // 発動時刻と解除時刻を印字したレシート
     let log = v.emergency_log.unwrap();
     assert_eq!(log.started_at, since);
     assert!(log.ended_at > since);
-    advance(&mut s, 10_000);
+    advance(&mut s, EMERGENCY_LOG_MS);
     assert!(reg(&s, 1).emergency_log.is_none());
-    // レシートを出したら通常運転：スタッフ操作モードが続き、無操作が続けばセルフ操作モードへ
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     advance(&mut s, janus_pos_core::store::IDLE_REVERT_MS);
     let v = reg(&s, 1);
@@ -4616,7 +4693,7 @@ fn unanswered_call_rings_again_up_to_three_times() {
         first + BELL_REMINDS as u64,
         "rings again at most BELL_REMINDS times"
     );
-    assert!(!reg(&s, 1).emergency, "reminders are not customer presses");
+    assert!(!reg(&s, 1).emergency, "still under five minutes");
     // 新しい呼び出しがあれば、また BELL_REMINDS 回まで鳴らし直す
     ok(&mut s, json!({"type":"ff_button","register":1}));
     ok(&mut s, json!({"type":"release_call","register":1}));

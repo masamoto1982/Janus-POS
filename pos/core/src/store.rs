@@ -1312,10 +1312,8 @@ struct Register {
     touch: Option<(Side, u64)>,
     pressing: bool,
     emoney: Option<EmoneyTask>,
-    /// 呼び鈴が鳴らされた時刻（エマージェンシーモードの判定用、直近 EMERGENCY_WINDOW_MS 分だけ持つ）
-    press_log: Vec<u64>,
-    /// 呼び鈴を押し始めた時刻（押している間だけ）。鳴らしっぱなしの判定用
-    press_since: Option<u64>,
+    /// 直前に非常事態モードを解除した時刻。解除より前から残っている呼び出しは、解除の時刻から数え直す
+    emergency_ended: Option<u64>,
     /// 非常事態モード（旧 エマージェンシーモード）に入った時刻。一度入ったら、スタッフ側の「解除」が押されるまで続く。
     /// 押すのは誰でもよい（駆け付けた警察官・救急隊も）。ログインだけでは解除しない
     emergency: Option<u64>,
@@ -1325,20 +1323,21 @@ struct Register {
 }
 
 impl Register {
-    /// セルフ操作モードでスタッフがログインしないまま、呼び鈴が EMERGENCY_WINDOW_MS 以上鳴らしっぱなし、
-    /// または EMERGENCY_WINDOW_MS 以内に EMERGENCY_PRESSES 回以上鳴らされた。
+    /// セルフ操作モードでスタッフがログインしないまま、未解決の呼び出しのうち最も古いものが立ってから
+    /// EMERGENCY_UNANSWERED_MS たった。押した回数ではなく、待たせた時間で決める。
+    /// 釣銭忘れは数えない（お客様はもう立ち去っている）。お客様がもう一度押しても数え直さない。
     /// 呼び鈴が届いているかどうかは問わない（不通でも、スタッフが応答しない状況には違いない）
-    fn emergency_due(&self, now: u64) -> bool {
-        let held = self
-            .press_since
-            .is_some_and(|t0| now.saturating_sub(t0) >= EMERGENCY_WINDOW_MS);
-        let rung = self
-            .press_log
+    fn emergency_due(&self, calls: &Calls, now: u64) -> bool {
+        if self.mode != Mode::SelfOperated || self.staff.is_some() {
+            return false;
+        }
+        calls
+            .open
             .iter()
-            .filter(|&&t| now.saturating_sub(t) < EMERGENCY_WINDOW_MS)
-            .count()
-            >= EMERGENCY_PRESSES;
-        self.mode == Mode::SelfOperated && self.staff.is_none() && (held || rung)
+            .filter(|c| c.register == self.id && c.kind != CallKind::ChangeLeft)
+            .map(|c| c.created_at.max(self.emergency_ended.unwrap_or(0)))
+            .min()
+            .is_some_and(|since| now.saturating_sub(since) >= EMERGENCY_UNANSWERED_MS)
     }
 
     fn sync_mode(&mut self) {
@@ -1568,10 +1567,10 @@ pub const THANKS_MS: u64 = 3000;
 pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
-/// エマージェンシーモード：セルフ操作モードでスタッフがログインしないまま、
-/// 呼び鈴が EMERGENCY_WINDOW_MS 以上鳴らしっぱなし、または EMERGENCY_WINDOW_MS 以内に EMERGENCY_PRESSES 回以上鳴らされた
-pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
-pub const EMERGENCY_PRESSES: usize = 10;
+/// 非常事態モード：セルフ操作モードでスタッフがログインしないまま、最も古い未解決の呼び出し（釣銭忘れを除く）が
+/// この時間応答されない。24 時間 365 日の店舗で社員やオーナーが即座に対処することはできないので、通知は送らない。
+/// 店内で 5 分応答がないことは通常ありえず、その時点で異常とみなす
+pub const EMERGENCY_UNANSWERED_MS: u64 = 5 * 60 * 1000;
 /// 非常事態モードの解除のあと、スタッフ側に「レシートを出力しました」と発動・解除時刻を出しておく時間
 pub const EMERGENCY_LOG_MS: u64 = 10_000;
 
@@ -1636,8 +1635,7 @@ impl Store {
                 touch: None,
                 pressing: false,
                 emoney: None,
-                press_log: vec![],
-                press_since: None,
+                emergency_ended: None,
                 emergency: None,
                 emergency_log: None,
             })
@@ -1713,7 +1711,6 @@ impl Store {
             self.presses += 1;
         }
         // 応答のない呼び出しが残っていれば、最後に鳴ってから BELL_REMIND_MS ごとに BELL_REMINDS 回まで鳴らし直す
-        // （エマージェンシーモードの回数には数えない：press_log はお客様が押したときだけ増える）
         if self.presses != self.rung_presses {
             self.rung_presses = self.presses;
             self.rung_at = now;
@@ -1741,7 +1738,7 @@ impl Store {
             m.tick(now, self.signal, self.bell_loss, &mut self.rng);
         }
         for r in &mut self.registers {
-            if r.emergency.is_none() && r.emergency_due(now) {
+            if r.emergency.is_none() && r.emergency_due(&self.calls, now) {
                 r.emergency = Some(now);
             }
             if r.emergency_log.is_some_and(|(_, end)| end + EMERGENCY_LOG_MS <= now) {
@@ -2910,7 +2907,6 @@ impl Store {
             C::ReleaseCall { register } => {
                 let r = self.reg_mut(register)?;
                 r.pressing = false;
-                r.press_since = None;
                 done("")
             }
             C::EndEmergency { register } => {
@@ -2922,8 +2918,7 @@ impl Store {
                 // 解除は誰でもできる：スタッフに連絡が付かないことが問題なので、駆け付けた警察官や救急隊が解除する（user 2026-11-14）
                 r.emergency = None;
                 r.emergency_log = Some((since, now));
-                r.press_log.clear();
-                r.press_since = None;
+                r.emergency_ended = Some(now);
                 // 解除したら通常運転：非常事態のもとになった呼び鈴の呼び出しも片付ける（ほかの用件の呼び出しは残す）
                 self.calls.resolve(register, CallKind::CustomerHelp, now);
                 done("非常事態モードを解除しました")
@@ -3218,17 +3213,8 @@ impl Store {
     }
 
     fn press(&mut self, register: u8) -> Result<(), String> {
-        let now = self.now;
         let r = self.reg_mut(register)?;
-        if !r.pressing {
-            r.press_since = Some(now);
-        }
         r.pressing = true;
-        if r.staff.is_none() {
-            r.press_log
-                .retain(|&t| now.saturating_sub(t) < EMERGENCY_WINDOW_MS);
-            r.press_log.push(now);
-        }
         self.presses += 1;
         Ok(())
     }
@@ -3366,11 +3352,9 @@ impl Store {
             let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.customer_turn;
             r.staff = Some(StaffSession { account: acc });
-            r.press_log.clear();
             r.touch = None;
             r.txn.customer_turn = false;
             r.pressing = false;
-            r.press_since = None;
             let service_pending = r.txn.service_pending();
             let first = self
                 .calls

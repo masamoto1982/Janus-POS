@@ -278,6 +278,9 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
+/* 受け付けなかった理由（B-2）：二段目の帯の直下、内税の行の位置に赤文字で一行。何も覆わず、閉じるボタンも置かない */
+.screen .reject-note { flex: none; margin: 0; padding: 4px 0; color: var(--alert-ink); font-size: var(--msg-small); font-weight: 700; line-height: 1.35; }
+.screen-main > .reject-note + .confirm { flex: 1; }
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }
 .screen-main > .reg-top, .screen-main > .banner { flex: none; }
 /* 確認・案内画面の配置（アプリ全体で共通）

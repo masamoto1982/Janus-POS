@@ -922,7 +922,7 @@ function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolea
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
   // 呼び鈴のない側（スタッフ操作モードのお客様側）は空きを作らず、両ボタンを中央に詰める
   const bell = bellBtn(r, side);
-  return `<div class="reg-top welcome-band"><div class="band-row">${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>`;
+  return `<div class="reg-top welcome-band"><div class="band-row">${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>${BAND_END}`;
 }
 
 export function welcome(r: RegisterView, side: Side, emoney?: Gate): string {
@@ -1153,6 +1153,25 @@ function pointInfo(p: PointsView | undefined): string {
 
 const pt = (n: number): string => `${n.toLocaleString("ja-JP")}P`;
 
+
+/** 二段目の帯の終わりの印。受け付けなかった理由（B-2）をこの直後に差し込む */
+const BAND_END = "<!--band-end-->";
+
+/** レジが受け付けなかった理由を表示する時間（B-2）。そのレジで次に操作が受け付けられたときにも消す */
+export const REJECT_SHOW_MS = 8000;
+
+/** 受け付けなかった理由を、操作した側の画面の二段目の帯の直下（内税の行の位置）に赤文字で一行出す（B-2）。
+ *  何も覆わず、閉じるボタンも置かない。表示中もすべての操作を受け付ける。内税の行があればその位置に入れ替え、
+ *  帯のない画面（お礼・案内など）では画面の一番上に出す */
+export function withRejection(html: string, reason: string | undefined): string {
+  if (!reason) return html;
+  const note = `<p class="reject-note" role="status">${reason.split("\n").map(esc).join("<br>")}</p>`;
+  const head = /<div class="staff-head">[\s\S]*?<\/div>/;
+  if (head.test(html)) return html.replace(head, note);
+  if (html.includes(BAND_END)) return html.replace(BAND_END, note);
+  return note + html;
+}
+
 export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = ""): string {
   // ポイントカードだけ読んだときも、取引中止と読んだポイントを出す
   if (count === 0 && (points?.balance ?? null) === null) return "";
@@ -1160,7 +1179,7 @@ export function regTop(total: number, count: number, action: string, max = Infin
   const point = pointInfo(points);
   const info = point ? `<small class="info">${point}</small>` : "";
   const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
-  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>`;
+  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>${BAND_END}`;
 }
 
 export function itemCount(lines: { qty: number }[]): number {

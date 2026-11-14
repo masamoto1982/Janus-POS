@@ -96,10 +96,12 @@ describe("view helpers", () => {
     expect(staff).toContain("払込票に収納印を押してお渡しください");
     expect(staff).toContain(`<span class="bill-n">3枚</span>`);
     expect(staff).toContain("お渡し済");
-    const customer = billHandover(1, "customer", 3, st);
+    const customer = billHandover(1, "customer", 3, st, 140);
     expect(customer).toContain("支払いが完了しました");
     expect(customer).toContain(`<span class="bill-n">3枚</span>`);
     expect(customer).toContain("払込票とレシート、お釣りをお受け取りください");
+    // 50,000 円ちょうどならお釣りはないので「お釣り」を外す（B-6）
+    expect(billHandover(1, "customer", 1, st, 0)).toContain("払込票とレシートをお受け取りください");
     expect(customer).not.toContain("お渡し済");
   });
 

@@ -29,6 +29,8 @@ const WEEKDAY: Record<string, string> = { 日: "Sun", 月: "Mon", 火: "Tue", �
 const MONTH = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const DICT: Record<string, string> = {
+  "払込票とレシートをお受け取りください": "Please take your slips and receipt",
+  "ポイントカード・アプリはお持ちですか": "Do you have a point card or app?",
   // 共通の部品
   バック: "Back",
   スキップ: "Skip",

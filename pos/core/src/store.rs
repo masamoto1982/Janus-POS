@@ -341,7 +341,6 @@ pub enum Command {
         register: u8,
     },
     /// 照合が済んだ案内（年確OK・FFのお渡しOK）を閉じて先へ進む
-    /// 照合イベントの済んだ案内を閉じる（「次へ」）
     DismissPassed {
         register: u8,
     },
@@ -378,7 +377,6 @@ pub enum Command {
         side: Side,
     },
     /// スタッフがお渡ししたチケットの枚数を入力する（発券枚数と照合）
-    /// チケットのお渡し枚数を入れる（スタッフ側）
     HandTickets {
         register: u8,
         #[serde(default = "staff_side")]
@@ -388,7 +386,6 @@ pub enum Command {
     },
     /// お客様が受け取ったチケットの枚数を入力する（発券枚数と照合）。
     /// 両方が発券枚数と一致したらお渡し完了
-    /// チケットの受け取り枚数を入れる（お客様側）
     ReceiveTickets {
         register: u8,
         #[serde(default = "customer_side")]
@@ -425,7 +422,6 @@ pub enum Command {
         side: Side,
     },
     /// 販売個数の上限の案内を閉じる
-    /// 販売個数の上限の案内を閉じる
     CloseLimitAlert {
         register: u8,
         side: Side,
@@ -449,7 +445,6 @@ pub enum Command {
         side: Side,
     },
     /// 「ポイント利用」を選んだあと、ポイントの使い方を決めて充てる
-    /// ポイントの使い方（全部・端数・指定）を決めて払う
     UsePoints {
         register: u8,
         side: Side,
@@ -464,7 +459,6 @@ pub enum Command {
         register: u8,
     },
     /// 非常事態モードを解除する（スタッフ側の解除ボタンで。ログインは要らない）
-    /// 非常事態モードを解除する（ログイン不要）
     EndEmergency {
         register: u8,
     },

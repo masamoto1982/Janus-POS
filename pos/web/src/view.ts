@@ -762,7 +762,7 @@ function simClock(snap: Snapshot, t: number): string {
 }
 
 /** 非常事態モード（旧 エマージェンシーモード）：セルフ操作モードでスタッフがログインしないまま、最も古い未解決の呼び出し（釣銭忘れを除く）が
- *  5分応答されない（B-1）。両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。
+ *  1分応答されない（B-1、実機は5分でシミュレーターは便宜的に1分）。両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。
  *  スタッフ側は帯（二段目）を出さず、「非常事態モードを解除します」の案内と解除ボタンだけ。オーナーと担当スーパーバイザーの連絡先は最下段
  *  （emergencyContactsRow）。解除はログインなしで誰でも押せる（駆け付けた警察官・救急隊が解除する、user 2026-11-14）。ログインだけでは解除しない */
 function emergencyScreen(r: RegisterView, side: Side): string {
@@ -1613,7 +1613,7 @@ export function bellSettings(s: Snapshot): string {
   const off = s.bells.every((m) => m.offline);
   const test = `<label class="bell-setting"><span>呼び鈴を不通にする</span><input type="checkbox" data-bells-offline${off ? " checked" : ""} aria-label="呼び鈴を不通にする" /><span>${off ? "不通" : "通常"}</span></label>`;
   return `${rows}
-    <h3 class="bell-sub">非常事態モードの確認</h3><p class="muted">セルフ操作モードで、スタッフを呼び出したまま5分応答がないと、両画面に通報をお願いする案内を出します<br>スタッフ側の「解除」で通常運転に戻ります（ログインは不要）<br>呼び鈴を不通にして、スタッフに届かない状況で試せます</p>${test}`;
+    <h3 class="bell-sub">非常事態モードの確認</h3><p class="muted">セルフ操作モードで、スタッフを呼び出したまま1分応答がないと（実機は5分）、両画面に通報をお願いする案内を出します<br>スタッフ側の「解除」で通常運転に戻ります（ログインは不要）<br>呼び鈴を不通にして、スタッフに届かない状況で試せます</p>${test}`;
 }
 
 const AGE_CHOICES = [15, 18, 20];

@@ -154,8 +154,11 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: Action) => Gate):
       </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
   }
   const st = a("check_id");
+  // 法令の年齢制限（酒・たばこ）は免許証・マイナンバーカード、店舗が任意で決めた年齢制限だけなら学生証など顔写真付きの身分証も可。
+  // デジタル身分証は偽造が容易なので、どちらでも認めない
+  const ids = v.age_official_id ? "運転免許証またはマイナンバーカードで確認してください" : "学生証など顔写真付きの身分証で確認できます<br>デジタル身分証は不可";
   return `<div class="point-screen id-entry">
-      <div class="big">身分証の生年月日を入力してください</div>
+      ${msg("身分証の生年月日を入力してください", ids)}
       ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "西暦8桁　例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field", st)}
     </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
 }
@@ -795,7 +798,9 @@ function ageNote(reg: number, v: StaffView): string {
   const typing = padEntry.get(`${reg}:staff`)?.target === "birth" || !!padValue.get(padValueKey(reg, "birth"));
   return typing
     ? pairNote("生年月日から年齢を判定しています", "端末は個人情報を保存しません")
-    : pairNote("年齢確認が必要な商品が含まれています", "免許証またはマイナンバーカードの提示をお願いいたします");
+    : v.age_official_id
+      ? pairNote("年齢確認が必要な商品が含まれています", "免許証またはマイナンバーカードの提示をお願いいたします")
+      : `<div class="point-screen pair-note">${msg("年齢確認が必要な商品が含まれています", "学生証など顔写真付きの身分証の提示をお願いいたします<br>デジタル身分証はご利用いただけません")}</div>`;
 }
 
 function ageStep(reg: number, v: StaffView, side: Side, a: (n: Action) => Gate): string {

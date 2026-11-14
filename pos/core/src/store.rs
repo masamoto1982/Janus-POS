@@ -1163,6 +1163,16 @@ impl Txn {
             .any(|a| !self.age_done.contains(a))
     }
 
+    /// まだ確認していない年確商品に法令の年齢制限（酒・たばこ）があるか。あれば免許証・マイナンバーカード、
+    /// 店舗が任意で決めた年齢制限だけなら学生証など顔写真付きの身分証も認める（デジタル身分証は不可）
+    fn age_official_id(&self, rules: &AgeRules) -> bool {
+        self.lines.iter().any(|l| {
+            rules
+                .legal_age_for(l.code, l.category)
+                .is_some_and(|a| !self.age_done.contains(&a))
+        })
+    }
+
     fn line_age_checked(&self, age: Option<u8>) -> bool {
         age.is_some_and(|a| self.age_done.contains(&a))
     }
@@ -4520,6 +4530,7 @@ impl Store {
                 coupons: coupons.clone(),
                 point_card: t.point_card.clone(),
                 required_age: t.required_age.filter(|_| t.paying || t.age_early),
+                age_official_id: t.age_official_id(&self.age_rules),
                 age_choice_pending: c.age_choice_pending,
                 age_early: t.age_early,
                 confiscated: t
@@ -4724,6 +4735,8 @@ pub struct StaffView {
     pub coupons: Vec<CouponView>,
     pub point_card: Option<String>,
     pub required_age: Option<u8>,
+    /// 年確に免許証・マイナンバーカードが要る（法令の年齢制限）。false なら顔写真付きの身分証も可
+    pub age_official_id: bool,
     pub age_choice_pending: bool,
     pub age_early: bool,
     pub confiscated: Vec<Confiscated>,

@@ -268,7 +268,11 @@ tickets: number, id: number, touched: number, code: string, name: string, unit_p
 
 export type StaffState = "absent" | "ready";
 
-export type StaffView = { state: StaffState, name: string | null, role: Role | null, phase: Phase, lines: Array<StaffLine>, total: number, taxes: Array<TaxTotal>, coupons: Array<CouponView>, point_card: string | null, required_age: number | null, age_choice_pending: boolean, age_early: boolean, confiscated: Array<Confiscated>, ff_collect: Array<Confiscated>, passed: Passed | null, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, id_pending: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, point_pending: boolean, parcel_ask: boolean, method: PaymentMethod | null, inserted: number, settle_in_ms: number | null, due: number, payment_blocker: string | null, calls: Array<Call>, actions: Array<ActionState>, drawer_total: number, drawer: Array<[number, number]>, bell_down: Array<string>, };
+export type StaffView = { state: StaffState, name: string | null, role: Role | null, phase: Phase, lines: Array<StaffLine>, total: number, taxes: Array<TaxTotal>, coupons: Array<CouponView>, point_card: string | null, required_age: number | null, 
+/**
+ * 年確に免許証・マイナンバーカードが要る（法令の年齢制限）。false なら顔写真付きの身分証も可
+ */
+age_official_id: boolean, age_choice_pending: boolean, age_early: boolean, confiscated: Array<Confiscated>, ff_collect: Array<Confiscated>, passed: Passed | null, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, id_pending: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, point_pending: boolean, parcel_ask: boolean, method: PaymentMethod | null, inserted: number, settle_in_ms: number | null, due: number, payment_blocker: string | null, calls: Array<Call>, actions: Array<ActionState>, drawer_total: number, drawer: Array<[number, number]>, bell_down: Array<string>, };
 
 export type StockLevel = "made_to_order" | "plenty" | "low" | "out";
 

@@ -4543,8 +4543,8 @@ fn trading_cards_are_flagged_only_once_over_the_limit() {
 }
 
 #[test]
-fn unanswered_call_rings_again_every_remind_interval() {
-    use janus_pos_core::store::BELL_REMIND_MS;
+fn unanswered_call_rings_again_up_to_three_times() {
+    use janus_pos_core::store::{BELL_REMINDS, BELL_REMIND_MS};
     let mut s = Store::new(3, 2, 1);
     advance(&mut s, 3_000);
     ok(
@@ -4570,7 +4570,22 @@ fn unanswered_call_rings_again_every_remind_interval() {
     );
     advance(&mut s, BELL_REMIND_MS);
     assert_eq!(s.snapshot().bells[0].rings, first + 2);
+    advance(&mut s, BELL_REMIND_MS);
+    assert_eq!(s.snapshot().bells[0].rings, first + 3);
+    advance(&mut s, BELL_REMIND_MS * 4);
+    assert_eq!(
+        s.snapshot().bells[0].rings,
+        first + BELL_REMINDS as u64,
+        "rings again at most BELL_REMINDS times"
+    );
     assert!(!reg(&s, 1).emergency, "reminders are not customer presses");
+    // 新しい呼び出しがあれば、また BELL_REMINDS 回まで鳴らし直す
+    ok(&mut s, json!({"type":"ff_button","register":1}));
+    ok(&mut s, json!({"type":"release_call","register":1}));
+    advance(&mut s, 2_000);
+    let again = s.snapshot().bells[0].rings;
+    advance(&mut s, BELL_REMIND_MS);
+    assert_eq!(s.snapshot().bells[0].rings, again + 1);
     login_as(&mut s, 1, "ST001");
     let r = s.snapshot().bells[0].rings;
     advance(&mut s, BELL_REMIND_MS * 2);

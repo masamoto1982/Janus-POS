@@ -331,7 +331,8 @@ const DICT: Record<string, string> = {
   お預かりの荷物が見つかりませんでした: "We couldn't find your parcel",
   荷物をお持ちします: "We'll bring your parcel",
   少々お待ちください: "Please wait a moment",
-  ただいまスタッフをお呼びしています: "Calling a staff member",
+  スタッフを呼び出しています: "Calling a staff member",
+  鳴動を止めるにはログインしてください: "Log in to stop the bell",
   取り消し: "Cancel",
   二千円札を返却しました: "The ¥2,000 bill was returned",
   取り扱い対象外の紙幣です: "This bill is not accepted",
@@ -583,7 +584,6 @@ type Rule = [RegExp, (m: RegExpExecArray) => string];
 
 const RULES: Rule[] = [
   [/^(\d{4})年(\d{1,2})月(\d{1,2})日 (.)曜日 (\d{2}:\d{2})$/, (m) => `${WEEKDAY[m[4]] ?? m[4]}, ${MONTH[Number(m[2]) - 1]} ${m[3]}, ${m[1]} ${m[5]}`],
-  [/^ご用件：(.+) 少々お待ちください$/, (m) => `For: ${topicsEn(m[1])}. Please wait a moment`],
   [/^用件：(.+)$/, (m) => `Called for: ${topicsEn(m[1])}`],
   [/^(\d+)歳以上の年齢確認をしますか？$/, (m) => `Check age (${m[1]}+)?`],
   [/^(\d+)歳前後のお客様は身分証をご準備ください$/, (m) => `If you are around ${m[1]}, please have your ID ready`],

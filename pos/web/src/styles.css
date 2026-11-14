@@ -810,5 +810,8 @@ body.dragging .drop-hint { display: inline; }
 :root { --off-light: color-mix(in oklch, oklch(0.8699 0 0) 45%, oklch(1 0 0)); --off-deep: oklch(0.8699 0 0); }
 :root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--off-light); --tier-deep: var(--off-deep); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
+/* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。
+   ヘッダー・最下段は消えているあいだもこの黄なので、黄と赤（--sos-head）で点滅する（user 2026-11-14） */
+:root .screen.sos.sos.sos { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 商品が登録された行を一瞬だけ染めるエフェクトも、濃いめの段と同じモードの色 */
 :root .screen:is(.mode-staff, .mode-self) { --flash: var(--tier-deep); }

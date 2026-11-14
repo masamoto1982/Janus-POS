@@ -47,6 +47,7 @@ const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません\nお支払いをやめるときは取引中止にしてください";
 const NO_POINTS: &str =
     "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）";
+const EXPIRED_STAFF_ONLY: &str = "販売期限切れの商品は、スタッフが回収します";
 const NO_POINT_BALANCE: &str = "ポイントの残高がありません";
 const NO_FRACTION: &str = "お支払い額に端数がありません";
 const FRACTION_OVER: &str = "端数がご利用可能なポイントを超えています";
@@ -1340,6 +1341,48 @@ impl Register {
             .is_some_and(|since| now.saturating_sub(since) >= EMERGENCY_UNANSWERED_MS)
     }
 
+    /// 今の取引の状態から、スタッフの対応が要る呼び出し（B-3）。出来事で立てるのではなく状態から導くので、
+    /// ログインで呼び出しが片付いたあと対応せずにログアウトしても、取引に残っていれば立ち直る。
+    /// ボタンで立てる呼び出し（ベル・FF・サービス・金券・たばこ）は出来事のまま
+    fn required_calls(&self) -> Vec<(CallKind, String)> {
+        if self.staff_state() == StaffState::Ready || self.paused {
+            return vec![];
+        }
+        let t = &self.txn;
+        let mut out = vec![];
+        if let Some(l) = t.lines.iter().find(|l| l.is_expired()) {
+            out.push((CallKind::Expired, l.name.to_string()));
+        }
+        if let Some(l) = t
+            .lines
+            .iter()
+            .find(|l| matches!(l.kind, LineKind::Service { done: false, .. }))
+        {
+            out.push((CallKind::Service, l.name.to_string()));
+        }
+        if t.paying {
+            let slips = t.bill_slips();
+            if slips > 0 {
+                out.push((CallKind::Bill, format!("{slips}枚")));
+            }
+            if !t.age_cleared() {
+                out.push((
+                    CallKind::AgeCheck,
+                    format!("{}歳以上", t.required_age.unwrap_or(0)),
+                ));
+            }
+            if slips == 0 && t.cash_only() > 0 {
+                out.push((CallKind::CashOnly, t.cash_only_label()));
+            } else if slips == 0 && t.method == Some(PaymentMethod::Cash) {
+                out.push((CallKind::CashOnly, crate::calls::CASH_CHOSEN.to_string()));
+            }
+        }
+        if self.receipt_stamp.is_some() {
+            out.push((CallKind::ReceiptStamp, "レシート".to_string()));
+        }
+        out
+    }
+
     fn sync_mode(&mut self) {
         if self.staff_state() != StaffState::Ready {
             self.menu = None;
@@ -1760,6 +1803,7 @@ impl Store {
                 self.calls.resolve(r.id, CallKind::ChangeLeft, now);
             }
         }
+        self.raise_required_calls();
         let due: Vec<u8> = self
             .registers
             .iter()
@@ -1969,7 +2013,19 @@ impl Store {
         for r in &mut self.registers {
             r.sync_mode();
         }
+        self.raise_required_calls();
         res
+    }
+
+    /// スタッフの対応が要るのに呼び出しが立っていないものを立てる（B-3）。コマンドと tick のたびに行う。
+    /// 片付けるのは今までどおり、対応が済んだときの各コマンド
+    fn raise_required_calls(&mut self) {
+        let now = self.now;
+        for r in &self.registers {
+            for (kind, detail) in r.required_calls() {
+                self.calls.raise(r.id, kind, now, detail);
+            }
+        }
     }
 
     fn apply(&mut self, cmd: Command) -> Result<Outcome, String> {
@@ -2261,6 +2317,12 @@ impl Store {
                 }
                 if r.txn.lines[i].is_pickup() {
                     return Err(PICKUP_NO_REMOVE.into());
+                }
+                // 販売期限切れの明細を消せるのは、スタッフ側の「回収しました」だけ（B-3）
+                if r.txn.lines[i].is_expired()
+                    && (side != Side::Staff || r.staff_state() != StaffState::Ready)
+                {
+                    return Err(EXPIRED_STAFF_ONLY.into());
                 }
                 let received = r.txn.lines[i].kind
                     == LineKind::Ff {

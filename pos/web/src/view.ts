@@ -256,10 +256,10 @@ function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate |
   const back = st ? `<div class="back-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>` : "";
   return (
     collectScreen(
-      "販売期限が切れています",
+      staff ? "販売期限が切れています" : "この商品は販売期限が切れているためお売りできません",
       // 期限切れの品はスキャンした瞬間に一点ずつ止まるので、回収は常に一点。点数は出さず、販売期限を出す
       [{ name: l.name, note: l.dates ? `販売期限 ${expiryLabel(l.dates.sell_by_min, l.fresh)}` : "" }],
-      staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "申し訳ございません、店員が新しい商品にお取替えいたします",
+      staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "店員が対応いたします",
       st ? btn("回収しました", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary") : "",
     ) + back
   );
@@ -1552,7 +1552,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
       const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
       const n = l.tickets || l.qty;
       const qty =
-        c.phase === "registering" && !fixedHere
+        c.phase === "registering" && !fixedHere && !(l.expired && side === "customer")
           ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, c.lines))
           : `${n}`;
       return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(l.name)} ${tags.join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>`];

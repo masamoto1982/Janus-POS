@@ -4769,3 +4769,17 @@ fn passing_age_or_ff_check_is_shown_until_staff_moves_on() {
     );
     assert_eq!(reg(&s, 1).staff.passed, Some(Passed::Ff));
 }
+
+#[test]
+fn store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids() {
+    const FIREWORKS: &str = "4910000000076";
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "staff", FIREWORKS);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    assert!(!reg(&s, 1).staff.age_official_id, "fireworks is a store rule");
+    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
+    scan(&mut s, 1, "staff", BEER);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
+    assert!(reg(&s, 1).staff.age_official_id, "alcohol is a legal rule");
+}

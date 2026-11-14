@@ -1334,10 +1334,10 @@ export const isWelcome = (main: string): boolean => main.includes("welcome-band"
 const CALL_TOPIC: Partial<Record<CallKind, string>> = { fast_food: "FF", service: "サービス", voucher: "金券", tobacco: "たばこ" };
 const callTopics = (kinds: CallKind[]): string => kinds.map((k) => CALL_TOPIC[k]).filter(Boolean).join("・");
 
-/** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。左に「取り消し」（戻る側の中ボタン）、中央に案内 */
-function callingRow(r: RegisterView, st: Gate): string {
+/** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで、呼び出し中の案内だけを出す（取り消しボタンは置かない、user 2026-11-14） */
+function callingRow(r: RegisterView): string {
   const topics = callTopics(r.customer_calls);
-  return `<div class="call-row calling">${btn("取り消し", { type: "cancel_call", register: r.id }, st, "md ghost back-btn")}${msg(
+  return `<div class="call-row calling">${msg(
     "ただいまスタッフをお呼びしています",
     topics ? `ご用件：${esc(topics)}　少々お待ちください` : "少々お待ちください",
   )}</div>`;
@@ -1356,9 +1356,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (first) return signage(now);
   if (r.mode === "self_operated") {
     const a = (n: Action) => find(r.customer.actions, n);
-    // お客様が呼んで、まだスタッフが来ていない：最下段の呼び出しボタンを、呼び出し中の案内と「取り消し」（押し間違い用）に置き換える。
+    // お客様が呼んで、まだスタッフが来ていない：最下段の呼び出しボタンを、呼び出し中の案内に置き換える。
     // 三段目（明細）は残すので、待つあいだも商品の登録を続けられる。スタッフがログインすると消える
-    if (r.customer_calls.length) return callingRow(r, a("call_staff"));
+    if (r.customer_calls.length) return callingRow(r);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     return `<div class="call-row">${[

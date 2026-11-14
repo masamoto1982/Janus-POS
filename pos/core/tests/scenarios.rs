@@ -4578,7 +4578,7 @@ fn unanswered_call_rings_again_every_remind_interval() {
 }
 
 #[test]
-fn customer_can_cancel_own_call_and_staff_sees_answered_topic() {
+fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
     let mut s = Store::new(3, 2, 1);
     ok(
         &mut s,
@@ -4587,14 +4587,6 @@ fn customer_can_cancel_own_call_and_staff_sees_answered_topic() {
     ok(&mut s, json!({"type":"release_call","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.customer_calls, vec![CallKind::Tobacco]);
-    ok(&mut s, json!({"type":"cancel_call","register":1}));
-    let v = reg(&s, 1);
-    assert!(v.customer_calls.is_empty());
-    assert!(
-        v.staff.calls.is_empty(),
-        "staff side call screen clears too"
-    );
-    assert!(run(&mut s, json!({"type":"cancel_call","register":1})).is_err());
 
     ok(
         &mut s,

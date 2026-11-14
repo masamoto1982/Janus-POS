@@ -1,6 +1,8 @@
 # Janus-POS 仕様書
 
-現在の実装（`pos/core` と `pos/web`）から書き起こした仕様。実装と食い違う記述を見つけたら、実装を正としてこの文書を直す。
+この文書は仕様 v1.0。対応するシミュレーターは `build:` 番号（15.2）で示し、版を切るたびに `spec-vX.Y` のタグを付ける。
+
+Janus-POS は「実行できる要件定義」である。この仕様書は現在の実装（`pos/core` と `pos/web`）から書き起こしたもので、実装と食い違う記述を見つけたら、実装を正としてこの文書を直す。事実の部分（定数・コマンド・商品・料金表・シナリオ一覧）はコードから生成する（18 章）。変更の経緯は [CHANGELOG.md](../CHANGELOG.md) に置き、この文書には現在の規則だけを書く。
 
 ## 1. 概要
 
@@ -43,6 +45,8 @@ Janus-POS は、コンビニエンスストア向けのセミセルフ式 POS �
 | 000 | スタッフ000 | オーナー | 9999 | `ST000` |
 | 001 | スタッフ001 | クルー | 1111 | `ST001` |
 | 002 | スタッフ002 | クルー | 2222 | `ST002` |
+
+- この表はシミュレーターの見本の口座。実機では店舗のスタッフ管理から読み込む。
 
 - 名札には本名ではなく番号を出す。
 - 店舗パスワード（お金を抜く操作用、店舗共通）は `7777`。
@@ -163,7 +167,7 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 | それ以外のスタッフ操作モード | 両方 |
 
 - 機器の操作（スキャン・現金の投入・決済端末にかざす・ログアウト）は操作側に関係なく受け付ける。
-- 次の操作はスタッフ側の画面からしか押せない：年齢確認の「する／スキップ」、生年月日の判定、公共料金の払込票の確認とお渡し、収入印紙の貼り付け確認、FF のお渡し照合。
+- 次の操作はスタッフ側の画面からしか押せない：年齢確認の「する／スキップ」、生年月日の判定、公共料金の払込票の確認とお渡し、収入印紙の貼り付け確認、FF のお渡し照合、チケットのお渡し枚数。チケットの受け取り枚数はお客様側の画面からしか入力できない。
 - スタッフ側のベル（応援）は操作側に関係なく押せる。
 
 ### 4.3 モードごとの操作の可否
@@ -185,6 +189,8 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 | 年齢確認 | 会計中、確認待ちのとき | 不可（スタッフのログイン待ち） |
 | 払込票の確認 | 会計中、払込票があるとき | 不可 |
 | 収入印紙の貼り付け確認 | 5 万円以上の払込票があるとき（登録中も会計中も可） | 不可 |
+| チケットのお渡し（枚数の入力） | 発券後（お渡し枚数はスタッフ側、受け取り枚数はお客様側） | 同左 |
+| 販売個数の上限の案内を閉じる | 案内が出ているとき | 同左 |
 | 払込票のお渡し | 決済後のお渡し待ち | 可（決済後にログアウトしていても済ませられる） |
 | 現金の投入 | 会計中、決済の関門がなく、現金か未選択 | 不可（「セルフレジでは現金を使えません」） |
 | 決済端末にかざす | 会計中、決済の関門がなく、キャッシュレスを選んでいる | 同左 |
@@ -209,8 +215,8 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 - 明細には番号（取引内の通し番号）と最終更新順（`touched`）がある。画面は更新の新しい行ほど上に出す。クーポンも同じ通し番号を使う。
 - 同じ商品を続けて読んだときだけ、直前の行の数量を増やす。間に別の商品を挟んだら新しい行になる。サービス商品はまとめない。
 - 明細には登録した時点の税区分と税率を残す。あとで税率を変えても登録済みの明細は変わらない。
-- 買い物点数（数量の合計）の上限は 100 点。超える登録はできず、ブラウザの警告で知らせる（たくさんの買い物で合計が税抜 5 万円を超え、レシートに収入印紙が要るケースを再現できるように 10 点から引き上げた）。
-- オーナーが決めた販売個数の上限（1 回のお会計で n 点まで）を超える登録はできず、ブラウザの警告で知らせる。
+- 買い物点数（数量の合計）の上限は 100 点（`MAX_ITEMS`）。超える登録はできず、ブラウザの警告で知らせる。上限に達すると帯の点数に「上限」を添える。
+- オーナーが決めた販売個数の上限（1 回のお会計で n 点まで、14.2）を超える登録はできない。ブラウザの警告は使わず、レジ画面を案内に置き換える（コアの `limit_alert`）。スタッフ側「〇〇は1回のお会計でn点までです」「n点を超える分はお売りできないことをお客様にお伝えください」、お客様側は同じ大きなテキストに「申し訳ございません、n点を超える分はお売りできません」。左下の「バック」（`close_limit_alert`）で閉じる。上限を超えて登録しようとした明細にだけ「限定n」のフラグが付く（5.6）。上限に達した明細は「＋」を出さず、テンキーも上限までしか受け付けない。
 - 数量の変更は登録画面で行う。「−」「＋」で 1 つずつ、数字を押すとテンキーで打ち込む（2 桁まで、0 は不可）。数量 1 の「−」は「削除」になる。サービス商品の数量は変えられない。
 - 数量を変えても行の並びは変えない。
 
@@ -244,15 +250,16 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 - いつ読んでもよい。読むとヘッダーの帯に「ポイント：読取済」と出る。
 - 会計ボタンの後、ポイントの付与対象がある取引で未読取なら「ポイントを付与しますか？」の確認を出す。「付与する」は読み取りの案内を出し、そのまま読めば確認済みになる。右下の「スキップ」でカードなしで進む。スタッフ操作モードのお客様側は、スタッフが「付与する」を選ぶまでは「ポイントカード・アプリはお持ちですか」、選んだ後に「ポイントをお付けします」とカード・アプリの絵を出す（スキップした取引では一度も「ポイントをお付けします」を出さない）。
 - 公共料金の取引と、付与対象の商品がない取引では確認しない。
-- 付与対象外：荷物を送る・荷物を受取る・公共料金・切手・たばこ。
-- 付与ポイントは、付与対象の商品の合計（取引の合計が上限）を 100 で割った数。
+- 付与対象外：荷物を送る・荷物を受取る・公共料金・チケット・切手・たばこ・金券。
+- 付与ポイントは、付与対象の商品の合計からクーポンの値引きとポイントで払った分を引いた額を 200 で割った数（`YEN_PER_POINT`、端数は切り捨て）。ポイントカードを読んでいない取引には付けない。
 
 ### 5.6 フラグ
 
-- フラグは取引の阻害因子（決済に進めない理由）にだけ付く。確認や入力を終えるとフラグは外れる。済んだことを示す札（お渡し済・年確済・受付済など）や、限定n・現金のみの札は出さない。
-- フラグのある明細は行ごと淡いオレンジ（`oklch(0.68 0.14 50)` 45% を白に混ぜた色。ピンクの背景の上でも沈まない濃さ）に染まる。フラグは別画面を呼び出す部品なので、商品名の右隣の小さな消極ボタン（操作できる側では青枠・青文字・背景なし、弱い角丸）。操作できない側では同じ形のグレー。明細の「削除」「−」「＋」は行の色に関わらず入金ボックスと同じグレーの消極ボタン。
-- フラグ：「年確20」（年齢確認前）、「お渡し前」（FF の照合前）、「受付待ち」（サービス商品）、「受付中」「届け先未定」（荷物を送る）、「照合待ち」「見つかりません」（荷物を受取る）。
-- 押して解消できるフラグはボタンになる（スタッフ側の「年確20」「お渡し前」）。いつ解消するかはスタッフが決める。
+- フラグは取引の阻害因子（決済に進めない理由）にだけ付く。確認や入力を終えるとフラグは外れる。済んだことを示す札（お渡し済・年確済・受付済など）や、現金のみの札は出さない。
+- フラグのある明細は行ごと淡いオレンジ（`oklch(0.68 0.14 50)` 45% を白に混ぜた色。ピンクの背景の上でも沈まない濃さ）に染まる。フラグは別画面を呼び出す部品なので、商品名の右隣の小さな消極ボタン（操作できる側では青枠・青文字・背景なし、弱い角丸）。操作できない側では同じ形のグレー。明細の「削除」「−」「＋」は行の色に関わらず操作可能部品の青。
+- フラグ：「年確20」（年齢確認前）、「お渡し前」（FF の照合前）、「受付待ち」（サービス商品）、「受付中」「届け先未定」（荷物を送る）、「照合待ち」「見つかりません」（荷物を受取る）、「印紙貼付前」（5 万円以上の払込票、10.4）、「期限切れ」（販売期限切れ、11.1）。
+- 例外として「限定n」は、販売個数の上限を超えて登録しようとした明細にだけ付く。押せず、会計も止めない（5.1）。
+- 押して解消できるフラグはボタンになる（スタッフ側の「年確20」「お渡し前」「印紙貼付前」「期限切れ」）。いつ解消するかはスタッフが決める。
 - フラグを全部解消しないと決済選択に進めない。順序は フラグ → ポイントカード → 決済選択。電子マネーのチャージ・残高照会は別枠で、決済完了前・取引中止前ならいつでも割り込める。
 - 「お渡し前」が残ったまま会計ボタンを押すと、お渡し照合の画面を開く。「年確20」が残ったまま会計ボタンを押すと、年齢確認から始める。
 
@@ -296,7 +303,7 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 1. 電子マネーの残高不足に答えていない
 2. 販売期限切れの商品がある（会計そのものも押せない）
 3. スタッフが払込票の内容を確認していない
-4. 収入印紙の貼り付けが確認できていない（5 万円以上の払込票は領収証に印紙 200 円。税金の払込票は非課税なので要らない。通常のお買い物は、税抜 5 万円以上をクレジットカード以外で受け取ると、決済のあとにレシートの収入印紙の貼り付け確認がスタッフ側に出る（お釣り・お礼の案内の前。セルフ操作モードでスタッフがいなければ「収入印紙」で呼び出す）。明細のフラグ「印紙貼付前」から登録中でも確認でき、会計では払込票の確認のあとにスタッフ側へ出る。一枚ずつチェック）
+4. 払込票の収入印紙の貼り付けが確認できていない（10.4）
 5. セルフ操作モードで現金のみの商品がある
 6. セルフ操作モードで支払方法に現金が選ばれた
 7. 年齢確認のやり方を選んでいない
@@ -314,6 +321,8 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 - 現金と併用できるのは電子マネーだけ。現金のみの商品（切手・公共料金）がある取引では、バーコード決済とクレジットカードは選べない。
 - 現金のみの商品だけの取引では、キャッシュレスは選べない。
 - ポイント利用は付与対象の商品の分だけに使え、1 回の会計で一度だけ（キャッシュレスで先に払った分があると使えない）。付与対象がなければ選べない。ポイントカードを読まずに選ぶと、ポイントカードの確認に戻る。
+- 1 ポイント＝1 円。使えるのは付与対象の分（残りのお支払い額が上限）とカードの残高の小さい方。使い方は三択（`use_points` の `how`）：「全部使う」（`all`）、「端数を払う」（`fraction`、100 円未満の端数＝`FRACTION_UNIT`）、「指定する」（`amount`、テンキーで打つ）。
+- ポイントの残高はカード・アプリごとに持つ。シミュレーターの初期値はポイントカード 1,250P、ポイントアプリ 1P（3.4 のリセットで戻る）。付与したポイントは決済のときに残高に足す。
 - 選択中の支払方法をもう一度押すと選択を外す（待ち受けの案内ボタンと同じ挙動）。ただし現金が投入済みのときと、セルフ操作モードの「現金」（店員呼び出し）は外さない。
 - 現金を投入した後は、現金以外を選べない。
 - 電子マネー・クレジットカードは決済端末に、決済用バーコード・ポイントカードはスキャナにかざす。選んだ支払方法と違うものは受け付けない。
@@ -376,7 +385,7 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 
 ## 7. 電子マネーのチャージ・残高確認
 
-- 入口は未定（2026-11-06 にヘッダーから取り除いた。置き場所は検討中）。
+- 入口は待ち受けの帯の「電子マネー（チャージ・残高照会）」ボタン（15.4）。
 - セルフ操作モードのお買い物の途中（明細・クーポン・返却待ちのクーポンがある）は、ボタンは押している間スタッフを呼ぶ呼び出しボタンになる。
 - 押すと「チャージ」「残高確認」を選ぶ画面になる。
 - 残高確認：決済端末にかざすと残高を出す。
@@ -387,8 +396,8 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 ## 8. FF
 
 - スタッフ操作モードのスタッフ側で、画面下のタブから登録する。
-- ボタンに在庫数は出さない。在庫は 3 段階で見せる：潤沢（3 個以上）＝積極ボタン、品薄（1〜2 個）＝消極ボタン、欠品（理論上 0）＝グレーアウト。品薄の境目はコアの `FF_LOW_STOCK`（2）。
-- FF の単品ボタンは別画面に移らない部品なので、角に丸みのない四角にする（積極・消極・グレーアウトの三段階はそのまま）。タブとも形で役割を分ける。
+- ボタンに在庫数は出さない。作り置きの概念がない品（コーヒー・ソフトクリーム）＝積極ボタン（青背景・白文字・枠なし）。作り置きの品は、豊富（10 個以上、`FF_PLENTY_STOCK`）と希薄（1〜9 個）がどちらも消極ボタン（背景なし・青文字・青枠）、無し（理論上 0）＝グレーアウト。
+- FF の単品ボタンは弱い角丸（ほかのボタンと同じ）。
 - 欠品のボタンは押しても登録しない。長押し（0.5 秒）で予約注文として登録する（作り置きがないときの受け付け用）。在庫は 0 のまま。
 - 在庫が足りないときの案内は「〇〇は欠品です（FF ボタンの長押しで予約注文として登録できます）」。残数は出さない。明細の「＋」・個数入力で在庫を超えて増やすことはできない。
 - セルフ操作モードでは画面下に呼び出しボタン「FF（揚げ物・中華まん）」「サービス（お支払い・荷物）」「金券（ギフトカード・印紙）」「たばこ（紙巻き・電子）」が並ぶ。押している間 Bell が鳴る。
@@ -401,15 +410,15 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 
 ## 9. 年齢確認
 
-- 年確の対象は年確ルール（12.1）で決まる。会計ボタンを押したときに、対象が複数あれば最も高い年齢で 1 回行う。
+- 年確の対象は年齢制限（14.1）で決まる。会計ボタンを押したときに、対象が複数あれば最も高い年齢で 1 回行う。
 - 年齢確認前の年確商品の明細には「年確20」のフラグが付く（5.6、お客様側にも出す）。
-- スタッフ操作モードでは、登録の途中でもスタッフ側の「年確20」フラグを押して年齢確認を始められる。販売できない客に早めに伝え、ほかの商品まで登録してから取引ごと取りやめになるのを防ぐため。年齢確認の画面が登録画面を置き換え、左下の「バック」で登録画面に戻る。済んだら登録画面に戻る。
+- スタッフ操作モードでは、登録の途中でもスタッフ側の「年確20」フラグを押して年齢確認を始められる（`early_age_check`）。販売できない客に早めに伝え、ほかの商品まで登録してから取引ごと取りやめになるのを防ぐため。年齢確認の画面が登録画面を置き換え、左下の「バック」で登録画面に戻る。済んだら登録画面に戻る。
 - 年齢確認が済むとフラグと行の警告色が外れ、会計で再び尋ねない。年齢に届かなければ年確商品を明細から取り除く（「スキップ」を選んだときは取り除かない）。確認は年齢ごとに済む。年齢確認の後に、まだ確認していない年齢の年確商品が加わったら（20歳の確認の後の花火＝18歳など）、その明細に「年確18」が付き、会計でその年齢の確認をやり直す。すでに確認した年齢の年確商品（ライターの後のたばこカートンなど）や、同じ明細の数量を増やしただけではやり直さない。
 - スタッフ側に「〇歳以上の年齢確認をしますか？」を出す（お客様側は「年齢確認が必要な商品が含まれています」）。「する」で生年月日の入力、右下の「スキップ」でスタッフの判断で済ませる。
 - 認める身分証は年齢制限の種類で変わる。まだ確認していない年確商品に法令の年齢制限（酒・たばこ）があれば運転免許証またはマイナンバーカード。店舗が任意で決めた年齢制限（花火など）だけなら学生証など顔写真付きの身分証も認める。デジタル身分証は偽造が容易なので、どちらでも認めない（コアの `age_official_id`）。外国人の在留カード・特別永住者証明書・パスポートは法令の年確でも認める。並べて書くと日本人にも外国人にも冗長なので、お客様側では法令の年確のときだけ、日本語の案内の下に英語で一行添える（店舗が任意で決めた年確には添えない。日本語を介さない外国人の小中高生が花火やライターを買うのはまれ。「Also OK: Residence Card, Special Permanent Resident Certificate, Passport」、言語切り替えでも訳さない）。スタッフ側は「在留カード・特別永住者証明書・パスポートも可」。生年月日の入力画面の小さなテキストでスタッフに示す（「運転免許証またはマイナンバーカードで確認してください」／「学生証など顔写真付きの身分証で確認できます」「デジタル身分証は不可」）。
 - 「する」を選ぶと、お客様側は「年齢確認が必要な商品が含まれています」と、法令なら「免許証またはマイナンバーカードの提示をお願いいたします」、店舗の任意だけなら「学生証など顔写真付きの身分証の提示をお願いいたします」「デジタル身分証はご利用いただけません」。スタッフが生年月日の入力を始める（テンキーを開く）と、お客様側は「生年月日から年齢を判定しています」「端末は個人情報を保存しません」に切り替わる。
 - 生年月日は身分証の西暦 8 桁（例 19821002）をテンキーで打ち、テンキーの「決定」でそのまま判定する（画面に「判定」ボタンは置かない）。8 桁でない・存在しない日付（1900 年より前を含む）・今日より後は判定せず、テンキーを開いたまま理由を出す。年齢は誕生日の当日に加算する。
-- 入力欄がひとつだけの画面（生年月日・荷物の長さ・重さ・郵便番号・使うポイント数）は、どれもテンキーの「決定」で送る。テンキーの「決定」と画面の決定ボタンがほぼ同じ位置に重なり、二度押しが要るように見えたため（動作試験 第2回）。
+- 入力欄がひとつだけの画面（生年月日・荷物の長さ・重さ・郵便番号・使うポイント数）は、どれもテンキーの「決定」で送る。画面に決定ボタンは置かない（テンキーの「決定」と重なり、二度押しが要るように見えるため）。
 - 年齢が足りていれば照合イベントの済んだ案内（9.1）を出す。スタッフ側「〇歳以上であることを確認しました」「身分証をお返しください」と「次へ」、お客様側「年齢確認が完了しました」「ご協力ありがとうございました」。年確商品の販売は責任が重いので、手ごたえなしにポイントの確認などへ進めない。スキップは確かめていないので出さない。
 - 年齢に届かない年確商品は取引から取り除き、回収イベントの共通の形（9.1）で出す。スタッフ側「年齢制限により販売できない商品があります」「お客様にお詫びし、商品を回収してください」・品名と点数・「回収しました」、お客様側「年齢制限によりお売りできない商品があります」「申し訳ございません、こちらの商品はお会計から外させていただきます」と品名・点数。すべて取り除いたら登録画面に戻る。
 - セルフ操作モードでは年齢確認の呼び出しをかけ、お客様側に「年齢確認が必要な商品が含まれています／〇歳前後のお客様は身分証をご準備ください」を出す。スタッフがログインしてから確認する。
@@ -479,6 +488,21 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 - 確認が済むと、お客様側に「公共料金n枚を受け付けます／現金でお支払いください」（セルフ操作モードでは「現金はスタッフがお預かりします／スタッフをお呼びください」）、スタッフ側に「お客様に受付点数、合計金額をお伝えください」を出す。
 - 決済の後、スタッフ側に「払込票に収納印を押してお渡しください」と「お渡し済」、お客様側に「払込票とレシート、お釣りをお受け取りください」を出す（お釣りが 0 円なら「払込票とレシートをお受け取りください」）。受付枚数はどの画面でも大きく出す。
 
+### 10.4 収入印紙
+
+- 領収証に貼る収入印紙の額は受取金額で決まる（`stamp_duty`）：5 万円未満 0、5 万〜100 万円 200 円、100 万円超〜200 万円 400 円、200 万円超〜300 万円 600 円、300 万円超〜500 万円 1,000 円、それより上 2,000 円。
+- 公共料金：5 万円以上の払込票は一枚ずつ印紙が要る。税金（公金）の払込票は非課税なので要らない（商品マスタの `stamp_exempt`、例：自動車税）。印紙の要る払込票の明細には「印紙貼付前」のフラグが付き、スタッフ側でフラグを押すと貼り付け確認を開く（登録中も会計中も可）。会計では払込票の確認のあとにスタッフ側へ出る。一枚ずつチェックを入れ（`affix_stamp`）、すべて済むまで決済できない（6.3）。
+- 通常のお買い物：レシートの税抜金額が 5 万円以上で、クレジットカード以外（先に払った分がある場合を含む）で受け取ると、決済のあとにレシートの収入印紙の貼り付け確認をスタッフ側に出す（お釣り・お礼の案内の前）。スタッフがチェックを入れて（`affix_receipt_stamp`）確認する。お客様側には「レシートに収入印紙を貼り付けています」「少々お待ちください」（スタッフ不在なら「レシートに収入印紙を貼り付けます」「スタッフが向かっています」）を出す。セルフ操作モードでスタッフがいなければ「収入印紙」で呼び出す。
+
+### 10.5 チケット
+
+- 申込券を読むとチケットの明細ができる。申込券 1 枚でチケット 2 枚を発券する（商品マスタの備考）。数量の列は「発券枚数」になる。
+- チケットは一件ずつのお取り扱い。ほかのチケットや商品と一緒に会計できない（「チケットは一件ずつのお取り扱いです（ほかのチケットや商品と一緒に会計できません）」）。現金のみ、ポイントは付かない。セルフ操作モードでは現金のみの呼び出しで、用件は「チケット」。
+- 発券は支払いの後。店全体で先入れ先出しの列（支払った順）を持ち、先のレジのお渡しが済むまで次のレジは発券しない。待っているあいだ、スタッフ側に「チケットの発券待ち」「ほかのレジのチケットのお渡しが済むと発券します」、お客様側に「チケットn枚」「発券の順番をお待ちください」を出す。
+- 発券したら、スタッフはお渡しした枚数（`hand_tickets`）、お客様は受け取った枚数（`receive_tickets`）を、それぞれ入力欄に打つ。発券枚数は画面に出さない。どちらの入力も発券枚数とだけ比べ（スタッフとお客様の入力どうしは比べない）、一致しない側にだけ「発券枚数とお渡し枚数が一致しません」（お客様側は「申込数と受け取り数が一致しません」）「再度ご確認ください」を出す。
+- 両方が一致するとお渡しを終える。それまでお釣りとレシートは出金ボックスに出さずに留める。
+- お渡しが済むまで、そのレジでは次の取引を始められない（「チケットのお渡しが済むまで、次の取引は始められません」）。
+
 ## 11. 店員呼び出しと Bell
 
 ### 11.1 呼び出し
@@ -514,7 +538,7 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 - ボタンで立てる呼び出し（ベル・FF・サービス・金券・たばこ・電子マネー）は出来事のまま。
 - スタッフがログインしているレジでは、ボタンでの呼び出しは記録しない（Bell は鳴る）。
 - 解決した呼び出しは直近 30 件を履歴に残す。
-- 呼び出し中は、そのレジの両方の画面のヘッダー中央（ベルのまわり）がやわらかい黄色で点滅する。点滅の速さも色も待ち時間で変えない（経過時間がお客様にも伝わり、待たされた不満を増やしかねないため）。
+- 呼び出し中は、そのレジの両方の画面のヘッダー全体がやわらかい黄色（`--call-soft`）一色で一定の速さで点滅する（非常事態モードでは赤 `--sos-head` と白文字で同じ点滅）。点滅の速さも色も待ち時間で変えない（経過時間がお客様にも伝わり、待たされた不満を増やしかねないため）。
 - 応答のない呼び出しがあるあいだ、Bell は最後に鳴ってから 30 秒ごとに、3 回まで鳴らし直す（`BELL_REMIND_MS`・`BELL_REMINDS`）。お客様が押す・新しい呼び出しが立つと数え直す。鳴り続けるとレジ台数が増えたときの騒音になり、繰り返される音に人は鈍くなって、かえって呼び出しに気づきにくくなるため。鳴らし直しは非常事態モード（11.4）の判定に関わらない。
 - セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（ベル・FF・サービス・宅配便・金券・たばこ・電子マネー・年齢確認・公共料金・現金・収入印紙・販売期限切れ・釣銭忘れ）、最下段の呼び出しボタンを、お客様側は「スタッフを呼び出しています」（添え字なし）、スタッフ側は呼び出しからの経過秒数（例「12秒経過」）に置き換える。取り消しボタンは置かない。最下段の背景は、ヘッダーの呼び出しの点滅と同じ拍で薄い黄（`--alert-bg`）と濃い黄（`--call-soft`）を行き来する。三段目の明細は残すので、待つあいだも商品を登録できる（受付待ちのサービス商品が呼んでいるサービスの呼び出しは、この案内の対象にしない）。
 - スタッフがログインすると、応答した用件（呼び鈴と釣銭忘れ以外のすべての呼び出し）の最初の一件を取引が終わるまでスタッフ側の担当スタッフ名の右に「用件：たばこ」と出す。
@@ -627,7 +651,7 @@ Item 見出しの歯車から開く。開くときにオーナーの番号とパ
 
 ### 15.3 レジ画面
 
-- ヘッダー（高さ 51px）：左に稼働モード、中央にベル、右に日時（「2026年11月5日 木曜日 09:21」）。背景は普段は無色。呼び出し中だけ、中心（ベルのまわり）ほど濃く周辺へ消えていくやわらかい黄色で点滅し、ベルから来ていることを表す。
+- ヘッダー（高さ 41px）：左・中央・右の 3 列（左右は等幅）。左に稼働モード（背景・枠線なしのテキスト）、中央にベル（スタッフ操作モードのお客様側は空く）、右に日時（「2026年11月5日 木曜日 09:21」）。背景は普段は段の色（15.5）。呼び出し中はヘッダー全体が黄一色で点滅し、非常事態モードでは赤と白文字で同じ点滅になる（11.1）。
 - 登録画面の上の帯：左から取引中止・合計（点数・金額、その下に小さくポイントの読み取り状況）・会計ボタン。明細がないときは出さない。点数が上限に達すると「上限」を添える。帯の高さは大ボタン（48px）に上下 8px の余白を足した 64px。
 - 明細の表：品目｜数量｜小計。表の上に内税の内訳（スタッフ操作モードは担当スタッフ名も）。新しく動いた行を一瞬目立たせ、表を一番上まで戻す。
 - 画面下：スタッフ操作モードのスタッフ側は FF のタブ、セルフ操作モードは呼び出しボタン。確認画面・店舗メニュー・電子マネーの手続き・荷物の取引中は出さない。
@@ -640,6 +664,12 @@ Item 見出しの歯車から開く。開くときにオーナーの番号とパ
 
 - セルフ操作モード：「バーコードをスキャンしてください／すべてのバーコードを受け付けます」と、案内ボタン 商品・レジ袋・ポイント・お支払い・クーポン。ボタンを押すと読むものの案内を出す（もう一度押すと閉じる）。押さなくてもどのバーコードも読める。
 - スタッフ操作モード：スタッフ側に「お辞儀とご挨拶をしましょう／ご用件をお伺いしてください」、お客様側に「いらっしゃいませ／ご用件をお申し付けください」。案内ボタン お買い物・宅配便・お支払い（スタッフ側だけ押せる）。
+- 待ち受けの上端（二段目）は登録画面の帯と同じ 64px の帯（背景なし）。中央に呼び鈴（商品の登録が始まるとヘッダーへ戻る）、その左に「Language／言語」（4.4）、右に「電子マネー（チャージ・残高照会）」（7 章）。スタッフ操作モードのお客様側は呼び鈴を出さず、二つのボタンを中央に寄せる。
+- サイネージ：スタッフ操作モードのお客様側の最下段、第一待ち受けの最下段、店舗メニューを開いているあいだのお客様側に出す。次の 3 枚を 8 秒（web `SIGNAGE_MS`）ごとに順に回す（時刻から決めるので、どの画面でも同じ一枚が出る）。言語切り替えでは訳さない。
+  1. 「販促キャンペーン告知」「揚げ物・中華まんなど、店舗のキャンペーンをお知らせする枠です」
+  2. 「電話で電子マネーの購入を求められたら詐欺です」「ご心配なときはスタッフにお声がけください」
+  3. 「販促キャンペーン告知」「新商品・季節の商品をお知らせする枠です」
+  値引きを約束する広告は出さない（シミュレーターに値引きの仕組みがなく、会計と食い違うため）。
 - 案内ボタンは強い丸みのボタン。選択中のボタンは濃い背景・白文字・枠線なしで示す（下線は使わない）。ボタンで出すガイダンスは青文字。支払方法のボタンも画面遷移を伴わず案内を出すだけのボタンなので、案内ボタンと同じ強い丸みで、選択中は濃い背景・白文字・枠線なし。もう一度押すと選択を外す（セルフ操作モードの「現金」は店員呼び出しなので除く）。支払方法を選んだときに出すガイダンス（例：「Wallet の電子マネーを、決済端末にかざしてください」）も青文字。
 
 ### 15.5 文言
@@ -858,46 +888,155 @@ npm run build
 - **3 店舗の構成**：シナリオなし
 - **3.1 スタッフ**：シナリオなし
 - **3.2 商品マスタ**：シナリオなし
-- **3.3 バーコード**：シナリオなし
-- **3.4 状態の保存**：シナリオなし
+- **3.3 バーコード**
+  - どのバーコードもどの順でも読める（`any_barcode_is_accepted_in_any_order`）
+- **3.4 状態の保存**
+  - 保存した状態からすべてのレジを戻す（`saved_state_restores_every_register`）
+  - 壊れた・古い保存状態は読み込まない（`broken_or_old_saved_state_is_refused`）
+  - 発券の列は保存と読み込みで残る（`ticket_queue_survives_save_and_load`）
 - **4 モードと操作権**：シナリオなし
 - **4.1 モード**
+  - モードはスタッフバーコードのログインに従う（`mode_follows_staff_badge`）
+  - たばこの呼び出しはたばこを登録するまで印を残す（`tobacco_call_marks_the_register_until_tobacco_is_scanned`）
   - 販売期限切れを読み、ログインして回収せずにログアウトすると「販売期限切れ」の呼び出しが立ち直る（B-3）（`expired_call_comes_back_after_logout_without_collecting`）
   - 会計後の年齢確認も、ログインして確認せずにログアウトすると「年確」の呼び出しが立ち直る（B-3）（`age_check_call_comes_back_after_logout_without_checking`）
   - 公共料金・受付待ちのサービス商品も、取引に残っていればログアウトで立ち直る（B-3）（`bill_and_service_calls_come_back_after_logout`）
-- **4.2 操作側**：シナリオなし
-- **4.3 モードごとの操作の可否**：シナリオなし
+- **4.2 操作側**
+  - スタッフ操作モードのレジをお客様側から乗っ取れない（`customer_cannot_take_over_staff_operated_register`）
+  - お客様側にはスタッフだけの情報を出さない（`customer_view_hides_staff_only_information`）
+  - スタッフ側とお客様側は同時には操作できない（`staff_and_customer_screens_are_exclusive`）
+  - スタッフ操作モードは操作した側だけ 1 秒ロックする（`staff_operated_screens_lock_only_while_touched`）
+  - 年齢確認のほかはどちらの画面からも操作できる（`either_screen_can_operate_except_age_confirmation`）
+- **4.3 モードごとの操作の可否**
+  - セルフ操作モードではお客様が FF を登録できない（`customer_cannot_register_ff_in_self_operated`）
 - **4.4 画面の言語**：シナリオなし
 - **5 取引**：シナリオなし
-- **5.1 明細**：シナリオなし
-- **5.2 一緒に登録できないもの**：シナリオなし
-- **5.3 取り消しの制限**：シナリオなし
-- **5.4 クーポン**：シナリオなし
-- **5.5 ポイントカード**：シナリオなし
-- **5.6 フラグ**：シナリオなし
+- **5.1 明細**
+  - 買い物点数は 100 点まで（`shopping_is_limited_to_100_items`）
+  - 同じ商品は続けて読んだときだけまとめる（`same_item_merges_only_when_scanned_in_a_row`）
+  - スタッフもお客様も明細の数量を変えられる（`staff_or_customer_changes_a_line_quantity`）
+  - クーポンと明細は同じ通し番号を使う（`coupon_and_line_ids_never_collide`）
+  - 日配食品は数量を増やせない（`fresh_food_quantity_cannot_be_raised_on_screen`）
+- **5.2 一緒に登録できないもの**
+  - 荷物を送るはほかの商品と一緒にできない（`parcel_cannot_be_mixed_with_other_goods`）
+  - 払込票はほかの商品と同じ取引にできない（`utility_bills_cannot_share_a_transaction_with_other_goods`）
+- **5.3 取り消しの制限**
+  - 払込票は明細ごとに取り消せず、取引中止だけ（`registered_bill_slips_cannot_be_removed_only_voided`）
+- **5.4 クーポン**
+  - クーポンは対象商品がいつ登録されても効く（`coupons_apply_whenever_the_target_is_registered`）
+  - 適用先のないクーポンは返却まで決済を止める（`a_coupon_without_its_target_blocks_payment_until_it_is_returned`）
+- **5.5 ポイントカード**
+  - たばこ・切手・公共料金・荷物にはポイントを付けない（`points_are_not_earned_on_tobacco_stamps_bills_or_parcels`）
+  - ポイントカードの確認は一度きりで、決済まではいつでも読める（`point_card_is_asked_once_but_can_be_read_until_paid`）
+  - 付与対象 200 円につき 1P を付け、カードに残す（`points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card`）
+  - 付与対象がない取引だけポイントカードを確認しない（`only_non_point_goods_skip_the_point_card_check`）
+  - ポイントカードだけでも取引が始まり、取引中止できる（`a_point_card_alone_starts_a_transaction_that_can_be_voided`）
+- **5.6 フラグ**
+  - 上限を超えて登録しようとした明細にだけ限定n を付ける（`trading_cards_are_flagged_only_once_over_the_limit`）
 - **6 会計**：シナリオなし
-- **6.1 会計ボタン**：シナリオなし
+- **6.1 会計ボタン**
+  - 会計画面で読むと登録画面に戻って追加する（`scanning_on_payment_screen_returns_to_registering`）
+  - お客様側から会計し、ポイントカードの確認に進む（`checkout_from_held_customer_screen_then_point_card_check`）
 - **6.2 確認の順序**：シナリオなし
-- **6.3 決済の関門**：シナリオなし
-- **6.4 支払方法**：シナリオなし
+- **6.3 決済の関門**
+  - 販売期限切れの品は取り除くまで会計できない（`expired_onigiri_blocks_checkout_until_removed`）
+- **6.4 支払方法**
+  - 選んだ支払方法と違うカードは受け付けない（`wallet_card_must_match_chosen_method`）
+  - ポイント利用は付与対象の商品の分だけ（`points_pay_only_for_point_eligible_goods`）
+  - セルフ操作モードで現金を選ぶとスタッフを呼ぶ（`self_operated_cash_choice_calls_staff`）
+  - 現金の案内からバックすると呼び出しを取り下げる（`self_operated_back_from_cash_choice_withdraws_the_call`）
+  - スタッフがポイント利用を選べばポイントで払える（`points_can_pay_once_staff_chooses_them`）
+  - カードなしでポイント利用を選ぶとポイントカードの確認に戻る（`points_payment_without_a_card_goes_back_to_the_point_card_check`）
+  - 選んだ支払方法をもう一度押すと選択を外す（`pressing_the_chosen_payment_method_again_clears_it`）
+  - ポイント残高が足りなければ一部を払い、残りは別の支払方法（`a_short_point_balance_pays_part_and_the_rest_goes_to_another_method`）
+  - 取引中止で使ったポイントを戻し、残高 0 では払えない（`voiding_returns_used_points_and_an_empty_card_cannot_pay`）
+  - ポイントは全部・端数・指定額で使える（`points_can_pay_all_the_odd_yen_or_a_chosen_amount`）
 - **6.5 現金**
+  - 入金ボックスで払い、お釣りは出金ボックスで待つ（`inlet_pays_and_change_waits_in_outlet`）
+  - 足りた状態で 30 秒入れなければ投入おわり（`thirty_seconds_without_insert_means_done_inserting`）
+  - 現金投入後のバックで現金を返し、支払方法の選択に戻る（`back_after_inserting_cash_returns_it_and_reopens_methods`）
+  - 二千円札は出金ボックスに返す（`two_thousand_yen_bill_is_returned_to_the_outlet`）
   - 現金の投入中、両画面の帯に出す合計（残りのお支払い額）・お預かり・お釣り／不足の元になる値（B-4）（`tendered_cash_and_change_are_shown_on_both_sides`）
-- **6.6 キャッシュレスで先に払う分**：シナリオなし
-- **6.7 電子マネーの残高不足**：シナリオなし
-- **6.8 決済**：シナリオなし
-- **6.9 釣銭忘れ**：シナリオなし
-- **7 電子マネーのチャージ・残高確認**：シナリオなし
-- **8 FF**：シナリオなし
-- **9 年齢確認**：シナリオなし
-- **9.1 照合イベントと回収イベント**：シナリオなし
+- **6.6 キャッシュレスで先に払う分**
+  - 切手はほかの商品と一緒でも現金で払う（`stamps_are_paid_in_cash_even_with_other_items`）
+- **6.7 電子マネーの残高不足**
+  - 電子マネーの残高不足は三つの選択を出す（`emoney_short_offers_three_choices`）
+  - セルフ操作モードの残高不足は頼まれたときだけスタッフを呼ぶ（`self_operated_emoney_short_calls_staff_only_when_asked`）
+- **6.8 決済**
+  - 0 円の取引は会計で支払方法を選ばずに終わる（`a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment`）
+- **6.9 釣銭忘れ**
+  - 釣銭忘れは案内してからスタッフを呼ぶ（`change_left_in_the_outlet_reminds_then_calls_staff`）
+- **7 電子マネーのチャージ・残高確認**
+  - セルフ操作モードのお買い物中の電子マネーはスタッフを呼ぶ（`self_operated_emoney_fan_calls_staff_while_shopping`）
+  - 残高確認で残高を出す（`emoney_inquiry_shows_the_balance`）
+  - チャージは紙幣で上限まで（`emoney_charge_takes_bills_up_to_the_limit`）
+- **8 FF**
+  - セルフ操作モードの FF は呼び出しからスタッフが登録する（`fast_food_flow_in_self_operated_mode`）
+  - お渡し済みの FF を増やすと照合に戻り、減らすと回収を求める（`changing_handed_ff_rewinds_or_asks_to_collect`）
+  - FF のお渡し照合はスタッフだけが行う（`staff_alone_is_responsible_for_ff_handover`）
+  - ログアウト後は FF のお渡しを照合できない（`ff_handover_cannot_be_confirmed_after_staff_logs_out`）
+  - FF の在庫は四段階で見せ、欠品は予約注文できる（`ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved`）
+- **9 年齢確認**
+  - 年齢確認は会計で行い、済むまで決済できない（`age_check_happens_at_checkout_and_blocks_payment`）
+  - セルフ操作モードの年齢確認はスタッフを呼ぶ（`self_operated_age_check_calls_staff`）
+  - スタッフが年齢確認をスキップすればお客様の操作は要らない（`staff_skipping_the_age_check_needs_no_customer_button`）
+  - 生年月日を入力し、販売できない商品は回収する（`staff_enters_the_birth_date_and_unsellable_items_are_confiscated`）
+  - 年齢は誕生日の当日に加算する（`age_counts_the_birthday`）
+  - 登録中に年齢確認でき、新しい年齢の商品はやり直す（`staff_can_check_age_early_and_new_age_goods_need_it_again`）
+  - 早めの年齢確認はやめられ、済めば会計で尋ねない（`early_age_check_can_be_cancelled_and_covers_checkout`）
+  - 確認済みの年齢の商品では年齢確認をやり直さない（`goods_needing_an_age_already_checked_do_not_redo_the_check`）
+  - 20 歳の確認の後の 18 歳の商品はやり直す（`an_18_item_after_a_20_check_redoes_the_check_for_18`）
+  - 店舗の年齢制限は顔写真付きの身分証、法令の年齢制限は公的な身分証（`store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids`）
+- **9.1 照合イベントと回収イベント**
+  - 年確・FF の照合が済んだ案内はスタッフが次へ進むまで出す（`passing_age_or_ff_check_is_shown_until_staff_moves_on`）
 - **10 サービス商品**：シナリオなし
-- **10.1 荷物を送る**：シナリオなし
-- **10.2 荷物を受取る**：シナリオなし
-- **10.3 公共料金**：シナリオなし
+- **10.1 荷物を送る**
+  - 着払いは 0 円、受け付けた荷物は伝票で取り消す（`collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip`）
+  - 着払いだけなら会計で支払方法を選ばずに終わる（`collect_parcels_finish_on_checkout_without_choosing_a_payment`）
+  - 次の荷物を尋ねている間に別の伝票を読める（`a_parcel_for_another_address_is_scanned_even_while_asking_for_more`）
+  - 発払いと着払いが混じれば支払方法を選ぶ（`prepaid_and_collect_parcels_together_still_ask_for_a_payment`）
+  - サイズは三辺の合計と重さの二段階で決まり、バックで一段戻る（`parcel_size_is_decided_in_two_steps_and_back_steps_back`）
+  - 料金はサイズと郵便番号で決まる（`parcel_fee_comes_from_size_and_postal_code`）
+  - 荷物の取引ではポイントカードを確認しない（`parcel_skips_point_card_check`）
+  - 複数口は届け先を共有し、サイズだけ尋ねる（`multi_piece_parcels_share_the_address_and_only_ask_for_the_size`）
+  - お客様控えは伝票ごとに一枚、複数口は一枚（`customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one`）
+- **10.2 荷物を受取る**
+  - 荷物を照合してから引き渡す（`pickup_matches_the_parcel_then_hands_it_over`）
+  - 保管場所の荷物は有り・無しで決める（`pickup_can_be_decided_by_found_or_missing`）
+- **10.3 公共料金**
+  - 払込票は会計の後にスタッフが確かめ、現金で払う（`utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash`）
+  - セルフ操作モードの払込票の会計はスタッフを呼ぶ（`self_operated_bill_checkout_calls_staff_to_check_the_slips`）
+- **10.4 収入印紙**
+  - 払込票の印紙は登録中に確認でき、確認まで決済できない（`revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_then`）
+  - 同じ金額でも税金の払込票には印紙が要らない（`a_tax_slip_of_the_same_amount_needs_no_revenue_stamp`）
+  - 税抜 5 万円の現金のお買い物はレシートに印紙が要る（`a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt`）
+  - セルフ操作モードで印紙が要ればスタッフを呼ぶ（`a_self_operated_purchase_needing_a_stamp_calls_staff`）
+  - 税抜 5 万円未満かクレジットカードなら印紙は要らない（`a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp`）
+  - セルフ操作モードの払込票の印紙はスタッフを待つ（`revenue_stamp_waits_for_staff_in_self_operated_mode`）
+- **10.5 チケット**
+  - チケットは支払い後に発券し、枚数が一致したらお渡しを終える（`tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matches`）
+  - チケットはほかの商品と同じ取引にできない（`tickets_cannot_share_a_transaction_with_other_goods`）
+  - セルフ操作モードのチケットは現金でスタッフを呼ぶ（`self_operated_ticket_checkout_calls_staff_for_cash`）
+  - チケットは店全体で先入れ先出しに発券する（`tickets_are_issued_first_in_first_out_across_registers`）
 - **11 店員呼び出しと Bell**：シナリオなし
-- **11.1 呼び出し**：シナリオなし
-- **11.2 ベル**：シナリオなし
-- **11.3 Bell**：シナリオなし
+- **11.1 呼び出し**
+  - 年確の呼び出し中も FF ボタンで呼べる（`ff_button_works_while_age_check_call_is_open`）
+  - 呼び出しは呼んだレジに留まる（`calls_stay_on_originating_register`）
+  - 呼び出しはすぐに表示され、スタッフが来るまで続く（`called_register_lamp_lights_at_once_until_staff_arrives`）
+  - 最下段の呼び出しボタンでスタッフを呼ぶ（`shortcut_buttons_call_staff`）
+  - セルフ操作モードで期限切れを読むとスタッフを呼ぶ（`self_operated_expired_scan_calls_staff`）
+  - 呼び出しはログインまで出し、スタッフは用件を見る（`customer_call_shows_until_login_and_staff_sees_answered_topic`）
+  - セルフ操作モードのチャージの呼び出しもほかと同じく待つ（`self_emoney_charge_call_waits_like_other_waiting_calls`）
+  - セルフ操作モードの呼び出しは最下段で待ち、ログイン後に用件を出す（`every_self_call_waits_on_the_bottom_row_and_is_named_after_login`）
+  - 用件は具体的で、最初の一件だけを出す（`call_topic_is_concrete_and_only_the_first_one_is_kept`）
+- **11.2 ベル**
+  - スタッフ側のベルは応援を呼ぶだけで呼び出し画面を出さない（`staff_bell_calls_colleagues_without_call_screen`）
+  - 呼び出しボタンは押している間だけ鳴り、押すたびに鳴る（`call_button_rings_only_while_held_and_every_press_rings`）
+- **11.3 Bell**
+  - 通信ロスがあっても Bell は鳴り、不通を知らせる（`bell_rings_despite_loss_and_reports_link_down`）
+  - 放置された呼び出しは大きく鳴る（`neglected_calls_ring_louder`）
+  - 可搬性端末とストアコンピューターの呼び鈴は切れる（`handheld_and_store_computer_bells_can_be_turned_off`）
+  - 応答のない呼び出しは 3 回まで鳴らし直す（`unanswered_call_rings_again_up_to_three_times`）
 - **11.4 非常事態モード**
   - 呼び鈴を何度押しても、待たせた時間が 5 分未満なら非常事態モードに入らない（B-1）（`many_rings_do_not_start_emergency_before_five_minutes`）
   - 最も古い未解決の呼び出しから 4 分 59 秒では入らず、5 分で入る。押し直しても数え直さない（B-1）（`emergency_after_five_minutes_unanswered`）
@@ -910,16 +1049,31 @@ npm run build
   - 解除の前から残っているほかの呼び出しは、解除した時刻から数え直す（`calls_left_after_ending_emergency_count_from_the_end`）
   - ログインだけでは続き、解除で発動・解除時刻のレシートを出して通常運転に戻る（`emergency_lasts_until_ended`）
 - **12 取引中止・無操作・休止**：シナリオなし
-- **12.1 取引中止**：シナリオなし
+- **12.1 取引中止**
+  - お客様が取引中止するとお金が戻る（`customer_voids_and_money_comes_back`）
 - **12.2 無操作**
+  - 無操作のレジはセルフ操作モードに戻る（`idle_register_returns_to_self_operated`）
   - 呼び出し中は無操作の残り時間が減らず、片付いたら止まった値から続きを数える（B-5）（`idle_countdown_pauses_while_a_call_is_open`）
   - セルフ操作モードの呼び出しのあいだも残り時間は変わらない（B-5）（`idle_countdown_is_frozen_for_a_self_operated_call`）
-- **12.3 休止・ログアウト**：シナリオなし
-- **13 店舗メニュー**：シナリオなし
+- **12.3 休止・ログアウト**
+  - お客様側が操作中でもログアウトでセルフ操作モードに戻る（`logout_returns_to_self_operated_even_while_customer_screen_holds`）
+  - 店舗メニューからログアウト・休止する（`logout_and_pause_from_either_store_menu`）
+- **13 店舗メニュー**
+  - 出金は店舗メニューの中だけ（`cash_out_only_inside_the_store_menu`）
+  - 店舗メニューはスタッフ側でだけ開く（`store_menu_opens_only_on_the_staff_side`）
+  - 店舗メニューから入金・出金する（`cash_in_and_out_from_the_customer_side_menu`）
+  - 店舗メニューも入金・出金ボックスを使う（`store_menu_uses_inlet_and_outlet`）
+  - 取引中は店舗メニューを開けない（`store_menu_cannot_open_during_a_transaction`）
 - **14 販売規則の設定**：シナリオなし
-- **14.1 年齢制限**：シナリオなし
-- **14.2 個数制限**：シナリオなし
-- **14.3 税率**：シナリオなし
+- **14.1 年齢制限**
+  - 年齢制限を変えられるのはオーナーだけ（`only_owner_changes_age_rules`）
+  - オーナーが商品ごとに年齢制限を決める（`owner_sets_age_rule_per_product`）
+- **14.2 個数制限**
+  - オーナーが 1 回のお会計の販売個数の上限を決める（`owner_limits_how_many_of_an_item_one_purchase_can_have`）
+  - トレカは既定で 1 回のお会計 3 パックまで（`trading_cards_sell_at_most_three_packs_by_default`）
+- **14.3 税率**
+  - 税率はデータで、変えられるのはオーナーだけ（`tax_rates_are_data_and_owner_only`）
+  - 商品の税区分を変えられる（`product_tax_class_can_be_changed`）
 - **15 画面**：シナリオなし
 - **15.1 シミュレーターの配置**：シナリオなし
 - **15.2 ビルド番号**：シナリオなし
@@ -935,5 +1089,5 @@ npm run build
 - **17 コマンド**：シナリオなし
 - **18 開発**：シナリオなし
 
-節をまだ書いていないシナリオ（122 件）：`any_barcode_is_accepted_in_any_order`・`scanning_on_payment_screen_returns_to_registering`・`age_check_happens_at_checkout_and_blocks_payment`・`self_operated_age_check_calls_staff`・`ff_button_works_while_age_check_call_is_open`・`only_owner_changes_age_rules`・`customer_cannot_take_over_staff_operated_register`・`fast_food_flow_in_self_operated_mode`・`pickup_matches_the_parcel_then_hands_it_over`・`pickup_can_be_decided_by_found_or_missing`・`collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip`・`collect_parcels_finish_on_checkout_without_choosing_a_payment`・`a_parcel_for_another_address_is_scanned_even_while_asking_for_more`・`prepaid_and_collect_parcels_together_still_ask_for_a_payment`・`parcel_size_is_decided_in_two_steps_and_back_steps_back`・`parcel_fee_comes_from_size_and_postal_code`・`parcel_skips_point_card_check`・`parcel_cannot_be_mixed_with_other_goods`・`cash_out_only_inside_the_store_menu`・`store_menu_opens_only_on_the_staff_side`・`calls_stay_on_originating_register`・`bell_rings_despite_loss_and_reports_link_down`・`customer_view_hides_staff_only_information`・`staff_and_customer_screens_are_exclusive`・`owner_sets_age_rule_per_product`・`mode_follows_staff_badge`・`customer_cannot_register_ff_in_self_operated`・`idle_register_returns_to_self_operated`・`cash_in_and_out_from_the_customer_side_menu`・`inlet_pays_and_change_waits_in_outlet`・`store_menu_uses_inlet_and_outlet`・`staff_operated_screens_lock_only_while_touched`・`called_register_lamp_lights_at_once_until_staff_arrives`・`wallet_card_must_match_chosen_method`・`neglected_calls_ring_louder`・`shortcut_buttons_call_staff`・`staff_bell_calls_colleagues_without_call_screen`・`call_button_rings_only_while_held_and_every_press_rings`・`logout_returns_to_self_operated_even_while_customer_screen_holds`・`checkout_from_held_customer_screen_then_point_card_check`・`either_screen_can_operate_except_age_confirmation`・`staff_skipping_the_age_check_needs_no_customer_button`・`revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_then`・`a_tax_slip_of_the_same_amount_needs_no_revenue_stamp`・`a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt`・`a_self_operated_purchase_needing_a_stamp_calls_staff`・`a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp`・`revenue_stamp_waits_for_staff_in_self_operated_mode`・`utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash`・`self_operated_bill_checkout_calls_staff_to_check_the_slips`・`utility_bills_cannot_share_a_transaction_with_other_goods`・`registered_bill_slips_cannot_be_removed_only_voided`・`points_pay_only_for_point_eligible_goods`・`self_operated_cash_choice_calls_staff`・`self_operated_back_from_cash_choice_withdraws_the_call`・`stamps_are_paid_in_cash_even_with_other_items`・`shopping_is_limited_to_100_items`・`store_menu_cannot_open_during_a_transaction`・`staff_enters_the_birth_date_and_unsellable_items_are_confiscated`・`age_counts_the_birthday`・`coupons_apply_whenever_the_target_is_registered`・`a_coupon_without_its_target_blocks_payment_until_it_is_returned`・`same_item_merges_only_when_scanned_in_a_row`・`staff_or_customer_changes_a_line_quantity`・`coupon_and_line_ids_never_collide`・`points_can_pay_once_staff_chooses_them`・`points_payment_without_a_card_goes_back_to_the_point_card_check`・`handheld_and_store_computer_bells_can_be_turned_off`・`tobacco_call_marks_the_register_until_tobacco_is_scanned`・`change_left_in_the_outlet_reminds_then_calls_staff`・`owner_limits_how_many_of_an_item_one_purchase_can_have`・`tax_rates_are_data_and_owner_only`・`product_tax_class_can_be_changed`・`self_operated_emoney_fan_calls_staff_while_shopping`・`emoney_inquiry_shows_the_balance`・`emoney_charge_takes_bills_up_to_the_limit`・`emoney_short_offers_three_choices`・`customer_voids_and_money_comes_back`・`logout_and_pause_from_either_store_menu`・`changing_handed_ff_rewinds_or_asks_to_collect`・`points_are_not_earned_on_tobacco_stamps_bills_or_parcels`・`staff_alone_is_responsible_for_ff_handover`・`thirty_seconds_without_insert_means_done_inserting`・`ff_handover_cannot_be_confirmed_after_staff_logs_out`・`saved_state_restores_every_register`・`broken_or_old_saved_state_is_refused`・`ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved`・`back_after_inserting_cash_returns_it_and_reopens_methods`・`pressing_the_chosen_payment_method_again_clears_it`・`point_card_is_asked_once_but_can_be_read_until_paid`・`staff_can_check_age_early_and_new_age_goods_need_it_again`・`early_age_check_can_be_cancelled_and_covers_checkout`・`two_thousand_yen_bill_is_returned_to_the_outlet`・`tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matches`・`tickets_cannot_share_a_transaction_with_other_goods`・`self_operated_ticket_checkout_calls_staff_for_cash`・`tickets_are_issued_first_in_first_out_across_registers`・`ticket_queue_survives_save_and_load`・`fresh_food_quantity_cannot_be_raised_on_screen`・`expired_onigiri_blocks_checkout_until_removed`・`self_operated_expired_scan_calls_staff`・`goods_needing_an_age_already_checked_do_not_redo_the_check`・`an_18_item_after_a_20_check_redoes_the_check_for_18`・`self_operated_emoney_short_calls_staff_only_when_asked`・`points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card`・`a_short_point_balance_pays_part_and_the_rest_goes_to_another_method`・`voiding_returns_used_points_and_an_empty_card_cannot_pay`・`only_non_point_goods_skip_the_point_card_check`・`points_can_pay_all_the_odd_yen_or_a_chosen_amount`・`a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment`・`multi_piece_parcels_share_the_address_and_only_ask_for_the_size`・`customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one`・`a_point_card_alone_starts_a_transaction_that_can_be_voided`・`trading_cards_sell_at_most_three_packs_by_default`・`trading_cards_are_flagged_only_once_over_the_limit`・`unanswered_call_rings_again_up_to_three_times`・`customer_call_shows_until_login_and_staff_sees_answered_topic`・`self_emoney_charge_call_waits_like_other_waiting_calls`・`every_self_call_waits_on_the_bottom_row_and_is_named_after_login`・`call_topic_is_concrete_and_only_the_first_one_is_kept`・`passing_age_or_ff_check_is_shown_until_staff_moves_on`・`store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids`
+節をまだ書いていないシナリオ（0 件）：
 <!-- /generated -->

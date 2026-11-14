@@ -101,6 +101,7 @@ fn advance(s: &mut Store, ms: u64) {
     }
 }
 
+/// 仕様 3.3：どのバーコードもどの順でも読める
 #[test]
 fn any_barcode_is_accepted_in_any_order() {
     let mut s = Store::new(1, 2, 1);
@@ -120,6 +121,7 @@ fn any_barcode_is_accepted_in_any_order() {
     .is_err());
 }
 
+/// 仕様 6.1：会計画面で読むと登録画面に戻って追加する
 #[test]
 fn scanning_on_payment_screen_returns_to_registering() {
     let mut s = Store::new(1, 2, 1);
@@ -152,6 +154,7 @@ fn scanning_on_payment_screen_returns_to_registering() {
     assert_eq!(v.last_receipt.as_ref().unwrap().change_total, 600 - 320);
 }
 
+/// 仕様 9：年齢確認は会計で行い、済むまで決済できない
 #[test]
 fn age_check_happens_at_checkout_and_blocks_payment() {
     let mut s = Store::new(1, 2, 1);
@@ -193,6 +196,7 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
     );
 }
 
+/// 仕様 9：セルフ操作モードの年齢確認はスタッフを呼ぶ
 #[test]
 fn self_operated_age_check_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -220,6 +224,7 @@ fn self_operated_age_check_calls_staff() {
     assert!(s.snapshot().calls.is_empty());
 }
 
+/// 仕様 11.1：年確の呼び出し中も FF ボタンで呼べる
 #[test]
 fn ff_button_works_while_age_check_call_is_open() {
     let mut s = Store::new(1, 2, 1);
@@ -241,6 +246,7 @@ fn ff_button_works_while_age_check_call_is_open() {
         .any(|c| c.register == 2 && c.kind == CallKind::FastFood));
 }
 
+/// 仕様 14.1：年齢制限を変えられるのはオーナーだけ
 #[test]
 fn only_owner_changes_age_rules() {
     let mut s = Store::new(1, 2, 1);
@@ -266,6 +272,7 @@ fn only_owner_changes_age_rules() {
     assert_eq!(s.snapshot().age_rules.history.len(), 1);
 }
 
+/// 仕様 4.2：スタッフ操作モードのレジをお客様側から乗っ取れない
 #[test]
 fn customer_cannot_take_over_staff_operated_register() {
     let mut s = Store::new(1, 2, 1);
@@ -293,6 +300,7 @@ fn customer_cannot_take_over_staff_operated_register() {
     assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
 }
 
+/// 仕様 8：セルフ操作モードの FF は呼び出しからスタッフが登録する
 #[test]
 fn fast_food_flow_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);
@@ -377,6 +385,7 @@ fn fast_food_flow_in_self_operated_mode() {
     assert_eq!(reg(&s, 2).last_receipt.unwrap().total, 160 + 440);
 }
 
+/// 仕様 10.2：荷物を照合してから引き渡す
 #[test]
 fn pickup_matches_the_parcel_then_hands_it_over() {
     let mut s = Store::new(1, 2, 1);
@@ -475,6 +484,7 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     scan(&mut s, 2, "staff", BREAD);
 }
 
+/// 仕様 10.2：保管場所の荷物は有り・無しで決める
 #[test]
 fn pickup_can_be_decided_by_found_or_missing() {
     let mut s = Store::new(1, 2, 1);
@@ -529,6 +539,7 @@ fn pending_parcel(s: &Store, r: u8) -> u32 {
         .expect("受付中の荷物")
 }
 
+/// 仕様 10.1：着払いは 0 円、受け付けた荷物は伝票で取り消す
 #[test]
 fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     let mut s = Store::new(1, 2, 1);
@@ -588,6 +599,7 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     assert_eq!(v.staff.lines[0].line.id, id2);
 }
 
+/// 仕様 10.1：着払いだけなら会計で支払方法を選ばずに終わる
 #[test]
 fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
     let mut s = Store::new(1, 2, 1);
@@ -614,6 +626,7 @@ fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
     assert_eq!(rc.method, "着払い");
 }
 
+/// 仕様 10.1：次の荷物を尋ねている間に別の伝票を読める
 #[test]
 fn a_parcel_for_another_address_is_scanned_even_while_asking_for_more() {
     let mut s = Store::new(1, 2, 1);
@@ -644,6 +657,7 @@ fn a_parcel_for_another_address_is_scanned_even_while_asking_for_more() {
     assert_eq!(p2.postal, None, "新しく読んだ荷物の届け先は改めて入力する");
 }
 
+/// 仕様 10.1：発払いと着払いが混じれば支払方法を選ぶ
 #[test]
 fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
     let mut s = Store::new(1, 2, 1);
@@ -677,6 +691,7 @@ fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
     assert!(v.last_receipt.is_none());
 }
 
+/// 仕様 10.1：サイズは三辺の合計と重さの二段階で決まり、バックで一段戻る
 #[test]
 fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     let mut s = Store::new(1, 2, 1);
@@ -746,6 +761,7 @@ fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     assert!(v.staff.parcel_ask);
 }
 
+/// 仕様 10.1：料金はサイズと郵便番号で決まる
 #[test]
 fn parcel_fee_comes_from_size_and_postal_code() {
     let mut s = Store::new(1, 2, 1);
@@ -827,6 +843,7 @@ fn parcel_fee_comes_from_size_and_postal_code() {
     assert_eq!(reg(&s, 2).last_receipt.map(|r| r.points), Some(0));
 }
 
+/// 仕様 10.1：荷物の取引ではポイントカードを確認しない
 #[test]
 fn parcel_skips_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -848,6 +865,7 @@ fn parcel_skips_point_card_check() {
     assert!(!reg(&s, 2).staff.point_pending);
 }
 
+/// 仕様 5.2：荷物を送るはほかの商品と一緒にできない
 #[test]
 fn parcel_cannot_be_mixed_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
@@ -878,6 +896,7 @@ fn parcel_cannot_be_mixed_with_other_goods() {
     .is_err());
 }
 
+/// 仕様 13：出金は店舗メニューの中だけ
 #[test]
 fn cash_out_only_inside_the_store_menu() {
     let mut s = Store::new(1, 2, 1);
@@ -911,6 +930,7 @@ fn cash_out_only_inside_the_store_menu() {
     .is_err());
 }
 
+/// 仕様 13：店舗メニューはスタッフ側でだけ開く
 #[test]
 fn store_menu_opens_only_on_the_staff_side() {
     let mut s = Store::new(1, 2, 1);
@@ -932,6 +952,7 @@ fn store_menu_opens_only_on_the_staff_side() {
     assert!(reg(&s, 1).menu.is_none());
 }
 
+/// 仕様 11.1：呼び出しは呼んだレジに留まる
 #[test]
 fn calls_stay_on_originating_register() {
     let mut s = Store::new(1, 4, 2);
@@ -947,6 +968,7 @@ fn calls_stay_on_originating_register() {
     assert_eq!(snap.calls[0].register, 2);
 }
 
+/// 仕様 11.3：通信ロスがあっても Bell は鳴り、不通を知らせる
 #[test]
 fn bell_rings_despite_loss_and_reports_link_down() {
     let mut s = Store::new(7, 2, 1);
@@ -983,6 +1005,7 @@ fn bell_rings_despite_loss_and_reports_link_down() {
     );
 }
 
+/// 仕様 4.2：お客様側にはスタッフだけの情報を出さない
 #[test]
 fn customer_view_hides_staff_only_information() {
     let mut s = Store::new(1, 2, 1);
@@ -996,6 +1019,7 @@ fn customer_view_hides_staff_only_information() {
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
 }
 
+/// 仕様 4.2：スタッフ側とお客様側は同時には操作できない
 #[test]
 fn staff_and_customer_screens_are_exclusive() {
     let mut s = Store::new(1, 2, 1);
@@ -1038,6 +1062,7 @@ fn staff_and_customer_screens_are_exclusive() {
     assert!(!reg(&s, 1).customer.point_pending);
 }
 
+/// 仕様 14.1：オーナーが商品ごとに年齢制限を決める
 #[test]
 fn owner_sets_age_rule_per_product() {
     let mut s = Store::new(1, 2, 1);
@@ -1056,6 +1081,7 @@ fn owner_sets_age_rule_per_product() {
     assert_eq!(age(TEA), Some(18));
 }
 
+/// 仕様 4.1：モードはスタッフバーコードのログインに従う
 #[test]
 fn mode_follows_staff_badge() {
     let mut s = Store::new(1, 2, 1);
@@ -1070,6 +1096,7 @@ fn mode_follows_staff_badge() {
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
+/// 仕様 4.3：セルフ操作モードではお客様が FF を登録できない
 #[test]
 fn customer_cannot_register_ff_in_self_operated() {
     let mut s = Store::new(1, 2, 1);
@@ -1081,6 +1108,7 @@ fn customer_cannot_register_ff_in_self_operated() {
     ok(&mut s, json!({"type":"ff_button","register":2}));
 }
 
+/// 仕様 12.2：無操作のレジはセルフ操作モードに戻る
 #[test]
 fn idle_register_returns_to_self_operated() {
     let mut s = Store::new(1, 2, 1);
@@ -1125,6 +1153,7 @@ fn idle_register_returns_to_self_operated() {
     assert!(reg(&s, 2).idle_revert_in.is_none());
 }
 
+/// 仕様 13：店舗メニューから入金・出金する
 #[test]
 fn cash_in_and_out_from_the_customer_side_menu() {
     let mut s = Store::new(1, 2, 1);
@@ -1158,6 +1187,7 @@ fn cash_in_and_out_from_the_customer_side_menu() {
     .is_err());
 }
 
+/// 仕様 6.5：入金ボックスで払い、お釣りは出金ボックスで待つ
 #[test]
 fn inlet_pays_and_change_waits_in_outlet() {
     let mut s = Store::new(1, 2, 1);
@@ -1203,6 +1233,7 @@ fn inlet_pays_and_change_waits_in_outlet() {
     assert!(run(&mut s, json!({"type":"take_outlet","register":1})).is_err());
 }
 
+/// 仕様 13：店舗メニューも入金・出金ボックスを使う
 #[test]
 fn store_menu_uses_inlet_and_outlet() {
     let mut s = Store::new(1, 2, 1);
@@ -1255,6 +1286,7 @@ fn store_menu_uses_inlet_and_outlet() {
     assert!(reg(&s, 1).menu.is_none());
 }
 
+/// 仕様 4.2：スタッフ操作モードは操作した側だけ 1 秒ロックする
 #[test]
 fn staff_operated_screens_lock_only_while_touched() {
     let mut s = Store::new(1, 2, 1);
@@ -1304,6 +1336,7 @@ fn staff_operated_screens_lock_only_while_touched() {
     confirm_point(&mut s, 1);
 }
 
+/// 仕様 11.1：呼び出しはすぐに表示され、スタッフが来るまで続く
 #[test]
 fn called_register_lamp_lights_at_once_until_staff_arrives() {
     let mut s = Store::new(1, 2, 1);
@@ -1332,6 +1365,7 @@ fn called_register_lamp_lights_at_once_until_staff_arrives() {
     assert!(reg(&s, 2).lamp);
 }
 
+/// 仕様 6.4：選んだ支払方法と違うカードは受け付けない
 #[test]
 fn wallet_card_must_match_chosen_method() {
     let mut s = Store::new(1, 2, 1);
@@ -1360,6 +1394,7 @@ fn wallet_card_must_match_chosen_method() {
     assert_eq!(rc.method, "クレジットカード");
 }
 
+/// 仕様 11.3：放置された呼び出しは大きく鳴る
 #[test]
 fn neglected_calls_ring_louder() {
     use janus_pos_core::store::{ring_volume, RING_FULL_MS, RING_MIN};
@@ -1388,6 +1423,7 @@ fn neglected_calls_ring_louder() {
     assert_eq!(reg(&s, 1).ring_volume, 0.0);
 }
 
+/// 仕様 11.1：最下段の呼び出しボタンでスタッフを呼ぶ
 #[test]
 fn shortcut_buttons_call_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -1427,6 +1463,7 @@ fn shortcut_buttons_call_staff() {
     assert!(kinds(&s, 1).is_empty());
 }
 
+/// 仕様 11.2：スタッフ側のベルは応援を呼ぶだけで呼び出し画面を出さない
 #[test]
 fn staff_bell_calls_colleagues_without_call_screen() {
     let mut s = Store::new(1, 2, 1);
@@ -1444,6 +1481,7 @@ fn staff_bell_calls_colleagues_without_call_screen() {
     ok(&mut s, json!({"type":"release_call","register":1}));
 }
 
+/// 仕様 11.2：呼び出しボタンは押している間だけ鳴り、押すたびに鳴る
 #[test]
 fn call_button_rings_only_while_held_and_every_press_rings() {
     for seed in 1..20u64 {
@@ -1486,6 +1524,7 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
     }
 }
 
+/// 仕様 12.3：お客様側が操作中でもログアウトでセルフ操作モードに戻る
 #[test]
 fn logout_returns_to_self_operated_even_while_customer_screen_holds() {
     let mut s = Store::new(1, 2, 1);
@@ -1503,6 +1542,7 @@ fn logout_returns_to_self_operated_even_while_customer_screen_holds() {
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
+/// 仕様 6.1：お客様側から会計し、ポイントカードの確認に進む
 #[test]
 fn checkout_from_held_customer_screen_then_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -1560,6 +1600,7 @@ fn checkout_from_held_customer_screen_then_point_card_check() {
     assert!(!reg(&s, 1).customer.point_pending);
 }
 
+/// 仕様 4.2：年齢確認のほかはどちらの画面からも操作できる
 #[test]
 fn either_screen_can_operate_except_age_confirmation() {
     let mut s = Store::new(1, 2, 1);
@@ -1586,6 +1627,7 @@ fn either_screen_can_operate_except_age_confirmation() {
     ok(&mut s, json!({"type":"void_transaction","register":1}));
 }
 
+/// 仕様 9：スタッフが年齢確認をスキップすればお客様の操作は要らない
 #[test]
 fn staff_skipping_the_age_check_needs_no_customer_button() {
     let mut s = Store::new(1, 2, 1);
@@ -1617,6 +1659,7 @@ fn affix_stamp(s: &mut Store, r: u8, line_id: u32, affixed: bool) {
     );
 }
 
+/// 仕様 10.4：払込票の印紙は登録中に確認でき、確認まで決済できない
 #[test]
 fn revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_then() {
     let mut s = Store::new(1, 2, 1);
@@ -1642,6 +1685,7 @@ fn revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_the
     assert_eq!(reg(&s, 1).bill_handover, Some(1));
 }
 
+/// 仕様 10.4：同じ金額でも税金の払込票には印紙が要らない
 #[test]
 fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
     let mut s = Store::new(1, 2, 1);
@@ -1689,6 +1733,7 @@ fn big_basket(s: &mut Store, side: &str) {
     assert_eq!(reg(s, 1).staff.total, 56_200);
 }
 
+/// 仕様 10.4：税抜 5 万円の現金のお買い物はレシートに印紙が要る
 #[test]
 fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
     let mut s = Store::new(1, 2, 1);
@@ -1724,6 +1769,7 @@ fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
     assert!(reg(&s, 1).last_receipt.is_none());
 }
 
+/// 仕様 10.4：セルフ操作モードで印紙が要ればスタッフを呼ぶ
 #[test]
 fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -1766,6 +1812,7 @@ fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
     assert!(s.snapshot().calls.is_empty());
 }
 
+/// 仕様 10.4：税抜 5 万円未満かクレジットカードなら印紙は要らない
 #[test]
 fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
     let mut s = Store::new(1, 2, 1);
@@ -1788,6 +1835,7 @@ fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
     assert_eq!(reg(&s, 1).receipt_stamp, None);
 }
 
+/// 仕様 10.4：セルフ操作モードの払込票の印紙はスタッフを待つ
 #[test]
 fn revenue_stamp_waits_for_staff_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);
@@ -1805,6 +1853,7 @@ fn bill_ids(s: &Store, r: u8) -> Vec<u32> {
     reg(s, r).staff.bills.iter().map(|b| b.line_id).collect()
 }
 
+/// 仕様 10.3：払込票は会計の後にスタッフが確かめ、現金で払う
 #[test]
 fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     let mut s = Store::new(1, 2, 1);
@@ -1932,6 +1981,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     assert!(reg(&s, 1).last_receipt.is_none());
 }
 
+/// 仕様 10.3：セルフ操作モードの払込票の会計はスタッフを呼ぶ
 #[test]
 fn self_operated_bill_checkout_calls_staff_to_check_the_slips() {
     let mut s = Store::new(1, 2, 1);
@@ -1969,6 +2019,7 @@ fn self_operated_bill_checkout_calls_staff_to_check_the_slips() {
     assert_eq!(reg(&s, 1).bill_handover, None);
 }
 
+/// 仕様 5.2：払込票はほかの商品と同じ取引にできない
 #[test]
 fn utility_bills_cannot_share_a_transaction_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
@@ -1995,6 +2046,7 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
     assert_eq!(reg(&s, 1).staff.lines.len(), 1);
 }
 
+/// 仕様 5.3：払込票は明細ごとに取り消せず、取引中止だけ
 #[test]
 fn registered_bill_slips_cannot_be_removed_only_voided() {
     let mut s = Store::new(1, 2, 1);
@@ -2020,6 +2072,7 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
     assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
+/// 仕様 6.4：ポイント利用は付与対象の商品の分だけ
 #[test]
 fn points_pay_only_for_point_eligible_goods() {
     let mut s = Store::new(1, 2, 1);
@@ -2087,6 +2140,7 @@ fn points_pay_only_for_point_eligible_goods() {
         .any(|u| u.method == PaymentMethod::Points));
 }
 
+/// 仕様 6.4：セルフ操作モードで現金を選ぶとスタッフを呼ぶ
 #[test]
 fn self_operated_cash_choice_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -2109,6 +2163,7 @@ fn self_operated_cash_choice_calls_staff() {
     assert!(reg(&s, 1).staff.calls.is_empty());
 }
 
+/// 仕様 6.4：現金の案内からバックすると呼び出しを取り下げる
 #[test]
 fn self_operated_back_from_cash_choice_withdraws_the_call() {
     let mut s = Store::new(1, 2, 1);
@@ -2130,6 +2185,7 @@ fn self_operated_back_from_cash_choice_withdraws_the_call() {
     assert!(reg(&s, 1).staff.calls.is_empty());
 }
 
+/// 仕様 6.6：切手はほかの商品と一緒でも現金で払う
 #[test]
 fn stamps_are_paid_in_cash_even_with_other_items() {
     let mut s = Store::new(1, 2, 1);
@@ -2225,6 +2281,7 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
     assert_eq!(emoney_balance(&s), 1_000);
 }
 
+/// 仕様 5.1：買い物点数は 100 点まで
 #[test]
 fn shopping_is_limited_to_100_items() {
     let mut s = Store::new(1, 2, 1);
@@ -2264,6 +2321,7 @@ fn shopping_is_limited_to_100_items() {
     scan(&mut s, 1, "customer", SNACK);
 }
 
+/// 仕様 13：取引中は店舗メニューを開けない
 #[test]
 fn store_menu_cannot_open_during_a_transaction() {
     let mut s = Store::new(1, 2, 1);
@@ -2284,6 +2342,7 @@ fn store_menu_cannot_open_during_a_transaction() {
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
+/// 仕様 9：生年月日を入力し、販売できない商品は回収する
 #[test]
 fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     let mut s = Store::new(1, 2, 1);
@@ -2338,6 +2397,7 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     ok(&mut s, cash);
 }
 
+/// 仕様 9：年齢は誕生日の当日に加算する
 #[test]
 fn age_counts_the_birthday() {
     use janus_pos_core::store::age_on;
@@ -2349,6 +2409,7 @@ fn age_counts_the_birthday() {
     }
 }
 
+/// 仕様 5.4：クーポンは対象商品がいつ登録されても効く
 #[test]
 fn coupons_apply_whenever_the_target_is_registered() {
     let mut s = Store::new(1, 2, 1);
@@ -2386,6 +2447,7 @@ fn coupons_apply_whenever_the_target_is_registered() {
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 420);
 }
 
+/// 仕様 5.4：適用先のないクーポンは返却まで決済を止める
 #[test]
 fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     let mut s = Store::new(1, 2, 1);
@@ -2423,6 +2485,7 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 320);
 }
 
+/// 仕様 5.1：同じ商品は続けて読んだときだけまとめる
 #[test]
 fn same_item_merges_only_when_scanned_in_a_row() {
     let mut s = Store::new(1, 2, 1);
@@ -2439,6 +2502,7 @@ fn same_item_merges_only_when_scanned_in_a_row() {
     assert_eq!(rows, [("袋菓子", 3), ("ソフトドリンク", 1), ("袋菓子", 2)]);
 }
 
+/// 仕様 5.1：スタッフもお客様も明細の数量を変えられる
 #[test]
 fn staff_or_customer_changes_a_line_quantity() {
     let mut s = Store::new(1, 2, 1);
@@ -2461,6 +2525,7 @@ fn staff_or_customer_changes_a_line_quantity() {
     assert_eq!(reg(&s, 1).customer.total, 150 + 320);
 }
 
+/// 仕様 5.1：クーポンと明細は同じ通し番号を使う
 #[test]
 fn coupon_and_line_ids_never_collide() {
     let mut s = Store::new(1, 2, 1);
@@ -2477,6 +2542,7 @@ fn coupon_and_line_ids_never_collide() {
     assert_eq!(ids.len(), n);
 }
 
+/// 仕様 6.4：スタッフがポイント利用を選べばポイントで払える
 #[test]
 fn points_can_pay_once_staff_chooses_them() {
     let mut s = Store::new(1, 2, 1);
@@ -2500,6 +2566,7 @@ fn points_can_pay_once_staff_chooses_them() {
     assert!(reg(&s, 1).staff.lines.is_empty());
 }
 
+/// 仕様 6.4：カードなしでポイント利用を選ぶとポイントカードの確認に戻る
 #[test]
 fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -2543,6 +2610,7 @@ fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     assert_eq!(v.staff.method, None);
 }
 
+/// 仕様 11.3：可搬性端末とストアコンピューターの呼び鈴は切れる
 #[test]
 fn handheld_and_store_computer_bells_can_be_turned_off() {
     let mut s = Store::new(1, 2, 3);
@@ -2564,6 +2632,7 @@ fn handheld_and_store_computer_bells_can_be_turned_off() {
     assert!(s.snapshot().bells[2].buzzing);
 }
 
+/// 仕様 4.1：たばこの呼び出しはたばこを登録するまで印を残す
 #[test]
 fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
     let mut s = Store::new(1, 2, 1);
@@ -2582,6 +2651,7 @@ fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
     assert!(!reg(&s, 2).tobacco_asked);
 }
 
+/// 仕様 6.9：釣銭忘れは案内してからスタッフを呼ぶ
 #[test]
 fn change_left_in_the_outlet_reminds_then_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -2642,6 +2712,7 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
     );
 }
 
+/// 仕様 14.2：オーナーが 1 回のお会計の販売個数の上限を決める
 #[test]
 fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
     let mut s = Store::new(1, 2, 1);
@@ -2686,6 +2757,7 @@ fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
         .any(|h| h.change.contains("2点まで → 制限なし")));
 }
 
+/// 仕様 14.3：税率はデータで、変えられるのはオーナーだけ
 #[test]
 fn tax_rates_are_data_and_owner_only() {
     let mut s = Store::new(1, 2, 1);
@@ -2727,6 +2799,7 @@ fn tax_rates_are_data_and_owner_only() {
     assert_eq!(s.snapshot().age_rules.history.len(), 2);
 }
 
+/// 仕様 14.3：商品の税区分を変えられる
 #[test]
 fn product_tax_class_can_be_changed() {
     let mut s = Store::new(1, 2, 1);
@@ -2762,6 +2835,7 @@ fn emoney_balance(s: &Store) -> u32 {
     s.snapshot().emoney_balance
 }
 
+/// 仕様 7：セルフ操作モードのお買い物中の電子マネーはスタッフを呼ぶ
 #[test]
 fn self_operated_emoney_fan_calls_staff_while_shopping() {
     let mut s = Store::new(1, 2, 1);
@@ -2784,6 +2858,7 @@ fn self_operated_emoney_fan_calls_staff_while_shopping() {
     );
 }
 
+/// 仕様 7：残高確認で残高を出す
 #[test]
 fn emoney_inquiry_shows_the_balance() {
     let mut s = Store::new(1, 2, 1);
@@ -2833,6 +2908,7 @@ fn emoney_inquiry_shows_the_balance() {
     assert!(reg(&s, 1).emoney.is_none());
 }
 
+/// 仕様 7：チャージは紙幣で上限まで
 #[test]
 fn emoney_charge_takes_bills_up_to_the_limit() {
     let mut s = Store::new(1, 2, 1);
@@ -2925,6 +3001,7 @@ fn short_checkout_on(s: &mut Store, side: &str) {
     );
 }
 
+/// 仕様 6.7：電子マネーの残高不足は三つの選択を出す
 #[test]
 fn emoney_short_offers_three_choices() {
     let mut s = Store::new(1, 2, 1);
@@ -3043,6 +3120,7 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(emoney_balance(&s), 880);
 }
 
+/// 仕様 12.1：お客様が取引中止するとお金が戻る
 #[test]
 fn customer_voids_and_money_comes_back() {
     let mut s = Store::new(1, 2, 1);
@@ -3063,6 +3141,7 @@ fn customer_voids_and_money_comes_back() {
     assert_eq!(v.outlet, 0);
 }
 
+/// 仕様 12.3：店舗メニューからログアウト・休止する
 #[test]
 fn logout_and_pause_from_either_store_menu() {
     let mut s = Store::new(1, 2, 1);
@@ -3100,6 +3179,7 @@ fn logout_and_pause_from_either_store_menu() {
     assert!(reg(&s, 1).paused);
 }
 
+/// 仕様 8：お渡し済みの FF を増やすと照合に戻り、減らすと回収を求める
 #[test]
 fn changing_handed_ff_rewinds_or_asks_to_collect() {
     let mut s = Store::new(1, 2, 1);
@@ -3166,6 +3246,7 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
     assert_eq!(reg(&s, 1).staff.ff_collect[0].qty, 2);
 }
 
+/// 仕様 5.5：たばこ・切手・公共料金・荷物にはポイントを付けない
 #[test]
 fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     let mut s = Store::new(1, 2, 1);
@@ -3207,6 +3288,7 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     assert!(!reg(&s, 1).staff.point_pending);
 }
 
+/// 仕様 8：FF のお渡し照合はスタッフだけが行う
 #[test]
 fn staff_alone_is_responsible_for_ff_handover() {
     let mut s = Store::new(1, 1, 1);
@@ -3238,6 +3320,7 @@ fn staff_alone_is_responsible_for_ff_handover() {
     assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
 }
 
+/// 仕様 6.5：足りた状態で 30 秒入れなければ投入おわり
 #[test]
 fn thirty_seconds_without_insert_means_done_inserting() {
     let mut s = Store::new(1, 2, 1);
@@ -3267,6 +3350,7 @@ fn thirty_seconds_without_insert_means_done_inserting() {
     assert_eq!(v.outlet, 1100 - 160);
 }
 
+/// 仕様 8：ログアウト後は FF のお渡しを照合できない
 #[test]
 fn ff_handover_cannot_be_confirmed_after_staff_logs_out() {
     let mut s = Store::new(1, 2, 1);
@@ -3307,6 +3391,7 @@ fn same_after_reload(s: &Store) -> Store {
     back
 }
 
+/// 仕様 3.4：保存した状態からすべてのレジを戻す
 #[test]
 fn saved_state_restores_every_register() {
     let mut s = Store::new(7, 2, 3);
@@ -3343,6 +3428,7 @@ fn saved_state_restores_every_register() {
     same_after_reload(&back);
 }
 
+/// 仕様 3.4：壊れた・古い保存状態は読み込まない
 #[test]
 fn broken_or_old_saved_state_is_refused() {
     assert!(Store::load_json("{").is_err());
@@ -3352,6 +3438,7 @@ fn broken_or_old_saved_state_is_refused() {
     assert!(Store::load_json(&v.to_string()).is_err());
 }
 
+/// 仕様 8：FF の在庫は四段階で見せ、欠品は予約注文できる
 #[test]
 fn ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved() {
     use janus_pos_core::store::StockLevel;
@@ -3404,6 +3491,7 @@ fn ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved() {
     assert_eq!(level(&s, "FF31"), StockLevel::MadeToOrder);
 }
 
+/// 仕様 6.5：現金投入後のバックで現金を返し、支払方法の選択に戻る
 #[test]
 fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     let mut s = Store::new(1, 2, 1);
@@ -3438,6 +3526,7 @@ fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
 }
 
+/// 仕様 6.4：選んだ支払方法をもう一度押すと選択を外す
 #[test]
 fn pressing_the_chosen_payment_method_again_clears_it() {
     let mut s = Store::new(1, 2, 1);
@@ -3460,6 +3549,7 @@ fn pressing_the_chosen_payment_method_again_clears_it() {
     assert!(!e.is_empty());
 }
 
+/// 仕様 5.5：ポイントカードの確認は一度きりで、決済まではいつでも読める
 #[test]
 fn point_card_is_asked_once_but_can_be_read_until_paid() {
     let mut s = Store::new(1, 2, 1);
@@ -3502,6 +3592,7 @@ fn point_card_is_asked_once_but_can_be_read_until_paid() {
     assert_eq!(reg(&s, 1).last_receipt.map(|r| r.points), Some(160 / 200));
 }
 
+/// 仕様 9：登録中に年齢確認でき、新しい年齢の商品はやり直す
 #[test]
 fn staff_can_check_age_early_and_new_age_goods_need_it_again() {
     let mut s = Store::new(1, 2, 1);
@@ -3555,6 +3646,7 @@ fn staff_can_check_age_early_and_new_age_goods_need_it_again() {
     );
 }
 
+/// 仕様 9：早めの年齢確認はやめられ、済めば会計で尋ねない
 #[test]
 fn early_age_check_can_be_cancelled_and_covers_checkout() {
     let mut s = Store::new(1, 2, 1);
@@ -3784,6 +3876,7 @@ fn emergency_lasts_until_ended() {
     assert!(!v.emergency);
 }
 
+/// 仕様 6.5：二千円札は出金ボックスに返す
 #[test]
 fn two_thousand_yen_bill_is_returned_to_the_outlet() {
     let mut s = Store::new(1, 2, 1);
@@ -3813,6 +3906,7 @@ fn two_thousand_yen_bill_is_returned_to_the_outlet() {
 
 const TICKET: &str = "2100000000074";
 
+/// 仕様 10.5：チケットは支払い後に発券し、枚数が一致したらお渡しを終える
 #[test]
 fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matches() {
     let mut s = Store::new(1, 2, 1);
@@ -3900,6 +3994,7 @@ fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matc
     assert!(reg(&s, 1).last_receipt.is_none());
 }
 
+/// 仕様 10.5：チケットはほかの商品と同じ取引にできない
 #[test]
 fn tickets_cannot_share_a_transaction_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
@@ -3913,6 +4008,7 @@ fn tickets_cannot_share_a_transaction_with_other_goods() {
     assert!(e.contains("チケット"), "{e}");
 }
 
+/// 仕様 10.5：セルフ操作モードのチケットは現金でスタッフを呼ぶ
 #[test]
 fn self_operated_ticket_checkout_calls_staff_for_cash() {
     let mut s = Store::new(1, 2, 1);
@@ -3956,6 +4052,7 @@ fn pay_tickets(s: &mut Store, r: u8) {
     ok(s, json!({"type":"finish_insert","register":r}));
 }
 
+/// 仕様 10.5：チケットは店全体で先入れ先出しに発券する
 #[test]
 fn tickets_are_issued_first_in_first_out_across_registers() {
     let mut s = Store::new(3, 3, 1);
@@ -4004,6 +4101,7 @@ fn tickets_are_issued_first_in_first_out_across_registers() {
     scan(&mut s, 1, "staff", BREAD);
 }
 
+/// 仕様 3.4：発券の列は保存と読み込みで残る
 #[test]
 fn ticket_queue_survives_save_and_load() {
     let mut s = Store::new(2, 2, 1);
@@ -4016,6 +4114,7 @@ fn ticket_queue_survives_save_and_load() {
     assert!(!reg(&s, 2).tickets_issued && reg(&s, 2).tickets_ahead == 1);
 }
 
+/// 仕様 5.1：日配食品は数量を増やせない
 #[test]
 fn fresh_food_quantity_cannot_be_raised_on_screen() {
     let mut s = Store::new(1, 2, 1);
@@ -4048,6 +4147,7 @@ fn fresh_food_quantity_cannot_be_raised_on_screen() {
     );
 }
 
+/// 仕様 6.3：販売期限切れの品は取り除くまで会計できない
 #[test]
 fn expired_onigiri_blocks_checkout_until_removed() {
     let mut s = Store::new(1, 2, 1);
@@ -4083,6 +4183,7 @@ fn expired_onigiri_blocks_checkout_until_removed() {
     );
 }
 
+/// 仕様 11.1：セルフ操作モードで期限切れを読むとスタッフを呼ぶ
 #[test]
 fn self_operated_expired_scan_calls_staff() {
     let mut s = Store::new(1, 2, 1);
@@ -4196,6 +4297,7 @@ fn bill_and_service_calls_come_back_after_logout() {
 const CARTON: &str = "4900000000158";
 const FIREWORKS: &str = "4910000000076";
 
+/// 仕様 9：確認済みの年齢の商品では年齢確認をやり直さない
 #[test]
 fn goods_needing_an_age_already_checked_do_not_redo_the_check() {
     let mut s = Store::new(1, 2, 1);
@@ -4222,6 +4324,7 @@ fn goods_needing_an_age_already_checked_do_not_redo_the_check() {
     );
 }
 
+/// 仕様 9：20 歳の確認の後の 18 歳の商品はやり直す
 #[test]
 fn an_18_item_after_a_20_check_redoes_the_check_for_18() {
     let mut s = Store::new(1, 2, 1);
@@ -4259,6 +4362,7 @@ fn an_18_item_after_a_20_check_redoes_the_check_for_18() {
     assert!(reg(&s, 1).staff.lines.iter().all(|l| l.age_checked));
 }
 
+/// 仕様 6.7：セルフ操作モードの残高不足は頼まれたときだけスタッフを呼ぶ
 #[test]
 fn self_operated_emoney_short_calls_staff_only_when_asked() {
     let mut s = Store::new(1, 2, 1);
@@ -4333,6 +4437,7 @@ fn pay_cash(s: &mut Store, r: u8) {
     ok(s, json!({"type":"finish_insert","register":r}));
 }
 
+/// 仕様 5.5：付与対象 200 円につき 1P を付け、カードに残す
 #[test]
 fn points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card() {
     let mut s = Store::new(1, 2, 1);
@@ -4362,6 +4467,7 @@ fn points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card() {
     assert_eq!(reg(&s, 1).points.balance, Some(1_253));
 }
 
+/// 仕様 6.4：ポイント残高が足りなければ一部を払い、残りは別の支払方法
 #[test]
 fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
     let mut s = Store::new(1, 2, 1);
@@ -4400,6 +4506,7 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
     assert_eq!((r.points, r.points_used, r.point_balance), (1, 1, Some(1)));
 }
 
+/// 仕様 6.4：取引中止で使ったポイントを戻し、残高 0 では払えない
 #[test]
 fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
     let mut s = Store::new(1, 2, 1);
@@ -4456,6 +4563,7 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
     .is_err());
 }
 
+/// 仕様 5.5：付与対象がない取引だけポイントカードを確認しない
 #[test]
 fn only_non_point_goods_skip_the_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -4477,6 +4585,7 @@ fn use_points(s: &mut Store, r: u8, how: &str, points: Option<u32>) {
     );
 }
 
+/// 仕様 6.4：ポイントは全部・端数・指定額で使える
 #[test]
 fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
     let start = |s: &mut Store| {
@@ -4520,6 +4629,7 @@ fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
     assert_eq!(reg(&s, 1).prepaid, 480);
 }
 
+/// 仕様 6.8：0 円の取引は会計で支払方法を選ばずに終わる
 #[test]
 fn a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment() {
     let mut s = Store::new(1, 2, 1);
@@ -4536,6 +4646,7 @@ fn a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment() {
     assert_eq!(v.last_receipt.unwrap().method, "お支払いなし");
 }
 
+/// 仕様 10.1：複数口は届け先を共有し、サイズだけ尋ねる
 #[test]
 fn multi_piece_parcels_share_the_address_and_only_ask_for_the_size() {
     let mut s = Store::new(1, 2, 1);
@@ -4577,6 +4688,7 @@ fn multi_piece_parcels_share_the_address_and_only_ask_for_the_size() {
     assert!(allowed(&v, Side::Staff, Action::Checkout));
 }
 
+/// 仕様 10.1：お客様控えは伝票ごとに一枚、複数口は一枚
 #[test]
 fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
     let mut s = Store::new(1, 2, 1);
@@ -4632,6 +4744,7 @@ fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
     assert_eq!(reg(&s, 2).parcel_handover, None);
 }
 
+/// 仕様 5.5：ポイントカードだけでも取引が始まり、取引中止できる
 #[test]
 fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
     let mut s = Store::new(1, 2, 1);
@@ -4646,6 +4759,7 @@ fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
     assert!(!reg(&s, 1).customer.point_card);
 }
 
+/// 仕様 14.2：トレカは既定で 1 回のお会計 3 パックまで
 #[test]
 fn trading_cards_sell_at_most_three_packs_by_default() {
     let mut s = Store::new(1, 2, 1);
@@ -4714,6 +4828,7 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
     );
 }
 
+/// 仕様 5.6：上限を超えて登録しようとした明細にだけ限定n を付ける
 #[test]
 fn trading_cards_are_flagged_only_once_over_the_limit() {
     let mut s = Store::new(1, 2, 1);
@@ -4735,6 +4850,7 @@ fn trading_cards_are_flagged_only_once_over_the_limit() {
     );
 }
 
+/// 仕様 11.3：応答のない呼び出しは 3 回まで鳴らし直す
 #[test]
 fn unanswered_call_rings_again_up_to_three_times() {
     use janus_pos_core::store::{BELL_REMINDS, BELL_REMIND_MS};
@@ -4785,6 +4901,7 @@ fn unanswered_call_rings_again_up_to_three_times() {
     assert_eq!(s.snapshot().bells[0].rings, r, "stops once staff logs in");
 }
 
+/// 仕様 11.1：呼び出しはログインまで出し、スタッフは用件を見る
 #[test]
 fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
     let mut s = Store::new(3, 2, 1);
@@ -4811,6 +4928,7 @@ fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
     );
 }
 
+/// 仕様 11.1：セルフ操作モードのチャージの呼び出しもほかと同じく待つ
 #[test]
 fn self_emoney_charge_call_waits_like_other_waiting_calls() {
     let mut s = Store::new(3, 2, 1);
@@ -4826,6 +4944,7 @@ fn self_emoney_charge_call_waits_like_other_waiting_calls() {
     assert_eq!(v.answered.as_deref(), Some("電子マネー"));
 }
 
+/// 仕様 11.1：セルフ操作モードの呼び出しは最下段で待ち、ログイン後に用件を出す
 #[test]
 fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
     // 年確
@@ -4855,6 +4974,7 @@ fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
     assert_eq!(reg(&s, 1).answered.as_deref(), Some("宅配便"));
 }
 
+/// 仕様 11.1：用件は具体的で、最初の一件だけを出す
 #[test]
 fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
     // 公共料金の払込票は「お支払い」
@@ -4899,6 +5019,7 @@ fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
     assert_eq!(reg(&s, 1).answered.as_deref(), Some("金券"));
 }
 
+/// 仕様 9.1：年確・FF の照合が済んだ案内はスタッフが次へ進むまで出す
 #[test]
 fn passing_age_or_ff_check_is_shown_until_staff_moves_on() {
     use janus_pos_core::store::Passed;
@@ -4963,6 +5084,7 @@ fn passing_age_or_ff_check_is_shown_until_staff_moves_on() {
     assert_eq!(reg(&s, 1).staff.passed, Some(Passed::Ff));
 }
 
+/// 仕様 9：店舗の年齢制限は顔写真付きの身分証、法令の年齢制限は公的な身分証
 #[test]
 fn store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids() {
     const FIREWORKS: &str = "4910000000076";

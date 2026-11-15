@@ -6,9 +6,9 @@
   --gap: 6px;
   /* 色は四つ（カラーユニバーサルデザインの赤 #FF4B00・青 #005AFF・緑 #03AF7A・橙 #F6AA00）。濃度は四段：3＝その色そのもの、1＝淡・2＝薄は白を混ぜて明るさ 0.95・0.87、4＝濃は黒を混ぜて 0.44。白・黒・グレーは色に数えない無彩色（グレーは 0.95・0.87・0.52・0.44） */
   --grey-1: oklch(0.95 0 0); --grey-2: oklch(0.87 0 0); --grey-3: oklch(0.52 0 0); --grey-4: oklch(0.44 0 0);
-  --blue-1: oklch(0.95 0.028 262.2); --blue-2: oklch(0.87 0.072 262.2); --blue-3: oklch(0.542 0.254 262.2); --blue-4: oklch(0.44 0.206 262.2);
+  --blue-1: oklch(0.95 0.028 262.2); --blue-2: oklch(0.87 0.072 262.2); --blue-3: oklch(0.542 0.254 262.2); --blue-4: oklch(0.44 0.13 262.2);
   --orange-1: oklch(0.95 0.04 76.6); --orange-2: oklch(0.87 0.103 76.6); --orange-3: oklch(0.791 0.166 76.6); --orange-4: oklch(0.44 0.092 76.6);
-  --red-1: oklch(0.95 0.034 36.6); --red-2: oklch(0.87 0.088 36.6); --red-3: oklch(0.666 0.225 36.6); --red-4: oklch(0.44 0.149 36.6);
+  --red-1: oklch(0.95 0.034 36.6); --red-2: oklch(0.87 0.088 36.6); --red-3: oklch(0.666 0.225 36.6); --red-4: oklch(0.44 0.13 36.6);
   --green-1: oklch(0.95 0.022 162.8); --green-2: oklch(0.87 0.056 162.8); --green-3: oklch(0.667 0.144 162.8); --green-4: oklch(0.44 0.095 162.8);
   --white: oklch(1 0 0); --black: oklch(0 0 0);
   /* フラグ：背景なし・枠線と文字は同じ色。注意＝橙、済み＝緑、その他＝グレー。阻害因子のある明細の行は橙の薄 */
@@ -36,9 +36,9 @@
   --call: var(--blue-4);
   --call-bg: var(--blue-1);
   --text-xl: min(16cqi, 96px);
-  --text-num: 28px;
+  --text-num: 24px;
   --text-lg: 18px;
-  --text-sm: 13px;
+  --text-sm: 12px;
   --flash: var(--orange-2);
   --bill-bg: var(--green-1);
   --coin-bg: var(--orange-1);

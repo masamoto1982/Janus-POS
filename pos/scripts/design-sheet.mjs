@@ -18,9 +18,9 @@ const HUES = [
 const DENSITY = ["1 淡", "2 薄", "3 中", "4 濃"];
 const SIZES = [
   ["特大", "--text-xl", 96, 800],
-  ["強調", "--text-num", 28, 700],
+  ["強調", "--text-num", 24, 700],
   ["大", "--text-lg", 18, 700],
-  ["小", "--text-sm", 13, 400],
+  ["小", "--text-sm", 12, 400],
 ];
 
 const token = (name) => {
@@ -94,7 +94,7 @@ let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" vi
 <rect width="${W}" height="${H}" fill="#ffffff"/>
 <text x="16" y="28" font-size="16" font-weight="700" fill="#4a4a4a">Janus-POS 色 4（＋無彩色）× 濃度 4 の役割と、文字サイズ 4 の見本（白地）</text>
 <text x="16" y="50" font-size="12" fill="#4a4a4a">濃度1・2＝塗りつぶし　濃度3＝添え字　濃度4＝アクセント（文字・枠線）。✕＝使ってはいけない（白・濃度1の背景で 4.5:1 未満の添え字、3:1 未満の文字）</text>
-<text x="16" y="68" font-size="12" fill="#4a4a4a">見本の文字サイズ：特大 96px・強調 28px・大 18px・小 13px</text>
+<text x="16" y="68" font-size="12" fill="#4a4a4a">見本の文字サイズ：特大 96px・強調 24px・大 18px・小 12px</text>
 `;
 let y = TOP;
 for (const r of rows) {
@@ -115,15 +115,15 @@ for (const r of rows) {
   } else if (r.d === 3) {
     const ok = r.light >= 4.5;
     svg += `<text x="${X}" y="${y + 30}" font-size="18" font-weight="700" fill="${ink4(r.h).hex}">サンドイッチ</text>
-<text x="${X}" y="${y + 50}" font-size="13" fill="${r.hex}">320円　販売 11/15 19:00</text>
+<text x="${X}" y="${y + 50}" font-size="12" fill="${r.hex}">320円　販売 11/15 19:00</text>
 `;
     if (!ok) svg += `<line x1="${X - 4}" y1="${y + 36}" x2="${X + 190}" y2="${y + 56}" stroke="#d00" stroke-width="2"/><text x="${X + 200}" y="${y + 52}" font-size="13" font-weight="700" fill="#d00">✕ 添え字に足りない（${r.light.toFixed(2)}:1）→ グレー3を使う</text>\n`;
     else svg += `<text x="${X + 200}" y="${y + 52}" font-size="13" fill="#555">○ 白・濃度1の上で ${r.light.toFixed(2)}:1${r.deep < 4.5 ? `（濃度2の上は ${r.deep.toFixed(2)}:1 で ✕）` : ""}</text>\n`;
   } else {
     svg += `<text x="${X}" y="${y + 96}" font-size="96" font-weight="800" fill="${r.hex}">安全</text>
-<text x="${X + 220}" y="${y + 70}" font-size="28" font-weight="700" fill="${r.hex}">1,280</text>
+<text x="${X + 220}" y="${y + 70}" font-size="24" font-weight="700" fill="${r.hex}">1,280</text>
 <text x="${X + 340}" y="${y + 68}" font-size="18" font-weight="700" fill="${r.hex}">お会計</text>
-<text x="${X + 420}" y="${y + 66}" font-size="13" fill="${r.hex}">お会計</text>
+<text x="${X + 420}" y="${y + 66}" font-size="12" fill="${r.hex}">お会計</text>
 <rect x="${X + 490}" y="${y + 40}" width="116" height="40" rx="4" fill="none" stroke="${r.hex}" stroke-width="1.5"/><text x="${X + 548}" y="${y + 65}" font-size="13" font-weight="700" text-anchor="middle" fill="${r.hex}">枠線</text>
 `;
   }

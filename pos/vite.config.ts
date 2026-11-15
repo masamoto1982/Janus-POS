@@ -28,5 +28,7 @@ export default defineConfig({
   test: {
     root: ".",
     include: ["web/src/**/*.test.ts"],
+    // styles.test.ts が styles.css?raw を読むため（既定では CSS は空になる）
+    css: { include: /styles\.css/ },
   },
 });

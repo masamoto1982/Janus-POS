@@ -428,9 +428,12 @@ button.emoney { background: var(--blue-2); color: var(--black); }
 .screen.head-blink { animation: head-blink 1s steps(1) infinite; }
 @keyframes head-blink { 0% { --blink-on: 1; } 50% { --blink-on: 0; } }
 @media (prefers-reduced-motion: reduce) { .screen.head-blink { animation: none; --blink-on: 1; } }
-.screen-head.calling { --head-call-bg: var(--call-soft); }
-.screen-head.sos { --head-call-bg: var(--sos-head); }
-.screen-head:is(.calling, .sos) { background: color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-bg)); }
+/* 呼び出し中のヘッダーは濃い黄（--call-soft）と薄い黄（--alert-bg）を行き来する（user 2026-11-15、最下段・呼び鈴と同じ二色）。
+   消えている側を段の色（--head-bg＝透明）に任せると、段の色を塗り替えたときに黄とグレー・緑の点滅に化けるので、
+   消えている側も黄で明示する（styles.test.ts で守る） */
+.screen-head.calling { --head-call-bg: var(--call-soft); --head-call-off: var(--alert-bg); }
+.screen-head.sos { --head-call-bg: var(--sos-head); --head-call-off: var(--head-bg); }
+.screen-head:is(.calling, .sos) { background: color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-call-off)); }
 .screen-head.sos :is(.mode-title, .clock) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), currentColor); }
 
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
@@ -792,7 +795,8 @@ body.dragging .drop-hint { display: inline; }
 :root .screen.operable { --cust-bg: var(--green-1); --tier-deep: var(--green-2); }
 :root .screen:not(.operable) { --cust-bg: var(--red-1); --tier-deep: var(--red-2); }
 /* セルフ操作モードのスタッフ側（操作できない側）は、赤だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
-:root .staff-screen.mode-self:not(.operable) { --cust-bg: var(--grey-1); --tier-deep: var(--grey-2); }
+:root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--grey-1); --tier-deep: var(--grey-2); }
+/* 呼び出し中のスタッフ側は黄の段が優先。段の色の規則を足すときは :not(.calling) で呼び出し中を外す（styles.test.ts で守る） */
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。
    ヘッダー・最下段は消えているあいだもこの黄なので、黄と赤（--sos-head）で点滅する（user 2026-11-14） */

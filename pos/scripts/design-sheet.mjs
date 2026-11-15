@@ -63,7 +63,14 @@ const worst = (fg, bgs) => Math.min(...bgs.map(([, bg]) => contrast(fg, bg)));
 
 // 判定：3:1 未満は大きさに関わらず使わない（✕）。3:1 以上 4.5:1 未満は特大・強調だけ（△）。4.5:1 以上はすべて可（○）
 const grade = (c) => (c < 3 ? "✕" : c < 4.5 ? "△" : "○");
-const allowed = (g, sizeIdx) => g === "○" || (g === "△" && sizeIdx <= 1);
+
+// 濃度の役割（user 2026-11-15）：4 濃＝アクセント（枠線・文字だけ、広い面は塗らない）、3＝添え字だけ、1・2＝塗りつぶしだけ（文字に使わない）
+const ROLE = {
+  1: "塗りつぶし（文字に使わない）",
+  2: "塗りつぶし（文字に使わない）",
+  3: "添え字（小テキスト）だけ",
+  4: "アクセント（文字・枠線）",
+};
 
 const rows = [];
 for (const [h, label] of HUES) {
@@ -74,52 +81,64 @@ for (const [h, label] of HUES) {
     rows.push({ h, label, d, fg, hex: hex(fg), oklch: token(`${h}-${d}`), white: contrast(fg, WHITE), light, deep, gl: grade(light), gd: grade(deep) });
   }
 }
+const ink4 = (h) => rows.find((r) => r.h === h && r.d === 4);
 
-// ---- SVG：行＝色×濃度、列＝文字サイズ。白地に見本を置き、使ってはいけないものは斜線で消す ----
-const COL_X = [250, 520, 660, 800];
-const COL_W = [260, 130, 130, 120];
-const ROW_H = 112;
-const TOP = 70;
+// ---- SVG：行＝色×濃度。各行には、その濃度の役割どおりの見本だけを置く ----
 const W = 930;
-const H = TOP + rows.length * ROW_H + 20;
+const ROW_H = { 1: 64, 2: 64, 3: 64, 4: 120 };
+const TOP = 78;
+const H = TOP + HUES.length * (ROW_H[1] + ROW_H[2] + ROW_H[3] + ROW_H[4]) + 20;
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const X = 250;
 let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="'Hiragino Sans','Noto Sans JP',sans-serif">
 <rect width="${W}" height="${H}" fill="#ffffff"/>
-<text x="16" y="28" font-size="16" font-weight="700" fill="#4a4a4a">Janus-POS 文字サイズ 4 × 色 4（＋無彩色）× 濃度 4　白地の見本</text>
-<text x="16" y="50" font-size="12" fill="#4a4a4a">✕＝使ってはいけない（白・濃度1の背景でコントラスト 3:1 未満）　△＝特大・強調だけ（4.5:1 未満）</text>
+<text x="16" y="28" font-size="16" font-weight="700" fill="#4a4a4a">Janus-POS 色 4（＋無彩色）× 濃度 4 の役割と、文字サイズ 4 の見本（白地）</text>
+<text x="16" y="50" font-size="12" fill="#4a4a4a">濃度1・2＝塗りつぶし　濃度3＝添え字　濃度4＝アクセント（文字・枠線）。✕＝使ってはいけない（白・濃度1の背景で 4.5:1 未満の添え字、3:1 未満の文字）</text>
+<text x="16" y="68" font-size="12" fill="#4a4a4a">見本の文字サイズ：特大 96px・強調 28px・大 18px・小 13px</text>
 `;
-SIZES.forEach(([name, , px], i) => {
-  svg += `<text x="${COL_X[i]}" y="${TOP - 4}" font-size="12" fill="#4a4a4a">${name} ${px}px</text>\n`;
-});
-rows.forEach((r, i) => {
-  const y = TOP + i * ROW_H;
+let y = TOP;
+for (const r of rows) {
+  const rh = ROW_H[r.d];
   if (r.d === 1) svg += `<line x1="16" y1="${y}" x2="${W - 16}" y2="${y}" stroke="#d4d4d4"/>\n`;
-  svg += `<rect x="16" y="${y + 14}" width="28" height="28" fill="${r.hex}" stroke="#d4d4d4"/>
-<text x="54" y="${y + 26}" font-size="12" font-weight="700" fill="#333">${esc(r.label)}</text>
-<text x="54" y="${y + 42}" font-size="11" fill="#555">濃度${DENSITY[r.d - 1]}　--${r.h}-${r.d}</text>
-<text x="54" y="${y + 58}" font-size="11" fill="#555">白に ${r.white.toFixed(2)}:1</text>
+  svg += `<rect x="16" y="${y + 12}" width="28" height="28" fill="${r.hex}" stroke="#d4d4d4"/>
+<text x="54" y="${y + 24}" font-size="12" font-weight="700" fill="#333">${esc(r.label)}　濃度${DENSITY[r.d - 1]}</text>
+<text x="54" y="${y + 40}" font-size="11" fill="#555">--${r.h}-${r.d}　白に ${r.white.toFixed(2)}:1</text>
+<text x="54" y="${y + 56}" font-size="11" fill="#555">${esc(ROLE[r.d])}</text>
 `;
-  SIZES.forEach(([, , px, weight], c) => {
-    const ok = allowed(r.gl, c);
-    const base = y + ROW_H / 2 + px * 0.36;
-    const fs = Math.min(px, 96);
-    const sample = c === 0 ? "安全" : c === 1 ? "1,280" : "お会計";
-    svg += `<text x="${COL_X[c]}" y="${base}" font-size="${fs}" font-weight="${weight}" fill="${r.hex}"${ok ? "" : ' opacity="0.9"'}>${sample}</text>\n`;
-    if (!ok) {
-      const x0 = COL_X[c] - 4, x1 = COL_X[c] + COL_W[c] - 14;
-      svg += `<line x1="${x0}" y1="${y + 10}" x2="${x1}" y2="${y + ROW_H - 10}" stroke="#d00" stroke-width="2"/><text x="${x1 - 14}" y="${y + 24}" font-size="16" font-weight="700" fill="#d00">${r.gl}</text>\n`;
-    }
-  });
-});
+  if (r.d <= 2) {
+    // 塗りつぶしの見本：濃度1・2の面に、同じ色の濃度4の文字と枠線を載せる
+    const k = ink4(r.h);
+    svg += `<rect x="${X}" y="${y + 10}" width="${W - X - 16}" height="${rh - 20}" fill="${r.hex}"/>
+<text x="${X + 12}" y="${y + rh / 2 + 6}" font-size="18" font-weight="700" fill="${k.hex}">塗りつぶしの上の文字は濃度4（${contrast(k.fg, r.fg).toFixed(2)}:1）</text>
+<rect x="${W - 16 - 128}" y="${y + 18}" width="112" height="${rh - 36}" rx="4" fill="none" stroke="${k.hex}" stroke-width="1.5"/><text x="${W - 16 - 72}" y="${y + rh / 2 + 5}" font-size="13" text-anchor="middle" fill="${k.hex}">枠線は濃度4</text>
+`;
+  } else if (r.d === 3) {
+    const ok = r.light >= 4.5;
+    svg += `<text x="${X}" y="${y + 30}" font-size="18" font-weight="700" fill="${ink4(r.h).hex}">サンドイッチ</text>
+<text x="${X}" y="${y + 50}" font-size="13" fill="${r.hex}">320円　販売 11/15 19:00</text>
+`;
+    if (!ok) svg += `<line x1="${X - 4}" y1="${y + 36}" x2="${X + 190}" y2="${y + 56}" stroke="#d00" stroke-width="2"/><text x="${X + 200}" y="${y + 52}" font-size="13" font-weight="700" fill="#d00">✕ 添え字に足りない（${r.light.toFixed(2)}:1）→ グレー3を使う</text>\n`;
+    else svg += `<text x="${X + 200}" y="${y + 52}" font-size="13" fill="#555">○ 白・濃度1の上で ${r.light.toFixed(2)}:1${r.deep < 4.5 ? `（濃度2の上は ${r.deep.toFixed(2)}:1 で ✕）` : ""}</text>\n`;
+  } else {
+    svg += `<text x="${X}" y="${y + 96}" font-size="96" font-weight="800" fill="${r.hex}">安全</text>
+<text x="${X + 220}" y="${y + 70}" font-size="28" font-weight="700" fill="${r.hex}">1,280</text>
+<text x="${X + 340}" y="${y + 68}" font-size="18" font-weight="700" fill="${r.hex}">お会計</text>
+<text x="${X + 420}" y="${y + 66}" font-size="13" fill="${r.hex}">お会計</text>
+<rect x="${X + 490}" y="${y + 40}" width="116" height="40" rx="4" fill="none" stroke="${r.hex}" stroke-width="1.5"/><text x="${X + 548}" y="${y + 65}" font-size="13" font-weight="700" text-anchor="middle" fill="${r.hex}">枠線</text>
+`;
+  }
+  y += rh;
+}
 svg += "</svg>\n";
 writeFileSync(join(root, "docs/design-language.svg"), svg);
 
 // ---- Markdown ----
 const f = (c) => `${c.toFixed(2)}`;
-const forbidden = rows.filter((r) => r.gl === "✕");
-const largeOnly = rows.filter((r) => r.gl === "△");
-const deepWorse = rows.filter((r) => r.gl !== "✕" && r.gd !== r.gl);
 const name = (r) => `${r.label.replace(/（.*）/, "")}${r.d}（\`--${r.h}-${r.d}\`）`;
+const sub = rows.filter((r) => r.d === 3);
+const subOk = sub.filter((r) => r.light >= 4.5);
+const subNg = sub.filter((r) => r.light < 4.5);
+const accDeep = rows.filter((r) => r.d === 4 && r.deep < 4.5);
 let md = `# Janus-POS デザイン言語
 
 <!-- このファイルと design-language.svg は pos/scripts/design-sheet.mjs が styles.css から作る。手で直さず \`cd pos && npm run gen:design\` -->
@@ -134,34 +153,35 @@ UI はレゴのように、少ない部品の掛け合わせで組み立てる�
 | ボタンの形 | 積極・消極・案内（強い丸み。円は案内の正方形）・タブ |
 | ボタンの大きさ | 特大 160×64・大 116×48・中 64×34・小 56×26 |
 
-## 文字サイズ × 色 × 濃度の見本
+## 濃度の役割
 
-![文字サイズ・色・濃度の見本](design-language.svg)
+| 濃度 | 役割 | 使ってはいけないこと |
+| --- | --- | --- |
+| 4 濃 | アクセントカラー。文字の色と枠線の色 | 広い面の塗りつぶし |
+| 3 中 | 添え字（小テキストの補足：値段・期限・案内の二行目など） | 本文の文字、塗りつぶし |
+| 2 薄 | 塗りつぶし（帯・最下段など濃いめの段、行の色） | 文字、枠線 |
+| 1 淡 | 塗りつぶし（一段目・三段目など明るい段、確認画面） | 文字、枠線 |
+
+塗りつぶしの上に載せる文字と枠線は濃度4。濃度4の文字は、どの大きさでも、白・濃度1・濃度2のどの背景でも読める。
+
+## 見本
+
+![色・濃度の役割と文字サイズの見本](design-language.svg)
 
 ## 使ってはいけない組み合わせ
 
-文字の色と、その文字が載る背景とのコントラスト比で決める。
+文字の色と、その文字が載る背景とのコントラスト比で決める。小テキスト（添え字を含む）は 4.5:1 以上、特大・強調は 3:1 以上がいる。
 
-- ✕：コントラスト比が 3:1 未満。大きさに関わらず、文字に使ってはいけない。
-- △：3:1 以上 4.5:1 未満。特大・強調（大きな文字）にだけ使える。大・小には使ってはいけない。
-- ○：4.5:1 以上。すべての大きさに使える。
-
-白と濃度1の背景（一段目・三段目、確認画面）の上で：
-
-- ✕ 文字に使わない：${forbidden.map(name).join("、")}。淡・薄は背景の色で、文字の色ではない。
-- △ 特大・強調だけ：${largeOnly.map(name).join("、") || "なし"}。
-${deepWorse.length ? `
-濃度2の背景（帯・最下段）の上では、さらに次の判定が下がる。帯と最下段に置く文字は濃度4（濃）を基本にする。
-
-${deepWorse.map((r) => `- ${name(r)}：${r.gl} → ${r.gd}（濃度2の背景で ${f(r.deep)}:1）`).join("\n")}
-` : ""}
+- 濃度1・2は文字に使わない（背景に対して ${f(Math.min(...rows.filter((r) => r.d <= 2).map((r) => r.light)))}〜${f(Math.max(...rows.filter((r) => r.d <= 2).map((r) => r.white)))}:1）。
+- 添え字に使えるのは ${subOk.map(name).join("、")}（白・濃度1の上）。${subNg.map(name).join("、")} は添え字に足りないので、文字には使わない。色の意味は濃度4の文字・枠線で示し、添え字はグレー3にする。
+${subOk.filter((r) => r.deep < 4.5).length ? `- 濃度2の背景（帯・最下段）の上では、${subOk.filter((r) => r.deep < 4.5).map((r) => `${name(r)}も ${f(r.deep)}:1`).join("、")} で添え字に足りない。帯と最下段に添え字を置くときの扱いは未決。\n` : ""}${accDeep.length ? `- 濃度4でも濃度2の背景で 4.5:1 に届かないもの：${accDeep.map(name).join("、")}。\n` : ""}
 ## コントラスト比の表
 
-背景は、白と濃度1（グレー・緑・赤・橙の 1）のうち一番低いもの、濃度2（同じく 2）のうち一番低いもの。
+背景は、白と濃度1（グレー・緑・赤・橙の 1）のうち一番低いもの、濃度2（同じく 2）のうち一番低いもの。○ 4.5:1 以上、△ 3:1 以上（特大・強調だけ）、✕ 3:1 未満。
 
-| 文字の色 | OKLCH | 白 | 白・濃度1 | 濃度2 |
-| --- | --- | --- | --- | --- |
-${rows.map((r) => `| ${name(r)} | \`${r.oklch}\` | ${f(r.white)} | ${f(r.light)} ${r.gl} | ${f(r.deep)} ${r.gd} |`).join("\n")}
+| 色 | 役割 | OKLCH | 白 | 白・濃度1 | 濃度2 |
+| --- | --- | --- | --- | --- | --- |
+${rows.map((r) => `| ${name(r)} | ${ROLE[r.d]} | \`${r.oklch}\` | ${f(r.white)} | ${f(r.light)} ${r.gl} | ${f(r.deep)} ${r.gd} |`).join("\n")}
 `;
 writeFileSync(join(root, "docs/design-language.md"), md);
-console.log(`design-sheet: ✕ ${forbidden.length}、△ ${largeOnly.length}、濃度2で下がる ${deepWorse.length}`);
+console.log(`design-sheet: 添え字に使える ${subOk.map((r) => r.h).join(",")}、使えない ${subNg.map((r) => r.h).join(",")}`);

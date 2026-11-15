@@ -204,7 +204,6 @@ pub const TRADING_CARD_LIMIT: u32 = 3;
 pub const CATALOG: &[Product] = &[
     // 日配食品：販売期限・賞味期限は時刻まで。数量はレジ画面で増やせない
     fresh("4900000000028", "サンドイッチ", 320, Food, 6 * H, 10 * H),
-    fresh("4900000000042", "牛乳", 198, Drink, 3 * D, 5 * D),
     fresh("4900000000011", "パン", 160, Food, D, 2 * D),
     // 販売期限切れを登録したときのデモ。賞味期限はまだ先でも、販売期限を過ぎたら売らない
     fresh("4900000000080", "おにぎり", 150, Food, -2 * H, 4 * H),
@@ -236,15 +235,6 @@ pub const CATALOG: &[Product] = &[
         90 * D,
         120 * D,
     ),
-    packaged(
-        "4900000000066",
-        "即席麺",
-        214,
-        Reduced8,
-        Food,
-        150 * D,
-        180 * D,
-    ),
     p("4910000000014", "新聞", 160, Standard10, Newspaper),
     p("4910000000038", "雑誌", 480, Standard10, Magazine),
     p("4900000000127", "たばこ", 600, Standard10, Tobacco),
@@ -259,10 +249,7 @@ pub const CATALOG: &[Product] = &[
     p("4900000000134", "ライター", 110, Standard10, SmokingGoods),
     p("4900000000141", "切手", 110, Standard10, Stamp),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
-    p("2000000000022", "レジ袋 L", 5, Standard10, Bag),
     p("2000000000039", "フォーク", 3, Standard10, Bag),
-    p("2000000000046", "スプーン", 3, Standard10, Bag),
-    p("2000000000053", "お手拭き", 3, Standard10, Bag),
     Product {
         parcel_send: true,
         ..p("2100000000014", "荷物を送る 発払い", 0, Standard10, Service)
@@ -283,7 +270,6 @@ pub const CATALOG: &[Product] = &[
     },
     bill("2100000000021", "電気料金", 50000),
     bill("2100000000043", "水道料金", 4000),
-    bill("2100000000050", "ガス料金", 3000),
     // 申込券1枚でチケット2枚（7,800円×2）。支払いが済むと発券し、スタッフが枚数を照合してお渡しする
     Product {
         needs_staff: false,

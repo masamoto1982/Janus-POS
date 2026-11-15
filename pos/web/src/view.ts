@@ -1784,8 +1784,8 @@ type Shelf = { label: string; match: (p: Snapshot["catalog"][number]) => boolean
 
 const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(p.code);
 const SHELVES: Shelf[] = [
-  { label: "日配食品", match: byCodes("4900000000028", "4900000000042", "4900000000011", "4900000000080") },
-  { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073", "4900000000066") },
+  { label: "日配食品", match: byCodes("4900000000028", "4900000000011", "4900000000080") },
+  { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073") },
   { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000158", "4900000000134", "4900000000141", "4910000000076", "4910000000069", "4910000000090") },
   { label: "サービス", match: (p) => p.category === "service" },
   { label: "オプション", match: (p) => p.category === "bag" },
@@ -1795,7 +1795,7 @@ const PARCEL_CODES = ["2100000000014", "2100000000045", "2100000000081"];
 
 const PICKUP_CODE = "2100000000038";
 
-const BILL_CODES = ["2100000000021", "2100000000043", "2100000000050"];
+const BILL_CODES = ["2100000000021", "2100000000043"];
 const TAX_CODES = ["2100000000067"];
 const TICKET_CODES = ["2100000000074"];
 
@@ -1803,13 +1803,11 @@ const TICKET_CODES = ["2100000000074"];
  *  登録のしかたは Item の見出しのホバーにまとめてあるので、ここには書かない */
 const PURPOSE: Record<string, string> = {
   "4900000000028": "割引券（50円引き）の対象商品、クーポンの読み取りと値引きを試す",
-  "4900000000042": "軽減税率8%の日配食品、レジ画面では数量を増やせず、一点ずつスキャンすることを確かめる",
   "4900000000011": "軽減税率8%の日配食品、基本の登録と、＋で数量を増やせないことを確かめる",
   "4900000000035": "引換券（1個無料）の対象商品、クーポンの読み取りと引き換えを試す",
   "4900000000103": "法令による年齢確認（20歳）、標準税率10%なので、食品と一緒に買うと税率ごとの内税表示も確かめられる",
   "4900000000080": "販売期限が切れた日配食品、期限切れの商品を登録したときの警告と取り替えを試す",
   "4900000000073": "規則のない軽減税率8%の加工食品、数量の変更や販売規則の個数制限を試す",
-  "4900000000066": "規則のない軽減税率8%の加工食品、数量の変更や販売規則の個数制限を試す",
   "4910000000014": "店頭で買う新聞は軽減税率の対象外（標準税率10%）、税区分の違いを確かめる",
   "4910000000038": "標準税率10%の非食品、販売規則で店舗独自の年齢確認を付けるなどの設定を試す",
   "4900000000127": "法令による年齢確認（20歳）、スタッフがログインしているレジでのみ扱える",
@@ -1820,33 +1818,24 @@ const PURPOSE: Record<string, string> = {
   "4900000000134": "法令ではなく店舗の判断で年齢確認（20歳）を行う例",
   "4900000000141": "現金でしか買えない商品、スタッフがログインしているレジでのみ扱える",
   "2000000000015": "有料のレジ袋、待ち受けの「レジ袋」案内と対になる登録",
-  "2000000000022": "有料のレジ袋、待ち受けの「レジ袋」案内と対になる登録",
   "2000000000039": "お弁当などに添える付属品、オプションの登録を試す",
-  "2000000000046": "お弁当などに添える付属品、オプションの登録を試す",
-  "2000000000053": "お弁当などに添える付属品、オプションの登録を試す",
   "2100000000014": "宅配便の受付（サイズ・お届け先の郵便番号・送料）、ほかの商品と一緒にお会計できない",
   "2100000000045": "送料をお届け先が払う宅配便の受付、代金0円で受け付けだけを行う",
   "2100000000081": "同じお届け先に複数の荷物を送る受付、2個目からは届け先を引き継ぎ、サイズを決めるだけで送料が決まる",
   "2100000000038": "荷物の受け取り、受取番号の表示、保管場所の荷物の照合、サインからお渡しまで",
   "2100000000021": "5万円以上の払込票、現金のみで、収入印紙の貼り付け確認が済むまでお会計に進めない",
   "2100000000043": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
-  "2100000000050": "公共料金の受付、スタッフが払込先と金額を確かめ、現金で受け取る",
   "2100000000067": "電気料金と同じ5万円でも、税金の領収証には収入印紙が要らないことを確かめる",
   "2100000000074": "申込券でチケットを買う、現金のみで一件ずつ会計、支払い後に発券し、スタッフのお渡し枚数とお客様の受け取り枚数をそれぞれ発券枚数と照合する",
 };
 
-/** Item・Wallet のボタン。back（裏面）があれば、表は商品名と価格だけにして、それ以外の情報は裏に回す。
- *  クリック（モバイルのピッカーではタップ）でカードを裏返すように表と裏を入れ替える */
-function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[code] ?? "", back = ""): string {
-  const face = `<span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}`;
-  const body = back ? `<span class="item-face item-front">${face}</span><span class="item-face item-back">${back}</span>` : face;
-  const flip = back ? ` data-flip="${esc(code)}"` : "";
+function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[code] ?? ""): string {
   if (cls.split(" ").includes("off"))
-    return `<button type="button" class="item ${cls}"${flip} aria-disabled="true" title="${esc(hint)}" aria-label="${esc(name)}（${esc(hint)}）">
-    ${body}</button>`;
+    return `<button type="button" class="item ${cls}" aria-disabled="true" title="${esc(hint)}" aria-label="${esc(name)}（${esc(hint)}）">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
   const tip = hint ? ` data-hint="${esc(hint)}"` : "";
-  return `<button type="button" class="item ${cls}" data-code="${esc(code)}"${flip}${tip} aria-label="${esc(name)}${hint ? `、${esc(hint)}` : ""}">
-    ${body}</button>`;
+  return `<button type="button" class="item ${cls}" data-code="${esc(code)}"${tip} aria-label="${esc(name)}${hint ? `、${esc(hint)}` : ""}">
+    <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
 /** スタッフがログインしているレジ（スタッフ操作モード）でだけ扱えるカテゴリ（たばこ・切手・金券）。
@@ -1862,33 +1851,34 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
-        PARCEL_CODES.includes(p.code)
-          ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
-          : item(
-              p.code,
-              p.name,
-              p.code === PICKUP_CODE ? "" : p.price ? yen(p.price) : "金額は受付時",
-              STAFF_ONLY_SHELF.includes(p.category) && !staffOperated ? "off" : p.category === "tobacco" && asked ? "call-blink" : "",
-              STAFF_ONLY_SHELF.includes(p.category) && !staffOperated ? STAFF_ONLY_OFF : undefined,
-              backOf(p),
-            ),
+        BILL_CODES.includes(p.code)
+          ? item(p.code, "公共料金", `${esc(p.name.replace(/料金$/, ""))} ${yen(p.price)}`)
+          : TAX_CODES.includes(p.code)
+            ? item(p.code, "税金", `${esc(p.name)} ${yen(p.price)}`)
+          : TICKET_CODES.includes(p.code)
+            ? item(p.code, p.name, `${p.tickets}枚 ${yen(p.price)}`)
+          :
+            PARCEL_CODES.includes(p.code)
+            ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
+            : STAFF_ONLY_SHELF.includes(p.category) && !staffOperated
+              ? item(p.code, p.name, `${yen(p.price)}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}`, "off", STAFF_ONLY_OFF)
+              : item(
+                p.code,
+                p.name,
+                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}${datesSub(p)}`,
+                p.category === "tobacco" && asked ? "call-blink" : "",
+              ),
       )
       .join("")}</div></div>`;
   }).join("") + extra + slipShelf(s);
 }
 
-/** Item の商品ボタンの裏面：商品名と価格のほかの情報（年確・限定・販売期限・種別・枚数など）。何もなければ空（裏返らない）。
- *  販売期限切れは警告色。賞味期限はボタンには載せず、期限切れの案内にだけ使う */
-export function backOf(p: { code: string; age: number | null; limit: number | null; fresh: boolean; dates: Dates | null; tickets: number }): string {
-  const marks = [p.age ? `<b>年確${p.age}</b>` : "", p.limit ? `<b>限定${p.limit}</b>` : ""].filter(Boolean).join(" ・");
-  const kind = BILL_CODES.includes(p.code) ? "公共料金" : TAX_CODES.includes(p.code) ? "税金" : p.code === PICKUP_CODE ? "受取用バーコード" : "";
-  const lines = [
-    kind,
-    TICKET_CODES.includes(p.code) ? `${p.tickets}枚` : "",
-    marks,
-    p.dates ? (p.dates.sell_by_min < 0 ? `<b>販売 ${expiryLabel(p.dates.sell_by_min, p.fresh)}</b>` : `販売 ${expiryLabel(p.dates.sell_by_min, p.fresh)}`) : "",
-  ].filter(Boolean);
-  return lines.map((l) => `<span class="item-sub">${l}</span>`).join("");
+/** 日配食品・加工食品の販売期限（販売期限切れは警告色）。ボタンの大きさは変えず、名前・値段の下に三行目として足す。
+ *  賞味期限はボタンには載せず、期限切れの取り替え画面で販売期限と並べる */
+function datesSub(p: { fresh: boolean; dates: Dates | null }): string {
+  if (!p.dates) return "";
+  const sell = `販売 ${expiryLabel(p.dates.sell_by_min, p.fresh)}`;
+  return `</span><span class="item-sub item-date">${p.dates.sell_by_min < 0 ? `<b>${sell}</b>` : sell}`;
 }
 
 function slipShelf(s: Snapshot): string {

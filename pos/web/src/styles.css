@@ -57,6 +57,9 @@
   --service-ink: oklch(0 0 0);
   --tob: var(--ac-blue);
   --tob-ink: oklch(1 0 0);
+  --text-xl: min(16cqi, 96px);
+  --text-lg: 18px;
+  --text-sm: 13px;
   --flash: color-mix(in oklch, var(--ac-yellow) 70%, transparent);
   --bill-bg: color-mix(in oklch, var(--ac-green) 12%, white);
   --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, white);
@@ -82,7 +85,6 @@ button { touch-action: manipulation; }
 }
 
 
-.mode { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--line); }
 
 .screens { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 760px) { .screens { grid-template-columns: 1fr; } }
@@ -113,15 +115,14 @@ button { touch-action: manipulation; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
 .screen-items:has(> .ff-tabs) { gap: 3px; }
-/* 大きなテキストと小さなテキスト（アプリ全体で共通、待ち受け画面が基準。web の msg()）
-   大きなテキスト＝濃いグレー・18px・太字、小さなテキスト＝薄いグレー・13px。大きなテキストは必ず小さなテキストより上に、4px 空けて置く
-   対象外：青文字の案内（.guide）、呼び出し画面の理由、数字の強調（荷物番号・残高・枚数） */
-.screen { --muted: var(--msg-weak); --gap: 8px; --msg-big: 18px; --msg-small: 13px; }
-.screen .big { color: var(--msg-strong); font-size: var(--msg-big); font-weight: 700; line-height: 1.35; margin-bottom: 0; }
-.screen .guide { color: var(--msg-strong); font-size: var(--msg-small); }
+/* レジ画面のテキストは三段階：特大テキスト（第一待ち受けの稼働モード・休止中、呼び出し画面の用件）、大テキスト（濃いグレー・太字）、小テキスト（薄いグレー）
+   大テキストは必ず小テキストより上に、4px 空けて置く（web の msg()）。対象外：数字の強調（合計・残高・荷物番号・枚数）、部品の中の文字 */
+.screen { --muted: var(--msg-weak); --gap: 8px; }
+.screen .big { color: var(--msg-strong); font-size: var(--text-lg); font-weight: 700; line-height: 1.35; margin-bottom: 0; }
+.screen .guide { color: var(--msg-strong); font-size: var(--text-sm); }
 .screen .msg { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; text-align: center; }
 .screen .msg > p.small { margin: 0; }
-.screen .muted, .screen p.small, .screen :is(.point-screen, .paybox) p:not([class]) { color: var(--msg-weak); font-size: var(--msg-small); font-weight: 400; }
+.screen .muted, .screen p.small, .screen :is(.point-screen, .paybox) p:not([class]) { color: var(--msg-weak); font-size: var(--text-sm); font-weight: 400; }
 /* 意味の色はレジ画面でもグレーにしない：否定・エラー＝警告の赤（釣り銭の取り忘れと同じ）、完了＝緑 */
 .screen { --danger: var(--alert-ink); }
 .parcel-error { color: var(--danger); font-weight: 700; }
@@ -200,7 +201,6 @@ button { touch-action: manipulation; }
 .screen-main .lines td { font-size: 12px; padding: 3px 4px; }
 .screen-main .lines button { font-size: 11px; padding: 1px 8px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
-.total { font-size: 20px; }
 
 .row { display: flex; gap: var(--gap); align-items: center; margin: 6px 0; }
 .screen .row { margin: 8px 0; }
@@ -241,7 +241,6 @@ button.ghost:disabled { opacity: .3; }
 button.skip { font-weight: 500; }
 button.small { padding: 3px 8px; font-size: 12px; }
 button.primary { font-weight: 600; }
-button.big-btn { font-size: 18px; padding: 12px 22px; }
 button.seg { padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
 .segs { display: inline-flex; gap: var(--gap); }
@@ -273,7 +272,7 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 .banner.call { background: var(--call-bg); color: var(--call); }
 .call-screen { box-sizing: border-box; margin: -8px -12px; min-height: calc(100% + 16px); text-align: center; padding: 16px 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--call); }
 .call-screen .banner { align-self: stretch; }
-.call-screen .call-reason { color: var(--msg-strong); font-size: min(16cqi, 96px, calc(88cqi / var(--len, 1))); font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
+.call-screen .call-reason { color: var(--msg-strong); font-size: min(var(--text-xl), calc(88cqi / var(--len, 1))); font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
 .call-screen p { margin: 0; font-size: 16px; }
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
 /* 釣り銭の取り忘れ（両画面）：お釣り・お礼の案内を置き換える案内画面。大きなテキスト＝警告の赤、背景＝やわらかい黄色（領域いっぱい）
@@ -286,23 +285,23 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 /* 電子マネーの残高不足：払えていないことを見落とさないよう、大きなテキストを赤く、さらに大きく（user 2026-11-12）。両画面とも同じ大きさ */
 .screen .emoney-short .big { color: var(--alert-ink); font-size: 28px; }
 /* エマージェンシーモード：通報先の番号は数字の強調（赤・大きく） */
-.screen .sos-tel { display: flex; gap: 24px; justify-content: center; margin: 0; color: var(--alert-ink); font-size: var(--msg-big); font-weight: 700; }
+.screen .sos-tel { display: flex; gap: 24px; justify-content: center; margin: 0; color: var(--alert-ink); font-size: var(--text-lg); font-weight: 700; }
 .screen .sos-tel b { font-size: 32px; font-variant-numeric: tabular-nums; }
 /* 番号の下に小さなテキスト（オレンジ）でレシートの出力を添える。大小の間は 4px（pos-text-tiers） */
 .screen .sos-contact { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .screen .sos-contact p.small { margin: 0; }
 /* 非常事態モードのスタッフ側の最下段：オーナー・担当スーパーバイザーの連絡先を二行で。最下段の点滅（赤＋白）に合わせて文字も白に */
-.screen .sos-store { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0; margin: 0; font-size: var(--msg-small); font-weight: 700; line-height: 1.3; }
-.screen .sos-store b { font-size: var(--msg-big); font-variant-numeric: tabular-nums; }
+.screen .sos-store { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0; margin: 0; font-size: var(--text-sm); font-weight: 700; line-height: 1.3; }
+.screen .sos-store b { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
 .screen.sos .call-row.calling .sos-store { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
 /* 解除のあと：発動・解除の時刻（レシートの中身） */
-.screen .sos-log { display: flex; flex-wrap: wrap; gap: 4px 24px; justify-content: center; margin: 0; color: var(--msg-strong); font-size: var(--msg-small); font-weight: 700; font-variant-numeric: tabular-nums; }
+.screen .sos-log { display: flex; flex-wrap: wrap; gap: 4px 24px; justify-content: center; margin: 0; color: var(--msg-strong); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
 .bell-sub { margin: 16px 0 4px; font-size: 14px; }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
 /* 受け付けなかった理由（B-2）：二段目の帯の直下、内税の行の位置に赤文字で一行。何も覆わず、閉じるボタンも置かない */
-.screen .reject-note { flex: none; margin: 0; padding: 4px 0; color: var(--alert-ink); font-size: var(--msg-small); font-weight: 700; line-height: 1.35; }
+.screen .reject-note { flex: none; margin: 0; padding: 4px 0; color: var(--alert-ink); font-size: var(--text-sm); font-weight: 700; line-height: 1.35; }
 .screen-main > .reject-note + .confirm { flex: 1; }
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }
 .screen-main > .reg-top, .screen-main > .banner { flex: none; }
@@ -332,7 +331,7 @@ details summary h3 { display: inline; }
 .point-screen { text-align: center; padding: 0; display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .point-choices { display: flex; gap: var(--gap); flex-wrap: nowrap; justify-content: center; max-width: 100%; }
 .point-services { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-.point-service { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; padding: 8px 12px; font-size: 13px; }
+.point-service { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 96px; padding: 8px 12px; font-size: var(--text-sm); }
 .point-service .icon { font-size: 30px; line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: 14px; }
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
@@ -362,7 +361,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* チケットの受け取り枚数（お客様側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
 /* 入力欄は荷物の長さ・重さと同じ形（.parcel-fields） */
-.screen .ticket-alert { margin: 0; color: var(--alert-ink); font-size: var(--msg-small); font-weight: 700; text-align: center; }
+.screen .ticket-alert { margin: 0; color: var(--alert-ink); font-size: var(--text-sm); font-weight: 700; text-align: center; }
 .ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: 8px 0 0; }
 .ffv-foot.end { justify-content: flex-end; }
 .screen-foot { align-self: stretch; display: flex; justify-content: space-between; margin-top: auto; padding-top: 8px; }
@@ -378,7 +377,6 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 .qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
 .confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 2px; font-size: 12px; white-space: nowrap; }
 .confirm button.back-btn.wide, button.back-btn.wide { width: auto; min-width: var(--btn-md-w); padding: 0 8px; }
-.change { font-size: 18px; margin: 8px 0; }
 
 .toast {
   position: absolute; left: 10px; right: 10px; bottom: 8px; padding: 8px 10px; border-radius: 8px;
@@ -436,7 +434,6 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 }
 .register h2, .bell-area h2, .right h2 { margin: 0 0 8px; font-size: 16px; display: flex; gap: 8px; align-items: center; }
 .hw { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 10px; }
-.hw-label { font-size: 12px; color: var(--muted); }
 .hw .row { margin: 0; }
 
 .bell-area { position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-block: 8px; }
@@ -555,7 +552,6 @@ body.dragging .drop-hint { display: inline; }
 .points-amount { align-items: center; }
 /* 空のときも数字が入ったときと同じ高さ（空だと潰れて見えるため） */
 .parcel-fields button.pad-field { box-sizing: border-box; width: 84px; height: 40px; font-size: 18px; padding: 6px 8px; }
-.parcel-entry button.parcel-post { justify-content: center; height: auto; min-height: 1.6em; width: 200px; text-align: center; font-size: 18px; padding: 6px 10px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-no { margin-right: 8px; }
 .parcel-fee { margin-left: 8px; }
@@ -565,7 +561,6 @@ body.dragging .drop-hint { display: inline; }
 /* 照合イベントが済んだ印：意味色のグリーン（安全・肯定）の丸に白い✓ */
 .pass-mark { width: 48px; height: 48px; border-radius: 50%; background: var(--ok); color: oklch(1 0 0); font-size: 28px; font-weight: 700; line-height: 48px; text-align: center; }
 
-.mirror-head { font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--staff-line); margin-bottom: 8px; }
 .mirror { background: var(--cust-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
 .mirror .muted { color: var(--muted); }
 .login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 500; color: var(--muted); }
@@ -650,8 +645,8 @@ body.dragging .drop-hint { display: inline; }
 /* 第一待ち受け：三段目いっぱいに稼働モードを特大の文字で（有人レジ／セルフレジ） */
 .first-welcome { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 16px; text-align: center; }
 .first-welcome:has(> .mode-sub) { flex-direction: column; gap: 4px; }
-.first-welcome .mode-sub { color: var(--msg-weak); font-size: min(4.5cqi, 27px); font-weight: 400; line-height: 1.35; }
-.first-welcome .mode-big { color: var(--msg-strong); font-size: min(16cqi, 96px); font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
+.first-welcome .mode-sub { color: var(--msg-weak); font-size: var(--text-sm); font-weight: 400; line-height: 1.35; }
+.first-welcome .mode-big { color: var(--msg-strong); font-size: var(--text-xl); font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: var(--gap); }
 /* 呼び出し中の最下段：案内を中央に */
 .call-row.calling { display: flex; align-items: center; justify-content: center; padding: 0 var(--gap); }
@@ -668,7 +663,7 @@ body.dragging .drop-hint { display: inline; }
 .call-btn b { font-size: 12px; }
 .call-btn small { font-size: 9px; }
 
-.coupon-list { margin: 0; padding: 0; list-style: none; color: var(--msg-strong); font-size: var(--msg-small); }
+.coupon-list { margin: 0; padding: 0; list-style: none; color: var(--msg-strong); font-size: var(--text-sm); }
 .coupon-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 
 @keyframes line-flash { from { background: var(--flash); } to { background: transparent; } }
@@ -688,11 +683,11 @@ body.dragging .drop-hint { display: inline; }
 .qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); min-width: 0; text-align: center; }
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, oklch(0 0 0) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 18px oklch(0 0 0 / .25); }
-.qty-pop-name { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--msg-strong); }
-.qty-pop-name .muted { font-size: 12px; white-space: nowrap; }
+.qty-pop-name { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-sm); color: var(--msg-strong); }
+.qty-pop-name .muted { font-size: var(--text-sm); white-space: nowrap; }
 .qty-pop-value { border: 1.5px solid var(--msg-strong); border-radius: 0; padding: 2px 8px; text-align: right; font-size: 22px; font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
-.qty-pop-value .muted { font-size: 13px; font-weight: 400; }
-.qty-pop .pad-error { color: var(--alert-ink); font-size: 13px; line-height: 1.4; }
+.qty-pop-value .muted { font-size: var(--text-sm); font-weight: 400; }
+.qty-pop .pad-error { color: var(--alert-ink); font-size: var(--text-sm); line-height: 1.4; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); flex: 1 1 auto; min-height: 0; }
 .qty-pop-keys .pad-key { height: var(--btn-md-h); padding: 0; font-size: 16px; font-weight: 600; min-height: 0; }
 .qty-pop-keys .zero { grid-column: span 2; }

@@ -13,7 +13,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "check": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "gen:design": "node scripts/design-sheet.mjs"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

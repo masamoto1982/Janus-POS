@@ -788,6 +788,8 @@ body.dragging .drop-hint { display: inline; }
   --mode-self-bg: var(--white); --mode-self-deep: var(--grey-1); --alert-deep: var(--orange-2); }
 :root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
 :root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
+/* 操作できる側（アクティブ側）の画面は緑：一段目・三段目は緑の淡、二段目（帯）と四段目（最下段）は緑そのもの（濃度3） */
+:root .screen.operable { --cust-bg: var(--green-1); --tier-deep: var(--green-3); }
 /* セルフ操作モードのスタッフ側（操作できない側）はモードの色ではなくグレーの段でグレーアウトする */
 :root { --off-light: var(--grey-1); --off-deep: var(--grey-2); }
 :root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--off-light); --tier-deep: var(--off-deep); }

@@ -246,12 +246,13 @@ function buildSkeleton(): void {
     ${rampFilter()}`;
 }
 
+// グレーの四段（styles.css の --grey-1〜4）を青の四段（--blue-1〜4）に写す
 const RAMP_STEPS: [number, string][] = [
   [0x00, "oklch(0 0 0)"],
-  [0x53, "oklch(0.4415 0.11 245)"], // 操作可能部品の青。styles.css の --operable-blue（呼び鈴）と同じ値に保つ
-  [0x87, "oklch(0.6246 0.15 245)"],
-  [0xae, "oklch(0.7507 0.136 245)"],
-  [0xd4, "oklch(0.8704 0.0685 245)"],
+  [0x53, "oklch(0.44 0.11 245)"],
+  [0x87, "oklch(0.62 0.15 245)"],
+  [0xd4, "oklch(0.87 0.07 245)"],
+  [0xee, "oklch(0.95 0.03 245)"],
   [0xff, "oklch(1 0 0)"],
 ];
 

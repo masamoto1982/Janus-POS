@@ -1,71 +1,48 @@
 :root {
+  --btn-xl-w: 160px; --btn-xl-h: 64px;
   --btn-w: 116px; --btn-h: 48px;
   --btn-sm-w: 56px; --btn-sm-h: 26px;
   --btn-md-w: 64px; --btn-md-h: 34px;
   --gap: 6px;
-  /* フラグ：背景なし・枠線と文字は同じ色で、白地で読める（コントラスト4.5）ぎりぎりの濃さ。注意＝オレンジ、済み＝緑、その他＝グレー */
-  --flag-caution: oklch(0.575 0.13 59); --flag-safe: oklch(0.55 0.12 154); --flag-plain: oklch(0.565 0 0);
-  /* 阻害因子のある明細の行（淡いオレンジ） */
-  --flag-row: color-mix(in oklch, oklch(0.68 0.14 50) 45%, white);
-  --flag-flash: color-mix(in oklch, oklch(0.68 0.14 50) 80%, white);
-  --base-pink: oklch(0.883 0.063 32);
-  --base-cream: oklch(0.975 0.149 109);
-  --base-lime: oklch(0.914 0.180 118);
-  --base-sky: oklch(0.901 0.054 240);
-  --base-beige: oklch(0.870 0.110 75);
-  --base-green: oklch(0.812 0.117 160);
-  --base-purple: oklch(0.789 0.086 307);
-  --ac-red: oklch(0.666 0.225 37);
-  --ac-yellow: oklch(0.939 0.200 105);
-  --ac-green: oklch(0.667 0.144 163);
-  --ac-blue: oklch(0.542 0.254 262);
-  --ac-sky: oklch(0.778 0.134 234);
-  --ac-pink: oklch(0.745 0.155 21);
-  --ac-orange: oklch(0.791 0.166 77);
-  --ac-purple: oklch(0.479 0.220 328);
-  --ac-brown: oklch(0.444 0.109 55);
-  --btn: oklch(0.7508 0 0);
-  --btn-ink: oklch(0 0 0);
-  --btn-on: oklch(0.4423 0 0);
-  --btn-on-ink: oklch(1 0 0);
-
-  --bg: oklch(0.97 0.00287 265);
-  --panel: oklch(1 0 0);
-  --ink: oklch(0 0 0);
-  --muted: oklch(0.551 0.0234 264);
-  --line: oklch(0.8699 0 0); --border: oklch(0.6234 0 0); --msg-strong: oklch(0.4423 0 0); --msg-weak: oklch(0.6234 0 0); --off-bg: oklch(0.8699 0 0); --off-ink: oklch(0.6234 0 0);
-  --accent: var(--ac-blue);
+  /* 色は四つ（青・黄・赤・緑）、濃度は四段（1＝淡 0.95・2＝薄 0.87・3＝中 0.62・4＝濃 0.44）。白・黒・グレーは色に数えない無彩色で、グレーも同じ四段 */
+  --grey-1: oklch(0.95 0 0); --grey-2: oklch(0.87 0 0); --grey-3: oklch(0.62 0 0); --grey-4: oklch(0.44 0 0);
+  --blue-1: oklch(0.95 0.03 245); --blue-2: oklch(0.87 0.07 245); --blue-3: oklch(0.62 0.15 245); --blue-4: oklch(0.44 0.11 245);
+  --yellow-1: oklch(0.95 0.08 98); --yellow-2: oklch(0.87 0.13 92); --yellow-3: oklch(0.62 0.13 65); --yellow-4: oklch(0.44 0.1 60);
+  --red-1: oklch(0.95 0.035 25); --red-2: oklch(0.87 0.07 25); --red-3: oklch(0.62 0.17 27); --red-4: oklch(0.44 0.15 27);
+  --green-1: oklch(0.95 0.04 150); --green-2: oklch(0.87 0.08 150); --green-3: oklch(0.62 0.13 150); --green-4: oklch(0.44 0.1 150);
+  --white: oklch(1 0 0); --black: oklch(0 0 0);
+  /* フラグ：背景なし・枠線と文字は同じ色。注意＝黄、済み＝緑、その他＝グレー。阻害因子のある明細の行は黄の薄 */
+  --flag-caution: var(--yellow-4); --flag-safe: var(--green-4); --flag-plain: var(--grey-3);
+  --flag-row: var(--yellow-2);
+  --flag-flash: var(--yellow-3);
+  --btn-on: var(--grey-4);
+  --btn-on-ink: var(--white);
+  --bg: var(--grey-1);
+  --panel: var(--white);
+  --ink: var(--black);
+  --muted: var(--grey-3);
+  --line: var(--grey-2); --border: var(--grey-3); --msg-strong: var(--grey-4); --msg-weak: var(--grey-3); --off-bg: var(--grey-2); --off-ink: var(--grey-3);
+  --accent: var(--blue-3);
   --frame-w: 1.5px;
-  --accent-ink: oklch(1 0 0);
-  --accent-soft: color-mix(in oklch, var(--ac-blue) 8%, transparent);
-  --reg-top-bg: oklch(0.8699 0 0);
-  --reg-top-ink: oklch(0 0 0);
-  --staff-bg: oklch(0.2781 0.0296 257);
-  --staff-ink: oklch(0.967 0.00287 265);
-  --staff-line: oklch(0.3729 0.0306 260);
-  --cust-bg: oklch(1 0 0);
-  --warn: color-mix(in oklch, var(--ac-orange) 55%, black);
-  --warn-bg: color-mix(in oklch, var(--ac-orange) 22%, white);
-  --danger: color-mix(in oklch, var(--ac-red) 75%, black);
-  --danger-bg: color-mix(in oklch, var(--ac-red) 14%, white);
-  --ok: color-mix(in oklch, var(--ac-green) 70%, black);
-  --call: color-mix(in oklch, var(--ac-blue) 85%, black);
-  --call-bg: color-mix(in oklch, var(--ac-blue) 12%, white);
-  --ff: var(--ac-orange);
-  --ff-ink: oklch(0 0 0);
-  --service: var(--ac-green);
-  --service-ink: oklch(0 0 0);
-  --tob: var(--ac-blue);
-  --tob-ink: oklch(1 0 0);
+  --accent-ink: var(--white);
+  --reg-top-ink: var(--black);
+  --staff-bg: var(--grey-4);
+  --staff-ink: var(--white);
+  --cust-bg: var(--white);
+  --warn: var(--yellow-4);
+  --danger: var(--red-4);
+  --danger-bg: var(--red-1);
+  --ok: var(--green-4);
+  --call: var(--blue-4);
+  --call-bg: var(--blue-1);
   --text-xl: min(16cqi, 96px);
   --text-num: 28px;
   --text-lg: 18px;
   --text-sm: 13px;
-  --text-xs: 11px;
-  --flash: color-mix(in oklch, var(--ac-yellow) 70%, transparent);
-  --bill-bg: color-mix(in oklch, var(--ac-green) 12%, white);
-  --coin-bg: color-mix(in oklch, var(--ac-orange) 18%, white);
-  --pay-bg: color-mix(in oklch, var(--ac-sky) 18%, white);
+  --flash: var(--yellow-2);
+  --bill-bg: var(--green-1);
+  --coin-bg: var(--yellow-1);
+  --pay-bg: var(--blue-1);
   color-scheme: only light;
 }
 
@@ -92,7 +69,7 @@ button { touch-action: manipulation; }
 @media (max-width: 760px) { .screens { grid-template-columns: 1fr; } }
 
 .screen-wrap { min-width: 0; display: flex; flex-direction: column; }
-.screen-cap { font-size: var(--text-xs); letter-spacing: .08em; color: var(--muted); margin: 0 0 3px 2px; }
+.screen-cap { font-size: var(--text-sm); letter-spacing: .08em; color: var(--muted); margin: 0 0 3px 2px; }
 .screen-cap::after { content: ""; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 /* レジ画面の縦幅は三段の積み上げで決める（いずれも上下の枠線1pxずつを含む）
@@ -111,7 +88,7 @@ button { touch-action: manipulation; }
 /* スタッフがログインして応答した呼び出しの用件（たばこ など）。担当スタッフ名の右に */
 .staff-head .answered-topic { margin-left: 8px; font-weight: 700; color: var(--msg-strong); white-space: nowrap; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: 8px; }
-.screen-head .clock { font-size: var(--text-xs); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+.screen-head .clock { font-size: var(--text-sm); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: 8px 12px; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: 3px 8px; border-top: 1px solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
@@ -129,12 +106,12 @@ button { touch-action: manipulation; }
 .screen { --danger: var(--alert-ink); }
 .parcel-error { color: var(--danger); font-weight: 700; }
 .ff-tabs { flex: none; margin-top: 5px; }
-.ff-tab { padding: 2px 4px; font-size: var(--text-xs); }
+.ff-tab { padding: 2px 4px; font-size: var(--text-sm); }
 .ff-page { flex: 1; min-height: 0; display: flex; gap: var(--gap); }
-.ff-arrows { flex: none; width: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--gap); }
-.ff-arrow { flex: 1; max-height: 48%; padding: 0; font-size: var(--text-xs); }
-.ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: var(--gap); }
-.ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 1px 3px; font-size: var(--text-xs); line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
+.ff-arrows { flex: none; display: flex; flex-direction: row; justify-content: space-between; gap: var(--gap); }
+.ff-arrow { flex: none; width: 20px; padding: 0; font-size: var(--text-sm); }
+.ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); gap: var(--gap); }
+.ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 1px 3px; font-size: var(--text-sm); line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
    無し＝グレーアウト（長押しで予約注文） */
 .screen [data-region] button.ff-item.out {
@@ -150,7 +127,7 @@ button { touch-action: manipulation; }
 .lines.cols3 col.c-qty { width: 48px; }
 .lines.cols3:has(.qty-step) col.c-qty { width: min(calc(var(--btn-sm-w) * 3 + 2 * var(--gap)), 50%); }
 .lines.cols3 col.c-amt { width: 60px; }
-.lines th { text-align: left; font-weight: 500; font-size: var(--text-xs); color: var(--msg-weak); }
+.lines th { text-align: left; font-weight: 500; font-size: var(--text-sm); color: var(--msg-weak); }
 .lines th.num { text-align: right; }
 .lines td, .lines th { padding: 4px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .num { text-align: right; white-space: nowrap; }
@@ -158,7 +135,7 @@ button { touch-action: manipulation; }
 .reg-top { --row: 14px; --sum-h: 34px; position: sticky; top: -8px; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 8px; min-height: var(--btn-h); margin: -8px -12px 8px; padding: 8px 12px; background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: 1px solid var(--border); box-sizing: content-box; }
 .reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
 .reg-top .total { font-size: var(--text-num); }
-.reg-top .info { height: var(--row); line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 0 14px; font-size: var(--text-xs); white-space: nowrap; }
+.reg-top .info { height: var(--row); line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 0 14px; font-size: var(--text-sm); white-space: nowrap; }
 .reg-top .info .point { color: var(--msg-weak); }
 .reg-top .info .point.read { color: inherit; }
 .reg-top .sum { height: var(--sum-h); font-size: var(--text-lg); white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 0 4px; line-height: 1.2; }
@@ -181,7 +158,7 @@ button { touch-action: manipulation; }
 .reg-top .tender { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
 .reg-top .tender-row { display: flex; align-items: baseline; justify-content: center; gap: 0 12px; white-space: nowrap; }
 .reg-top .tender-cell { display: inline-flex; align-items: baseline; gap: 0 2px; font-variant-numeric: tabular-nums; }
-.reg-top .tender-cell small { margin-right: 4px; font-size: var(--text-xs); }
+.reg-top .tender-cell small { margin-right: 4px; font-size: var(--text-sm); }
 .reg-top .tender-cell b { font-size: var(--text-lg); }
 .reg-top .tender.two-rows .tender-row { gap: 0 8px; }
 .reg-top .tender.two-rows .tender-cell small { margin-right: 2px; }
@@ -195,10 +172,10 @@ button { touch-action: manipulation; }
 @container (max-width: 420px) {
   .reg-top .tender.two-rows .tender-row { gap: 0 6px; }
   .reg-top .tender.two-rows .tender-cell small { margin-right: 1px; }
-  .reg-top .tender.two-rows .tender-cell .yen { font-size: var(--text-xs); }
+  .reg-top .tender.two-rows .tender-cell .yen { font-size: var(--text-sm); }
 }
 .screen-main .lines td { font-size: var(--text-sm); padding: 3px 4px; }
-.screen-main .lines button { font-size: var(--text-xs); padding: 1px 8px; }
+.screen-main .lines button { font-size: var(--text-sm); padding: 1px 8px; }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
 
 .row { display: flex; gap: var(--gap); align-items: center; margin: 6px 0; }
@@ -238,7 +215,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button:disabled { opacity: .35; filter: grayscale(1); cursor: not-allowed; }
 button.ghost:disabled { opacity: .3; }
 button.skip { font-weight: 500; }
-button.small { padding: 3px 8px; font-size: var(--text-xs); }
+button.small { padding: 3px 8px; font-size: var(--text-sm); }
 button.primary { font-weight: 600; }
 button.seg { padding: 4px 10px; }
 .method-list .seg.off { background: var(--off-bg); color: var(--off-ink); }
@@ -257,7 +234,7 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 
 .tag {
   box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
-  font-size: var(--text-xs); font-weight: 700; line-height: 1; white-space: nowrap;
+  font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap;
   background: transparent; border: none; color: var(--flag-plain);
 }
 .tag.warn, .tag.age { color: var(--flag-caution); }
@@ -277,7 +254,7 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 /* 釣り銭の取り忘れ（両画面）：お釣り・お礼の案内を置き換える案内画面。大きなテキスト＝警告の赤、背景＝やわらかい黄色（領域いっぱい）
    画面の色変数はグレーに置き換わるので、色はここで直接 OKLCH で持つ
    小さなテキストを足すときはオレンジ --alert-note */
-:root { --alert-bg: oklch(0.96 0.07 98); --alert-ink: oklch(0.53 0.2 29); --alert-note: oklch(0.58 0.15 55); }
+:root { --alert-bg: var(--yellow-1); --alert-ink: var(--red-4); --alert-note: var(--yellow-4); }
 .screen .confirm.change-alert { margin: -8px -12px; background: var(--alert-bg); }
 .screen .change-alert .big { color: var(--alert-ink); }
 .screen .change-alert p.small { color: var(--alert-note); }
@@ -321,7 +298,7 @@ details summary h3 { display: inline; }
 .welcome p { margin: 4px 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: 8px; }
-.guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-xs); padding: 0 2px; border-radius: 999px; white-space: nowrap; }
+.guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 2px; border-radius: 999px; white-space: nowrap; }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-weight: 700; }
@@ -335,16 +312,16 @@ details summary h3 { display: inline; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: var(--text-sm); }
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 4px 6px; }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
-.method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: var(--text-xs); white-space: nowrap; }
+.method-row button { width: auto; height: var(--btn-sm-h); padding: 0 6px; font-size: var(--text-sm); white-space: nowrap; }
 /* お客様側の支払方法一覧（スタッフ操作モード、表示のみ）はスタッフ側の支払方法ボタンと同じ大きさ（user 2026-11-12） */
-.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: var(--btn-sm-h); padding: 0 6px; font-size: var(--text-xs); line-height: 1; white-space: nowrap; }
+.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: var(--btn-sm-h); padding: 0 6px; font-size: var(--text-sm); line-height: 1; white-space: nowrap; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
    （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
 */
 .lines tr.flagged > td { background: var(--flag-row); }
 .flag {
   box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
-  font: inherit; font-size: var(--text-xs); font-weight: 700; line-height: 1; white-space: nowrap;
+  font: inherit; font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap;
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-radius: 8px;
 }
 button.flag { cursor: pointer; }
@@ -355,7 +332,7 @@ button.flag { cursor: pointer; }
 .ffv-screen .lines.ffv td { vertical-align: middle; text-align: left; }
 .ffv-screen .lines.ffv td.num, .ffv-screen .lines.ffv th.num { text-align: right; }
 .ffv-screen .lines.ffv .ffv-judge { text-align: center; width: 48px; }
-button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0 4px; }
+button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 4px; }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* チケットの受け取り枚数（お客様側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
@@ -379,7 +356,7 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 
 .toast {
   position: absolute; left: 10px; right: 10px; bottom: 8px; padding: 8px 10px; border-radius: 8px;
-  background: oklch(0.2101 0.0318 265); color: oklch(1 0 0); opacity: 0; transform: translateY(6px); pointer-events: none;
+  background: var(--grey-4); color: var(--white); opacity: 0; transform: translateY(6px); pointer-events: none;
   transition: opacity .15s, transform .15s; font-size: var(--text-sm);
   white-space: pre-line;
 }
@@ -388,15 +365,15 @@ button.ffv-input { box-sizing: border-box; width: 52px; height: 22px; padding: 0
 
 button.cash { min-width: 56px; color: var(--ink); }
 button.cash.bill { background: var(--bill-bg); color: var(--ink); border: 1px solid var(--border); }
-button.cash.coin { background: var(--ac-orange); color: oklch(0 0 0); border-radius: 999px; }
-button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
+button.cash.coin { background: var(--yellow-2); color: var(--black); border-radius: 999px; }
+button.emoney { background: var(--blue-2); color: var(--black); }
 
 
 .bells { display: flex; gap: var(--gap); flex-wrap: wrap; }
 .bell-unit { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 4px 12px; border: 2px solid var(--border); }
 .bell-unit .bell-icon { font-size: var(--text-lg); display: inline-block; }
 .bell-id { font-weight: 600; }
-.bell-state { font-size: var(--text-xs); color: var(--muted); }
+.bell-state { font-size: var(--text-sm); color: var(--muted); }
 .bell-unit.buzz { border-color: var(--call); background: var(--call-bg); }
 /* 呼び鈴機能が OFF・不通の端末は、操作不可の部品と同じグレーアウト（薄いグレーの塗り・グレーの文字、絵文字も無彩色） */
 .bell-unit.off { background: var(--off-bg); color: var(--off-ink); border-color: var(--line); }
@@ -416,11 +393,11 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 
 .top h1 { font-size: var(--text-lg); margin: 0; }
 .top .logo { width: 73px; height: 73px; flex: none; }
-.build-badge { font-size: var(--text-xs); font-weight: 600; color: oklch(1 0 0); background: oklch(0.3717 0.0392 257); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
+.build-badge { font-size: var(--text-sm); font-weight: 600; color: var(--white); background: var(--grey-4); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
 .reset-btn { margin-left: auto; }
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
-.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: var(--text-xs); font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
+.tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: var(--grey-4); color: var(--white); font-size: var(--text-sm); font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
 .tip:hover::after, .tip:focus-visible::after { opacity: 1; }
 .floor, .bottom {
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -443,7 +420,7 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
    エマージェンシーモード中は同じ点滅を赤で。赤は釣り銭警告・エマージェンシーの赤い文字（--alert-ink）と同じ色相で、
    黄（--call-soft）と並べても浮かない濃さにし、文字は白にする。
    待ち時間で色や速さは変えない（経過時間がお客様にも伝わり、待たされた不満を増やしかねないため） */
-:root { --call-soft: oklch(0.93 0.10 95); --sos-head: oklch(0.6 0.17 29); --sos-head-ink: oklch(1 0 0); }
+:root { --call-soft: var(--yellow-2); --sos-head: var(--red-3); --sos-head-ink: var(--white); }
 /* 点滅の拍は画面（.screen.head-blink）に一つだけ持ち、--blink-on（1＝点いている／0＝消えている）として配る。
    ヘッダーの中身（時計・呼び鈴）は描き直されるので、部品ごとにアニメーションを持つと拍がずれる。
    ヘッダーの背景・エマージェンシーの白文字・呼び鈴の黄はすべてこの拍で切り替わる */
@@ -459,7 +436,7 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
 @media (max-width: 900px) { .right-col { position: static; max-height: none; } }
 .shelf + .shelf { margin-top: 6px; }
-.shelf h3 { margin: 0 0 4px; font-size: var(--text-xs); color: var(--muted); font-weight: 600; letter-spacing: .04em; }
+.shelf h3 { margin: 0 0 4px; font-size: var(--text-sm); color: var(--muted); font-weight: 600; letter-spacing: .04em; }
 .items { display: flex; flex-wrap: wrap; gap: var(--gap); }
 .item {
   display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left;
@@ -467,20 +444,20 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
   padding: 3px 8px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .item:hover { border-color: var(--accent); }
-.item-name { font-weight: 600; font-size: var(--text-xs); }
-.item-sub { font-size: var(--text-xs); color: var(--muted); }
+.item-name { font-weight: 600; font-size: var(--text-sm); }
+.item-sub { font-size: var(--text-sm); color: var(--muted); }
 .item-sub b { color: var(--warn); font-weight: 600; }
 @keyframes item-call-blink { 50% { border-color: var(--border); color: var(--ink); } }
 .item.call-blink { border: 2px solid var(--call); color: var(--call); animation: item-call-blink 1s steps(1) infinite; }
 .item.call-blink .item-name, .item.call-blink .item-sub, .item.call-blink .item-sub b { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .item.call-blink { animation: none; } }
 .item.staff { background: var(--staff-bg); color: var(--staff-ink); border-color: var(--border); }
-.item.staff .item-sub { color: oklch(0.7137 0.0192 261); }
+.item.staff .item-sub { color: var(--grey-2); }
 .item.coupon { background: var(--danger-bg); color: var(--danger); }
 .item.card { background: var(--call-bg); color: var(--call); margin: 0; }
 .item.bill { background: var(--bill-bg); border-color: var(--border); justify-content: center; min-height: 34px; }
 .item.coin { background: var(--coin-bg); border-color: var(--border); border-radius: 50%; width: var(--btn-h); height: var(--btn-h); padding: 0; align-items: center; justify-content: center; text-align: center; }
-.item.coin .item-name { font-size: var(--text-xs); white-space: nowrap; }
+.item.coin .item-name { font-size: var(--text-sm); white-space: nowrap; }
 .item.pay { background: var(--pay-bg); border-color: var(--border); }
 /* 扱えない Item（スタッフ不在のときのたばこ・切手）は、レジ画面の操作不可の部品と同じグレーアウト */
 .item.off, .item.off:hover { background: var(--off-bg); color: var(--off-ink); border-color: var(--line); cursor: not-allowed; }
@@ -488,10 +465,10 @@ button.emoney { background: var(--ac-sky); color: oklch(0 0 0); }
 .item.off:active { transform: none; }
 .wallet-cards { margin-top: 4px; }
 .items.uniform .item, .wallet-cards .item, .item.bill { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); justify-content: center; align-items: center; text-align: center; }
-/* 日配食品・加工食品は名前・値段・販売期限の三行。ボタンの大きさはそのままで行間を詰める */
+.items.uniform .item { height: var(--btn-xl-h); }
 .items.uniform .item:has(.item-date) { gap: 0; padding-top: 1px; padding-bottom: 1px; }
 .items.uniform .item:has(.item-date) > span { line-height: 1.2; }
-.item-sub.item-date { font-size: var(--text-xs); }
+.item-sub.item-date { font-size: var(--text-sm); }
 .items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 .drop-hint { display: none; margin-left: 8px; letter-spacing: 0; }
@@ -504,7 +481,7 @@ body.dragging .drop-hint { display: inline; }
 .drag-ghost {
   position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none;
   background: var(--accent); color: var(--accent-ink); padding: 6px 10px; border-radius: 8px; font-weight: 600;
-  box-shadow: 0 6px 18px oklch(0 0 0 / .25);
+  box-shadow: 0 6px 18px color-mix(in oklch, var(--black) 25%, transparent);
 }
 
 .bottom { border-top: 1px solid var(--border); background: var(--panel); padding-block: 8px; }
@@ -512,19 +489,13 @@ body.dragging .drop-hint { display: inline; }
 .floor { user-select: none; -webkit-user-select: none; }
 .floor input, .floor select { user-select: text; -webkit-user-select: text; }
 .ffmenu { display: flex; flex-wrap: wrap; gap: var(--gap); align-items: center; margin: 6px 0; }
-.copyright { margin: 8px 0 0; text-align: center; font-size: var(--text-xs); }
+.copyright { margin: 8px 0 0; text-align: center; font-size: var(--text-sm); }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
 .staff-screen, .customer-screen {
-  --base-pink: oklch(0.8699 0 0); --base-cream: oklch(0.9731 0 0); --base-lime: oklch(0.9097 0 0); --base-sky: oklch(0.9006 0 0);
-  --base-beige: oklch(0.8576 0 0); --base-green: oklch(0.8109 0 0); --base-purple: oklch(0.7763 0 0); --ac-red: oklch(0.5313 0 0);
-  --ac-yellow: oklch(0.9158 0 0); --ac-green: oklch(0.6234 0 0); --ac-blue: oklch(0.4423 0 0); --ac-sky: oklch(0.754 0 0);
-  --ac-pink: oklch(0.6895 0 0); --ac-orange: oklch(0.7508 0 0); --ac-purple: oklch(0.2931 0 0); --ac-brown: oklch(0.4054 0 0);
-  --bg: oklch(0.9702 0 0); --accent: oklch(0.4423 0 0); --accent-soft: oklch(0.4423 0 0 / 0.08); --staff-bg: oklch(0.2768 0 0);
-  --staff-ink: oklch(0.9672 0 0); --staff-line: oklch(0.3715 0 0); --call: oklch(0.3942 0 0);
-  --call-bg: oklch(0.937 0 0); --ff: oklch(0.7508 0 0); --service: oklch(0.6234 0 0); --tob: oklch(0.4423 0 0);
-  --flash: oklch(0.9158 0 0 / 0.7); --bill-bg: oklch(0.9581 0 0); --coin-bg: oklch(0.9551 0 0); --pay-bg: oklch(0.9581 0 0);
+  --accent: var(--grey-4); --staff-bg: var(--grey-4); --staff-ink: var(--white); --call: var(--grey-4); --call-bg: var(--grey-1);
+  --flash: var(--grey-2); --bill-bg: var(--grey-1); --coin-bg: var(--grey-1); --pay-bg: var(--grey-1);
 }
 .screen :is(button, input, select, summary) { filter: grayscale(1); }
 .screen.operable [data-region] :is(button, input, select, summary),
@@ -558,7 +529,7 @@ body.dragging .drop-hint { display: inline; }
 .collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: min(370px, 100%); }
 .collect-list li { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 8px 12px; border: 1.5px solid var(--border); font-size: var(--text-lg); text-align: left; }
 /* 照合イベントが済んだ印：意味色のグリーン（安全・肯定）の丸に白い✓ */
-.pass-mark { width: 48px; height: 48px; border-radius: 50%; background: var(--ok); color: oklch(1 0 0); font-size: var(--text-num); font-weight: 700; line-height: 48px; text-align: center; }
+.pass-mark { width: 48px; height: 48px; border-radius: 50%; background: var(--ok); color: var(--white); font-size: var(--text-num); font-weight: 700; line-height: 48px; text-align: center; }
 
 .mirror { background: var(--cust-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
 .mirror .muted { color: var(--muted); }
@@ -567,16 +538,16 @@ body.dragging .drop-hint { display: inline; }
 
 .rules-open { margin-left: auto; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
-.rules-dlg::backdrop { background: oklch(0 0 0 / .45); }
+.rules-dlg::backdrop { background: color-mix(in oklch, var(--black) 45%, transparent); }
 .rules-dlg .dlg-head { display: flex; align-items: center; gap: 8px; }
 .rules-dlg .dlg-head h2 { margin: 0; font-size: var(--text-lg); flex: 1; }
 .rules-dlg .toast { position: sticky; top: 0; z-index: 1; margin: 6px 0; }
 .rules-dlg .toast:not(.show) { display: none; }
-.lines.rules tr.grp th { text-align: left; padding-top: 10px; color: var(--muted); font-size: var(--text-xs); }
+.lines.rules tr.grp th { text-align: left; padding-top: 10px; color: var(--muted); font-size: var(--text-sm); }
 .lines.rules select { font-size: var(--text-sm); padding: 3px 6px; }
-.idle { margin-left: 6px; font-size: var(--text-xs); font-weight: 400; color: var(--muted); }
+.idle { margin-left: 6px; font-size: var(--text-sm); font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
-.icon-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+.icon-btn { width: var(--btn-sm-h); height: var(--btn-sm-h); padding: 0; border-radius: 50%; font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: var(--text-sm); margin: 14px 0 6px; }
 .rules-dlg h4 { font-size: var(--text-sm); margin: 14px 0 6px; }
@@ -610,7 +581,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io .inlet.blink .placeholder { color: var(--ink); font-weight: 700; }
 /* お客様側の下は、左に決済端末・右にスキャナ（スタッフ側の入金・出金ボックスと同じ横並び）。どちらも二重枠、文字は入金・出金と同じ色 */
 .money-io .terminal { width: 100%; outline: var(--frame-w) solid var(--msg-strong); outline-offset: calc(var(--frame-w) * -3); justify-content: center; text-align: center; }
-.money-io .terminal { --scan-red: oklch(0.6 0.2 27); --tap-blue: oklch(0.6 0.2 255); position: relative; overflow: hidden; }
+.money-io .terminal { --scan-red: var(--red-3); --tap-blue: var(--blue-3); position: relative; overflow: hidden; }
 .money-io .terminal > * { position: relative; z-index: 1; }
 /* 決済端末：電子マネー・クレジットカードを待っているあいだだけ、二重枠が操作色で点滅（入金ボックスと同じ。背景は塗らない） */
 .money-io .terminal.reader { border-color: var(--accent); outline-color: var(--accent); animation: io-frame-double 1s steps(1) infinite; }
@@ -660,7 +631,7 @@ body.dragging .drop-hint { display: inline; }
 .call-btn.pressing { transform: translate(1px, 2px); }
 .call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
 .call-btn b { font-size: var(--text-sm); }
-.call-btn small { font-size: var(--text-xs); }
+.call-btn small { font-size: var(--text-sm); }
 
 .coupon-list { margin: 0; padding: 0; list-style: none; color: var(--msg-strong); font-size: var(--text-sm); }
 .coupon-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -677,11 +648,11 @@ body.dragging .drop-hint { display: inline; }
 /* 数量フォームのある明細：見出し「数量」・数字・入力欄を列の中央に揃える（−・入力欄・＋は同じ幅なので入力欄が列の中心） */
 .lines.cols3:has(.qty-step) :is(th, td):nth-child(2) { text-align: center; }
 .qty-step { display: flex; align-items: center; justify-content: center; gap: var(--gap); white-space: nowrap; }
-.screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 2px; font-size: var(--text-xs); }
+.screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 2px; font-size: var(--text-sm); }
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: var(--text-sm); }
 .qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); min-width: 0; text-align: center; }
-.qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, oklch(0 0 0) 28%, transparent); }
-.qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 18px oklch(0 0 0 / .25); }
+.qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, var(--black) 28%, transparent); }
+.qty-pop-box { background: var(--panel); border: 1.5px solid var(--msg-strong); border-radius: 10px; padding: 8px; width: min(220px, calc(100% - 16px)); max-height: calc(100% - 12px); display: flex; flex-direction: column; gap: 8px; box-shadow: 0 6px 18px color-mix(in oklch, var(--black) 25%, transparent); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-sm); color: var(--msg-strong); }
 .qty-pop-name .muted { font-size: var(--text-sm); white-space: nowrap; }
 .qty-pop-value { border: 1.5px solid var(--msg-strong); border-radius: 0; padding: 2px 8px; text-align: right; font-size: var(--text-lg); font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
@@ -704,7 +675,7 @@ body.dragging .drop-hint { display: inline; }
   /* レジ画面ヘッダーの背景は普段は無色（段の色）。呼び出し中は黄、エマージェンシー中は赤で点滅する */
   --head-bg: transparent; }
 .scan-welcome, .staff-operated-welcome { position: relative; margin: -8px -12px; min-height: calc(100% + 16px); padding: 8px 12px; }
-.hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: oklch(0.2781 0.0296 257); color: oklch(1 0 0); font-size: var(--text-xs); font-weight: 500; line-height: 1.5; pointer-events: none; }
+.hover-tip { position: fixed; z-index: 50; max-width: 260px; padding: 6px 10px; border-radius: 8px; background: var(--grey-4); color: var(--white); font-size: var(--text-sm); font-weight: 500; line-height: 1.5; pointer-events: none; }
 .hover-tip[hidden] { display: none; }
 
 .swipe-tabs { display: none; }
@@ -732,9 +703,9 @@ body.dragging .drop-hint { display: inline; }
   .bell-unit .bell-icon { font-size: var(--text-sm); }
   .register { padding: 8px; }
   .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: var(--text-sm); margin-bottom: 4px; }
-  .register h2 .idle { font-size: var(--text-xs); }
+  .register h2 .idle { font-size: var(--text-sm); }
   .swipe-tabs { display: flex; border-bottom: none; }
-  .swipe-tabs .tab { min-height: 30px; padding: 2px 4px; font-size: var(--text-sm); line-height: 1.2; transition: flex-grow .2s; }
+  .swipe-tabs .tab { min-height: var(--btn-md-h); padding: 2px 4px; font-size: var(--text-sm); line-height: 1.2; transition: flex-grow .2s; }
   .swipe-tabs .tab.on { flex-grow: 2; }
   .swipe-tabs .tab.operable { filter: url(#ramp); }
   .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
@@ -771,8 +742,8 @@ body.dragging .drop-hint { display: inline; }
    呼び出し中のヘッダーと重なっても、青い縁取りで呼び鈴の形がわかる。
    呼び鈴は黄背景を保つため青のランプ（#ramp）を通さないので、ベルも縁も青のランプが濃いグレー（--msg-strong）を
    写す先の青（main.ts RAMP_STEPS の 0x53）を直接使い、操作可能部品の青と一致させる */
-:root { --operable-blue: oklch(0.4415 0.11 245); --bell-bg: var(--call-soft); --bell-ink: var(--operable-blue); --bell-ring: var(--operable-blue); }
-.bell-btn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border-radius: 50%; line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+:root { --operable-blue: var(--blue-4); --bell-bg: var(--call-soft); --bell-ink: var(--operable-blue); --bell-ring: var(--operable-blue); }
+.bell-btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-sm-h); height: var(--btn-sm-h); padding: 0; border-radius: 50%; line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .screen .bell-btn, .screen .bell-btn:disabled { filter: none !important; opacity: 1 !important; }
 .screen .bell-btn:not(:disabled) { background: var(--bell-bg); color: var(--bell-ink); border: 1.5px solid var(--bell-ring); }
 /* 呼び出し中は呼び鈴の黄もヘッダーと同じ拍で切り替える：ヘッダーが黄のときは同じ黄、ヘッダーが戻るときはやわらかい黄（--alert-bg） */
@@ -798,9 +769,9 @@ body.dragging .drop-hint { display: inline; }
 .screen-main > .welcome-band { display: block; }
 .welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: max(var(--gap), (100cqi + 8px - 4 * var(--btn-w) - 3 * var(--gap)) / 5 + var(--gap)); }
 .welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--btn-h); height: var(--btn-h); }
-.welcome-band .band-btn { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 2px 6px; line-height: 1.2; white-space: nowrap; }
+.welcome-band .band-btn { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-xl-w); max-width: 100%; height: var(--btn-h); padding: 2px 6px; line-height: 1.2; white-space: nowrap; }
 .welcome-band .band-btn b { font-size: var(--text-sm); }
-.welcome-band .band-btn small { font-size: var(--text-xs); }
+.welcome-band .band-btn small { font-size: var(--text-sm); }
 .welcome-band .band-row:has(> .msg) { height: var(--btn-h); }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }
 /* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードのお客様側）でも押せる＝青 */
@@ -813,12 +784,12 @@ body.dragging .drop-hint { display: inline; }
 /* 稼働モードの背景色：スタッフ操作モード＝ピンク、セルフ操作モード＝ミント（グレー・青・黄と P/D/T 型でも区別できる淡い色）。
    グラデーションは使わず段ごとに塗り分ける：一段目（ヘッダー）と三段目は薄く、二段目（帯）と四段目（FF・サイネージ）は濃いめ。
    呼び出し中のスタッフ側画面は、エマージェンシーと同じやわらかい黄色を同じ塗り分けで */
-:root { --mode-staff-bg: oklch(0.95 0.035 330); --mode-staff-deep: oklch(0.89 0.07 330);
-  --mode-self-bg: oklch(0.95 0.04 150); --mode-self-deep: oklch(0.89 0.08 150); --alert-deep: oklch(0.91 0.11 98); }
+:root { --mode-staff-bg: var(--red-1); --mode-staff-deep: var(--red-2);
+  --mode-self-bg: var(--green-1); --mode-self-deep: var(--green-2); --alert-deep: var(--yellow-2); }
 :root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
 :root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
 /* セルフ操作モードのスタッフ側（操作できない側）はモードの色ではなくグレーの段でグレーアウトする */
-:root { --off-light: color-mix(in oklch, oklch(0.8699 0 0) 45%, oklch(1 0 0)); --off-deep: oklch(0.8699 0 0); }
+:root { --off-light: var(--grey-1); --off-deep: var(--grey-2); }
 :root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--off-light); --tier-deep: var(--off-deep); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。

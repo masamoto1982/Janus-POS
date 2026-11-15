@@ -791,8 +791,8 @@ body.dragging .drop-hint { display: inline; }
 /* 操作できる側（アクティブ側）の画面は肯定の緑、操作できない側は否定の赤：一段目・三段目は淡（濃度1）、二段目（帯）と四段目（最下段）は薄（濃度2） */
 :root .screen.operable { --cust-bg: var(--green-1); --tier-deep: var(--green-2); }
 :root .screen:not(.operable) { --cust-bg: var(--red-1); --tier-deep: var(--red-2); }
-/* スタッフ操作モードのスタッフ側は、緑だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
-:root .staff-screen.mode-staff { --cust-bg: var(--grey-1); --tier-deep: var(--grey-2); }
+/* セルフ操作モードのスタッフ側（操作できない側）は、赤だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
+:root .staff-screen.mode-self:not(.operable) { --cust-bg: var(--grey-1); --tier-deep: var(--grey-2); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。
    ヘッダー・最下段は消えているあいだもこの黄なので、黄と赤（--sos-head）で点滅する（user 2026-11-14） */

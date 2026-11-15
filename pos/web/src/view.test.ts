@@ -58,7 +58,7 @@ describe("view helpers", () => {
       "staff",
       [
         { line_id: 1, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 1234 5678 9012", checked: true, stamp: 200, stamped: false },
-        { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: false, stamp: 0, stamped: false },
+        { line_id: 2, code: "2100000000043", name: "水道料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: false, stamp: 0, stamped: false },
         { line_id: 3, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 5555 6666 7777", checked: false, stamp: 200, stamped: true },
       ],
       { allowed: true, reason: null },
@@ -79,11 +79,11 @@ describe("view helpers", () => {
   it("lists only the slips that need a revenue stamp and ticks each one", () => {
     const bills = [
       { line_id: 1, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 1234 5678 9012", checked: true, stamp: 200, stamped: false },
-      { line_id: 2, code: "2100000000050", name: "ガス料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: true, stamp: 0, stamped: false },
+      { line_id: 2, code: "2100000000043", name: "水道料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: true, stamp: 0, stamped: false },
     ];
     const html = stampVerifyScreen(1, "staff", bills, { allowed: true, reason: null }, true);
     expect(html).toContain("収入印紙の貼り付け確認");
-    expect(html).not.toContain("ガス料金");
+    expect(html).not.toContain("水道料金");
     expect(html).toContain('data-stamp-check="1:staff:1"');
     expect(html).toContain(">200円<");
     expect(html).toContain("data-stampverify-close");

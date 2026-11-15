@@ -16,7 +16,6 @@ const PARCEL_MULTI: &str = "2100000000081";
 const RECEIVE: &str = "2100000000038";
 const BILL: &str = "2100000000021";
 const WATER_BILL: &str = "2100000000043";
-const GAS_BILL: &str = "2100000000050";
 const TAX_BILL: &str = "2100000000067";
 const STAMP: &str = "4900000000141";
 const TOBACCO: &str = "4900000000127";
@@ -1858,7 +1857,7 @@ fn bill_ids(s: &Store, r: u8) -> Vec<u32> {
 fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    for code in [BILL, WATER_BILL, GAS_BILL, BILL] {
+    for code in [BILL, WATER_BILL, WATER_BILL, BILL] {
         scan(&mut s, 1, "staff", code);
     }
     ok(
@@ -1875,7 +1874,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
         [
             ("電気料金", 50_000),
             ("水道料金", 4_000),
-            ("ガス料金", 3_000),
+            ("水道料金", 4_000),
             ("電気料金", 50_000)
         ]
     );
@@ -1962,7 +1961,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
     let r = v.last_receipt.unwrap();
-    assert_eq!((r.total, r.method, r.points), (107_000, "現金", 0));
+    assert_eq!((r.total, r.method, r.points), (108_000, "現金", 0));
     assert_eq!(v.bill_handover, Some(4));
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     advance(&mut s, 10_000);
@@ -1985,8 +1984,8 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
 #[test]
 fn self_operated_bill_checkout_calls_staff_to_check_the_slips() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", GAS_BILL);
-    scan(&mut s, 1, "customer", GAS_BILL);
+    scan(&mut s, 1, "customer", WATER_BILL);
+    scan(&mut s, 1, "customer", WATER_BILL);
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"customer"}),

@@ -250,7 +250,7 @@ function buildSkeleton(): void {
 const RAMP_STEPS: [number, string][] = [
   [0x00, "oklch(0 0 0)"],
   [0x53, "oklch(0.44 0.206 262.2)"],
-  [0x87, "oklch(0.542 0.254 262.2)"],
+  [0x69, "oklch(0.542 0.254 262.2)"],
   [0xd4, "oklch(0.87 0.072 262.2)"],
   [0xee, "oklch(0.95 0.028 262.2)"],
   [0xff, "oklch(1 0 0)"],

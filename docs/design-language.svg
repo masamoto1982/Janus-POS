@@ -2,7 +2,7 @@
 <rect width="930" height="1658" fill="#ffffff"/>
 <text x="16" y="28" font-size="16" font-weight="700" fill="#4a4a4a">Janus-POS 色 4（＋無彩色）× 濃度 4 の役割と、文字サイズ 4 の見本（白地）</text>
 <text x="16" y="50" font-size="12" fill="#4a4a4a">濃度1・2＝塗りつぶし　濃度3＝添え字　濃度4＝アクセント（文字・枠線）。✕＝使ってはいけない（白・濃度1の背景で 4.5:1 未満の添え字、3:1 未満の文字）</text>
-<text x="16" y="68" font-size="12" fill="#4a4a4a">見本の文字サイズ：特大 96px・強調 28px・大 18px・小 13px</text>
+<text x="16" y="68" font-size="12" fill="#4a4a4a">見本の文字サイズ：特大 96px・強調 24px・大 18px・小 12px</text>
 <line x1="16" y1="78" x2="914" y2="78" stroke="#d4d4d4"/>
 <rect x="16" y="90" width="28" height="28" fill="#eeeeee" stroke="#d4d4d4"/>
 <text x="54" y="102" font-size="12" font-weight="700" fill="#333">グレー（無彩色）　濃度1 淡</text>
@@ -23,16 +23,16 @@
 <text x="54" y="246" font-size="11" fill="#555">--grey-3　白に 5.51:1</text>
 <text x="54" y="262" font-size="11" fill="#555">添え字（小テキスト）だけ</text>
 <text x="250" y="236" font-size="18" font-weight="700" fill="#525252">サンドイッチ</text>
-<text x="250" y="256" font-size="13" fill="#696969">320円　販売 11/15 19:00</text>
+<text x="250" y="256" font-size="12" fill="#696969">320円　販売 11/15 19:00</text>
 <text x="450" y="258" font-size="13" fill="#555">○ 白・濃度1の上で 4.66:1（濃度2の上は 3.52:1 で ✕）</text>
 <rect x="16" y="282" width="28" height="28" fill="#525252" stroke="#d4d4d4"/>
 <text x="54" y="294" font-size="12" font-weight="700" fill="#333">グレー（無彩色）　濃度4 濃</text>
 <text x="54" y="310" font-size="11" fill="#555">--grey-4　白に 7.77:1</text>
 <text x="54" y="326" font-size="11" fill="#555">アクセント（文字・枠線）</text>
 <text x="250" y="366" font-size="96" font-weight="800" fill="#525252">安全</text>
-<text x="470" y="340" font-size="28" font-weight="700" fill="#525252">1,280</text>
+<text x="470" y="340" font-size="24" font-weight="700" fill="#525252">1,280</text>
 <text x="590" y="338" font-size="18" font-weight="700" fill="#525252">お会計</text>
-<text x="670" y="336" font-size="13" fill="#525252">お会計</text>
+<text x="670" y="336" font-size="12" fill="#525252">お会計</text>
 <rect x="740" y="310" width="116" height="40" rx="4" fill="none" stroke="#525252" stroke-width="1.5"/><text x="798" y="335" font-size="13" font-weight="700" text-anchor="middle" fill="#525252">枠線</text>
 <line x1="16" y1="390" x2="914" y2="390" stroke="#d4d4d4"/>
 <rect x="16" y="402" width="28" height="28" fill="#e4efff" stroke="#d4d4d4"/>
@@ -40,31 +40,31 @@
 <text x="54" y="430" font-size="11" fill="#555">--blue-1　白に 1.16:1</text>
 <text x="54" y="446" font-size="11" fill="#555">塗りつぶし（文字に使わない）</text>
 <rect x="250" y="400" width="664" height="44" fill="#e4efff"/>
-<text x="262" y="428" font-size="18" font-weight="700" fill="#0042c1">塗りつぶしの上の文字は濃度4（7.08:1）</text>
-<rect x="786" y="408" width="112" height="28" rx="4" fill="none" stroke="#0042c1" stroke-width="1.5"/><text x="842" y="427" font-size="13" text-anchor="middle" fill="#0042c1">枠線は濃度4</text>
+<text x="262" y="428" font-size="18" font-weight="700" fill="#284e99">塗りつぶしの上の文字は濃度4（6.83:1）</text>
+<rect x="786" y="408" width="112" height="28" rx="4" fill="none" stroke="#284e99" stroke-width="1.5"/><text x="842" y="427" font-size="13" text-anchor="middle" fill="#284e99">枠線は濃度4</text>
 <rect x="16" y="466" width="28" height="28" fill="#bbd5ff" stroke="#d4d4d4"/>
 <text x="54" y="478" font-size="12" font-weight="700" fill="#333">青（操作可能）　濃度2 薄</text>
 <text x="54" y="494" font-size="11" fill="#555">--blue-2　白に 1.49:1</text>
 <text x="54" y="510" font-size="11" fill="#555">塗りつぶし（文字に使わない）</text>
 <rect x="250" y="464" width="664" height="44" fill="#bbd5ff"/>
-<text x="262" y="492" font-size="18" font-weight="700" fill="#0042c1">塗りつぶしの上の文字は濃度4（5.50:1）</text>
-<rect x="786" y="472" width="112" height="28" rx="4" fill="none" stroke="#0042c1" stroke-width="1.5"/><text x="842" y="491" font-size="13" text-anchor="middle" fill="#0042c1">枠線は濃度4</text>
+<text x="262" y="492" font-size="18" font-weight="700" fill="#284e99">塗りつぶしの上の文字は濃度4（5.31:1）</text>
+<rect x="786" y="472" width="112" height="28" rx="4" fill="none" stroke="#284e99" stroke-width="1.5"/><text x="842" y="491" font-size="13" text-anchor="middle" fill="#284e99">枠線は濃度4</text>
 <rect x="16" y="530" width="28" height="28" fill="#015aff" stroke="#d4d4d4"/>
 <text x="54" y="542" font-size="12" font-weight="700" fill="#333">青（操作可能）　濃度3 中</text>
 <text x="54" y="558" font-size="11" fill="#555">--blue-3　白に 5.37:1</text>
 <text x="54" y="574" font-size="11" fill="#555">添え字（小テキスト）だけ</text>
-<text x="250" y="548" font-size="18" font-weight="700" fill="#0042c1">サンドイッチ</text>
-<text x="250" y="568" font-size="13" fill="#015aff">320円　販売 11/15 19:00</text>
+<text x="250" y="548" font-size="18" font-weight="700" fill="#284e99">サンドイッチ</text>
+<text x="250" y="568" font-size="12" fill="#015aff">320円　販売 11/15 19:00</text>
 <text x="450" y="570" font-size="13" fill="#555">○ 白・濃度1の上で 4.54:1（濃度2の上は 3.43:1 で ✕）</text>
-<rect x="16" y="594" width="28" height="28" fill="#0042c1" stroke="#d4d4d4"/>
+<rect x="16" y="594" width="28" height="28" fill="#284e99" stroke="#d4d4d4"/>
 <text x="54" y="606" font-size="12" font-weight="700" fill="#333">青（操作可能）　濃度4 濃</text>
-<text x="54" y="622" font-size="11" fill="#555">--blue-4　白に 8.21:1</text>
+<text x="54" y="622" font-size="11" fill="#555">--blue-4　白に 7.92:1</text>
 <text x="54" y="638" font-size="11" fill="#555">アクセント（文字・枠線）</text>
-<text x="250" y="678" font-size="96" font-weight="800" fill="#0042c1">安全</text>
-<text x="470" y="652" font-size="28" font-weight="700" fill="#0042c1">1,280</text>
-<text x="590" y="650" font-size="18" font-weight="700" fill="#0042c1">お会計</text>
-<text x="670" y="648" font-size="13" fill="#0042c1">お会計</text>
-<rect x="740" y="622" width="116" height="40" rx="4" fill="none" stroke="#0042c1" stroke-width="1.5"/><text x="798" y="647" font-size="13" font-weight="700" text-anchor="middle" fill="#0042c1">枠線</text>
+<text x="250" y="678" font-size="96" font-weight="800" fill="#284e99">安全</text>
+<text x="470" y="652" font-size="24" font-weight="700" fill="#284e99">1,280</text>
+<text x="590" y="650" font-size="18" font-weight="700" fill="#284e99">お会計</text>
+<text x="670" y="648" font-size="12" fill="#284e99">お会計</text>
+<rect x="740" y="622" width="116" height="40" rx="4" fill="none" stroke="#284e99" stroke-width="1.5"/><text x="798" y="647" font-size="13" font-weight="700" text-anchor="middle" fill="#284e99">枠線</text>
 <line x1="16" y1="702" x2="914" y2="702" stroke="#d4d4d4"/>
 <rect x="16" y="714" width="28" height="28" fill="#e2f3ea" stroke="#d4d4d4"/>
 <text x="54" y="726" font-size="12" font-weight="700" fill="#333">緑（安全・肯定）　濃度1 淡</text>
@@ -85,16 +85,16 @@
 <text x="54" y="870" font-size="11" fill="#555">--green-3　白に 2.83:1</text>
 <text x="54" y="886" font-size="11" fill="#555">添え字（小テキスト）だけ</text>
 <text x="250" y="860" font-size="18" font-weight="700" fill="#016243">サンドイッチ</text>
-<text x="250" y="880" font-size="13" fill="#04af7a">320円　販売 11/15 19:00</text>
+<text x="250" y="880" font-size="12" fill="#04af7a">320円　販売 11/15 19:00</text>
 <line x1="246" y1="866" x2="440" y2="886" stroke="#d00" stroke-width="2"/><text x="450" y="882" font-size="13" font-weight="700" fill="#d00">✕ 添え字に足りない（2.40:1）→ グレー3を使う</text>
 <rect x="16" y="906" width="28" height="28" fill="#016243" stroke="#d4d4d4"/>
 <text x="54" y="918" font-size="12" font-weight="700" fill="#333">緑（安全・肯定）　濃度4 濃</text>
 <text x="54" y="934" font-size="11" fill="#555">--green-4　白に 7.39:1</text>
 <text x="54" y="950" font-size="11" fill="#555">アクセント（文字・枠線）</text>
 <text x="250" y="990" font-size="96" font-weight="800" fill="#016243">安全</text>
-<text x="470" y="964" font-size="28" font-weight="700" fill="#016243">1,280</text>
+<text x="470" y="964" font-size="24" font-weight="700" fill="#016243">1,280</text>
 <text x="590" y="962" font-size="18" font-weight="700" fill="#016243">お会計</text>
-<text x="670" y="960" font-size="13" fill="#016243">お会計</text>
+<text x="670" y="960" font-size="12" fill="#016243">お会計</text>
 <rect x="740" y="934" width="116" height="40" rx="4" fill="none" stroke="#016243" stroke-width="1.5"/><text x="798" y="959" font-size="13" font-weight="700" text-anchor="middle" fill="#016243">枠線</text>
 <line x1="16" y1="1014" x2="914" y2="1014" stroke="#d4d4d4"/>
 <rect x="16" y="1026" width="28" height="28" fill="#ffe7df" stroke="#d4d4d4"/>
@@ -102,31 +102,31 @@
 <text x="54" y="1054" font-size="11" fill="#555">--red-1　白に 1.18:1</text>
 <text x="54" y="1070" font-size="11" fill="#555">塗りつぶし（文字に使わない）</text>
 <rect x="250" y="1024" width="664" height="44" fill="#ffe7df"/>
-<text x="262" y="1052" font-size="18" font-weight="700" fill="#922700">塗りつぶしの上の文字は濃度4（7.06:1）</text>
-<rect x="786" y="1032" width="112" height="28" rx="4" fill="none" stroke="#922700" stroke-width="1.5"/><text x="842" y="1051" font-size="13" text-anchor="middle" fill="#922700">枠線は濃度4</text>
+<text x="262" y="1052" font-size="18" font-weight="700" fill="#8b3015">塗りつぶしの上の文字は濃度4（6.98:1）</text>
+<rect x="786" y="1032" width="112" height="28" rx="4" fill="none" stroke="#8b3015" stroke-width="1.5"/><text x="842" y="1051" font-size="13" text-anchor="middle" fill="#8b3015">枠線は濃度4</text>
 <rect x="16" y="1090" width="28" height="28" fill="#ffc0ac" stroke="#d4d4d4"/>
 <text x="54" y="1102" font-size="12" font-weight="700" fill="#333">赤（危険・否定）　濃度2 薄</text>
 <text x="54" y="1118" font-size="11" fill="#555">--red-2　白に 1.56:1</text>
 <text x="54" y="1134" font-size="11" fill="#555">塗りつぶし（文字に使わない）</text>
 <rect x="250" y="1088" width="664" height="44" fill="#ffc0ac"/>
-<text x="262" y="1116" font-size="18" font-weight="700" fill="#922700">塗りつぶしの上の文字は濃度4（5.33:1）</text>
-<rect x="786" y="1096" width="112" height="28" rx="4" fill="none" stroke="#922700" stroke-width="1.5"/><text x="842" y="1115" font-size="13" text-anchor="middle" fill="#922700">枠線は濃度4</text>
+<text x="262" y="1116" font-size="18" font-weight="700" fill="#8b3015">塗りつぶしの上の文字は濃度4（5.28:1）</text>
+<rect x="786" y="1096" width="112" height="28" rx="4" fill="none" stroke="#8b3015" stroke-width="1.5"/><text x="842" y="1115" font-size="13" text-anchor="middle" fill="#8b3015">枠線は濃度4</text>
 <rect x="16" y="1154" width="28" height="28" fill="#ff4b00" stroke="#d4d4d4"/>
 <text x="54" y="1166" font-size="12" font-weight="700" fill="#333">赤（危険・否定）　濃度3 中</text>
 <text x="54" y="1182" font-size="11" fill="#555">--red-3　白に 3.35:1</text>
 <text x="54" y="1198" font-size="11" fill="#555">添え字（小テキスト）だけ</text>
-<text x="250" y="1172" font-size="18" font-weight="700" fill="#922700">サンドイッチ</text>
-<text x="250" y="1192" font-size="13" fill="#ff4b00">320円　販売 11/15 19:00</text>
+<text x="250" y="1172" font-size="18" font-weight="700" fill="#8b3015">サンドイッチ</text>
+<text x="250" y="1192" font-size="12" fill="#ff4b00">320円　販売 11/15 19:00</text>
 <line x1="246" y1="1178" x2="440" y2="1198" stroke="#d00" stroke-width="2"/><text x="450" y="1194" font-size="13" font-weight="700" fill="#d00">✕ 添え字に足りない（2.84:1）→ グレー3を使う</text>
-<rect x="16" y="1218" width="28" height="28" fill="#922700" stroke="#d4d4d4"/>
+<rect x="16" y="1218" width="28" height="28" fill="#8b3015" stroke="#d4d4d4"/>
 <text x="54" y="1230" font-size="12" font-weight="700" fill="#333">赤（危険・否定）　濃度4 濃</text>
-<text x="54" y="1246" font-size="11" fill="#555">--red-4　白に 8.34:1</text>
+<text x="54" y="1246" font-size="11" fill="#555">--red-4　白に 8.26:1</text>
 <text x="54" y="1262" font-size="11" fill="#555">アクセント（文字・枠線）</text>
-<text x="250" y="1302" font-size="96" font-weight="800" fill="#922700">安全</text>
-<text x="470" y="1276" font-size="28" font-weight="700" fill="#922700">1,280</text>
-<text x="590" y="1274" font-size="18" font-weight="700" fill="#922700">お会計</text>
-<text x="670" y="1272" font-size="13" fill="#922700">お会計</text>
-<rect x="740" y="1246" width="116" height="40" rx="4" fill="none" stroke="#922700" stroke-width="1.5"/><text x="798" y="1271" font-size="13" font-weight="700" text-anchor="middle" fill="#922700">枠線</text>
+<text x="250" y="1302" font-size="96" font-weight="800" fill="#8b3015">安全</text>
+<text x="470" y="1276" font-size="24" font-weight="700" fill="#8b3015">1,280</text>
+<text x="590" y="1274" font-size="18" font-weight="700" fill="#8b3015">お会計</text>
+<text x="670" y="1272" font-size="12" fill="#8b3015">お会計</text>
+<rect x="740" y="1246" width="116" height="40" rx="4" fill="none" stroke="#8b3015" stroke-width="1.5"/><text x="798" y="1271" font-size="13" font-weight="700" text-anchor="middle" fill="#8b3015">枠線</text>
 <line x1="16" y1="1326" x2="914" y2="1326" stroke="#d4d4d4"/>
 <rect x="16" y="1338" width="28" height="28" fill="#feecd1" stroke="#d4d4d4"/>
 <text x="54" y="1350" font-size="12" font-weight="700" fill="#333">橙（着目・注意喚起）　濃度1 淡</text>
@@ -147,15 +147,15 @@
 <text x="54" y="1494" font-size="11" fill="#555">--orange-3　白に 1.97:1</text>
 <text x="54" y="1510" font-size="11" fill="#555">添え字（小テキスト）だけ</text>
 <text x="250" y="1484" font-size="18" font-weight="700" fill="#6f4a00">サンドイッチ</text>
-<text x="250" y="1504" font-size="13" fill="#f6aa00">320円　販売 11/15 19:00</text>
+<text x="250" y="1504" font-size="12" fill="#f6aa00">320円　販売 11/15 19:00</text>
 <line x1="246" y1="1490" x2="440" y2="1510" stroke="#d00" stroke-width="2"/><text x="450" y="1506" font-size="13" font-weight="700" fill="#d00">✕ 添え字に足りない（1.67:1）→ グレー3を使う</text>
 <rect x="16" y="1530" width="28" height="28" fill="#6f4a00" stroke="#d4d4d4"/>
 <text x="54" y="1542" font-size="12" font-weight="700" fill="#333">橙（着目・注意喚起）　濃度4 濃</text>
 <text x="54" y="1558" font-size="11" fill="#555">--orange-4　白に 7.89:1</text>
 <text x="54" y="1574" font-size="11" fill="#555">アクセント（文字・枠線）</text>
 <text x="250" y="1614" font-size="96" font-weight="800" fill="#6f4a00">安全</text>
-<text x="470" y="1588" font-size="28" font-weight="700" fill="#6f4a00">1,280</text>
+<text x="470" y="1588" font-size="24" font-weight="700" fill="#6f4a00">1,280</text>
 <text x="590" y="1586" font-size="18" font-weight="700" fill="#6f4a00">お会計</text>
-<text x="670" y="1584" font-size="13" fill="#6f4a00">お会計</text>
+<text x="670" y="1584" font-size="12" fill="#6f4a00">お会計</text>
 <rect x="740" y="1558" width="116" height="40" rx="4" fill="none" stroke="#6f4a00" stroke-width="1.5"/><text x="798" y="1583" font-size="13" font-weight="700" text-anchor="middle" fill="#6f4a00">枠線</text>
 </svg>

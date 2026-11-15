@@ -249,7 +249,7 @@ function buildSkeleton(): void {
 // グレーの四段（styles.css の --grey-1〜4）を青の四段（--blue-1〜4）に写す
 const RAMP_STEPS: [number, string][] = [
   [0x00, "oklch(0 0 0)"],
-  [0x53, "oklch(0.44 0.206 262.2)"],
+  [0x53, "oklch(0.44 0.13 262.2)"],
   [0x69, "oklch(0.542 0.254 262.2)"],
   [0xd4, "oklch(0.87 0.072 262.2)"],
   [0xee, "oklch(0.95 0.028 262.2)"],

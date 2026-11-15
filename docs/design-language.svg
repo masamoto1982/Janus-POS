@@ -1,0 +1,228 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="930" height="2330" viewBox="0 0 930 2330" font-family="'Hiragino Sans','Noto Sans JP',sans-serif">
+<rect width="930" height="2330" fill="#ffffff"/>
+<text x="16" y="28" font-size="16" font-weight="700" fill="#4a4a4a">Janus-POS 文字サイズ 4 × 色 4（＋無彩色）× 濃度 4　白地の見本</text>
+<text x="16" y="50" font-size="12" fill="#4a4a4a">✕＝使ってはいけない（白・濃度1の背景でコントラスト 3:1 未満）　△＝特大・強調だけ（4.5:1 未満）</text>
+<text x="250" y="66" font-size="12" fill="#4a4a4a">特大 96px</text>
+<text x="520" y="66" font-size="12" fill="#4a4a4a">強調 28px</text>
+<text x="660" y="66" font-size="12" fill="#4a4a4a">大 18px</text>
+<text x="800" y="66" font-size="12" fill="#4a4a4a">小 13px</text>
+<line x1="16" y1="70" x2="914" y2="70" stroke="#d4d4d4"/>
+<rect x="16" y="84" width="28" height="28" fill="#eeeeee" stroke="#d4d4d4"/>
+<text x="54" y="96" font-size="12" font-weight="700" fill="#333">グレー（無彩色）</text>
+<text x="54" y="112" font-size="11" fill="#555">濃度1 淡　--grey-1</text>
+<text x="54" y="128" font-size="11" fill="#555">白に 1.16:1</text>
+<text x="250" y="160.56" font-size="96" font-weight="800" fill="#eeeeee" opacity="0.9">安全</text>
+<line x1="246" y1="80" x2="496" y2="172" stroke="#d00" stroke-width="2"/><text x="482" y="94" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="136.08" font-size="28" font-weight="700" fill="#eeeeee" opacity="0.9">1,280</text>
+<line x1="516" y1="80" x2="636" y2="172" stroke="#d00" stroke-width="2"/><text x="622" y="94" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="132.48" font-size="18" font-weight="700" fill="#eeeeee" opacity="0.9">お会計</text>
+<line x1="656" y1="80" x2="776" y2="172" stroke="#d00" stroke-width="2"/><text x="762" y="94" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="130.68" font-size="13" font-weight="400" fill="#eeeeee" opacity="0.9">お会計</text>
+<line x1="796" y1="80" x2="906" y2="172" stroke="#d00" stroke-width="2"/><text x="892" y="94" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="196" width="28" height="28" fill="#d4d4d4" stroke="#d4d4d4"/>
+<text x="54" y="208" font-size="12" font-weight="700" fill="#333">グレー（無彩色）</text>
+<text x="54" y="224" font-size="11" fill="#555">濃度2 薄　--grey-2</text>
+<text x="54" y="240" font-size="11" fill="#555">白に 1.48:1</text>
+<text x="250" y="272.56" font-size="96" font-weight="800" fill="#d4d4d4" opacity="0.9">安全</text>
+<line x1="246" y1="192" x2="496" y2="284" stroke="#d00" stroke-width="2"/><text x="482" y="206" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="248.08" font-size="28" font-weight="700" fill="#d4d4d4" opacity="0.9">1,280</text>
+<line x1="516" y1="192" x2="636" y2="284" stroke="#d00" stroke-width="2"/><text x="622" y="206" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="244.48" font-size="18" font-weight="700" fill="#d4d4d4" opacity="0.9">お会計</text>
+<line x1="656" y1="192" x2="776" y2="284" stroke="#d00" stroke-width="2"/><text x="762" y="206" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="242.68" font-size="13" font-weight="400" fill="#d4d4d4" opacity="0.9">お会計</text>
+<line x1="796" y1="192" x2="906" y2="284" stroke="#d00" stroke-width="2"/><text x="892" y="206" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="308" width="28" height="28" fill="#868686" stroke="#d4d4d4"/>
+<text x="54" y="320" font-size="12" font-weight="700" fill="#333">グレー（無彩色）</text>
+<text x="54" y="336" font-size="11" fill="#555">濃度3 中　--grey-3</text>
+<text x="54" y="352" font-size="11" fill="#555">白に 3.64:1</text>
+<text x="250" y="384.56" font-size="96" font-weight="800" fill="#868686">安全</text>
+<text x="520" y="360.08" font-size="28" font-weight="700" fill="#868686">1,280</text>
+<text x="660" y="356.48" font-size="18" font-weight="700" fill="#868686" opacity="0.9">お会計</text>
+<line x1="656" y1="304" x2="776" y2="396" stroke="#d00" stroke-width="2"/><text x="762" y="318" font-size="16" font-weight="700" fill="#d00">△</text>
+<text x="800" y="354.68" font-size="13" font-weight="400" fill="#868686" opacity="0.9">お会計</text>
+<line x1="796" y1="304" x2="906" y2="396" stroke="#d00" stroke-width="2"/><text x="892" y="318" font-size="16" font-weight="700" fill="#d00">△</text>
+<rect x="16" y="420" width="28" height="28" fill="#525252" stroke="#d4d4d4"/>
+<text x="54" y="432" font-size="12" font-weight="700" fill="#333">グレー（無彩色）</text>
+<text x="54" y="448" font-size="11" fill="#555">濃度4 濃　--grey-4</text>
+<text x="54" y="464" font-size="11" fill="#555">白に 7.77:1</text>
+<text x="250" y="496.56" font-size="96" font-weight="800" fill="#525252">安全</text>
+<text x="520" y="472.08" font-size="28" font-weight="700" fill="#525252">1,280</text>
+<text x="660" y="468.48" font-size="18" font-weight="700" fill="#525252">お会計</text>
+<text x="800" y="466.68" font-size="13" font-weight="400" fill="#525252">お会計</text>
+<line x1="16" y1="518" x2="914" y2="518" stroke="#d4d4d4"/>
+<rect x="16" y="532" width="28" height="28" fill="#e4efff" stroke="#d4d4d4"/>
+<text x="54" y="544" font-size="12" font-weight="700" fill="#333">青（操作可能）</text>
+<text x="54" y="560" font-size="11" fill="#555">濃度1 淡　--blue-1</text>
+<text x="54" y="576" font-size="11" fill="#555">白に 1.16:1</text>
+<text x="250" y="608.56" font-size="96" font-weight="800" fill="#e4efff" opacity="0.9">安全</text>
+<line x1="246" y1="528" x2="496" y2="620" stroke="#d00" stroke-width="2"/><text x="482" y="542" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="584.08" font-size="28" font-weight="700" fill="#e4efff" opacity="0.9">1,280</text>
+<line x1="516" y1="528" x2="636" y2="620" stroke="#d00" stroke-width="2"/><text x="622" y="542" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="580.48" font-size="18" font-weight="700" fill="#e4efff" opacity="0.9">お会計</text>
+<line x1="656" y1="528" x2="776" y2="620" stroke="#d00" stroke-width="2"/><text x="762" y="542" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="578.68" font-size="13" font-weight="400" fill="#e4efff" opacity="0.9">お会計</text>
+<line x1="796" y1="528" x2="906" y2="620" stroke="#d00" stroke-width="2"/><text x="892" y="542" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="644" width="28" height="28" fill="#bbd5ff" stroke="#d4d4d4"/>
+<text x="54" y="656" font-size="12" font-weight="700" fill="#333">青（操作可能）</text>
+<text x="54" y="672" font-size="11" fill="#555">濃度2 薄　--blue-2</text>
+<text x="54" y="688" font-size="11" fill="#555">白に 1.49:1</text>
+<text x="250" y="720.56" font-size="96" font-weight="800" fill="#bbd5ff" opacity="0.9">安全</text>
+<line x1="246" y1="640" x2="496" y2="732" stroke="#d00" stroke-width="2"/><text x="482" y="654" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="696.08" font-size="28" font-weight="700" fill="#bbd5ff" opacity="0.9">1,280</text>
+<line x1="516" y1="640" x2="636" y2="732" stroke="#d00" stroke-width="2"/><text x="622" y="654" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="692.48" font-size="18" font-weight="700" fill="#bbd5ff" opacity="0.9">お会計</text>
+<line x1="656" y1="640" x2="776" y2="732" stroke="#d00" stroke-width="2"/><text x="762" y="654" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="690.68" font-size="13" font-weight="400" fill="#bbd5ff" opacity="0.9">お会計</text>
+<line x1="796" y1="640" x2="906" y2="732" stroke="#d00" stroke-width="2"/><text x="892" y="654" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="756" width="28" height="28" fill="#015aff" stroke="#d4d4d4"/>
+<text x="54" y="768" font-size="12" font-weight="700" fill="#333">青（操作可能）</text>
+<text x="54" y="784" font-size="11" fill="#555">濃度3 中　--blue-3</text>
+<text x="54" y="800" font-size="11" fill="#555">白に 5.37:1</text>
+<text x="250" y="832.56" font-size="96" font-weight="800" fill="#015aff">安全</text>
+<text x="520" y="808.08" font-size="28" font-weight="700" fill="#015aff">1,280</text>
+<text x="660" y="804.48" font-size="18" font-weight="700" fill="#015aff">お会計</text>
+<text x="800" y="802.68" font-size="13" font-weight="400" fill="#015aff">お会計</text>
+<rect x="16" y="868" width="28" height="28" fill="#0042c1" stroke="#d4d4d4"/>
+<text x="54" y="880" font-size="12" font-weight="700" fill="#333">青（操作可能）</text>
+<text x="54" y="896" font-size="11" fill="#555">濃度4 濃　--blue-4</text>
+<text x="54" y="912" font-size="11" fill="#555">白に 8.21:1</text>
+<text x="250" y="944.56" font-size="96" font-weight="800" fill="#0042c1">安全</text>
+<text x="520" y="920.08" font-size="28" font-weight="700" fill="#0042c1">1,280</text>
+<text x="660" y="916.48" font-size="18" font-weight="700" fill="#0042c1">お会計</text>
+<text x="800" y="914.68" font-size="13" font-weight="400" fill="#0042c1">お会計</text>
+<line x1="16" y1="966" x2="914" y2="966" stroke="#d4d4d4"/>
+<rect x="16" y="980" width="28" height="28" fill="#e2f3ea" stroke="#d4d4d4"/>
+<text x="54" y="992" font-size="12" font-weight="700" fill="#333">緑（安全・肯定）</text>
+<text x="54" y="1008" font-size="11" fill="#555">濃度1 淡　--green-1</text>
+<text x="54" y="1024" font-size="11" fill="#555">白に 1.15:1</text>
+<text x="250" y="1056.56" font-size="96" font-weight="800" fill="#e2f3ea" opacity="0.9">安全</text>
+<line x1="246" y1="976" x2="496" y2="1068" stroke="#d00" stroke-width="2"/><text x="482" y="990" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="1032.08" font-size="28" font-weight="700" fill="#e2f3ea" opacity="0.9">1,280</text>
+<line x1="516" y1="976" x2="636" y2="1068" stroke="#d00" stroke-width="2"/><text x="622" y="990" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="1028.48" font-size="18" font-weight="700" fill="#e2f3ea" opacity="0.9">お会計</text>
+<line x1="656" y1="976" x2="776" y2="1068" stroke="#d00" stroke-width="2"/><text x="762" y="990" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="1026.68" font-size="13" font-weight="400" fill="#e2f3ea" opacity="0.9">お会計</text>
+<line x1="796" y1="976" x2="906" y2="1068" stroke="#d00" stroke-width="2"/><text x="892" y="990" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="1092" width="28" height="28" fill="#b4e0ca" stroke="#d4d4d4"/>
+<text x="54" y="1104" font-size="12" font-weight="700" fill="#333">緑（安全・肯定）</text>
+<text x="54" y="1120" font-size="11" fill="#555">濃度2 薄　--green-2</text>
+<text x="54" y="1136" font-size="11" fill="#555">白に 1.45:1</text>
+<text x="250" y="1168.56" font-size="96" font-weight="800" fill="#b4e0ca" opacity="0.9">安全</text>
+<line x1="246" y1="1088" x2="496" y2="1180" stroke="#d00" stroke-width="2"/><text x="482" y="1102" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="1144.08" font-size="28" font-weight="700" fill="#b4e0ca" opacity="0.9">1,280</text>
+<line x1="516" y1="1088" x2="636" y2="1180" stroke="#d00" stroke-width="2"/><text x="622" y="1102" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="1140.48" font-size="18" font-weight="700" fill="#b4e0ca" opacity="0.9">お会計</text>
+<line x1="656" y1="1088" x2="776" y2="1180" stroke="#d00" stroke-width="2"/><text x="762" y="1102" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="1138.68" font-size="13" font-weight="400" fill="#b4e0ca" opacity="0.9">お会計</text>
+<line x1="796" y1="1088" x2="906" y2="1180" stroke="#d00" stroke-width="2"/><text x="892" y="1102" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="1204" width="28" height="28" fill="#04af7a" stroke="#d4d4d4"/>
+<text x="54" y="1216" font-size="12" font-weight="700" fill="#333">緑（安全・肯定）</text>
+<text x="54" y="1232" font-size="11" fill="#555">濃度3 中　--green-3</text>
+<text x="54" y="1248" font-size="11" fill="#555">白に 2.83:1</text>
+<text x="250" y="1280.56" font-size="96" font-weight="800" fill="#04af7a" opacity="0.9">安全</text>
+<line x1="246" y1="1200" x2="496" y2="1292" stroke="#d00" stroke-width="2"/><text x="482" y="1214" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="1256.08" font-size="28" font-weight="700" fill="#04af7a" opacity="0.9">1,280</text>
+<line x1="516" y1="1200" x2="636" y2="1292" stroke="#d00" stroke-width="2"/><text x="622" y="1214" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="1252.48" font-size="18" font-weight="700" fill="#04af7a" opacity="0.9">お会計</text>
+<line x1="656" y1="1200" x2="776" y2="1292" stroke="#d00" stroke-width="2"/><text x="762" y="1214" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="1250.68" font-size="13" font-weight="400" fill="#04af7a" opacity="0.9">お会計</text>
+<line x1="796" y1="1200" x2="906" y2="1292" stroke="#d00" stroke-width="2"/><text x="892" y="1214" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="1316" width="28" height="28" fill="#016243" stroke="#d4d4d4"/>
+<text x="54" y="1328" font-size="12" font-weight="700" fill="#333">緑（安全・肯定）</text>
+<text x="54" y="1344" font-size="11" fill="#555">濃度4 濃　--green-4</text>
+<text x="54" y="1360" font-size="11" fill="#555">白に 7.39:1</text>
+<text x="250" y="1392.56" font-size="96" font-weight="800" fill="#016243">安全</text>
+<text x="520" y="1368.08" font-size="28" font-weight="700" fill="#016243">1,280</text>
+<text x="660" y="1364.48" font-size="18" font-weight="700" fill="#016243">お会計</text>
+<text x="800" y="1362.68" font-size="13" font-weight="400" fill="#016243">お会計</text>
+<line x1="16" y1="1414" x2="914" y2="1414" stroke="#d4d4d4"/>
+<rect x="16" y="1428" width="28" height="28" fill="#ffe7df" stroke="#d4d4d4"/>
+<text x="54" y="1440" font-size="12" font-weight="700" fill="#333">赤（危険・否定）</text>
+<text x="54" y="1456" font-size="11" fill="#555">濃度1 淡　--red-1</text>
+<text x="54" y="1472" font-size="11" fill="#555">白に 1.18:1</text>
+<text x="250" y="1504.56" font-size="96" font-weight="800" fill="#ffe7df" opacity="0.9">安全</text>
+<line x1="246" y1="1424" x2="496" y2="1516" stroke="#d00" stroke-width="2"/><text x="482" y="1438" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="1480.08" font-size="28" font-weight="700" fill="#ffe7df" opacity="0.9">1,280</text>
+<line x1="516" y1="1424" x2="636" y2="1516" stroke="#d00" stroke-width="2"/><text x="622" y="1438" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="1476.48" font-size="18" font-weight="700" fill="#ffe7df" opacity="0.9">お会計</text>
+<line x1="656" y1="1424" x2="776" y2="1516" stroke="#d00" stroke-width="2"/><text x="762" y="1438" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="1474.68" font-size="13" font-weight="400" fill="#ffe7df" opacity="0.9">お会計</text>
+<line x1="796" y1="1424" x2="906" y2="1516" stroke="#d00" stroke-width="2"/><text x="892" y="1438" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="1540" width="28" height="28" fill="#ffc0ac" stroke="#d4d4d4"/>
+<text x="54" y="1552" font-size="12" font-weight="700" fill="#333">赤（危険・否定）</text>
+<text x="54" y="1568" font-size="11" fill="#555">濃度2 薄　--red-2</text>
+<text x="54" y="1584" font-size="11" fill="#555">白に 1.56:1</text>
+<text x="250" y="1616.56" font-size="96" font-weight="800" fill="#ffc0ac" opacity="0.9">安全</text>
+<line x1="246" y1="1536" x2="496" y2="1628" stroke="#d00" stroke-width="2"/><text x="482" y="1550" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="1592.08" font-size="28" font-weight="700" fill="#ffc0ac" opacity="0.9">1,280</text>
+<line x1="516" y1="1536" x2="636" y2="1628" stroke="#d00" stroke-width="2"/><text x="622" y="1550" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="1588.48" font-size="18" font-weight="700" fill="#ffc0ac" opacity="0.9">お会計</text>
+<line x1="656" y1="1536" x2="776" y2="1628" stroke="#d00" stroke-width="2"/><text x="762" y="1550" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="1586.68" font-size="13" font-weight="400" fill="#ffc0ac" opacity="0.9">お会計</text>
+<line x1="796" y1="1536" x2="906" y2="1628" stroke="#d00" stroke-width="2"/><text x="892" y="1550" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="1652" width="28" height="28" fill="#ff4b00" stroke="#d4d4d4"/>
+<text x="54" y="1664" font-size="12" font-weight="700" fill="#333">赤（危険・否定）</text>
+<text x="54" y="1680" font-size="11" fill="#555">濃度3 中　--red-3</text>
+<text x="54" y="1696" font-size="11" fill="#555">白に 3.35:1</text>
+<text x="250" y="1728.56" font-size="96" font-weight="800" fill="#ff4b00" opacity="0.9">安全</text>
+<line x1="246" y1="1648" x2="496" y2="1740" stroke="#d00" stroke-width="2"/><text x="482" y="1662" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="1704.08" font-size="28" font-weight="700" fill="#ff4b00" opacity="0.9">1,280</text>
+<line x1="516" y1="1648" x2="636" y2="1740" stroke="#d00" stroke-width="2"/><text x="622" y="1662" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="1700.48" font-size="18" font-weight="700" fill="#ff4b00" opacity="0.9">お会計</text>
+<line x1="656" y1="1648" x2="776" y2="1740" stroke="#d00" stroke-width="2"/><text x="762" y="1662" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="1698.68" font-size="13" font-weight="400" fill="#ff4b00" opacity="0.9">お会計</text>
+<line x1="796" y1="1648" x2="906" y2="1740" stroke="#d00" stroke-width="2"/><text x="892" y="1662" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="1764" width="28" height="28" fill="#922700" stroke="#d4d4d4"/>
+<text x="54" y="1776" font-size="12" font-weight="700" fill="#333">赤（危険・否定）</text>
+<text x="54" y="1792" font-size="11" fill="#555">濃度4 濃　--red-4</text>
+<text x="54" y="1808" font-size="11" fill="#555">白に 8.34:1</text>
+<text x="250" y="1840.56" font-size="96" font-weight="800" fill="#922700">安全</text>
+<text x="520" y="1816.08" font-size="28" font-weight="700" fill="#922700">1,280</text>
+<text x="660" y="1812.48" font-size="18" font-weight="700" fill="#922700">お会計</text>
+<text x="800" y="1810.68" font-size="13" font-weight="400" fill="#922700">お会計</text>
+<line x1="16" y1="1862" x2="914" y2="1862" stroke="#d4d4d4"/>
+<rect x="16" y="1876" width="28" height="28" fill="#feecd1" stroke="#d4d4d4"/>
+<text x="54" y="1888" font-size="12" font-weight="700" fill="#333">橙（着目・注意喚起）</text>
+<text x="54" y="1904" font-size="11" fill="#555">濃度1 淡　--orange-1</text>
+<text x="54" y="1920" font-size="11" fill="#555">白に 1.16:1</text>
+<text x="250" y="1952.56" font-size="96" font-weight="800" fill="#feecd1" opacity="0.9">安全</text>
+<line x1="246" y1="1872" x2="496" y2="1964" stroke="#d00" stroke-width="2"/><text x="482" y="1886" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="1928.08" font-size="28" font-weight="700" fill="#feecd1" opacity="0.9">1,280</text>
+<line x1="516" y1="1872" x2="636" y2="1964" stroke="#d00" stroke-width="2"/><text x="622" y="1886" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="1924.48" font-size="18" font-weight="700" fill="#feecd1" opacity="0.9">お会計</text>
+<line x1="656" y1="1872" x2="776" y2="1964" stroke="#d00" stroke-width="2"/><text x="762" y="1886" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="1922.68" font-size="13" font-weight="400" fill="#feecd1" opacity="0.9">お会計</text>
+<line x1="796" y1="1872" x2="906" y2="1964" stroke="#d00" stroke-width="2"/><text x="892" y="1886" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="1988" width="28" height="28" fill="#fbcc85" stroke="#d4d4d4"/>
+<text x="54" y="2000" font-size="12" font-weight="700" fill="#333">橙（着目・注意喚起）</text>
+<text x="54" y="2016" font-size="11" fill="#555">濃度2 薄　--orange-2</text>
+<text x="54" y="2032" font-size="11" fill="#555">白に 1.50:1</text>
+<text x="250" y="2064.56" font-size="96" font-weight="800" fill="#fbcc85" opacity="0.9">安全</text>
+<line x1="246" y1="1984" x2="496" y2="2076" stroke="#d00" stroke-width="2"/><text x="482" y="1998" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="2040.08" font-size="28" font-weight="700" fill="#fbcc85" opacity="0.9">1,280</text>
+<line x1="516" y1="1984" x2="636" y2="2076" stroke="#d00" stroke-width="2"/><text x="622" y="1998" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="2036.48" font-size="18" font-weight="700" fill="#fbcc85" opacity="0.9">お会計</text>
+<line x1="656" y1="1984" x2="776" y2="2076" stroke="#d00" stroke-width="2"/><text x="762" y="1998" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="2034.68" font-size="13" font-weight="400" fill="#fbcc85" opacity="0.9">お会計</text>
+<line x1="796" y1="1984" x2="906" y2="2076" stroke="#d00" stroke-width="2"/><text x="892" y="1998" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="2100" width="28" height="28" fill="#f6aa00" stroke="#d4d4d4"/>
+<text x="54" y="2112" font-size="12" font-weight="700" fill="#333">橙（着目・注意喚起）</text>
+<text x="54" y="2128" font-size="11" fill="#555">濃度3 中　--orange-3</text>
+<text x="54" y="2144" font-size="11" fill="#555">白に 1.97:1</text>
+<text x="250" y="2176.56" font-size="96" font-weight="800" fill="#f6aa00" opacity="0.9">安全</text>
+<line x1="246" y1="2096" x2="496" y2="2188" stroke="#d00" stroke-width="2"/><text x="482" y="2110" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="520" y="2152.08" font-size="28" font-weight="700" fill="#f6aa00" opacity="0.9">1,280</text>
+<line x1="516" y1="2096" x2="636" y2="2188" stroke="#d00" stroke-width="2"/><text x="622" y="2110" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="660" y="2148.48" font-size="18" font-weight="700" fill="#f6aa00" opacity="0.9">お会計</text>
+<line x1="656" y1="2096" x2="776" y2="2188" stroke="#d00" stroke-width="2"/><text x="762" y="2110" font-size="16" font-weight="700" fill="#d00">✕</text>
+<text x="800" y="2146.68" font-size="13" font-weight="400" fill="#f6aa00" opacity="0.9">お会計</text>
+<line x1="796" y1="2096" x2="906" y2="2188" stroke="#d00" stroke-width="2"/><text x="892" y="2110" font-size="16" font-weight="700" fill="#d00">✕</text>
+<rect x="16" y="2212" width="28" height="28" fill="#6f4a00" stroke="#d4d4d4"/>
+<text x="54" y="2224" font-size="12" font-weight="700" fill="#333">橙（着目・注意喚起）</text>
+<text x="54" y="2240" font-size="11" fill="#555">濃度4 濃　--orange-4</text>
+<text x="54" y="2256" font-size="11" fill="#555">白に 7.89:1</text>
+<text x="250" y="2288.56" font-size="96" font-weight="800" fill="#6f4a00">安全</text>
+<text x="520" y="2264.08" font-size="28" font-weight="700" fill="#6f4a00">1,280</text>
+<text x="660" y="2260.48" font-size="18" font-weight="700" fill="#6f4a00">お会計</text>
+<text x="800" y="2258.68" font-size="13" font-weight="400" fill="#6f4a00">お会計</text>
+</svg>

@@ -4,17 +4,17 @@
   --btn-sm-w: 56px; --btn-sm-h: 26px;
   --btn-md-w: 64px; --btn-md-h: 34px;
   --gap: 6px;
-  /* 色は四つ（青・黄・赤・緑）、濃度は四段（1＝淡 0.95・2＝薄 0.87・3＝中 0.62・4＝濃 0.44）。白・黒・グレーは色に数えない無彩色で、グレーも同じ四段 */
+  /* 色は四つ（カラーユニバーサルデザインの赤 #FF4B00・青 #005AFF・緑 #03AF7A・橙 #F6AA00）。濃度は四段：3＝その色そのもの、1＝淡・2＝薄は白を混ぜて明るさ 0.95・0.87、4＝濃は黒を混ぜて 0.44。白・黒・グレーは色に数えない無彩色（グレーは 0.95・0.87・0.62・0.44） */
   --grey-1: oklch(0.95 0 0); --grey-2: oklch(0.87 0 0); --grey-3: oklch(0.62 0 0); --grey-4: oklch(0.44 0 0);
-  --blue-1: oklch(0.95 0.03 245); --blue-2: oklch(0.87 0.07 245); --blue-3: oklch(0.62 0.15 245); --blue-4: oklch(0.44 0.11 245);
-  --yellow-1: oklch(0.95 0.08 98); --yellow-2: oklch(0.87 0.13 92); --yellow-3: oklch(0.62 0.13 65); --yellow-4: oklch(0.44 0.1 60);
-  --red-1: oklch(0.95 0.035 25); --red-2: oklch(0.87 0.07 25); --red-3: oklch(0.62 0.17 27); --red-4: oklch(0.44 0.15 27);
-  --green-1: oklch(0.95 0.04 150); --green-2: oklch(0.87 0.08 150); --green-3: oklch(0.62 0.13 150); --green-4: oklch(0.44 0.1 150);
+  --blue-1: oklch(0.95 0.028 262.2); --blue-2: oklch(0.87 0.072 262.2); --blue-3: oklch(0.542 0.254 262.2); --blue-4: oklch(0.44 0.206 262.2);
+  --orange-1: oklch(0.95 0.04 76.6); --orange-2: oklch(0.87 0.103 76.6); --orange-3: oklch(0.791 0.166 76.6); --orange-4: oklch(0.44 0.092 76.6);
+  --red-1: oklch(0.95 0.034 36.6); --red-2: oklch(0.87 0.088 36.6); --red-3: oklch(0.666 0.225 36.6); --red-4: oklch(0.44 0.149 36.6);
+  --green-1: oklch(0.95 0.022 162.8); --green-2: oklch(0.87 0.056 162.8); --green-3: oklch(0.667 0.144 162.8); --green-4: oklch(0.44 0.095 162.8);
   --white: oklch(1 0 0); --black: oklch(0 0 0);
-  /* フラグ：背景なし・枠線と文字は同じ色。注意＝黄、済み＝緑、その他＝グレー。阻害因子のある明細の行は黄の薄 */
-  --flag-caution: var(--yellow-4); --flag-safe: var(--green-4); --flag-plain: var(--grey-3);
-  --flag-row: var(--yellow-2);
-  --flag-flash: var(--yellow-3);
+  /* フラグ：背景なし・枠線と文字は同じ色。注意＝橙、済み＝緑、その他＝グレー。阻害因子のある明細の行は橙の薄 */
+  --flag-caution: var(--orange-4); --flag-safe: var(--green-4); --flag-plain: var(--grey-3);
+  --flag-row: var(--orange-2);
+  --flag-flash: var(--orange-3);
   --btn-on: var(--grey-4);
   --btn-on-ink: var(--white);
   --bg: var(--grey-1);
@@ -29,7 +29,7 @@
   --staff-bg: var(--grey-4);
   --staff-ink: var(--white);
   --cust-bg: var(--white);
-  --warn: var(--yellow-4);
+  --warn: var(--orange-4);
   --danger: var(--red-4);
   --danger-bg: var(--red-1);
   --ok: var(--green-4);
@@ -39,9 +39,9 @@
   --text-num: 28px;
   --text-lg: 18px;
   --text-sm: 13px;
-  --flash: var(--yellow-2);
+  --flash: var(--orange-2);
   --bill-bg: var(--green-1);
-  --coin-bg: var(--yellow-1);
+  --coin-bg: var(--orange-1);
   --pay-bg: var(--blue-1);
   color-scheme: only light;
 }
@@ -254,7 +254,7 @@ button.pad-field.typing { outline: 2px solid var(--accent); outline-offset: 1px;
 /* 釣り銭の取り忘れ（両画面）：お釣り・お礼の案内を置き換える案内画面。大きなテキスト＝警告の赤、背景＝やわらかい黄色（領域いっぱい）
    画面の色変数はグレーに置き換わるので、色はここで直接 OKLCH で持つ
    小さなテキストを足すときはオレンジ --alert-note */
-:root { --alert-bg: var(--yellow-1); --alert-ink: var(--red-4); --alert-note: var(--yellow-4); }
+:root { --alert-bg: var(--orange-1); --alert-ink: var(--red-4); --alert-note: var(--orange-4); }
 .screen .confirm.change-alert { margin: -8px -12px; background: var(--alert-bg); }
 .screen .change-alert .big { color: var(--alert-ink); }
 .screen .change-alert p.small { color: var(--alert-note); }
@@ -365,7 +365,7 @@ button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(-
 
 button.cash { min-width: 56px; color: var(--ink); }
 button.cash.bill { background: var(--bill-bg); color: var(--ink); border: 1px solid var(--border); }
-button.cash.coin { background: var(--yellow-2); color: var(--black); border-radius: 999px; }
+button.cash.coin { background: var(--orange-2); color: var(--black); border-radius: 999px; }
 button.emoney { background: var(--blue-2); color: var(--black); }
 
 
@@ -420,7 +420,7 @@ button.emoney { background: var(--blue-2); color: var(--black); }
    エマージェンシーモード中は同じ点滅を赤で。赤は釣り銭警告・エマージェンシーの赤い文字（--alert-ink）と同じ色相で、
    黄（--call-soft）と並べても浮かない濃さにし、文字は白にする。
    待ち時間で色や速さは変えない（経過時間がお客様にも伝わり、待たされた不満を増やしかねないため） */
-:root { --call-soft: var(--yellow-2); --sos-head: var(--red-3); --sos-head-ink: var(--white); }
+:root { --call-soft: var(--orange-2); --sos-head: var(--red-3); --sos-head-ink: var(--white); }
 /* 点滅の拍は画面（.screen.head-blink）に一つだけ持ち、--blink-on（1＝点いている／0＝消えている）として配る。
    ヘッダーの中身（時計・呼び鈴）は描き直されるので、部品ごとにアニメーションを持つと拍がずれる。
    ヘッダーの背景・エマージェンシーの白文字・呼び鈴の黄はすべてこの拍で切り替わる */
@@ -784,13 +784,15 @@ body.dragging .drop-hint { display: inline; }
 /* 稼働モードの背景色：スタッフ操作モード＝ピンク、セルフ操作モード＝ミント（グレー・青・黄と P/D/T 型でも区別できる淡い色）。
    グラデーションは使わず段ごとに塗り分ける：一段目（ヘッダー）と三段目は薄く、二段目（帯）と四段目（FF・サイネージ）は濃いめ。
    呼び出し中のスタッフ側画面は、エマージェンシーと同じやわらかい黄色を同じ塗り分けで */
-:root { --mode-staff-bg: var(--red-1); --mode-staff-deep: var(--red-2);
-  --mode-self-bg: var(--green-1); --mode-self-deep: var(--green-2); --alert-deep: var(--yellow-2); }
+:root { --mode-staff-bg: var(--white); --mode-staff-deep: var(--grey-1);
+  --mode-self-bg: var(--white); --mode-self-deep: var(--grey-1); --alert-deep: var(--orange-2); }
 :root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
 :root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
-/* セルフ操作モードのスタッフ側（操作できない側）はモードの色ではなくグレーの段でグレーアウトする */
-:root { --off-light: var(--grey-1); --off-deep: var(--grey-2); }
-:root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--off-light); --tier-deep: var(--off-deep); }
+/* 操作できる側（アクティブ側）の画面は肯定の緑、操作できない側は否定の赤：一段目・三段目は淡（濃度1）、二段目（帯）と四段目（最下段）は薄（濃度2） */
+:root .screen.operable { --cust-bg: var(--green-1); --tier-deep: var(--green-2); }
+:root .screen:not(.operable) { --cust-bg: var(--red-1); --tier-deep: var(--red-2); }
+/* セルフ操作モードのスタッフ側（操作できない側）は、赤だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
+:root .staff-screen.mode-self:not(.operable) { --cust-bg: var(--grey-1); --tier-deep: var(--grey-2); }
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。
    ヘッダー・最下段は消えているあいだもこの黄なので、黄と赤（--sos-head）で点滅する（user 2026-11-14） */

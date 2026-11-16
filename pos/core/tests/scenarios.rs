@@ -4991,6 +4991,7 @@ fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
     // 最下段のボタンはボタンの文言そのまま
     for (topic, want) in [
         ("voucher", "金券"),
+        ("other", "その他"),
         ("tobacco", "たばこ"),
     ] {
         let mut s = Store::new(3, 2, 1);

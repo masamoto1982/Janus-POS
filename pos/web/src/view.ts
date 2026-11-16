@@ -1388,7 +1388,7 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 6;
 export type FfUi = { tab: string; page: number };
 
-/** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・金券・たばこの段と同じ位置・高さ）に流すサイネージ。
+/** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・金券・たばこ・その他の段と同じ位置・高さ）に流すサイネージ。
  *  セール情報や詐欺防止の呼びかけを順番に表示する（シミュレーターの見本）。最下段を両モードで揃え、モード切り替え時の画面の変化を抑える。
  *  現物では広告を画像で流す想定なので、どのモードでも言語切り替えの対象外（data-i18n-skip） */
 export const SIGNAGE: readonly (readonly [string, string])[] = [
@@ -1458,6 +1458,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("金券", "ギフトカード・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
+      callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
     ].join("")}</div>`;
   }
   if (r.mode === "staff_operated" && side === "customer") return signage(now);

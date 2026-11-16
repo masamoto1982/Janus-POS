@@ -145,6 +145,7 @@ const DICT: Record<string, string> = {
   カウンター内の商品はスタッフが対応いたします: "Staff will help with items behind the counter",
   たばこ: "Tobacco",
   "紙巻き・電子": "Cigarettes / E-cigs",
+  その他: "Other",
   お渡しの確認: "Confirm hand-over",
   お渡し数: "Handed",
   お受け取り数: "Received",

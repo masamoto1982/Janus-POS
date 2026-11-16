@@ -195,3 +195,26 @@ export function applyLaw(root: ParentNode): void {
     );
   }
 }
+
+/**
+ * ボタンは青銅比か白銀比のどちらかに必ず一致する（user 2026-11-17）。大きさは動かさないので、
+ * 文字が入りきらないボタンは文字のほうを一段ずつ下げる（文字の段は √2 ずつ離れているので、÷√2 で一つ下の段に乗る）。
+ * 二段下げても入らなければそのまま（文言を見直す合図）
+ */
+export function fitText(root: ParentNode): void {
+  const over = (b: HTMLElement) => b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1;
+  // 合計の帯の中央（合計・点数）も、左右の大ボタンを縮めないかわりに文字を下げる
+  for (const b of root.querySelectorAll<HTMLElement>(".screen button, .screen .reg-top .mid")) {
+    const parts = [b, ...b.querySelectorAll<HTMLElement>("*")];
+    if (b.dataset.fit) {
+      for (const el of parts) el.style.removeProperty("font-size");
+      delete b.dataset.fit;
+    }
+    if (!b.getClientRects().length || !over(b)) continue;
+    for (let k = 1; k <= 2 && over(b); k++) {
+      const sizes = parts.map((el) => parseFloat(getComputedStyle(el).fontSize));
+      parts.forEach((el, i) => (el.style.fontSize = `${sizes[i] / Math.SQRT2}px`));
+      b.dataset.fit = String(k);
+    }
+  }
+}

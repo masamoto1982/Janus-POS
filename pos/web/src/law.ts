@@ -197,24 +197,74 @@ export function applyLaw(root: ParentNode): void {
 }
 
 /**
- * ボタンは青銅比か白銀比のどちらかに必ず一致する（user 2026-11-17）。大きさは動かさないので、
- * 文字が入りきらないボタンは文字のほうを一段ずつ下げる（文字の段は √2 ずつ離れているので、÷√2 で一つ下の段に乗る）。
- * 二段下げても入らなければそのまま（文言を見直す合図）
+ * ボタンの文字の大きさは、親要素であるボタン自身を基準に四段で自動的に決める（user 2026-11-17）。
+ * 基準はボタンの短い辺 B（青銅比・白銀比の横長ボタンでは高さ、縦長の ▲▼ では幅）。
+ *   特大 B÷2・大 B÷2√2・小 B÷4・極小 B÷4√2（√2 ずつ）
+ * 一行の文字は、入る中でいちばん大きい段。二行（主役＋添え字）は主役と添え字を二段離す（特大＋小、入らなければ大＋極小）。
+ * 同じ行に並ぶ同じ大きさのボタンは、いちばん小さい段にそろえる（並びの中で文字の大きさが揃うように）。
+ * 一つのボタンの中で同じ大きさの文字が二行になることはないので、一行の文字は折り返さない。
+ * 入力欄（数字を打つ欄）はボタンではないので対象外。ボタン以外の文字は、表示エリア（レジ画面の内幅 W）を基準にした四段
  */
+const STEPS = [2, 2 * Math.SQRT2, 4, 4 * Math.SQRT2];
+export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
+
 export function fitText(root: ParentNode): void {
   const over = (b: HTMLElement) => b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1;
-  // 合計の帯の中央（合計・点数）も、左右の大ボタンを縮めないかわりに文字を下げる
-  for (const b of root.querySelectorAll<HTMLElement>(".screen button, .screen .reg-top .mid")) {
-    const parts = [b, ...b.querySelectorAll<HTMLElement>("*")];
-    if (b.dataset.fit) {
-      for (const el of parts) el.style.removeProperty("font-size");
-      delete b.dataset.fit;
+  const buttons = [...root.querySelectorAll<HTMLElement>(".screen button")].filter(
+    (b) => !b.matches(".pad-field, .birth-field, .ffv-input") && b.getClientRects().length > 0,
+  );
+  const parts = (b: HTMLElement) => {
+    const main = b.querySelector<HTMLElement>(":scope > b");
+    const sub = b.querySelector<HTMLElement>(":scope > small");
+    return main && sub && sub.getClientRects().length ? { main, sub } : null;
+  };
+  const apply = (b: HTMLElement, k: number) => {
+    const base = Math.min(b.offsetWidth, b.offsetHeight);
+    const two = parts(b);
+    b.dataset.text = TEXT_STEP_NAMES[k];
+    b.style.fontSize = `${base / STEPS[k]}px`;
+    b.style.lineHeight = "1";
+    b.style.whiteSpace = "nowrap";
+    for (const el of b.querySelectorAll<HTMLElement>("*")) el.style.fontSize = "inherit";
+    if (two) {
+      two.main.style.fontSize = `${base / STEPS[k]}px`;
+      two.sub.style.fontSize = `${base / STEPS[k + 2]}px`;
     }
-    if (!b.getClientRects().length || !over(b)) continue;
-    for (let k = 1; k <= 2 && over(b); k++) {
+  };
+  const pick = new Map<HTMLElement, number>();
+  for (const b of buttons) {
+    const last = parts(b) ? 1 : 3;
+    let k = 0;
+    for (; k <= last; k++) {
+      apply(b, k);
+      if (!over(b)) break;
+    }
+    pick.set(b, Math.min(k, last));
+  }
+  // 同じ行（同じ親）に並ぶ同じ大きさのボタンは同じ段に
+  const groups = new Map<string, HTMLElement[]>();
+  const ids = new Map<Element, number>();
+  for (const b of buttons) {
+    const p = b.parentElement!;
+    if (!ids.has(p)) ids.set(p, ids.size);
+    const key = `${ids.get(p)}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;
+    groups.set(key, [...(groups.get(key) ?? []), b]);
+  }
+  for (const g of groups.values()) {
+    const k = Math.max(...g.map((b) => pick.get(b)!));
+    for (const b of g) if (pick.get(b) !== k) apply(b, k);
+  }
+}
+
+/** 合計の帯の中央（合計・点数）は、左右の大ボタンを縮めないかわりに、入りきらなければ文字を一段ずつ（÷√2）下げる */
+export function fitSum(root: ParentNode): void {
+  const over = (b: HTMLElement) => b.scrollWidth > b.clientWidth + 1;
+  for (const m of root.querySelectorAll<HTMLElement>(".screen .reg-top .mid")) {
+    const parts = [m, ...m.querySelectorAll<HTMLElement>("*")];
+    for (const el of parts) el.style.removeProperty("font-size");
+    for (let k = 1; k <= 2 && over(m); k++) {
       const sizes = parts.map((el) => parseFloat(getComputedStyle(el).fontSize));
       parts.forEach((el, i) => (el.style.fontSize = `${sizes[i] / Math.SQRT2}px`));
-      b.dataset.fit = String(k);
     }
   }
 }

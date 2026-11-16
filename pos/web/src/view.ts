@@ -50,7 +50,10 @@ function find(actions: ActionState[], name: Action): Gate {
 export function btn(label: string, cmd: Command, a?: Gate, cls = ""): string {
   const disabled = a && !a.allowed;
   const title = disabled && a.reason ? ` title="${esc(a.reason)}"` : "";
-  return `<button class="${cls}" data-cmd="${esc(JSON.stringify(cmd))}"${disabled ? " disabled" : ""}${title}>${esc(label)}</button>`;
+  // 二行のボタンは主役（一行目）と添え字（二行目）で文字の段を分ける（同じ大きさの文字で二行にしない、user 2026-11-17）
+  const [main, sub] = label.split("\n");
+  const inner = sub === undefined ? esc(label) : `<b>${esc(main)}</b><small>${esc(sub)}</small>`;
+  return `<button class="${cls}" data-cmd="${esc(JSON.stringify(cmd))}"${disabled ? " disabled" : ""}${title}>${inner}</button>`;
 }
 
 export function backBtn(cmd: Command, a?: Gate): string {
@@ -1256,13 +1259,13 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       // スタッフを呼んだあとは「他の決済を使う」も出さない（押されるとスタッフの無駄足になる）
       const buttons = called
         ? ""
-        : `<div class="point-choices pair">${choice("チャージまたは\n現金併用", "staff", "ghost")}${choice("他の決済を使う", "cancel", "primary")}</div>`;
+        : `<div class="point-choices pair">${choice("チャージまたは現金併用", "staff", "ghost")}${choice("他の決済を使う", "cancel", "primary")}</div>`;
       return `<div class="point-screen emoney-screen emoney-short">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>${called ? "<br>スタッフが向かっています" : ""}`)}
         ${ro ? "" : buttons}
       </div>`;
     }
-    const buttons = `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`;
+    const buttons = `<div class="point-choices pair">${choice("不足額を現金で払う", "cash", "primary")}${choice("電子マネーをチャージする", "charge", "primary")}</div>`;
     return `<div class="point-screen emoney-screen emoney-short">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
         ${ro ? "" : buttons}

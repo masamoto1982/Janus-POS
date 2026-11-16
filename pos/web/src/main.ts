@@ -1,4 +1,4 @@
-import { applyLaw, fitText } from "./law";
+import { applyLaw, fitSum, fitText } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { CashOutKind, Command, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { GuideKind, RulesTab } from "./view";
@@ -71,9 +71,9 @@ async function boot(): Promise<void> {
   window.addEventListener("pagehide", save);
   window.setInterval(frame, 100);
   // レイアウトの法則は部品の大きさで決まるので、段の大きさが変わったときとフォントが届いたときにも当て直す
-  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), applyLaw(e.target))));
+  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), fitSum(e.target), applyLaw(e.target))));
   app.querySelectorAll(".screen-main, .screen-items").forEach((el) => relaid.observe(el));
-  void document.fonts?.ready.then(() => (fitText(app), applyLaw(app)));
+  void document.fonts?.ready.then(() => (fitText(app), fitSum(app), applyLaw(app)));
 }
 
 const SAVE_KEY = "janus-pos-state";
@@ -317,6 +317,7 @@ function setRegion(name: string, raw: string, lang: Lang = "ja"): void {
 
   el.innerHTML = html;
   fitText(el);
+  fitSum(el);
   applyLaw(el);
 
   el.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-key]").forEach((i) => {

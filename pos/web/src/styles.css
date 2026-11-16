@@ -88,6 +88,8 @@ button { touch-action: manipulation; }
    四段目＝FF・金券・たばこ・その他の段 3＝一段目＋二段目（FF の商品登録ボタンが来るので広く、user 2026-11-16） */
 .screen-wrap { container-type: inline-size; }
 @property --W { syntax: "<length>"; inherits: true; initial-value: 400px; }
+/* 最小間隔も長さとして登録する：law.ts が getComputedStyle で px の値として読むため（登録しないと calc の式のまま返り、8px で計算していた） */
+@property --gap { syntax: "<length>"; inherits: true; initial-value: 6px; }
 .screen {
   --W: clamp(384px, 100cqi - 2 * var(--frame-w), 512px);
   /* 白銀比の階段 --sN＝W÷√2ⁿ（W=400 で s11≒8.8・s13≒4.4・s15≒2.2・s17≒1.1）。レジ画面の中の大きさはすべてこの段から選ぶ。
@@ -143,14 +145,15 @@ button { touch-action: manipulation; }
 .ff-tab { padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; }
 /* FF のタブは五つを帯の幅に等分し、高さは幅÷青銅比（user 2026-11-17） */
 .ff-tabs button.tab { height: auto; aspect-ratio: var(--bronze, 3.3028); }
-.ff-page { flex: 1; min-height: 0; display: flex; gap: var(--s13, 4px); }
+/* FF の単品の群が主役で段の中央、▲▼（ページ送り）は向きのある脇役で右の縁（レイアウトの法則）。左の列は右と同じ幅の空き */
+.ff-page { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: center; gap: var(--gap); }
 /* ページ送りは右端の ▲（前）・▼（次）を縦に並べる（user 2026-11-16：スワイプは廃止）。枠のない記号だけ */
-.ff-arrows { flex: none; display: flex; flex-direction: column; justify-content: center; gap: var(--s13, 4px); }
+.ff-arrows { grid-column: 3; justify-self: end; display: flex; flex-direction: column; justify-content: center; gap: var(--s13, 4px); }
 .screen .ff-arrow { border: none; background: none; color: var(--accent); }
 /* ▲▼は縦長の青銅比（幅＝小ボタンの高さ、高さ＝小ボタンの幅） */
 .ff-arrow, .ff-arrow-space { flex: none; width: var(--btn-sm-h, 20px); height: var(--btn-sm-w, 40px); padding: 0; font-size: var(--text-sm); }
 /* FF の単品は特大の白銀比を一行に四つ（user 2026-11-17：将来商品画像を入れるので正方形に近い形） */
-.ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, var(--sq-xl-w)); grid-template-rows: var(--sq-xl-h); justify-content: center; align-content: center; gap: var(--s13, 4px); }
+.ff-grid { grid-column: 2; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, var(--sq-xl-w)); grid-template-rows: var(--sq-xl-h); justify-content: center; align-content: center; gap: var(--gap); }
 .ff-item { box-sizing: border-box; width: var(--sq-xl-w); height: var(--sq-xl-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
    無し＝グレーアウト（長押しで予約注文） */
@@ -607,7 +610,8 @@ body.dragging .drop-hint { display: inline; }
 .menu-head > .muted { text-align: right; }
 .menu-body { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s11, 8px); text-align: center; }
 .menu-body > * { margin: 0; max-width: 100%; }
-.menu-list { display: grid; grid-template-columns: repeat(3, var(--btn-w)); justify-content: center; gap: var(--gap); }
+/* 店舗メニューの項目の並びはレイアウトの法則（law.ts）が決める（同じ種類の群＝中央、入らなければ殻の折り返し）。下の flex は当てはめる前の仮の並び */
+.menu-list { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .menu-list + .menu-list { margin-top: var(--s11, 10px); padding-top: var(--s11, 10px); border-top: var(--s17, 1px) solid var(--border); }
 /* 店舗メニューの項目は大ボタン（青銅比）を三列に並べる。長い名前は二行に折り返す（user 2026-11-17 青銅比） */
 .menu-item { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); text-align: center; padding: 0 var(--s15, 2px); line-height: 1.1; }

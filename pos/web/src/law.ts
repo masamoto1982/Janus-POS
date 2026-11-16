@@ -5,14 +5,17 @@
 //
 // 1. 目立たせたさは部品の見た目にすでに書いてある：部品の中でいちばん大きい文字（絵だけの部品は絵の高さ）
 // 2. いちばん目立たせたいものが主役で、中央に座る。同格が複数なら全員が主役。中央は空けない
-// 3. 残りは脇役で、縁に座る。戻る部品は左、進む部品（積極・スキップ）は右。向きのない脇役は、主役より前に書いたものが左、後に書いたものが右
+// 3. 残りは脇役。向きのある脇役は縁に座る：戻る部品は左、進む部品（積極・スキップ）は右。
+//    向きのない脇役は縁へ行く理由がないので、主役の両脇に最小間隔で寄り添う（主役より前に書いたものが左、後に書いたものが右）。
+//    主役の位置は脇役によって動かない（待ち受けの帯：Language｜呼び鈴｜電子マネー、呼び鈴は中央のまま）
 // 4. 同じ種類の部品が続くところは一つの群。群の中は最小間隔で詰める。部品同士、部品と縁は最小間隔（--gap）より近づかない
 // 5. 群が一行に入らないとき、次の行を置く余地があれば折り返す。行は中央から満たし（殻）、
 //    行の数が最も少なく、各行がなるべく均等な形にして中央にそろえる。余地がなければ部品を縮めて一行に収める
 //
 // 位置の計算（arrange）は DOM に触れない純粋関数。DOM への当てはめは applyLaw が行う。
 
-export type Attractor = "left" | "center" | "right";
+/** left・right＝縁、center＝中央（主役）、beside-left・beside-right＝主役の左右に寄り添う */
+export type Attractor = "left" | "center" | "right" | "beside-left" | "beside-right";
 
 export interface Unit {
   /** 群の部品の幅（単独の部品は要素一つ） */
@@ -29,12 +32,12 @@ export interface Unit {
 /** 同格とみなす幅：文字の四段は √2 倍ずつ離れているので、5% 以内なら同じ段 */
 const SAME_TIER = 0.95;
 
-/** 席を決める：いちばん目立たせたいものが中央、残りは縁（向きがなければ主役の前が左・後が右） */
+/** 席を決める：いちばん目立たせたいものが中央、向きのある脇役は縁、向きのない脇役は主役の両脇（主役の前が左・後が右） */
 export function seats(units: Pick<Unit, "weight" | "dir">[]): Attractor[] {
   const top = Math.max(...units.map((u) => u.weight ?? 0));
   const lead = units.map((u) => (u.weight ?? 0) >= top * SAME_TIER);
   const first = lead.indexOf(true);
-  return units.map((u, i) => (lead[i] ? "center" : u.dir === "back" ? "left" : u.dir === "go" ? "right" : i < first ? "left" : "right"));
+  return units.map((u, i) => (lead[i] ? "center" : u.dir === "back" ? "left" : u.dir === "go" ? "right" : i < first ? "beside-left" : "beside-right"));
 }
 
 export interface Placed {
@@ -86,30 +89,46 @@ export function arrange(units: Unit[], L: number, gap: number, maxHeight = Infin
     return { u, rows, height, width: Math.max(...rows.map((r) => rowWidth(r, gap))) };
   });
   const to = seats(units);
-  let x: number;
-  const left: number[] = [];
-  const right: number[] = [];
-  const mid: number[] = [];
-  to.forEach((t, i) => (t === "left" ? left : t === "right" ? right : mid).push(i));
+  const pick = (t: Attractor) => to.flatMap((x, i) => (x === t ? [i] : []));
   const at: number[] = [];
-  x = gap;
-  for (const i of left) {
+  // 縁：左は左から、右は右から詰める
+  let x = gap;
+  for (const i of pick("left")) {
     at[i] = x;
     x += shaped[i].width + gap;
   }
   const leftEnd = x;
   x = L - gap;
-  for (const i of [...right].reverse()) {
+  for (const i of pick("right").reverse()) {
     x -= shaped[i].width;
     at[i] = x;
     x -= gap;
   }
-  const rightStart = x + gap;
+  const rightEnd = x;
+  // 中央：主役の群の中心を段の中心に。寄り添う脇役はその外側に最小間隔で並ぶ
+  const mid = pick("center");
+  const before = pick("beside-left");
+  const after = pick("beside-right");
   const midW = rowWidth(mid.map((i) => shaped[i].width), gap);
-  let mx = Math.min(Math.max(L / 2 - midW / 2, leftEnd), rightStart - gap - midW);
+  const beforeW = before.reduce((s, i) => s + shaped[i].width + gap, 0);
+  const afterW = after.reduce((s, i) => s + shaped[i].width + gap, 0);
+  let mx = L / 2 - midW / 2;
+  // 縁の部品とぶつかるときだけ、まとまりごとずらす
+  mx = Math.min(Math.max(mx, leftEnd + beforeW), rightEnd - afterW - midW);
   for (const i of mid) {
     at[i] = mx;
     mx += shaped[i].width + gap;
+  }
+  x = at[mid[0]];
+  for (const i of [...before].reverse()) {
+    x -= gap + shaped[i].width;
+    at[i] = x;
+  }
+  x = mx - gap;
+  for (const i of after) {
+    x += gap;
+    at[i] = x;
+    x += shaped[i].width;
   }
   const H = Math.max(...shaped.map((s) => s.height));
   return shaped.map((s, i) => {
@@ -157,7 +176,10 @@ export function applyLaw(root: ParentNode): void {
     // 測り直すために、前回の当てはめを外す
     area.style.removeProperty("height");
     area.classList.remove("law-on");
-    for (const k of kids) for (const p of ["left", "top", "width"]) k.style.removeProperty(p);
+    // 前回縮めていたら、文字もその大きさで決めてあるので、元の大きさで決め直す
+    let shrunk = kids.some((k) => k.style.height !== "");
+    for (const k of kids) for (const p of ["left", "top", "width", "height"]) k.style.removeProperty(p);
+    if (shrunk) fitText(area);
     const shown = kids.filter((k) => k.getClientRects().length > 0);
     if (!shown.length) continue;
     const tier = area.closest<HTMLElement>(".screen-main, .screen-items") ?? area.parentElement!;
@@ -182,17 +204,27 @@ export function applyLaw(root: ParentNode): void {
       } else units.push({ els: [k], unit: { widths: [sizes[i].width], heights: [sizes[i].height], height: sizes[i].height, weight: weightOf(k), dir: dirOf(k) } });
     });
     const placed = arrange(units.map((u) => u.unit), L, gap, maxHeight);
+    shrunk = false;
     const offset = area.getBoundingClientRect().left - tierLeft;
+    // 部品は行の内側（padding の内側）に置く
+    const padTop = parseFloat(getComputedStyle(area).paddingTop) || 0;
     area.classList.add("law-on");
     area.style.height = `${Math.max(...placed.map((p) => p.height))}px`;
     units.forEach((u, i) =>
       u.els.forEach((el, j) => {
         const p = placed[i].items[j];
         el.style.left = `${p.x - offset}px`;
-        el.style.top = `${p.y}px`;
+        el.style.top = `${p.y + padTop}px`;
         el.style.width = `${p.w}px`;
+        // 縮めるときは縦も同じ比率で縮める（ボタンの縦横比は青銅比・白銀比から外さない）。文字は縮んだボタンから決め直す
+        const natural = u.unit.widths[j];
+        if (p.w < natural - 0.5) {
+          el.style.height = `${(u.unit.heights![j] * p.w) / natural}px`;
+          shrunk = true;
+        }
       }),
     );
+    if (shrunk) fitText(area);
   }
 }
 

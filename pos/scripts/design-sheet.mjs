@@ -23,11 +23,13 @@ const SIZES = [
   ["大", "--text-lg", "22.627", 9, 700],
   ["小", "--text-sm", "32", 10, 400],
 ];
+// ボタンの縦横比は青銅比 1:(3+√13)/2（user 2026-11-17）。高さが白銀比の段、幅＝高さ×青銅比
+const BRONZE = 3.3028;
 const BUTTONS = [
-  ["特大", "--btn-xl-w", "2.828", 3, "--btn-xl-h", "5.657", 5],
-  ["大", "--btn-w", "4", 4, "--btn-h", "8", 6],
-  ["中", "--btn-md-w", "5.657", 5, "--btn-md-h", "11.314", 7],
-  ["小", "--btn-sm-w", "8", 6, "--btn-sm-h", "16", 8],
+  ["特大", "--btn-xl-w", "--btn-xl-h", "8", 6],
+  ["大", "--btn-w", "--btn-h", "11.314", 7],
+  ["中", "--btn-md-w", "--btn-md-h", "16", 8],
+  ["小", "--btn-sm-w", "--btn-sm-h", "22.627", 9],
 ];
 const SUP = (n) => String(n).split("").map(d => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]).join("");
 const atW = (div, w = 400) => Math.round((w / Number(div)) * 10) / 10;
@@ -53,7 +55,11 @@ const checkDiv = (varName, div) => {
   if (!screenRule.includes(`${varName}: calc(var(--W) / ${div})`)) throw new Error(`.screen の ${varName} が W / ${div} ではない。SIZES・BUTTONS を直す`);
 };
 for (const [, varName, div] of SIZES) checkDiv(varName, div);
-for (const [, wv, wd, , hv, hd] of BUTTONS) { checkDiv(wv, wd); checkDiv(hv, hd); }
+if (!screenRule.includes(`--bronze: ${BRONZE};`)) throw new Error(`.screen の --bronze が ${BRONZE} ではない。BRONZE を直す`);
+for (const [, wv, hv, hd] of BUTTONS) {
+  checkDiv(hv, hd);
+  if (!screenRule.includes(`${wv}: calc(var(${hv}) * var(--bronze))`)) throw new Error(`.screen の ${wv} が ${hv}×青銅比ではない。BUTTONS を直す`);
+}
 
 const toRgb = (oklch) => {
   const [L, C, H] = oklch.match(/oklch\(([^)]*)\)/)[1].trim().split(/\s+/).map(Number);
@@ -205,7 +211,7 @@ UI はレゴのように、少ない部品の掛け合わせで組み立てる�
 | 色 | 青 #005AFF（操作可能）・緑 #03AF7A（安全・肯定）・赤 #FF4B00（危険・否定）・橙 #F6AA00（着目・注意喚起）。白・黒・グレーは色に数えない無彩色 |
 | 濃度 | 1 淡（明るさ 0.95）・2 薄（0.87）・3 中（その色そのもの。グレーは 0.52）・4 濃（0.44） |
 | ボタンの形 | ${SHAPES.map(([n, v]) => `${n}（\`${v}\`）`).join("・")} |
-| ボタンの大きさ | ${BUTTONS.map(([n, , wd, wk, , hd, hk]) => `${n} W÷√2${SUP(wk)}×W÷√2${SUP(hk)}（W=400 で ${atW(wd)}×${atW(hd)}）`).join("・")}。幅は高さの二段上（縦横 1:2） |
+| ボタンの大きさ | ${BUTTONS.map(([n, , , hd, hk]) => `${n} 高さ W÷√2${SUP(hk)}（W=400 で ${Math.round(atW(hd) * BRONZE * 10) / 10}×${atW(hd)}）`).join("・")}。幅＝高さ×青銅比 ${BRONZE}（縦横 1:(3+√13)/2） |
 
 ## 適用範囲
 
@@ -222,7 +228,7 @@ UI はレゴのように、少ない部品の掛け合わせで組み立てる�
 
 | 形 | 角の丸み | 意味 | レジ画面で使うところ |
 | --- | --- | --- | --- |
-| 弱い角丸 | \`--shape-soft\` 8px | ${SHAPES[0][3]} | 会計・はい・決定などの積極ボタン、バック・スキップ・取引中止、明細の削除・−・＋、テンキーのキー、FF 単品とページ送り、最下段（FF・サービス・金券・たばこ）、帯の Language・電子マネー、店舗メニューの項目、フラグ |
+| 弱い角丸 | \`--shape-soft\` 8px | ${SHAPES[0][3]} | 会計・はい・決定などの積極ボタン、バック・スキップ・取引中止、明細の削除・−・＋、テンキーのキー、FF 単品とページ送り、最下段（FF・金券・たばこ・その他）、帯の Language・電子マネー、店舗メニューの項目、フラグ |
 | 強い角丸 | \`--shape-pill\` 999px | ${SHAPES[1][3]} | 待ち受けの案内ボタン、支払方法のボタン |
 | タブ | \`--shape-tab\` 上の角 6px | ${SHAPES[2][3]} | FF のタブ |
 | 円 | \`--shape-round\` 50% | ${SHAPES[3][3]} | 呼び鈴（ヘッダーは小、待ち受けの帯は大）。Bell エリアの歯車も同じ円 |

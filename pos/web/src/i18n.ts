@@ -39,7 +39,7 @@ const DICT: Record<string, string> = {
   はい: "Yes",
   する: "Check",
   判定: "Verify",
-  削除: "Delete",
+  削除: "Del",
   取消: "Cancel",
   "＋": "+",
   上限: "Max",

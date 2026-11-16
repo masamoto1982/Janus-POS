@@ -1,7 +1,7 @@
 use serde::Serialize;
 
-/// 最下段の「サービス」ボタンで呼んだときの詳細
-pub const SERVICE_BUTTON: &str = "お支払い・荷物";
+/// 最下段の「その他」ボタンで呼んだときの詳細
+pub const OTHER_BUTTON: &str = "その他";
 /// セルフでお支払い方法に「現金」を選んで呼んだときの詳細
 pub const CASH_CHOSEN: &str = "現金でのお支払い";
 
@@ -30,11 +30,11 @@ impl CallKind {
         let s = match self {
             CallKind::AgeCheck => "年確",
             CallKind::FastFood => "FF",
-            // 最下段の「サービス」ボタンは detail が「お支払い・荷物」。商品登録から発動するのは荷物の伝票だけ
-            CallKind::Service if detail == SERVICE_BUTTON => "サービス",
             CallKind::Service => "宅配便",
             CallKind::Tobacco => "たばこ",
             CallKind::Voucher => "金券",
+            // 最下段の「その他」ボタンはボタンの文言そのまま
+            CallKind::CustomerHelp if detail == OTHER_BUTTON => "その他",
             CallKind::CustomerHelp => "呼び出し",
             CallKind::ChangeLeft => "釣銭忘れ",
             CallKind::Bill => "お支払い",
@@ -189,8 +189,8 @@ mod tests_topic {
 
     #[test]
     fn topic_is_concrete() {
-        assert_eq!(CallKind::Service.topic(SERVICE_BUTTON), "サービス");
         assert_eq!(CallKind::Service.topic("荷物を送る 発払い"), "宅配便");
+        assert_eq!(CallKind::CustomerHelp.topic(OTHER_BUTTON), "その他");
         assert_eq!(CallKind::Bill.topic("3枚"), "お支払い");
         assert_eq!(CallKind::CashOnly.topic("チケット・切手"), "チケット");
         assert_eq!(CallKind::CashOnly.topic(CASH_CHOSEN), "現金");

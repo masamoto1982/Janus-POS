@@ -85,7 +85,7 @@ button { touch-action: manipulation; }
    一段目＝ヘッダー 1（W÷√2⁷）
    二段目＝待ち受けの帯／合計の帯 2（W÷√2⁵。大ボタン＋上下の間隔）
    三段目＝10（W×0.88）
-   四段目＝FF・サービス・金券・たばこの段 3＝一段目＋二段目（FF の商品登録ボタンが来るので広く、user 2026-11-16） */
+   四段目＝FF・金券・たばこ・その他の段 3＝一段目＋二段目（FF の商品登録ボタンが来るので広く、user 2026-11-16） */
 .screen-wrap { container-type: inline-size; }
 @property --W { syntax: "<length>"; inherits: true; initial-value: 400px; }
 .screen {
@@ -168,7 +168,7 @@ button { touch-action: manipulation; }
 .reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
 /* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大きさ（user 2026-11-12）。
-   最下段の行（.call-row）は帯の内幅より 8px 広く、大ボタン4つ（最大 116×48）を gap 8px で並べるので、
+   最下段の行（.call-row）は帯の内幅より 8px 広く、大ボタン4つ（FF・金券・たばこ・その他）を gap で並べるので、
    幅＝min(大ボタンの幅, (帯の内幅 + 8px − gap×3) ÷ 4)、高さ＝大ボタンの高さ 48px（帯は 48＋上下8＝64px のまま） */
 .reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; width: min(var(--btn-w), (100cqi + var(--s11, 8px) - 3 * var(--gap)) / 4); max-width: 100%; height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 .reg-top { container-type: inline-size; }
@@ -322,6 +322,7 @@ details summary h3 { display: inline; }
 .welcome p { margin: var(--s13, 4px) 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: var(--s11, 8px); }
+.guide-row + .guide-row { margin-top: var(--gap); }
 .guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 var(--s15, 2px); border-radius: var(--shape-pill); white-space: nowrap; }
 .welcome .guide { margin-top: var(--s11, 8px); font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
@@ -670,11 +671,19 @@ body.dragging .drop-hint { display: inline; }
    点いているあいだは赤 --sos-head＋白文字、消えているあいだはその段のふだんの色 */
 .screen.sos .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--sos-head) calc(var(--blink-on) * 100%), var(--tier-deep)); }
 .screen.sos .call-row.calling :is(.big, p.small) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
+/* セルフ操作モードの最下段：ボタン群の上に「カウンター内の商品はスタッフが対応いたします」を添え、案内とボタン群をまとめて縦の中央に置く（user 2026-11-16） */
+.screen-items:has(> .call-note) { justify-content: center; }
+.screen-items:has(> .call-note) > .call-row { flex: none; }
+.call-note { margin: 0; color: var(--msg-strong); font-size: var(--text-sm); line-height: 1.35; text-align: center; }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(var(--s17, 1px), var(--s15, 2px)); }
 .call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: var(--s15, 2px) var(--s12, 6px); border-radius: var(--shape-soft); line-height: 1.2; }
-.call-btn b { font-size: var(--text-sm); }
-.call-btn small { font-size: var(--text-sm); }
+.call-btn b, .welcome-band .band-btn b { font-size: var(--text-lg); line-height: 1.2; }
+/* 二行のボタンは主役（ボタンの名前）を大テキスト、脇役（添え字）を小テキストに分けてメリハリを付ける（user 2026-11-16） */
+.call-btn small, .welcome-band .band-btn small { font-size: var(--text-sm); line-height: 1.2; }
+/* 添え字が一行に収まらないときは「・」の後ろで折り返し、ボタンの高さを伸ばす（文字がボタンからはみ出さないように） */
+.call-btn small { word-break: keep-all; overflow-wrap: anywhere; }
+.call-row .call-btn { height: auto; min-height: var(--btn-h); max-height: none; }
 
 .coupon-list { margin: 0; padding: 0; list-style: none; color: var(--msg-strong); font-size: var(--text-sm); }
 .coupon-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--s11, 8px); }
@@ -809,15 +818,13 @@ body.dragging .drop-hint { display: inline; }
 .screen-main:has(> .welcome-band) { display: flex; flex-direction: column; }
 .screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; }
 .welcome-band ~ :is(.scan-welcome, .staff-operated-welcome) { flex: 1 0 auto; min-height: 0; margin-top: 0; }
-/* 両ボタンは呼び鈴に寄せ、間の余白は顧客操作モードの FF とサービスの間と同じにする。
-   その行（.call-row）は帯より幅が 8px 狭く、大ボタン4つを gap 8px で space-evenly に並べるので、
-   余白＝(帯の内幅 + 8px − 大ボタン4つ − 8px×3) ÷ 5 + 8px。ボタンが縮むほど狭いときは 8px */
+/* 両ボタンは呼び鈴に寄せ、間の余白は顧客操作モードの FF と金券の間と同じにする。
+   その行（.call-row）は帯より幅が 8px 狭く、大ボタン4つを gap で space-evenly に並べるので、
+   余白＝(帯の内幅 + 8px − 大ボタン4つ − gap×3) ÷ 5 + gap。ボタンが縮むほど狭いときは 8px */
 .screen-main > .welcome-band { display: block; }
 .welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: max(var(--gap), (100cqi + var(--s11, 8px) - 4 * var(--btn-w) - 3 * var(--gap)) / 5 + var(--gap)); }
 .welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--btn-h); height: var(--btn-h); }
 .welcome-band .band-btn { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-xl-w); max-width: 100%; height: var(--btn-h); padding: var(--s15, 2px) var(--s12, 6px); line-height: 1.2; white-space: nowrap; }
-.welcome-band .band-btn b { font-size: var(--text-sm); }
-.welcome-band .band-btn small { font-size: var(--text-sm); }
 .welcome-band .band-row:has(> .msg) { height: var(--btn-h); }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }
 /* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードのお客様側）でも押せる＝青 */

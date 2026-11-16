@@ -1476,7 +1476,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     pages < 2 ? "" : show
       ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "◀" : "▶"}</button>`
       : `<span class="ff-arrow-space"></span>`;
-  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page">${side_(-1, page > 0)}<div class="ff-grid">${grid}</div>${side_(1, page < pages - 1)}</div>`;
+  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page" data-ffpages="${reg}:${pages}">${side_(-1, page > 0)}<div class="ff-grid">${grid}</div>${side_(1, page < pages - 1)}</div>`;
 }
 
 const MENU_LABEL: Record<MenuScreen, string> = {

@@ -1482,9 +1482,13 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${esc(f.name)}</button>`;
     })
     .join("");
-  // 隠れたページがある側の端にだけ白いグラデーションを置く（user 2026-11-16：◀▶ の代わり）。ページは左右のスワイプでめくる
-  const more = pages < 2 ? "" : `${page > 0 ? " more-prev" : ""}${page < pages - 1 ? " more-next" : ""}`;
-  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page${more}" data-ffpages="${reg}:${pages}"><div class="ff-grid">${grid}</div></div>`;
+  // ページ送りは右端の ▲（前）・▼（次）（user 2026-11-16：スワイプでのページ送りは廃止）。押せない側は同じ大きさの空きにして、もう一方の位置を動かさない
+  const arrow = (dir: -1 | 1, show: boolean) =>
+    show
+      ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "▲" : "▼"}</button>`
+      : `<span class="ff-arrow-space"></span>`;
+  const arrows = pages < 2 ? "" : `<div class="ff-arrows">${arrow(-1, page > 0)}${arrow(1, page < pages - 1)}</div>`;
+  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page"><div class="ff-grid">${grid}</div>${arrows}</div>`;
 }
 
 const MENU_LABEL: Record<MenuScreen, string> = {

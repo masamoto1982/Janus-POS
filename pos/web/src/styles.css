@@ -571,6 +571,13 @@ body.dragging .drop-hint { display: inline; }
   opacity: 1 !important; filter: grayscale(1) !important; background: var(--off-bg) !important; color: var(--off-ink) !important; border-color: var(--border);
 }
 .screen .guide-btn:disabled { background: transparent !important; }
+/* FF 単品ボタンの絵文字はデモのための便宜で、元の色のまま出す（user 2026-11-17：操作可能部品は青の原則から外れてよい）。
+   ボタンにランプ（#ramp）やグレーの filter を掛けると絵文字まで染まるので、単品ボタンだけ filter を外し、
+   ランプが出していた色（グレー4→操作の青）を直接指定する。押せないときのグレーは上の :disabled・.out の指定のまま */
+.screen [data-region] button.ff-item { filter: none !important; }
+:is(.screen.operable [data-region], .staff-screen [data-region] .staff-only) button.ff-item:not(:disabled, .out) { border-color: var(--operable-blue); }
+:is(.screen.operable [data-region], .staff-screen [data-region] .staff-only) button.ff-item.made_to_order:not(:disabled) { background: var(--operable-blue); }
+:is(.screen.operable [data-region], .staff-screen [data-region] .staff-only) button.ff-item:is(.plenty, .low):not(:disabled) { color: var(--operable-blue); }
 .pickup-no { font-size: var(--text-num); font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: var(--s11, 8px) var(--s9, 16px); justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: var(--s11, 8px); font-size: var(--text-sm); }

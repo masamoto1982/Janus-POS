@@ -304,7 +304,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--s11, 8px); align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
 /* 受け付けなかった理由（B-2）：二段目の帯の直下、内税の行の位置に赤文字で一行。何も覆わず、閉じるボタンも置かない */
-.screen .reject-note { flex: none; margin: 0; padding: var(--s13, 4px) 0; color: var(--alert-ink); font-size: var(--text-sm); font-weight: 700; line-height: 1.35; }
+.screen .reject-note { flex: none; margin: 0; padding: var(--s13, 4px) 0; color: var(--alert-ink); font-size: var(--text-lg); font-weight: 700; line-height: 1.35; text-align: center; }
 .screen-main > .reject-note + .confirm { flex: 1; }
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }
 .screen-main > .reg-top, .screen-main > .banner { flex: none; }
@@ -325,7 +325,6 @@ details summary h3 { display: inline; }
 .welcome p { margin: var(--s13, 4px) 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: var(--s11, 8px); }
-.guide-row + .guide-row { margin-top: var(--gap); }
 .guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 var(--s15, 2px); border-radius: var(--shape-pill); white-space: nowrap; }
 .welcome .guide { margin-top: var(--s11, 8px); font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
@@ -581,13 +580,15 @@ body.dragging .drop-hint { display: inline; }
 .rules-dlg .rules-tabs { margin-top: 12px; }
 .rules-dlg .rate-in { width: 6em; text-align: right; }
 .rules-dlg .owner-auth[hidden] { display: none; }
-.menu-head { display: flex; align-items: center; gap: var(--s11, 8px); margin-bottom: var(--s11, 8px); }
-.menu-head b { flex: 1; }
+.menu-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); margin-bottom: var(--s11, 8px); }
+.menu-head > .muted { text-align: right; }
+.menu-body { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s11, 8px); text-align: center; }
+.menu-body > * { margin: 0; max-width: 100%; }
 .menu-list { display: grid; gap: var(--gap); }
 .menu-list + .menu-list { margin-top: var(--s11, 10px); padding-top: var(--s11, 10px); border-top: var(--s17, 1px) solid var(--border); }
-.menu-item { text-align: left; padding: var(--s11, 10px) var(--s10, 12px); }
-.menu-form { display: flex; flex-wrap: wrap; gap: var(--gap); }
-.menu-form input { flex: 1 1 8em; min-width: 0; }
+.menu-item { text-align: center; padding: var(--s11, 10px) var(--s10, 12px); }
+.menu-form { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); }
+.menu-form input { flex: 0 1 8em; min-width: 0; }
 .money-io { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 8px; }
 .money-io-staff { grid-column: 1; min-width: 0; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
@@ -644,7 +645,8 @@ body.dragging .drop-hint { display: inline; }
 .first-welcome:has(> .mode-sub) { flex-direction: column; gap: var(--s13, 4px); }
 .first-welcome .mode-sub { color: var(--msg-weak); font-size: var(--text-sm); font-weight: 400; line-height: 1.35; }
 .first-welcome .mode-big { color: var(--msg-strong); font-size: min(var(--text-xl), calc(82cqi / var(--len, 1))); white-space: nowrap; font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
-.call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: var(--gap); }
+.call-row { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; gap: var(--gap); }
+.call-row:not(.calling) > .call-btn { box-sizing: border-box; width: var(--btn-w); min-width: 0; }
 /* 呼び出し中の最下段：案内を中央に */
 .call-row.calling { display: flex; align-items: center; justify-content: center; padding: 0 var(--gap); }
 .call-row.calling .msg { flex: 1; min-width: 0; }
@@ -801,11 +803,9 @@ body.dragging .drop-hint { display: inline; }
 .screen-main:has(> .welcome-band) { display: flex; flex-direction: column; }
 .screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; }
 .welcome-band ~ :is(.scan-welcome, .staff-operated-welcome) { flex: 1 0 auto; min-height: 0; margin-top: 0; }
-/* 両ボタンは呼び鈴に寄せ、間の余白は顧客操作モードの FF と金券の間と同じにする。
-   その行（.call-row）は帯より幅が 8px 狭く、大ボタン4つを gap で space-evenly に並べるので、
-   余白＝(帯の内幅 + 8px − 大ボタン4つ − gap×3) ÷ 5 + gap。ボタンが縮むほど狭いときは 8px */
+/* 帯の中の位置はレイアウトの法則（law.ts）が決める。下の flex は法則を当てはめる前の仮の並び */
 .screen-main > .welcome-band { display: block; }
-.welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: max(var(--gap), (100cqi + var(--s11, 8px) - 4 * var(--btn-w) - 3 * var(--gap)) / 5 + var(--gap)); }
+.welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: var(--gap); }
 .welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--btn-h); height: var(--btn-h); }
 .welcome-band .band-btn { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-xl-w); max-width: 100%; height: var(--btn-h); padding: var(--s15, 2px) var(--s12, 6px); line-height: 1.2; white-space: nowrap; }
 .welcome-band .band-row:has(> .msg) { height: var(--btn-h); }
@@ -836,3 +836,9 @@ body.dragging .drop-hint { display: inline; }
 :root .screen.sos.sos.sos { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 商品が登録された行を一瞬だけ染めるエフェクトも、濃いめの段と同じモードの色 */
 :root .screen:is(.mode-staff, .mode-self) { --flash: var(--tier-deep); }
+
+/* レイアウトの法則（law.ts, user 2026-11-16）：[data-law] の子要素の位置・幅は applyLaw が決める。
+   同じ種類が続けば群、群は中心か縁の近い方へ、最小間隔は --gap、入らなければ殻のように行を一つずつ満たして中央揃え、
+   次の行の余地がなければ縮む。当てはめる前（初回の描画）は各行の flex の仮の並び */
+[data-law].law-on { position: relative; display: block; flex: none; }
+[data-law].law-on > * { position: absolute; margin: 0; box-sizing: border-box; max-width: none; }

@@ -560,9 +560,9 @@ function payHint(method: string | null, blocker: string | null, inserted: number
     return `${guide}${op}${split}</p>`;
   }
   if (selfOperated) return "";
-  if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
+  if (inserted && due > 0) return staff ? `<div class="big">あと <b>${yen(due)}</b> 不足しています</div>` : `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
-  if (inserted) return staff ? `<p>${sec}秒の無操作で、お支払いを確定します</p>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
+  if (inserted) return staff ? `<div class="big">${sec}秒の無操作で、お支払いを確定します</div>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
   if (method === "cash" && staff) return `${guide}お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   if (method === "cash") return `${guide}スタッフが現金をお預かりします</p>`;
   return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
@@ -902,17 +902,14 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
 export const scanGuide = new Map<string, GuideKind>();
 export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon" | "shop" | "parcel" | "bill";
 /** セルフ操作モードの案内ボタン。一段目＝商品・レジ袋・お支払い・宅配便、二段目＝ポイント・クーポン（user 2026-11-16） */
-const GUIDES: [GuideKind, string, string][][] = [
-  [
-    ["item", "商品", "商品のバーコードをスキャンしてください"],
-    ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
-    ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
-    ["parcel", "宅配便", "送り状または受け取り用のバーコードをスキャンしてください"],
-  ],
-  [
-    ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
-    ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
-  ],
+// 並べ方（行の分け方・位置）はレイアウトの法則（law.ts）が決めるので、ここでは順番だけを書く
+const GUIDES: [GuideKind, string, string][] = [
+  ["item", "商品", "商品のバーコードをスキャンしてください"],
+  ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
+  ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
+  ["parcel", "宅配便", "送り状または受け取り用のバーコードをスキャンしてください"],
+  ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
+  ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
 ];
 
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
@@ -930,18 +927,16 @@ function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolea
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
   // 呼び鈴のない側（スタッフ操作モードのお客様側）は空きを作らず、両ボタンを中央に詰める
   const bell = bellBtn(r, side);
-  return `<div class="reg-top welcome-band"><div class="band-row">${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>${BAND_END}`;
+  return `<div class="reg-top welcome-band"><div class="band-row" data-law>${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>${BAND_END}`;
 }
 
 export function welcome(r: RegisterView, side: Side, emoney?: Gate): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:${side}`);
-  const guide = GUIDES.flat().find(([k]) => k === on);
-  const row = (g: [GuideKind, string, string][]) =>
-    `<div class="guide-row">${g.map(([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`).join("")}</div>`;
+  const guide = GUIDES.find(([k]) => k === on);
   return `<div class="welcome${emoney ? " scan-welcome" : ""}">
       ${msg("バーコードをスキャンしてください", "すべてのバーコードを受け付けます")}
-      ${GUIDES.map(row).join("")}
+      <div class="guide-row" data-law>${GUIDES.map(([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`).join("")}</div>
       ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
@@ -990,7 +985,7 @@ function staffOperatedWelcome(r: RegisterView, side: Side): string {
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
   return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}<div class="welcome staff-operated-welcome">${msg(head, sub)}
-      <div class="guide-row">${guides}</div>
+      <div class="guide-row" data-law>${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
@@ -1458,13 +1453,13 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const a = (n: Action) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
-    // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、ボタン群の上に添える（user 2026-11-16）
-    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row">${[
+    // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。小さい脇役なので主役のボタン群の下に置く（レイアウトの法則、user 2026-11-16）
+    return `<div class="call-row" data-law>${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("金券", "ギフトカード・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
-    ].join("")}</div>`;
+    ].join("")}</div><p class="call-note">カウンター内の商品はスタッフが対応いたします</p>`;
   }
   if (r.mode === "staff_operated" && side === "customer") return signage(now);
   if (r.mode === "staff_operated" && r.staff.phase === "paying") return "";
@@ -1524,11 +1519,12 @@ export function storeMenu(r: RegisterView): string {
   const reg = r.id;
   const m = r.menu!;
   const go = (screen: MenuScreen | null, extra: { exchange_to?: number } = {}): Command => ({ type: "open_menu", register: reg, screen, ...extra });
-  const head = (title: string) => `<div class="menu-head"><b class="big">${esc(title)}</b></div>`;
-  const screen = (body: string) => `<div class="menu-screen">${body}${backFootRow(go("top"))}</div>`;
+  const head = (title: string) => `<b class="big">${esc(title)}</b>`;
+  // 見出し・説明・入力欄は一つのまとまりとして中央に、バックは左下に置く（レイアウトの法則）
+  const screen = (body: string) => `<div class="menu-screen"><div class="menu-body">${body}</div>${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-head"><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
+      return `<div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
         <div class="menu-list">${MENU_ITEMS
           .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>
@@ -1566,7 +1562,8 @@ export function storeMenu(r: RegisterView): string {
         .map((d) => btn(`${d.toLocaleString()}円`, go("changer", { exchange_to: d }), undefined, `seg small ${m.exchange_to === d ? "on" : ""}`))
         .join("");
       return screen(`${head(MENU_LABEL.changer)}
-        <div class="row wrap">受け取る金種 ${segs}</div>
+        <p class="muted">受け取る金種</p>
+        <div class="row wrap center">${segs}</div>
         <p class="muted">両替する金額を<b>「入金」ボックス</b>に入れて Enter を押してください<br>同じ額を ${m.exchange_to.toLocaleString()}円 で<b>「出金」ボックス</b>に出します</p>
         <p class="muted">釣銭機の ${m.exchange_to.toLocaleString()}円：残り ${have(m.exchange_to)} 枚　在高 ${yen(v.drawer_total)}</p>`);
     }

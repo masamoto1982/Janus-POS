@@ -1,10 +1,13 @@
 // レイアウトの法則（user 2026-11-16）：ボタンの数が変わっても、置き場所を手で決め直さなくてよいように、
 // 行の中の部品の位置を次の法則だけで決める。
 //
-// 1. 同じ種類の部品が続くところは一つの「群」になる。群の中は最小間隔で詰める
-// 2. 群（と単独の部品）は、中心か縁のうち近い方へ寄る（出発点は均等に並べた位置）
-// 3. 部品同士、部品と縁は最小間隔（--gap）より近づかない
-// 4. 群が一行に入らないとき、次の行を置く余地があれば折り返す。行は一つずつ満たし（殻）、
+// 目立たせたい順に、良い席から座る。良い席とは中央
+//
+// 1. 目立たせたさは部品の見た目にすでに書いてある：部品の中でいちばん大きい文字（絵だけの部品は絵の高さ）
+// 2. いちばん目立たせたいものが主役で、中央に座る。同格が複数なら全員が主役。中央は空けない
+// 3. 残りは脇役で、縁に座る。戻る部品は左、進む部品（積極・スキップ）は右。向きのない脇役は、主役より前に書いたものが左、後に書いたものが右
+// 4. 同じ種類の部品が続くところは一つの群。群の中は最小間隔で詰める。部品同士、部品と縁は最小間隔（--gap）より近づかない
+// 5. 群が一行に入らないとき、次の行を置く余地があれば折り返す。行は中央から満たし（殻）、
 //    行の数が最も少なく、各行がなるべく均等な形にして中央にそろえる。余地がなければ部品を縮めて一行に収める
 //
 // 位置の計算（arrange）は DOM に触れない純粋関数。DOM への当てはめは applyLaw が行う。
@@ -17,6 +20,21 @@ export interface Unit {
   /** 部品の高さ。行の高さは群の中でいちばん高いもの（height）、各部品は行の中で上下の中央 */
   heights?: number[];
   height: number;
+  /** 目立たせたさ（いちばん大きい文字の大きさ）。省けば全員が同格＝主役 */
+  weight?: number;
+  /** 脇役になったときの向き：戻る＝左の縁、進む＝右の縁 */
+  dir?: "back" | "go";
+}
+
+/** 同格とみなす幅：文字の四段は √2 倍ずつ離れているので、5% 以内なら同じ段 */
+const SAME_TIER = 0.95;
+
+/** 席を決める：いちばん目立たせたいものが中央、残りは縁（向きがなければ主役の前が左・後が右） */
+export function seats(units: Pick<Unit, "weight" | "dir">[]): Attractor[] {
+  const top = Math.max(...units.map((u) => u.weight ?? 0));
+  const lead = units.map((u) => (u.weight ?? 0) >= top * SAME_TIER);
+  const first = lead.indexOf(true);
+  return units.map((u, i) => (lead[i] ? "center" : u.dir === "back" ? "left" : u.dir === "go" ? "right" : i < first ? "left" : "right"));
 }
 
 export interface Placed {
@@ -67,17 +85,8 @@ export function arrange(units: Unit[], L: number, gap: number, maxHeight = Infin
     const { rows, height } = wrapUnit(u, room, gap, maxHeight);
     return { u, rows, height, width: Math.max(...rows.map((r) => rowWidth(r, gap))) };
   });
-  // 出発点：均等に並べた位置（space-evenly）。そこから中心か縁の近い方へ
-  const free = L - shaped.reduce((s, x) => s + x.width, 0);
-  const step = free / (shaped.length + 1);
-  let x = step;
-  const to: Attractor[] = shaped.map((s) => {
-    const c = x + s.width / 2;
-    x += s.width + step;
-    const toCenter = Math.abs(c - L / 2);
-    const toEdge = Math.min(c - s.width / 2, L - (c + s.width / 2));
-    return toCenter <= toEdge ? "center" : c < L / 2 ? "left" : "right";
-  });
+  const to = seats(units);
+  let x: number;
   const left: number[] = [];
   const right: number[] = [];
   const mid: number[] = [];
@@ -120,6 +129,21 @@ export function arrange(units: Unit[], L: number, gap: number, maxHeight = Infin
   });
 }
 
+/** 目立たせたさ：部品の中でいちばん大きい文字。絵だけの部品（呼び鈴）は絵の高さ */
+function weightOf(el: HTMLElement): number {
+  let w = 0;
+  const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) if (n.nodeValue?.trim() && n.parentElement) w = Math.max(w, parseFloat(getComputedStyle(n.parentElement).fontSize) || 0);
+  for (const pic of el.querySelectorAll("svg, img")) w = Math.max(w, pic.getBoundingClientRect().height);
+  return w;
+}
+
+/** 向き：バック・取引中止は戻る、積極とスキップは進む */
+function dirOf(el: HTMLElement): Unit["dir"] {
+  const has = (sel: string) => el.matches(sel) || !!el.querySelector(sel);
+  return has(".back-btn, .void-btn") ? "back" : has(".primary, .skip") ? "go" : undefined;
+}
+
 /** 部品の種類：同じ種類が続くところが群になる */
 const kindOf = (el: Element) => (el as HTMLElement).dataset.kind ?? el.classList[0] ?? el.tagName;
 
@@ -154,7 +178,8 @@ export function applyLaw(root: ParentNode): void {
         last.unit.widths.push(sizes[i].width);
         last.unit.heights!.push(sizes[i].height);
         last.unit.height = Math.max(last.unit.height, sizes[i].height);
-      } else units.push({ els: [k], unit: { widths: [sizes[i].width], heights: [sizes[i].height], height: sizes[i].height } });
+        last.unit.weight = Math.max(last.unit.weight ?? 0, weightOf(k));
+      } else units.push({ els: [k], unit: { widths: [sizes[i].width], heights: [sizes[i].height], height: sizes[i].height, weight: weightOf(k), dir: dirOf(k) } });
     });
     const placed = arrange(units.map((u) => u.unit), L, gap, maxHeight);
     const offset = area.getBoundingClientRect().left - tierLeft;

@@ -560,9 +560,9 @@ function payHint(method: string | null, blocker: string | null, inserted: number
     return `${guide}${op}${split}</p>`;
   }
   if (selfOperated) return "";
-  if (inserted && due > 0) return staff ? `<p>あと <b>${yen(due)}</b> 不足しています</p>` : `<div class="big">不足額 ${yen(due)}</div>`;
+  if (inserted && due > 0) return staff ? `<div class="big">あと <b>${yen(due)}</b> 不足しています</div>` : `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
-  if (inserted) return staff ? `<p>${sec}秒の無操作で、お支払いを確定します</p>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
+  if (inserted) return staff ? `<div class="big">${sec}秒の無操作で、お支払いを確定します</div>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
   if (method === "cash" && staff) return `${guide}お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   if (method === "cash") return `${guide}スタッフが現金をお預かりします</p>`;
   return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
@@ -1453,13 +1453,13 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const a = (n: Action) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
-    // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、ボタン群の上に添える（user 2026-11-16）
-    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${[
+    // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。小さい脇役なので主役のボタン群の下に置く（レイアウトの法則、user 2026-11-16）
+    return `<div class="call-row" data-law>${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("金券", "ギフトカード・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
-    ].join("")}</div>`;
+    ].join("")}</div><p class="call-note">カウンター内の商品はスタッフが対応いたします</p>`;
   }
   if (r.mode === "staff_operated" && side === "customer") return signage(now);
   if (r.mode === "staff_operated" && r.staff.phase === "paying") return "";
@@ -1515,11 +1515,12 @@ export function storeMenu(r: RegisterView): string {
   const reg = r.id;
   const m = r.menu!;
   const go = (screen: MenuScreen | null, extra: { exchange_to?: number } = {}): Command => ({ type: "open_menu", register: reg, screen, ...extra });
-  const head = (title: string) => `<div class="menu-head"><b class="big">${esc(title)}</b></div>`;
-  const screen = (body: string) => `<div class="menu-screen">${body}${backFootRow(go("top"))}</div>`;
+  const head = (title: string) => `<b class="big">${esc(title)}</b>`;
+  // 見出し・説明・入力欄は一つのまとまりとして中央に、バックは左下に置く（レイアウトの法則）
+  const screen = (body: string) => `<div class="menu-screen"><div class="menu-body">${body}</div>${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-head"><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
+      return `<div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
         <div class="menu-list">${MENU_ITEMS
           .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>
@@ -1557,7 +1558,8 @@ export function storeMenu(r: RegisterView): string {
         .map((d) => btn(`${d.toLocaleString()}円`, go("changer", { exchange_to: d }), undefined, `seg small ${m.exchange_to === d ? "on" : ""}`))
         .join("");
       return screen(`${head(MENU_LABEL.changer)}
-        <div class="row wrap">受け取る金種 ${segs}</div>
+        <p class="muted">受け取る金種</p>
+        <div class="row wrap center">${segs}</div>
         <p class="muted">両替する金額を<b>「入金」ボックス</b>に入れて Enter を押してください<br>同じ額を ${m.exchange_to.toLocaleString()}円 で<b>「出金」ボックス</b>に出します</p>
         <p class="muted">釣銭機の ${m.exchange_to.toLocaleString()}円：残り ${have(m.exchange_to)} 枚　在高 ${yen(v.drawer_total)}</p>`);
     }

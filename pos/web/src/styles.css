@@ -84,8 +84,8 @@ button { touch-action: manipulation; }
    縦幅：画面全体を縦長の白銀長方形（縦＝W×√2、A判の紙と同じ形）にし、ヘッダー（W÷√2⁷）16個分を四段に分ける（user 2026-11-16）
    一段目＝ヘッダー 1（W÷√2⁷）
    二段目＝待ち受けの帯／合計の帯 2（W÷√2⁵。大ボタン＋上下の間隔）
-   三段目＝11（W×0.97、ほぼ正方形）
-   四段目＝FF・サービス・金券・たばこの段 2（W÷√2⁵） */
+   三段目＝10（W×0.88）
+   四段目＝FF・サービス・金券・たばこの段 3＝一段目＋二段目（FF の商品登録ボタンが来るので広く、user 2026-11-16） */
 .screen-wrap { container-type: inline-size; }
 @property --W { syntax: "<length>"; inherits: true; initial-value: 400px; }
 .screen {
@@ -102,7 +102,7 @@ button { touch-action: manipulation; }
   --btn-md-w: calc(var(--W) / 5.657); --btn-md-h: calc(var(--W) / 11.314);
   --btn-sm-w: calc(var(--W) / 8); --btn-sm-h: calc(var(--W) / 16);
   --gap: calc(var(--W) / 45.255);
-  --head-h: calc(var(--W) / 11.314); --band-h: calc(var(--W) / 5.657); --items-h: calc(var(--W) / 5.657); --tier3-h: calc(var(--head-h) * 11);
+  --head-h: calc(var(--W) / 11.314); --band-h: calc(var(--W) / 5.657); --items-h: calc(var(--head-h) * 3); --tier3-h: calc(var(--head-h) * 10);
   font-size: var(--text-sm); position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: calc(var(--s15, 2px) + var(--head-h) + var(--band-h) + var(--tier3-h) + var(--items-h)); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); height: var(--head-h);
   padding: 0 calc(var(--s11, 8px) + max(0px, (100% - var(--s9, 16px) - 4 * var(--btn-w) - 3 * var(--gap)) / 5)); border-bottom: var(--s17, 1px) solid var(--border); background: var(--head-bg); }

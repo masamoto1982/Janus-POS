@@ -23,13 +23,13 @@ describe("呼び出し中の黄の点滅", () => {
     expect(decl(tokens, "--call-soft")).toBe("var(--orange-2)");
   });
 
-  it("点滅していない呼び鈴は薄い黄（レジ画面の呼び鈴も Bell エリアの端末も）", () => {
+  it("点滅していないレジ画面の呼び鈴は薄い黄（Bell エリアの端末は対象外）", () => {
     const tokens = rules.filter(r => r.selector === ":root").map(r => r.body).join(";");
     expect(decl(tokens, "--bell-bg")).toBe("var(--alert-bg)");
     const idle = rules.find(r => r.selector === ".screen .bell-btn:not(:disabled)");
     expect(decl(idle!.body, "background")).toBe("var(--bell-bg)");
-    const unit = rules.find(r => r.selector === ".bell-unit" && decl(r.body, "background"));
-    expect(decl(unit!.body, "background")).toBe("var(--alert-bg)");
+    // Bell エリアの端末は対象外：待機中は背景を塗らない
+    expect(rules.some(r => r.selector === ".bell-unit" && decl(r.body, "background"))).toBe(false);
   });
 
   it("呼び出し中のスタッフ側の黄の段は、ほかの段の色の規則に負けない", () => {

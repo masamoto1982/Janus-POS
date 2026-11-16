@@ -80,7 +80,7 @@ const DICT: Record<string, string> = {
   "引換券、割引券のバーコードをスキャンしてください": "Please scan the voucher or discount coupon barcode",
   お買い物: "Shopping",
   宅配便: "Parcels",
-  "宅配便の伝票、または受取用のバーコードをスキャンしてください": "Scan the parcel slip or the pickup barcode",
+  送り状または受け取り用のバーコードをスキャンしてください: "Scan the parcel slip or the pickup barcode",
   いらっしゃいませ: "Welcome",
   ご用件をお申し付けください: "How may we help you?",
   お辞儀とご挨拶をしましょう: "Bow and greet the customer",

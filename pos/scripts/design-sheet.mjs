@@ -16,12 +16,21 @@ const HUES = [
   ["orange", "橙（着目・注意喚起）"],
 ];
 const DENSITY = ["1 淡", "2 薄", "3 中", "4 濃"];
+// レジ画面の寸法は画面の内幅 W を白銀比（√2）で割った階段から選ぶ（user 2026-11-16）。[名前, 変数, W を割る数, √2 の何乗, 太さ]
 const SIZES = [
-  ["特大", "--text-xl", 96, 800],
-  ["強調", "--text-num", 24, 700],
-  ["大", "--text-lg", 18, 700],
-  ["小", "--text-sm", 12, 400],
+  ["特大", "--text-xl", "5.657", 5, 800],
+  ["強調", "--text-num", "16", 8, 700],
+  ["大", "--text-lg", "22.627", 9, 700],
+  ["小", "--text-sm", "32", 10, 400],
 ];
+const BUTTONS = [
+  ["特大", "--btn-xl-w", "2.828", 3, "--btn-xl-h", "5.657", 5],
+  ["大", "--btn-w", "4", 4, "--btn-h", "8", 6],
+  ["中", "--btn-md-w", "5.657", 5, "--btn-md-h", "11.314", 7],
+  ["小", "--btn-sm-w", "8", 6, "--btn-sm-h", "16", 8],
+];
+const SUP = (n) => String(n).split("").map(d => "⁰¹²³⁴⁵⁶⁷⁸⁹"[d]).join("");
+const atW = (div, w = 400) => Math.round((w / Number(div)) * 10) / 10;
 
 const token = (name) => {
   const m = css.match(new RegExp(`--${name}:\\s*(oklch\\([^)]*\\))`));
@@ -39,10 +48,12 @@ for (const [n, varName, v] of SHAPES) {
   const m = css.match(new RegExp(`${varName}:\\s*([^;]+);`));
   if (!m || m[1].trim() !== v) throw new Error(`${varName}（${n}）が ${v} ではない（${m?.[1]}）。SHAPES を直す`);
 }
-for (const [, varName, px] of SIZES) {
-  const m = css.match(new RegExp(`${varName}:\\s*([^;]+);`));
-  if (!m || !m[1].includes(`${px}px`)) throw new Error(`${varName} が ${px}px ではない（${m?.[1]}）。SIZES を直す`);
-}
+const screenRule = css.match(/\n\.screen \{([^}]*)\}/)?.[1] ?? "";
+const checkDiv = (varName, div) => {
+  if (!screenRule.includes(`${varName}: calc(var(--W) / ${div})`)) throw new Error(`.screen の ${varName} が W / ${div} ではない。SIZES・BUTTONS を直す`);
+};
+for (const [, varName, div] of SIZES) checkDiv(varName, div);
+for (const [, wv, wd, , hv, hd] of BUTTONS) { checkDiv(wv, wd); checkDiv(hv, hd); }
 
 const toRgb = (oklch) => {
   const [L, C, H] = oklch.match(/oklch\(([^)]*)\)/)[1].trim().split(/\s+/).map(Number);
@@ -105,7 +116,7 @@ let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" vi
 <rect width="${W}" height="${H}" fill="#ffffff"/>
 <text x="16" y="28" font-size="16" font-weight="700" fill="#4a4a4a">Janus-POS 色 4（＋無彩色）× 濃度 4 の役割と、文字サイズ 4 の見本（白地）</text>
 <text x="16" y="50" font-size="12" fill="#4a4a4a">濃度1・2＝塗りつぶし　濃度3＝添え字　濃度4＝アクセント（文字・枠線）。✕＝使ってはいけない（白・濃度1の背景で 4.5:1 未満の添え字、3:1 未満の文字）</text>
-<text x="16" y="68" font-size="12" fill="#4a4a4a">見本の文字サイズ：特大 96px・強調 24px・大 18px・小 12px</text>
+<text x="16" y="68" font-size="12" fill="#4a4a4a">見本の文字サイズ（W=400 のとき）：特大 71px・強調 25px・大 18px・小 12.5px</text>
 `;
 let y = TOP;
 for (const r of rows) {
@@ -131,8 +142,8 @@ for (const r of rows) {
     if (!ok) svg += `<line x1="${X - 4}" y1="${y + 36}" x2="${X + 190}" y2="${y + 56}" stroke="#d00" stroke-width="2"/><text x="${X + 200}" y="${y + 52}" font-size="13" font-weight="700" fill="#d00">✕ 添え字に足りない（${r.light.toFixed(2)}:1）→ グレー3を使う</text>\n`;
     else svg += `<text x="${X + 200}" y="${y + 52}" font-size="13" fill="#555">○ 白・濃度1の上で ${r.light.toFixed(2)}:1${r.deep < 4.5 ? `（濃度2の上は ${r.deep.toFixed(2)}:1 で ✕）` : ""}</text>\n`;
   } else {
-    svg += `<text x="${X}" y="${y + 96}" font-size="96" font-weight="800" fill="${r.hex}">安全</text>
-<text x="${X + 220}" y="${y + 70}" font-size="24" font-weight="700" fill="${r.hex}">1,280</text>
+    svg += `<text x="${X}" y="${y + 96}" font-size="71" font-weight="800" fill="${r.hex}">安全</text>
+<text x="${X + 220}" y="${y + 70}" font-size="25" font-weight="700" fill="${r.hex}">1,280</text>
 <text x="${X + 340}" y="${y + 68}" font-size="18" font-weight="700" fill="${r.hex}">お会計</text>
 <text x="${X + 420}" y="${y + 66}" font-size="12" fill="${r.hex}">お会計</text>
 <rect x="${X + 490}" y="${y + 40}" width="116" height="40" rx="4" fill="none" stroke="${r.hex}" stroke-width="1.5"/><text x="${X + 548}" y="${y + 65}" font-size="13" font-weight="700" text-anchor="middle" fill="${r.hex}">枠線</text>
@@ -186,13 +197,15 @@ let md = `# Janus-POS デザイン言語
 
 UI はレゴのように、少ない部品の掛け合わせで組み立てる。軸はそれぞれ独立した四つずつ。
 
+大きさは絶対値（px）で決めず、レジ画面の内幅 W を白銀比 √2 で割った階段 W÷√2ⁿ から選ぶ（偶数の段は W の 1/4・1/8・1/16・1/32）。実機の POS では画面の幅がそのまま W になる。シミュレーターでは W を 384〜512px で止める（小テキストが 12〜16px）。
+
 | 軸 | 四つ |
 | --- | --- |
-| 文字サイズ | ${SIZES.map(([n, v, px]) => `${n} ${px === 96 ? "最大 96" : px}px（\`${v}\`）`).join("・")} |
+| 文字サイズ | ${SIZES.map(([n, v, d, k]) => `${n} W÷√2${SUP(k)}（W=400 で ${atW(d)}px、\`${v}\`）`).join("・")} |
 | 色 | 青 #005AFF（操作可能）・緑 #03AF7A（安全・肯定）・赤 #FF4B00（危険・否定）・橙 #F6AA00（着目・注意喚起）。白・黒・グレーは色に数えない無彩色 |
 | 濃度 | 1 淡（明るさ 0.95）・2 薄（0.87）・3 中（その色そのもの。グレーは 0.52）・4 濃（0.44） |
 | ボタンの形 | ${SHAPES.map(([n, v]) => `${n}（\`${v}\`）`).join("・")} |
-| ボタンの大きさ | 特大 160×64・大 116×48・中 64×34・小 56×26 |
+| ボタンの大きさ | ${BUTTONS.map(([n, , wd, wk, , hd, hk]) => `${n} W÷√2${SUP(wk)}×W÷√2${SUP(hk)}（W=400 で ${atW(wd)}×${atW(hd)}）`).join("・")}。幅は高さの二段上（縦横 1:2） |
 
 ## 適用範囲
 

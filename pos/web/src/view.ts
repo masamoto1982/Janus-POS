@@ -1401,7 +1401,7 @@ export function firstWelcome(r: RegisterView, side: Side): string {
   const band = staffOp
     ? welcomeBand(r, side, find(r.staff.actions, "emoney"), side === "customer")
     : welcomeBand(r, side, find(r.customer.actions, "emoney"), false);
-  return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
+  return `${band}<div class="first-welcome"><b class="mode-big" style="--len:${staffOp ? 4 : 5}">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
 }
 
 /** スタッフ側で店舗メニューを開いている間のお客様側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。

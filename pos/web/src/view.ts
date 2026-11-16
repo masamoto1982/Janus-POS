@@ -669,9 +669,10 @@ export function qtyPopup(r: RegisterView, side: Side): string {
   const ok = e.digits !== "" && Number(e.digits) > 0;
   return `<div class="qty-pop" data-qtypad-backdrop="${reg}:${side}">
       <div class="qty-pop-box" role="dialog" aria-label="${esc(l.name)}の数量">
-        <div class="qty-pop-name">${esc(l.name)}<span class="muted">いまの数量 ${l.qty}</span></div>
+        <div class="qty-pop-name">${esc(l.name)}</div>
         <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
-        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("0", "0", "pad-key zero")}${k("back", "←", "pad-key neg")}</div>
+        <div class="qty-pop-note muted">いまの数量 ${l.qty}</div>
+        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("back", "←", "pad-key neg")}${k("0")}</div>
         <div class="qty-pop-foot">${k("cancel", "バック", "md ghost back-btn")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
@@ -718,19 +719,19 @@ export function padPopup(r: RegisterView, side: Side): string {
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-pad="${reg}:${side}:${key}">${label}</button>`;
   const inserted = e.target === "inlet" ? (r.emoney && !r.menu ? r.emoney.inserted : !r.menu ? r.staff.inserted : 0) : 0;
   const ok = e.digits !== "" ? d.code || Number(e.digits) > 0 : e.target === "inlet" && !r.menu && inserted > 0;
-  const now = e.target === "inlet" && inserted ? `<span class="muted">入金済み ${yen(inserted)}</span>` : "";
+  const now = e.target === "inlet" && inserted ? `<div class="qty-pop-note muted">入金済み ${yen(inserted)}</div>` : "";
   const name = e.target === "ffv" ? r.staff.lines.find((l) => l.id === e.line)?.name : undefined;
   const title = name ? `${name}の${side === "customer" ? "お受け取り数" : "お渡し数"}` : d.title;
-  const last = d.decimal ? `${k("0")}${k(".", ".")}` : k("0", "0", "pad-key zero");
+  const last = `${k("back", "←", "pad-key neg")}${k("0")}${d.decimal ? k(".", ".") : ""}`;
   const shown = padShow(e.target, e.digits);
   // チケットの枚数はお客様側・スタッフ側それぞれ専用の入力。その側では操作可能部品として青で描く
   const only = e.target === "tkr" ? " customer-only" : e.target === "tkh" ? " staff-only" : "";
   return `<div class="qty-pop${only}" data-pad-backdrop="${reg}:${side}">
       <div class="qty-pop-box" role="dialog" aria-label="${esc(title)}">
-        <div class="qty-pop-name">${esc(title)}${now}</div>
+        <div class="qty-pop-name">${esc(title)}</div>
         <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
-        ${e.error ? `<div class="pad-error" role="alert">${esc(e.error)}</div>` : ""}
-        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}${k("back", "←", "pad-key neg")}</div>
+        ${now}${e.error ? `<div class="pad-error" role="alert">${esc(e.error)}</div>` : ""}
+        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}</div>
         <div class="qty-pop-foot">${k("cancel", "バック", "md ghost back-btn")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
@@ -1109,8 +1110,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}${answeredTopic(r, side)}</span>
       ${taxNote(v)}
     </div>
-    <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">${qtyHead(v.lines)}</th><th class="num">小計</th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="3" class="muted">明細はありません<br>どのバーコードからでも読めます</td></tr>`}</tbody></table>
+    <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th>${qtyHead(v.lines)}</th><th class="num">小計</th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="3" class="muted empty">明細はありません<br>どのバーコードからでも読めます</td></tr>`}</tbody></table>
 `;
 }
 
@@ -1634,7 +1635,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   closeFfVerify(reg, side);
   return `${top}
     <div class="staff-head">${taxNote(c)}</div>
-    <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th class="num">${qtyHead(c.lines)}</th><th class="num">小計</th></tr></thead><tbody>${rows}</tbody></table>`;
+    <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th>${qtyHead(c.lines)}</th><th class="num">小計</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;

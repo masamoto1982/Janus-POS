@@ -141,7 +141,7 @@ const DICT: Record<string, string> = {
   "揚げ物・中華まん": "Fried food / Buns",
   サービス: "Service",
   金券: "Vouchers",
-  "ギフトカード・印紙": "Gift cards / Revenue stamps",
+  "切手・印紙": "Postage / Revenue stamps",
   カウンター内の商品はスタッフが対応いたします: "Staff will help with items behind the counter",
   たばこ: "Tobacco",
   "紙巻き・電子": "Cigarettes / E-cigs",

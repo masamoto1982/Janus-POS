@@ -2986,7 +2986,7 @@ impl Store {
                 }
                 let (kind, detail) = match topic {
                     Some(CallTopic::Other) => (CallKind::CustomerHelp, crate::calls::OTHER_BUTTON),
-                    Some(CallTopic::Voucher) => (CallKind::Voucher, "ギフトカード・印紙"),
+                    Some(CallTopic::Voucher) => (CallKind::Voucher, "切手・印紙"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
                     Some(CallTopic::Emoney) => (CallKind::Emoney, "チャージ・残高確認"),
                     Some(CallTopic::Sos) => unreachable!(),

@@ -1457,7 +1457,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。文は受け取り方に誤りの余地がない一番具体的な表現なので、ボタン群の上に置く（user 2026-11-17）
     return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
-      callBtn("金券", "ギフトカード・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
+      callBtn("金券", "切手・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
     ].join("")}</div>`;

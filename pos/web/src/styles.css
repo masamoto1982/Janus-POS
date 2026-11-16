@@ -4,6 +4,7 @@
   --btn-w: 116px; --btn-h: 48px;
   --btn-sm-w: 56px; --btn-sm-h: 26px;
   --btn-md-w: 64px; --btn-md-h: 34px;
+  --inline-w: 56px; --inline-h: 26px; --key-h: 34px;
   /* ボタンの形は四種：弱い角丸（積極・消極）・強い角丸（案内）・タブ（上の角だけ丸い）・円（呼び鈴・歯車）。
      セレクタ（チェックボックス・プルダウン）と入力フォーム（角丸なし）はボタンではないので例外。
      デザイン言語（文字・色・濃度・ボタンの形と大きさ）が及ぶのはレジ画面の中だけ。周辺機器とシミュレーターまわりは対象外 */
@@ -98,10 +99,12 @@ button { touch-action: manipulation; }
   --shape-soft: var(--s11); --shape-tab: var(--s12) var(--s12) 0 0;
   --text-xl: calc(var(--W) / 5.657); --text-num: calc(var(--W) / 16); --text-lg: calc(var(--W) / 22.627); --text-sm: calc(var(--W) / 32);
   /* ボタンの縦横比も白銀比：幅＝高さ×√2³（2√2≒2.83）。幅は高さの三段上（user 2026-11-16。1:2 では小ボタンに小テキスト4文字が収まらなかった） */
-  --btn-xl-w: calc(var(--W) / 2); --btn-xl-h: calc(var(--W) / 5.657);
-  --btn-w: calc(var(--W) / 2.828); --btn-h: calc(var(--W) / 8);
-  --btn-md-w: calc(var(--W) / 4); --btn-md-h: calc(var(--W) / 11.314);
-  --btn-sm-w: calc(var(--W) / 5.657); --btn-sm-h: calc(var(--W) / 16);
+  --btn-xl-w: calc(var(--W) / 2); --btn-xl-h: calc(var(--W) / 2.828);
+  --btn-w: calc(var(--W) / 2.828); --btn-h: calc(var(--W) / 4);
+  --btn-md-w: calc(var(--W) / 4); --btn-md-h: calc(var(--W) / 5.657);
+  --btn-sm-w: calc(var(--W) / 5.657); --btn-sm-h: calc(var(--W) / 8);
+  /* 行の中に置く部品（明細の −・＋・削除、フラグ、案内ボタン、支払方法、タブ、テンキー、ヘッダーの呼び鈴）はボタンの四つの大きさの例外：高さ＝小テキスト一行分の段 W÷√2⁸、幅は文字なり（最小 W÷√2⁶） */
+  --inline-w: calc(var(--W) / 8); --inline-h: calc(var(--W) / 16); --key-h: calc(var(--W) / 11.314);
   --gap: calc(var(--W) / 45.255);
   --head-h: calc(var(--W) / 11.314); --band-h: calc(var(--W) / 5.657); --items-h: calc(var(--head-h) * 3); --tier3-h: calc(var(--head-h) * 10);
   font-size: var(--text-sm); position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: calc(var(--s15, 2px) + var(--head-h) + var(--band-h) + var(--tier3-h) + var(--items-h)); display: flex; flex-direction: column; }
@@ -152,14 +155,14 @@ button { touch-action: manipulation; }
 .lines.cols3 { table-layout: fixed; }
 .lines.cols3 td { overflow-wrap: anywhere; }
 .lines.cols3 col.c-qty { width: var(--s6, 48px); }
-.lines.cols3:has(.qty-step) col.c-qty { width: min(calc(var(--btn-sm-w) * 3 + 2 * var(--gap)), 50%); }
+.lines.cols3:has(.qty-step) col.c-qty { width: min(calc(var(--inline-w) * 3 + 2 * var(--gap)), 50%); }
 .lines.cols3 col.c-amt { width: var(--s5, 60px); }
 .lines th { text-align: left; font-weight: 500; font-size: var(--text-sm); color: var(--msg-weak); }
 .lines th.num { text-align: right; }
 .lines td, .lines th { padding: var(--s13, 4px) var(--s13, 4px); border-bottom: var(--s17, 1px) solid var(--border); vertical-align: middle; }
 .num { text-align: right; white-space: nowrap; }
 
-.reg-top { --sum-h: var(--btn-md-h); --row: calc(var(--btn-h) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 var(--s11, 8px); min-height: var(--btn-h); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
+.reg-top { --sum-h: var(--s7); --row: calc(var(--btn-sm-h) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 var(--s11, 8px); min-height: var(--btn-sm-h); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
 .reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; }
 .reg-top .total { font-size: var(--text-num); }
 .reg-top .info { height: var(--row); line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 0 var(--s10, 14px); font-size: var(--text-sm); white-space: nowrap; }
@@ -173,7 +176,7 @@ button { touch-action: manipulation; }
 /* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大きさ（user 2026-11-12）。
    最下段の行（.call-row）は帯の内幅より 8px 広く、大ボタン4つ（最大 116×48）を gap 8px で並べるので、
    幅＝min(大ボタンの幅, (帯の内幅 + 8px − gap×3) ÷ 4)、高さ＝大ボタンの高さ 48px（帯は 48＋上下8＝64px のまま） */
-.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; width: min(var(--btn-w), (100cqi + var(--s11, 8px) - 3 * var(--gap)) / 4); max-width: 100%; height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; width: min(var(--btn-sm-w), (100cqi + var(--s11, 8px) - 3 * var(--gap)) / 4); max-width: 100%; height: var(--btn-sm-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
   .reg-top .mid { --sum-h: var(--s8, 26px); }
@@ -260,7 +263,7 @@ button.pad-field .placeholder { color: var(--line); font-weight: 400; }
 button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-offset: var(--s17, 1px); }
 
 .tag {
-  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 var(--s12, 6px);
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--inline-w); height: var(--inline-h); padding: 0 var(--s12, 6px);
   font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap;
   background: transparent; border: none; color: var(--flag-plain);
 }
@@ -311,7 +314,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 /* 確認・案内画面の配置（アプリ全体で共通）
    上から 大きなテキスト→小さなテキスト（4px）→ボタン（16px）を一つのまとまりにし、領域の上下左右の中央へ
    バックなど引き返すボタンは左下の角、スキップなど先へ進む補助ボタンは右下の角。角のボタンの有無でまとまりの位置が変わらないよう、上下に同じ余白を取る */
-.confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: var(--s9, 16px); padding-block: calc(var(--btn-md-h) + var(--s13, 4px)); }
+.confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: var(--s9, 16px); padding-block: calc(var(--btn-sm-h) + var(--s13, 4px)); }
 .confirm > * { max-width: 100%; }
 .confirm .row { justify-content: center; }
 .confirm .paybox { border: none; }
@@ -325,7 +328,7 @@ details summary h3 { display: inline; }
 .welcome p { margin: var(--s13, 4px) 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: var(--s11, 8px); }
-.guide-btn { box-sizing: border-box; width: min(var(--btn-sm-w), (100% - 4 * var(--gap)) / 5); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 var(--s15, 2px); border-radius: var(--shape-pill); white-space: nowrap; }
+.guide-btn { box-sizing: border-box; width: auto; min-width: var(--inline-w); height: var(--inline-h); font-size: var(--text-sm); padding: 0 var(--s12, 6px); border-radius: var(--shape-pill); white-space: nowrap; }
 .welcome .guide { margin-top: var(--s11, 8px); font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-weight: 700; }
@@ -337,17 +340,17 @@ details summary h3 { display: inline; }
 .point-service { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); min-width: var(--s4, 96px); padding: var(--s11, 8px) var(--s10, 12px); font-size: var(--text-sm); }
 .point-service .icon { font-size: var(--text-num); line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: var(--text-sm); }
-.confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: var(--s13, 4px) var(--s12, 6px); }
+.confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-sm-w); max-width: 100%; height: var(--btn-sm-h); padding: var(--s13, 4px) var(--s12, 6px); }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
-.method-row button { width: auto; height: var(--btn-sm-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); white-space: nowrap; }
+.method-row button { width: auto; height: var(--inline-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); white-space: nowrap; }
 /* お客様側の支払方法一覧（スタッフ操作モード、表示のみ）はスタッフ側の支払方法ボタンと同じ大きさ（user 2026-11-12） */
-.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: var(--btn-sm-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); line-height: 1; white-space: nowrap; }
+.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; height: var(--inline-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); line-height: 1; white-space: nowrap; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
    （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
 */
 .lines tr.flagged > td { background: var(--flag-row); }
 .flag {
-  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 var(--s12, 6px);
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--inline-w); height: var(--inline-h); padding: 0 var(--s12, 6px);
   font: inherit; font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap;
   background: transparent; color: var(--msg-strong); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--shape-soft);
 }
@@ -359,7 +362,7 @@ button.flag { cursor: pointer; }
 .ffv-screen .lines.ffv td { vertical-align: middle; text-align: left; }
 .ffv-screen .lines.ffv td.num, .ffv-screen .lines.ffv th.num { text-align: right; }
 .ffv-screen .lines.ffv .ffv-judge { text-align: center; width: var(--s6, 48px); }
-button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 var(--s13, 4px); }
+button.ffv-input { box-sizing: border-box; width: var(--inline-w); height: var(--inline-h); padding: 0 var(--s13, 4px); }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* チケットの受け取り枚数（お客様側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
@@ -375,11 +378,11 @@ button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(-
 .confirm > .paybox > :is(p, .row) { margin: 0; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
 .skip-foot { position: absolute; right: 0; bottom: 0; }
-.confirm button.skip.md, button.skip.md { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+.confirm button.skip.md, button.skip.md { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 .menu-screen { display: flex; flex-direction: column; min-height: 100%; }
 .qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
-.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
-.confirm button.back-btn.wide, button.back-btn.wide { width: auto; min-width: var(--btn-md-w); padding: 0 var(--s11, 8px); }
+.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+.confirm button.back-btn.wide, button.back-btn.wide { width: auto; min-width: var(--btn-sm-w); padding: 0 var(--s11, 8px); }
 
 .toast {
   position: absolute; left: 10px; right: 10px; bottom: 8px; padding: 8px 10px; border-radius: 8px;
@@ -643,6 +646,7 @@ body.dragging .drop-hint { display: inline; }
 .first-welcome:has(> .mode-sub) { flex-direction: column; gap: var(--s13, 4px); }
 .first-welcome .mode-sub { color: var(--msg-weak); font-size: var(--text-sm); font-weight: 400; line-height: 1.35; }
 .first-welcome .mode-big { color: var(--msg-strong); font-size: min(var(--text-xl), calc(82cqi / var(--len, 1))); white-space: nowrap; font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
+/* 最下段・帯の横並びは幅だけ伸縮できる（上限は大ボタンの幅）。高さは小ボタン */
 .call-row { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-w))); justify-content: space-evenly; align-content: center; gap: var(--gap); }
 /* 呼び出し中の最下段：案内を中央に */
 .call-row.calling { display: flex; align-items: center; justify-content: center; padding: 0 var(--gap); }
@@ -655,7 +659,7 @@ body.dragging .drop-hint { display: inline; }
 .screen.sos .call-row.calling :is(.big, p.small) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(var(--s17, 1px), var(--s15, 2px)); }
-.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: var(--s15, 2px) var(--s12, 6px); border-radius: var(--shape-soft); line-height: 1.2; }
+.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-sm-h); max-height: 100%; min-height: 0; padding: var(--s15, 2px) var(--s12, 6px); border-radius: var(--shape-soft); line-height: 1.2; }
 .call-btn b { font-size: var(--text-sm); }
 .call-btn small { font-size: var(--text-sm); }
 
@@ -674,9 +678,9 @@ body.dragging .drop-hint { display: inline; }
 /* 数量フォームのある明細：見出し「数量」・数字・入力欄を列の中央に揃える（−・入力欄・＋は同じ幅なので入力欄が列の中心） */
 .lines.cols3:has(.qty-step) :is(th, td):nth-child(2) { text-align: center; }
 .qty-step { display: flex; align-items: center; justify-content: center; gap: var(--gap); white-space: nowrap; }
-.screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 var(--s15, 2px); font-size: var(--text-sm); }
+.screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--inline-w); width: var(--inline-w); height: var(--inline-h); min-width: 0; padding: 0 var(--s15, 2px); font-size: var(--text-sm); }
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: var(--text-sm); }
-.qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); min-width: 0; text-align: center; }
+.qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--inline-w); width: var(--inline-w); min-width: 0; text-align: center; }
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, var(--black) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--s11, 10px); padding: var(--s11, 8px); width: min(var(--s2, 220px), calc(100% - var(--s9, 16px))); max-height: calc(100% - var(--s10, 12px)); display: flex; flex-direction: column; gap: var(--s11, 8px); box-shadow: 0 var(--s12, 6px) var(--s9, 18px) color-mix(in oklch, var(--black) 25%, transparent); }
 .qty-pop-name { display: flex; justify-content: space-between; gap: var(--s11, 8px); font-size: var(--text-sm); color: var(--msg-strong); }
@@ -685,10 +689,10 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-value .muted { font-size: var(--text-sm); font-weight: 400; }
 .qty-pop .pad-error { color: var(--alert-ink); font-size: var(--text-sm); line-height: 1.4; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); flex: 1 1 auto; min-height: 0; }
-.qty-pop-keys .pad-key { height: var(--btn-md-h); padding: 0; font-size: var(--text-lg); font-weight: 600; min-height: 0; }
+.qty-pop-keys .pad-key { height: var(--key-h); padding: 0; font-size: var(--text-lg); font-weight: 600; min-height: 0; }
 .qty-pop-keys .zero { grid-column: span 2; }
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
-.qty-pop-foot button { flex: 1; height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
+.qty-pop-foot button { flex: 1; height: var(--key-h); padding-top: 0; padding-bottom: 0; }
 
 .point-choices.pair > button { white-space: pre-line; line-height: 1.25; }
 .emoney-screen .emoney-balance { display: block; font-size: var(--text-num); font-variant-numeric: tabular-nums; }
@@ -771,7 +775,7 @@ body.dragging .drop-hint { display: inline; }
    呼び鈴は黄背景を保つため青のランプ（#ramp）を通さないので、ベルも縁も青のランプが濃いグレー（--msg-strong）を
    写す先の青（main.ts RAMP_STEPS の 0x53）を直接使い、操作可能部品の青と一致させる */
 :root { --operable-blue: var(--blue-4); --bell-bg: var(--call-soft); --bell-ink: var(--operable-blue); --bell-ring: var(--operable-blue); }
-.bell-btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-sm-h); height: var(--btn-sm-h); padding: 0; border-radius: var(--shape-round); line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.bell-btn { display: inline-flex; align-items: center; justify-content: center; width: var(--inline-h); height: var(--inline-h); padding: 0; border-radius: var(--shape-round); line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .screen .bell-btn, .screen .bell-btn:disabled { filter: none !important; opacity: 1 !important; }
 .screen .bell-btn:not(:disabled) { background: var(--bell-bg); color: var(--bell-ink); border: var(--s16, 1.5px) solid var(--bell-ring); }
 /* 呼び出し中は呼び鈴の黄もヘッダーと同じ拍で切り替える：ヘッダーが黄のときは同じ黄、ヘッダーが戻るときはやわらかい黄（--alert-bg） */
@@ -796,17 +800,17 @@ body.dragging .drop-hint { display: inline; }
    余白＝(帯の内幅 + 8px − 大ボタン4つ − 8px×3) ÷ 5 + 8px。ボタンが縮むほど狭いときは 8px */
 .screen-main > .welcome-band { display: block; }
 .welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: max(var(--gap), (100cqi + var(--s11, 8px) - 4 * var(--btn-w) - 3 * var(--gap)) / 5 + var(--gap)); }
-.welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--btn-h); height: var(--btn-h); }
-.welcome-band .band-btn { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-xl-w); max-width: 100%; height: var(--btn-h); padding: var(--s15, 2px) var(--s12, 6px); line-height: 1.2; white-space: nowrap; }
+.welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--btn-sm-h); height: var(--btn-sm-h); }
+.welcome-band .band-btn { flex: 0 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-w); max-width: 100%; height: var(--btn-sm-h); padding: var(--s15, 2px) var(--s12, 6px); line-height: 1.2; white-space: nowrap; }
 .welcome-band .band-btn b { font-size: var(--text-sm); }
 .welcome-band .band-btn small { font-size: var(--text-sm); }
-.welcome-band .band-row:has(> .msg) { height: var(--btn-h); }
+.welcome-band .band-row:has(> .msg) { height: var(--btn-sm-h); }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }
 /* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードのお客様側）でも押せる＝青 */
 .screen [data-region] .welcome-band .lang-btn:not(.mirror-only) { filter: url(#ramp); }
 .screen.inactive [data-region] .welcome-band .lang-btn:not(.mirror-only) { pointer-events: auto; }
 /* 呼び鈴は待ち受けでは帯の中央に大きめに出し、商品登録が始まるとヘッダーに戻る */
-.welcome-band .bell-btn { width: var(--btn-h); height: var(--btn-h); }
+.welcome-band .bell-btn { width: var(--btn-sm-h); height: var(--btn-sm-h); }
 .screen:has(.welcome-band .bell-btn) .screen-head .bell-btn { display: none; }
 
 /* 稼働モードの背景色：スタッフ操作モード＝ピンク、セルフ操作モード＝ミント（グレー・青・黄と P/D/T 型でも区別できる淡い色）。

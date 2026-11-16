@@ -1375,7 +1375,7 @@ export const FF_TABS = [
   ["bun", "中華まん"],
   ["oden", "おでん"],
 ] as const;
-export const FF_PER_PAGE = 3;
+export const FF_PER_PAGE = 6;
 export type FfUi = { tab: string; page: number };
 
 /** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・サービス・たばこの段と同じ位置・高さ）に流すサイネージ。

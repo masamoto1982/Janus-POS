@@ -151,9 +151,10 @@ button { touch-action: manipulation; }
 .lines { width: 100%; border-collapse: collapse; margin: var(--s13, 4px) 0 var(--s11, 8px); }
 .lines.cols3 { table-layout: fixed; }
 .lines.cols3 td { overflow-wrap: anywhere; }
-.lines.cols3 col.c-qty { width: var(--s6, 48px); }
-.lines.cols3:has(.qty-step) col.c-qty { width: min(calc(var(--btn-sm-w) * 3 + 2 * var(--gap)), 50%); }
-.lines.cols3 col.c-amt { width: var(--s5, 60px); }
+/* 明細は三つの席：品目は左の縁、数量は中央、小計は右の縁。左右の列は同じ幅（幅を書かない二列で残りを等分）にして、
+   数量が画面の中央（帯の合計の真下）に来るようにする。数量の欄の幅は両画面・どの行でも同じ */
+.lines.cols3 col.c-qty { width: calc(var(--btn-sm-w) * 3 + 2 * var(--gap) + 2 * var(--s13, 4px)); }
+.lines.cols3 td.empty { text-align: center; }
 .lines th { text-align: left; font-weight: 500; font-size: var(--text-sm); color: var(--msg-weak); }
 .lines th.num { text-align: right; }
 .lines td, .lines th { padding: var(--s13, 4px) var(--s13, 4px); border-bottom: var(--s17, 1px) solid var(--border); vertical-align: middle; }
@@ -683,21 +684,21 @@ body.dragging .drop-hint { display: inline; }
 @media (prefers-reduced-motion: reduce) { .lines tr.flagged.flash > td { animation: none; background: var(--flag-flash); } }
 
 /* 数量フォームのある明細：見出し「数量」・数字・入力欄を列の中央に揃える（−・入力欄・＋は同じ幅なので入力欄が列の中心） */
-.lines.cols3:has(.qty-step) :is(th, td):nth-child(2) { text-align: center; }
+.lines.cols3 :is(th, td):nth-child(2) { text-align: center; }
 .qty-step { display: flex; align-items: center; justify-content: center; gap: var(--gap); white-space: nowrap; }
 .screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); height: var(--btn-sm-h); min-width: 0; padding: 0 var(--s15, 2px); font-size: var(--text-sm); }
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: var(--text-sm); }
 .qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-sm-w); width: var(--btn-sm-w); min-width: 0; text-align: center; }
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, var(--black) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--s11, 10px); padding: var(--s11, 8px); width: min(var(--s2, 220px), calc(100% - var(--s9, 16px))); max-height: calc(100% - var(--s10, 12px)); display: flex; flex-direction: column; gap: var(--s11, 8px); box-shadow: 0 var(--s12, 6px) var(--s9, 18px) color-mix(in oklch, var(--black) 25%, transparent); }
-.qty-pop-name { display: flex; justify-content: space-between; gap: var(--s11, 8px); font-size: var(--text-sm); color: var(--msg-strong); }
-.qty-pop-name .muted { font-size: var(--text-sm); white-space: nowrap; }
-.qty-pop-value { border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: 0; padding: var(--s15, 2px) var(--s11, 8px); text-align: right; font-size: var(--text-lg); font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
+/* テンキーも席順：見出しと入力欄が主役で上・中央、添え書きはその下、戻る（←・バック）は左、決定は右 */
+.qty-pop-name { text-align: center; font-size: var(--text-lg); font-weight: 700; line-height: 1.25; color: var(--msg-strong); overflow-wrap: anywhere; }
+.qty-pop-note { text-align: center; font-size: var(--text-sm); }
+.qty-pop-value { border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: 0; padding: var(--s15, 2px) var(--s11, 8px); text-align: center; font-size: var(--text-lg); font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
 .qty-pop-value .muted { font-size: var(--text-sm); font-weight: 400; }
 .qty-pop .pad-error { color: var(--alert-ink); font-size: var(--text-sm); line-height: 1.4; }
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); flex: 1 1 auto; min-height: 0; }
 .qty-pop-keys .pad-key { height: var(--btn-md-h); padding: 0; font-size: var(--text-lg); font-weight: 600; min-height: 0; }
-.qty-pop-keys .zero { grid-column: span 2; }
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
 .qty-pop-foot button { flex: 1; height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
 

@@ -133,11 +133,11 @@ button { touch-action: manipulation; }
 .ff-tabs { flex: none; margin-top: var(--s13, 5px); }
 .ff-tab { padding: var(--s15, 2px) var(--s13, 4px); font-size: var(--text-sm); }
 .ff-page { flex: 1; min-height: 0; display: flex; touch-action: pan-y; }
-/* ページは左右のスワイプでめくる。◀▶ の代わりに、隠れたページがある側の端を白くする（user 2026-11-16）。
+/* ページは左右のスワイプでめくる。◀▶ の代わりに、隠れたページがある側の端を黄のグラデーションにする（user 2026-11-16）。
    最下段の背景として塗り、ボタンやタブより後ろに置く（ボタンを覆わない） */
-.screen-items:has(> .ff-page.more-prev) { background-image: linear-gradient(to right, var(--white), transparent 25%); }
-.screen-items:has(> .ff-page.more-next) { background-image: linear-gradient(to left, var(--white), transparent 25%); }
-.screen-items:has(> .ff-page.more-prev.more-next) { background-image: linear-gradient(to right, var(--white), transparent 25%, transparent 75%, var(--white)); }
+.screen-items:has(> .ff-page.more-prev) { background-image: linear-gradient(to right, var(--hint), transparent 25%); }
+.screen-items:has(> .ff-page.more-next) { background-image: linear-gradient(to left, var(--hint), transparent 25%); }
+.screen-items:has(> .ff-page.more-prev.more-next) { background-image: linear-gradient(to right, var(--hint), transparent 25%, transparent 75%, var(--hint)); }
 .ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: var(--s13, 4px); }
 .ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: var(--s17, 1px) var(--s14, 3px); font-size: var(--text-sm); line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
@@ -455,8 +455,15 @@ button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(-
 /* 呼び出し中のヘッダーは濃い黄（--call-soft）と薄い黄（--alert-bg）を行き来する（user 2026-11-15、最下段・呼び鈴と同じ二色）。
    消えている側を段の色（--head-bg＝透明）に任せると、段の色を塗り替えたときに黄とグレー・緑の点滅に化けるので、
    消えている側も黄で明示する（styles.test.ts で守る） */
-/* 右スワイプで店舗メニューを開ける手がかり：スタッフ側ヘッダーの左1/4を左ほど白く（user 2026-11-16）。呼び出し・エマージェンシーの点滅には重ねない */
-.screen-head.swipe-open:not(.calling, .sos) { background-image: linear-gradient(to right, var(--white), transparent 25%); }
+/* スワイプできる所の手がかり（user 2026-11-16）：注意喚起の黄（橙2）のグラデーションを、端ほど濃く、ゆったり点滅させる。
+   ヘッダー＝右スワイプで店舗メニューを開けるあいだ、スタッフ側の左1/4。呼び出し・エマージェンシーの点滅には重ねない */
+@property --hint-on { syntax: "<number>"; inherits: true; initial-value: 1; }
+@keyframes swipe-hint { from { --hint-on: 1; } to { --hint-on: 0.15; } }
+.screen-head.swipe-open:not(.calling, .sos), .screen-items:has(> .ff-page:is(.more-prev, .more-next)) {
+  --hint: color-mix(in oklch, var(--orange-2) calc(var(--hint-on) * 100%), transparent); }
+@media (prefers-reduced-motion: no-preference) {
+  .screen-head.swipe-open:not(.calling, .sos), .screen-items:has(> .ff-page:is(.more-prev, .more-next)) { animation: swipe-hint 1.6s ease-in-out infinite alternate; } }
+.screen-head.swipe-open:not(.calling, .sos) { background-image: linear-gradient(to right, var(--hint), transparent 25%); }
 .screen-head.calling { --head-call-bg: var(--call-soft); --head-call-off: var(--alert-bg); }
 .screen-head.sos { --head-call-bg: var(--sos-head); --head-call-off: var(--head-bg); }
 .screen-head:is(.calling, .sos) { background: color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-call-off)); }

@@ -906,6 +906,7 @@ const GUIDES: [GuideKind, string, string][] = [
   ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
   ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
   ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
+  ["parcel", "宅配便", "宅配便の伝票、または受取用のバーコードをスキャンしてください"],
   ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
 ];
 
@@ -1387,7 +1388,7 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 6;
 export type FfUi = { tab: string; page: number };
 
-/** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・サービス・たばこの段と同じ位置・高さ）に流すサイネージ。
+/** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・金券・たばこの段と同じ位置・高さ）に流すサイネージ。
  *  セール情報や詐欺防止の呼びかけを順番に表示する（シミュレーターの見本）。最下段を両モードで揃え、モード切り替え時の画面の変化を抑える。
  *  現物では広告を画像で流す想定なので、どのモードでも言語切り替えの対象外（data-i18n-skip） */
 export const SIGNAGE: readonly (readonly [string, string])[] = [
@@ -1452,9 +1453,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const a = (n: Action) => find(r.customer.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
-    return `<div class="call-row">${[
+    // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、ボタン群の上に添える（user 2026-11-16）
+    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row">${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
-      callBtn("サービス", "お支払い・荷物", { type: "call_staff", register: reg, topic: "service" }, a("call_staff"), "service"),
       callBtn("金券", "ギフトカード・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
     ].join("")}</div>`;

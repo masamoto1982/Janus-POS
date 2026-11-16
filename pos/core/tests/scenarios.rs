@@ -1435,13 +1435,13 @@ fn shortcut_buttons_call_staff() {
     );
     ok(
         &mut s,
-        json!({"type":"call_staff","register":1,"topic":"service"}),
+        json!({"type":"call_staff","register":1,"topic":"voucher"}),
     );
     ok(&mut s, json!({"type":"ff_button","register":1}));
     let k = kinds(&s, 1);
     assert!(
         k.contains(&CallKind::Tobacco)
-            && k.contains(&CallKind::Service)
+            && k.contains(&CallKind::Voucher)
             && k.contains(&CallKind::FastFood)
     );
     assert!(reg(&s, 1).lamp);
@@ -1487,7 +1487,7 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
         let mut s = Store::new(seed, 2, 1);
         ok(&mut s, json!({"type":"set_bell_loss","percent":70}));
         advance(&mut s, 3_000);
-        for (i, topic) in [json!(null), json!("tobacco"), json!("service")]
+        for (i, topic) in [json!(null), json!("tobacco"), json!("voucher")]
             .into_iter()
             .enumerate()
         {
@@ -4990,7 +4990,6 @@ fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
     assert_eq!(reg(&s, 1).staff.calls[0].topic, "お支払い");
     // 最下段のボタンはボタンの文言そのまま
     for (topic, want) in [
-        ("service", "サービス"),
         ("voucher", "金券"),
         ("tobacco", "たばこ"),
     ] {

@@ -183,7 +183,6 @@ enum EmoneyTask {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum CallTopic {
-    Service,
     Voucher,
     Tobacco,
     Emoney,
@@ -432,7 +431,7 @@ pub enum Command {
         side: Side,
         choice: ShortChoice,
     },
-    /// 呼び出しボタンを押す（ベル・サービス・金券・たばこ・電子マネー、スタッフ側の応援）
+    /// 呼び出しボタンを押す（ベル・金券・たばこ・電子マネー、スタッフ側の応援）
     CallStaff {
         register: u8,
         #[serde(default)]
@@ -1408,7 +1407,7 @@ impl Register {
 
     /// 今の取引の状態から、スタッフの対応が要る呼び出し（B-3）。出来事で立てるのではなく状態から導くので、
     /// ログインで呼び出しが片付いたあと対応せずにログアウトしても、取引に残っていれば立ち直る。
-    /// ボタンで立てる呼び出し（ベル・FF・サービス・金券・たばこ）は出来事のまま
+    /// ボタンで立てる呼び出し（ベル・FF・金券・たばこ）は出来事のまま
     fn required_calls(&self) -> Vec<(CallKind, String)> {
         if self.staff_state() == StaffState::Ready || self.paused {
             return vec![];
@@ -2985,7 +2984,6 @@ impl Store {
                     return done("仲間のスタッフを呼んでいます");
                 }
                 let (kind, detail) = match topic {
-                    Some(CallTopic::Service) => (CallKind::Service, crate::calls::SERVICE_BUTTON),
                     Some(CallTopic::Voucher) => (CallKind::Voucher, "ギフトカード・印紙"),
                     Some(CallTopic::Tobacco) => (CallKind::Tobacco, ""),
                     Some(CallTopic::Emoney) => (CallKind::Emoney, "チャージ・残高確認"),
@@ -2995,7 +2993,6 @@ impl Store {
                 self.call(register, kind, detail);
                 self.press(register)?;
                 done(match topic {
-                    Some(CallTopic::Service) => "スタッフをお呼びしました（サービス）",
                     Some(CallTopic::Voucher) => "スタッフをお呼びしました（金券）",
                     Some(CallTopic::Tobacco) => "スタッフをお呼びしました（たばこ）",
                     Some(CallTopic::Emoney) => "スタッフをお呼びしました（電子マネー）",

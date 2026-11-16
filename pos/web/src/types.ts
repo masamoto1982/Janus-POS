@@ -38,7 +38,7 @@ topic: string, created_at: number, detail: string, };
 
 export type CallKind = "age_check" | "fast_food" | "service" | "tobacco" | "voucher" | "customer_help" | "change_left" | "bill" | "emoney" | "cash_only" | "receipt_stamp" | "expired";
 
-export type CallTopic = "service" | "voucher" | "tobacco" | "emoney" | "sos";
+export type CallTopic = "voucher" | "tobacco" | "emoney" | "sos";
 
 export type Cash = Array<[number, number]>;
 

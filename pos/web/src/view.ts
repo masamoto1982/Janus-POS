@@ -1337,8 +1337,17 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 const WEEKDAY = ["日", "月", "火", "水", "木", "金", "土"];
 
-export function clockText(d: Date): string {
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${WEEKDAY[d.getDay()]}曜日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+export function dateText(d: Date): string {
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${WEEKDAY[d.getDay()]}曜日`;
+}
+
+export function timeText(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** ヘッダー右の日時。年月日・曜日は別の span にし、モバイルモードでは CSS で隠して時刻だけにする（表示エリアの制約による便宜的措置） */
+export function clockHtml(d: Date): string {
+  return `<span class="clock-date">${dateText(d)} </span>${timeText(d)}`;
 }
 
 /** 呼び鈴の絵（色は CSS の currentColor：押せるときは青、押せないときはグレー） */
@@ -1365,7 +1374,7 @@ function bellBtn(r: RegisterView, side: Side): string {
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bell = bellBtn(r, side);
   const mode = r.emergency ? `<span class="mode-title emergency">非常事態モード</span>` : r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
-  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock">${clockText(now)}</time></span>`;
+  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock">${clockHtml(now)}</time></span>`;
 }
 
 export const FF_TABS = [

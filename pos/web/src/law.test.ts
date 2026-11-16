@@ -14,13 +14,30 @@ describe("レイアウトの法則", () => {
     expect(p.items[0].x + p.width / 2).toBeCloseTo(L / 2);
   });
 
-  it("いちばん目立たせたいものが中央、残りは主役の前が左・後が右（待ち受けの帯：Language｜呼び鈴｜電子マネー）", () => {
+  it("いちばん目立たせたいものが中央、向きのない脇役は主役の両脇に最小間隔で寄り添う（待ち受けの帯：Language｜呼び鈴｜電子マネー）", () => {
     const side = { widths: [141], height: 71, weight: 18 };
     const placed = arrange([side, { widths: [50], height: 50, weight: 31 }, side], L, g);
-    expect(placed.map((p) => p.to)).toEqual(["left", "center", "right"]);
-    expect(placed[0].items[0].x).toBeCloseTo(g);
-    expect(placed[2].items[0].x + 141).toBeCloseTo(L - g);
+    expect(placed.map((p) => p.to)).toEqual(["beside-left", "center", "beside-right"]);
     expect(placed[1].items[0].x + 25).toBeCloseTo(L / 2);
+    expect(placed[1].items[0].x - (placed[0].items[0].x + 141)).toBeCloseTo(g);
+    expect(placed[2].items[0].x - (placed[1].items[0].x + 50)).toBeCloseTo(g);
+  });
+
+  it("寄り添う脇役の幅が左右で違っても、主役は中央から動かない", () => {
+    const placed = arrange([{ widths: [60], height: 30, weight: 12 }, { widths: [50], height: 50, weight: 31 }, { widths: [141], height: 30, weight: 12 }], L, g);
+    expect(placed[1].items[0].x + 25).toBeCloseTo(L / 2);
+    expect(placed[0].items[0].x + 60 + g).toBeCloseTo(placed[1].items[0].x);
+  });
+
+  it("向きのある脇役は縁、向きのない脇役は主役の脇（縁の部品とは重ならない）", () => {
+    const placed = arrange(
+      [{ widths: [100], height: 50, weight: 12, dir: "back" }, { widths: [100], height: 50, weight: 12 }, { widths: [100], height: 50, weight: 25 }],
+      L,
+      g,
+    );
+    expect(placed.map((p) => p.to)).toEqual(["left", "beside-left", "center"]);
+    expect(placed[0].items[0].x).toBeCloseTo(g);
+    expect(placed[1].items[0].x).toBeGreaterThanOrEqual(placed[0].items[0].x + 100 + g - 1e-9);
   });
 
   it("主役がいなければ脇役が繰り上がって中央に座る（呼び鈴のない帯）", () => {
@@ -32,6 +49,7 @@ describe("レイアウトの法則", () => {
   it("脇役は向きで縁を選ぶ：戻るは左、進むは右。一つだけでも中央へは行かない", () => {
     const total = { weight: 25 };
     expect(seats([{ weight: 12.5, dir: "back" }, total, { weight: 12.5, dir: "go" }])).toEqual(["left", "center", "right"]);
+    expect(seats([{ weight: 12.5 }, total, { weight: 12.5 }])).toEqual(["beside-left", "center", "beside-right"]);
     expect(seats([{ weight: 12.5, dir: "back" }, total])).toEqual(["left", "center"]);
     expect(seats([total, { weight: 12.5, dir: "go" }])).toEqual(["center", "right"]);
     expect(seats([total, { weight: 12.5, dir: "back" }, { weight: 12.5, dir: "go" }])).toEqual(["center", "left", "right"]);

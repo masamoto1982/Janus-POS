@@ -1574,10 +1574,10 @@ export function storeMenu(r: RegisterView): string {
   switch (m.screen) {
     case "top":
       return `<div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
-        <div class="menu-list">${MENU_ITEMS
+        <div class="menu-list" data-law>${MENU_ITEMS
           .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>
-        <div class="menu-list">
+        <div class="menu-list" data-law>
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
           ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
         </div>`;

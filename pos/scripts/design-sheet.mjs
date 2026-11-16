@@ -28,6 +28,17 @@ const token = (name) => {
   if (!m) throw new Error(`styles.css に --${name} がない`);
   return m[1];
 };
+// ボタンの形四種（user 2026-11-16）：角の丸みの少ないボタン・強いボタン・タブ・円形ボタン
+const SHAPES = [
+  ["弱い角丸", "--shape-soft", "8px", "積極・消極。押すと何かが起きるボタン"],
+  ["強い角丸", "--shape-pill", "999px", "案内。画面遷移を伴わず案内を出すだけの第三のボタン"],
+  ["タブ", "--shape-tab", "6px 6px 0 0", "上の角だけ丸め、下は線に載せる"],
+  ["円", "--shape-round", "50%", "文字のない記号一つのボタン（ベル・歯車）"],
+];
+for (const [n, varName, v] of SHAPES) {
+  const m = css.match(new RegExp(`${varName}:\\s*([^;]+);`));
+  if (!m || m[1].trim() !== v) throw new Error(`${varName}（${n}）が ${v} ではない（${m?.[1]}）。SHAPES を直す`);
+}
 for (const [, varName, px] of SIZES) {
   const m = css.match(new RegExp(`${varName}:\\s*([^;]+);`));
   if (!m || !m[1].includes(`${px}px`)) throw new Error(`${varName} が ${px}px ではない（${m?.[1]}）。SIZES を直す`);
@@ -132,6 +143,36 @@ for (const r of rows) {
 svg += "</svg>\n";
 writeFileSync(join(root, "docs/design-language.svg"), svg);
 
+// ---- SVG：ボタンの形四種。上段＝消極（枠線と文字）、下段＝積極（塗りと白文字）。色は操作可能の青4 ----
+{
+  const ink = ink4("blue").hex;
+  const SW = 640, SH = 196, cx = [90, 250, 410, 560];
+  const shape = (i, y, on) => {
+    const fill = on ? ink : "none", text = on ? "#ffffff" : ink, x = cx[i];
+    const label = ["お会計", "商品", "揚げ物", ""][i];
+    const body = [
+      `<rect x="${x - 58}" y="${y}" width="116" height="48" rx="8" fill="${fill}" stroke="${ink}" stroke-width="1.5"/>`,
+      `<rect x="${x - 56}" y="${y + 11}" width="112" height="26" rx="13" fill="${fill}" stroke="${ink}" stroke-width="1.5"/>`,
+      `<path d="M${x - 58} ${y + 48} V${y + 6} a6 6 0 0 1 6 -6 H${x + 52} a6 6 0 0 1 6 6 V${y + 48}" fill="${fill}" stroke="${ink}" stroke-width="1.5"/><line x1="${x - 72}" y1="${y + 48}" x2="${x + 72}" y2="${y + 48}" stroke="#878787" stroke-width="1.5"/>`,
+      `<circle cx="${x}" cy="${y + 24}" r="24" fill="${on ? ink : "#ffd88a"}" stroke="${on ? ink : ink}" stroke-width="1.5"/><path d="M${x - 9} ${y + 30} h18 l-3 -4 v-6 a6 6 0 0 0 -12 0 v6 z M${x - 3} ${y + 32} a3 3 0 0 0 6 0 z" fill="${on ? "#ffffff" : ink}"/>`,
+    ][i];
+    return body + (label ? `<text x="${x}" y="${y + 29}" font-size="12" font-weight="${on ? 700 : 400}" text-anchor="middle" fill="${text}">${label}</text>` : "");
+  };
+  let s = `<svg xmlns="http://www.w3.org/2000/svg" width="${SW}" height="${SH}" viewBox="0 0 ${SW} ${SH}" font-family="'Hiragino Sans','Noto Sans JP',sans-serif">
+<rect width="${SW}" height="${SH}" fill="#ffffff"/>
+<text x="16" y="24" font-size="14" font-weight="700" fill="#4a4a4a">Janus-POS ボタンの形 4（レジ画面の中だけ）　上＝消極、下＝積極</text>
+`;
+  SHAPES.forEach(([n, v], i) => {
+    s += `<text x="${cx[i]}" y="50" font-size="12" font-weight="700" text-anchor="middle" fill="#4a4a4a">${esc(n)}</text>
+<text x="${cx[i]}" y="66" font-size="11" text-anchor="middle" fill="#555">${esc(v)}</text>
+${shape(i, 76, false)}
+${i === 3 ? `<text x="${cx[i]}" y="165" font-size="11" text-anchor="middle" fill="#555">積極の円はない</text>` : shape(i, 136, true)}
+`;
+  });
+  s += "</svg>\n";
+  writeFileSync(join(root, "docs/design-shapes.svg"), s);
+}
+
 // ---- Markdown ----
 const f = (c) => `${c.toFixed(2)}`;
 const name = (r) => `${r.label.replace(/（.*）/, "")}${r.d}（\`--${r.h}-${r.d}\`）`;
@@ -141,7 +182,7 @@ const subNg = sub.filter((r) => r.light < 4.5);
 const accDeep = rows.filter((r) => r.d === 4 && r.deep < 4.5);
 let md = `# Janus-POS デザイン言語
 
-<!-- このファイルと design-language.svg は pos/scripts/design-sheet.mjs が styles.css から作る。手で直さず \`cd pos && npm run gen:design\` -->
+<!-- このファイルと design-language.svg・design-shapes.svg は pos/scripts/design-sheet.mjs が styles.css から作る。手で直さず \`cd pos && npm run gen:design\` -->
 
 UI はレゴのように、少ない部品の掛け合わせで組み立てる。軸はそれぞれ独立した四つずつ。
 
@@ -150,8 +191,33 @@ UI はレゴのように、少ない部品の掛け合わせで組み立てる�
 | 文字サイズ | ${SIZES.map(([n, v, px]) => `${n} ${px === 96 ? "最大 96" : px}px（\`${v}\`）`).join("・")} |
 | 色 | 青 #005AFF（操作可能）・緑 #03AF7A（安全・肯定）・赤 #FF4B00（危険・否定）・橙 #F6AA00（着目・注意喚起）。白・黒・グレーは色に数えない無彩色 |
 | 濃度 | 1 淡（明るさ 0.95）・2 薄（0.87）・3 中（その色そのもの。グレーは 0.52）・4 濃（0.44） |
-| ボタンの形 | 積極・消極・案内（強い丸み。円は案内の正方形）・タブ |
+| ボタンの形 | ${SHAPES.map(([n, v]) => `${n}（\`${v}\`）`).join("・")} |
 | ボタンの大きさ | 特大 160×64・大 116×48・中 64×34・小 56×26 |
+
+## 適用範囲
+
+デザイン言語（文字サイズ・色・濃度・ボタンの形・ボタンの大きさ）が及ぶのは**レジ画面の中だけ**（ヘッダー・帯・三段目・最下段、その上に開くテンキーと数量のポップアップ）。次のものは対象外で、この表の四つに縛られない。
+
+- 周辺機器：入金ボックス・出金ボックス・決済端末・スキャナ、Bell の呼び鈴端末（据え付け端末・可搬性端末・ストアコンピューター）
+- シミュレーターまわり：ページ上部のヘッダー（ロゴ・ビルド番号・ログインの選択・リセット）、Bell エリア、Item・Wallet、ダイアログ（販売規則の設定・Bell の設定・モバイルの長押しピッカー）、モバイルの画面切替、トースト・ツールチップ、著作権表示
+
+## ボタンの形
+
+形と大きさは独立に組み合わせる。積極（濃い背景・白文字・枠線なし）と消極（濃い枠線・濃い文字・背景なし）は形ではなく塗り方で、弱い角丸にも強い角丸（選択中＝積極）にもタブ（選ばれている＝積極）にも使う。押せないものはどの形でもグレーアウトする（状態であって形ではない）。
+
+![ボタンの形四種の見本](design-shapes.svg)
+
+| 形 | 角の丸み | 意味 | レジ画面で使うところ |
+| --- | --- | --- | --- |
+| 弱い角丸 | \`--shape-soft\` 8px | ${SHAPES[0][3]} | 会計・はい・決定などの積極ボタン、バック・スキップ・取引中止、明細の削除・−・＋、テンキーのキー、FF 単品とページ送り、最下段（FF・サービス・金券・たばこ）、帯の Language・電子マネー、店舗メニューの項目、フラグ |
+| 強い角丸 | \`--shape-pill\` 999px | ${SHAPES[1][3]} | 待ち受けの案内ボタン、支払方法のボタン |
+| タブ | \`--shape-tab\` 上の角 6px | ${SHAPES[2][3]} | FF のタブ |
+| 円 | \`--shape-round\` 50% | ${SHAPES[3][3]} | 呼び鈴（ヘッダーは小、待ち受けの帯は大）。Bell エリアの歯車も同じ円 |
+
+ボタンではないので四種の例外：
+
+- セレクタ：チェックボックス（FF のお渡し照合、公共料金・印紙の確認）、プルダウン
+- 入力フォーム：角を丸めない四角（数量・荷物の長さと重さ・郵便番号・生年月日・お渡し数など、押すとテンキーが開く欄）。角の丸みはボタンだけの表現
 
 ## 濃度の役割
 

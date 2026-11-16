@@ -33,3 +33,26 @@ describe("呼び出し中の黄の点滅", () => {
     }
   });
 });
+
+/// ボタンの形は四種（user 2026-11-16）：弱い角丸・強い角丸・タブ・円。セレクタと入力フォームはボタンではないので例外。
+/// 範囲はレジ画面の中だけで、Item・Wallet など周辺機器とシミュレーターまわりは縛らない
+describe("ボタンの形は四種", () => {
+  const tokens = rules.filter(r => r.selector === ":root").map(r => r.body).join(";");
+  const SHAPES = ["--shape-soft", "--shape-pill", "--shape-tab", "--shape-round"];
+
+  it("形のトークンは四つだけ", () => {
+    expect([...tokens.matchAll(/(--shape-[a-z-]+)\s*:/g)].map(m => m[1])).toEqual(SHAPES);
+  });
+
+  it("ボタンの角の丸みは四つのトークンのどれか（入力フォームの四角は例外）", () => {
+    const outside = /\.item\b|\.picker|\.rules-dlg|\.bell-unit|\.bell-setting|\.build-badge/;
+    const buttonish = /(^|[\s,>~+(])button\b|-btn\b|\.seg\b|\.tab\b|\.flag\b|\.ff-(item|arrow)\b|\.pad-key\b/;
+    const checked = rules.filter(r => decl(r.body, "border-radius") !== undefined && buttonish.test(r.selector) && !outside.test(r.selector));
+    expect(checked.length).toBeGreaterThan(5);
+    for (const r of checked) {
+      const v = decl(r.body, "border-radius")!;
+      if (r.selector.includes("pad-field")) { expect(v, `${r.selector}：入力フォームは角を丸めない`).toBe("0"); continue; }
+      expect(SHAPES.map(s => `var(${s})`), `${r.selector} の border-radius: ${v}`).toContain(v);
+    }
+  });
+});

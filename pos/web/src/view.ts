@@ -901,13 +901,18 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
 
 export const scanGuide = new Map<string, GuideKind>();
 export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon" | "shop" | "parcel" | "bill";
-const GUIDES: [GuideKind, string, string][] = [
-  ["item", "商品", "商品のバーコードをスキャンしてください"],
-  ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
-  ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
-  ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
-  ["parcel", "宅配便", "送り状または受け取り用のバーコードをスキャンしてください"],
-  ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
+/** セルフ操作モードの案内ボタン。一段目＝商品・レジ袋・お支払い・宅配便、二段目＝ポイント・クーポン（user 2026-11-16） */
+const GUIDES: [GuideKind, string, string][][] = [
+  [
+    ["item", "商品", "商品のバーコードをスキャンしてください"],
+    ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
+    ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
+    ["parcel", "宅配便", "送り状または受け取り用のバーコードをスキャンしてください"],
+  ],
+  [
+    ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
+    ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
+  ],
 ];
 
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
@@ -931,12 +936,12 @@ function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolea
 export function welcome(r: RegisterView, side: Side, emoney?: Gate): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:${side}`);
-  const guide = GUIDES.find(([k]) => k === on);
+  const guide = GUIDES.flat().find(([k]) => k === on);
+  const row = (g: [GuideKind, string, string][]) =>
+    `<div class="guide-row">${g.map(([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`).join("")}</div>`;
   return `<div class="welcome${emoney ? " scan-welcome" : ""}">
       ${msg("バーコードをスキャンしてください", "すべてのバーコードを受け付けます")}
-      <div class="guide-row">${GUIDES.map(
-        ([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`,
-      ).join("")}</div>
+      ${GUIDES.map(row).join("")}
       ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }

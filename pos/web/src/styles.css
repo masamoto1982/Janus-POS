@@ -326,6 +326,7 @@ details summary h3 { display: inline; }
 .welcome p { margin: var(--s13, 4px) 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: var(--s11, 8px); }
+.guide-row + .guide-row { margin-top: var(--gap); }
 .guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 var(--s15, 2px); border-radius: var(--shape-pill); white-space: nowrap; }
 .welcome .guide { margin-top: var(--s11, 8px); font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }

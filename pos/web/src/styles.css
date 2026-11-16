@@ -132,8 +132,11 @@ button { touch-action: manipulation; }
 .parcel-error { color: var(--danger); font-weight: 700; }
 .ff-tabs { flex: none; margin-top: var(--s13, 5px); }
 .ff-tab { padding: var(--s15, 2px) var(--s13, 4px); font-size: var(--text-sm); }
-.ff-page { flex: 1; min-height: 0; display: flex; touch-action: pan-y; }
-/* ページは左右のスワイプでめくる。◀▶ の代わりに、隠れたページがある側の端にフロート部品「«」「»」を浮かせる（user 2026-11-16、下の「スワイプできる方向」） */
+.ff-page { flex: 1; min-height: 0; display: flex; gap: var(--s13, 4px); }
+/* ページ送りは右端の ▲（前）・▼（次）を縦に並べる（user 2026-11-16：スワイプは廃止）。枠のない記号だけ */
+.ff-arrows { flex: none; display: flex; flex-direction: column; gap: var(--s13, 4px); }
+.screen .ff-arrow { border: none; background: none; color: var(--accent); }
+.ff-arrow, .ff-arrow-space { flex: 1; width: var(--s9, 20px); padding: 0; font-size: var(--text-sm); }
 .ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: var(--s13, 4px); }
 .ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: var(--s17, 1px) var(--s14, 3px); font-size: var(--text-sm); line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
@@ -213,7 +216,7 @@ button {
   background: var(--btn-on); color: var(--btn-on-ink);
 }
 button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
-.ff-item.plenty, .ff-item.low, .guide-btn, .void-btn, .call-btn,
+.ff-arrow, .ff-item.plenty, .ff-item.low, .guide-btn, .void-btn, .call-btn,
 .method-list .seg {
   background: transparent; color: var(--msg-strong); border: var(--s16, 1.5px) solid var(--msg-strong);
 }
@@ -452,24 +455,6 @@ button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(-
 /* 呼び出し中のヘッダーは濃い黄（--call-soft）と薄い黄（--alert-bg）を行き来する（user 2026-11-15、最下段・呼び鈴と同じ二色）。
    消えている側を段の色（--head-bg＝透明）に任せると、段の色を塗り替えたときに黄とグレー・緑の点滅に化けるので、
    消えている側も黄で明示する（styles.test.ts で守る） */
-/* スワイプできる方向を示すフロート部品（user 2026-11-16：グラデーションをやめた）。「»」「«」を白い円に載せて部品の上に浮かせ、ゆったり点滅させる。
-   押せない（pointer-events: none）。テキストのメッセージではないので、レジ画面を覆わない規則の例外として可（user）。
-   ヘッダー＝右スワイプで店舗メニューを開けるあいだ、スタッフ側の稼働モード表示のすぐ右に「»」（左端だと文字に重なる）。呼び出し・エマージェンシーの点滅中は出さない。
-   FF＝隠れたページがある側の端にだけ、前「«」・次「»」 */
-.screen-head .mode-title { position: relative; }
-.ff-page { position: relative; }
-.screen-head.swipe-open:not(.calling, .sos) .mode-title::after, .ff-page.more-prev::before, .ff-page.more-next::after {
-  position: absolute; top: 50%; z-index: 2; translate: 0 -50%; pointer-events: none;
-  width: var(--btn-sm-h); height: var(--btn-sm-h); border-radius: 50%; display: grid; place-items: center;
-  background: var(--white); color: var(--operable-blue); border: var(--s16, 1.5px) solid var(--operable-blue);
-  font-size: var(--text-sm); font-weight: 700; line-height: 1;
-  box-shadow: 0 var(--s15, 2px) var(--s12, 6px) color-mix(in oklch, var(--black) 25%, transparent); }
-.screen-head.swipe-open:not(.calling, .sos) .mode-title::after { content: "»"; left: calc(100% + var(--s13, 4px)); }
-.ff-page.more-prev::before { content: "«"; left: calc(-1 * var(--s15, 2px)); }
-.ff-page.more-next::after { content: "»"; right: calc(-1 * var(--s15, 2px)); }
-@keyframes swipe-float { from { opacity: 1; } to { opacity: 0.35; } }
-@media (prefers-reduced-motion: no-preference) {
-  .screen-head.swipe-open:not(.calling, .sos) .mode-title::after, .ff-page.more-prev::before, .ff-page.more-next::after { animation: swipe-float 1.6s ease-in-out infinite alternate; } }
 .screen-head.calling { --head-call-bg: var(--call-soft); --head-call-off: var(--alert-bg); }
 .screen-head.sos { --head-call-bg: var(--sos-head); --head-call-off: var(--head-bg); }
 .screen-head:is(.calling, .sos) { background: color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-call-off)); }

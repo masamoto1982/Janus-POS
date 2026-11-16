@@ -902,17 +902,14 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
 export const scanGuide = new Map<string, GuideKind>();
 export type GuideKind = "item" | "bag" | "point" | "pay" | "coupon" | "shop" | "parcel" | "bill";
 /** セルフ操作モードの案内ボタン。一段目＝商品・レジ袋・お支払い・宅配便、二段目＝ポイント・クーポン（user 2026-11-16） */
-const GUIDES: [GuideKind, string, string][][] = [
-  [
-    ["item", "商品", "商品のバーコードをスキャンしてください"],
-    ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
-    ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
-    ["parcel", "宅配便", "送り状または受け取り用のバーコードをスキャンしてください"],
-  ],
-  [
-    ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
-    ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
-  ],
+// 並べ方（行の分け方・位置）はレイアウトの法則（law.ts）が決めるので、ここでは順番だけを書く
+const GUIDES: [GuideKind, string, string][] = [
+  ["item", "商品", "商品のバーコードをスキャンしてください"],
+  ["bag", "レジ袋", "レジ袋のバーコードをスキャンしてください"],
+  ["pay", "お支払い", "支払い用紙のバーコードをスキャンしてください"],
+  ["parcel", "宅配便", "送り状または受け取り用のバーコードをスキャンしてください"],
+  ["point", "ポイント", "ポイントカードまたはポイントアプリのバーコードをスキャンしてください"],
+  ["coupon", "クーポン", "引換券、割引券のバーコードをスキャンしてください"],
 ];
 
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
@@ -930,18 +927,16 @@ function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolea
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
   // 呼び鈴のない側（スタッフ操作モードのお客様側）は空きを作らず、両ボタンを中央に詰める
   const bell = bellBtn(r, side);
-  return `<div class="reg-top welcome-band"><div class="band-row">${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>${BAND_END}`;
+  return `<div class="reg-top welcome-band"><div class="band-row" data-law>${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>${BAND_END}`;
 }
 
 export function welcome(r: RegisterView, side: Side, emoney?: Gate): string {
   const reg = r.id;
   const on = scanGuide.get(`${reg}:${side}`);
-  const guide = GUIDES.flat().find(([k]) => k === on);
-  const row = (g: [GuideKind, string, string][]) =>
-    `<div class="guide-row">${g.map(([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`).join("")}</div>`;
+  const guide = GUIDES.find(([k]) => k === on);
   return `<div class="welcome${emoney ? " scan-welcome" : ""}">
       ${msg("バーコードをスキャンしてください", "すべてのバーコードを受け付けます")}
-      ${GUIDES.map(row).join("")}
+      <div class="guide-row" data-law>${GUIDES.map(([k, label]) => `<button type="button" class="guide-btn ${k === on ? "on" : ""}" data-guide="${reg}:${side}:${k}">${label}</button>`).join("")}</div>
       ${guide ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
@@ -990,7 +985,7 @@ function staffOperatedWelcome(r: RegisterView, side: Side): string {
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
   return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}<div class="welcome staff-operated-welcome">${msg(head, sub)}
-      <div class="guide-row">${guides}</div>
+      <div class="guide-row" data-law>${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
@@ -1459,7 +1454,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、ボタン群の上に添える（user 2026-11-16）
-    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row">${[
+    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${[
       callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("金券", "ギフトカード・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),

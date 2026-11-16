@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arrange, shells, wrapUnit } from "./law";
+import { arrange, seats, shells, wrapUnit } from "./law";
 
 // W=400 の目安：小ボタン 50×25、大ボタン 100×50、特大 141×71、最小間隔 8.8
 const g = 400 / 45.255;
@@ -14,12 +14,32 @@ describe("レイアウトの法則", () => {
     expect(p.items[0].x + p.width / 2).toBeCloseTo(L / 2);
   });
 
-  it("種類の違う三つは縁・中心・縁へ寄る（ヘッダー、待ち受けの帯）", () => {
-    const placed = arrange([{ widths: [141], height: 71 }, { widths: [50], height: 50 }, { widths: [141], height: 71 }], L, g);
+  it("いちばん目立たせたいものが中央、残りは主役の前が左・後が右（待ち受けの帯：Language｜呼び鈴｜電子マネー）", () => {
+    const side = { widths: [141], height: 71, weight: 18 };
+    const placed = arrange([side, { widths: [50], height: 50, weight: 31 }, side], L, g);
     expect(placed.map((p) => p.to)).toEqual(["left", "center", "right"]);
     expect(placed[0].items[0].x).toBeCloseTo(g);
     expect(placed[2].items[0].x + 141).toBeCloseTo(L - g);
     expect(placed[1].items[0].x + 25).toBeCloseTo(L / 2);
+  });
+
+  it("主役がいなければ脇役が繰り上がって中央に座る（呼び鈴のない帯）", () => {
+    const [p] = arrange([{ widths: [141, 141], height: 71, weight: 18 }], L, g);
+    expect(p.to).toBe("center");
+    expect((p.items[0].x + p.items[1].x + 141) / 2).toBeCloseTo(L / 2);
+  });
+
+  it("脇役は向きで縁を選ぶ：戻るは左、進むは右。一つだけでも中央へは行かない", () => {
+    const total = { weight: 25 };
+    expect(seats([{ weight: 12.5, dir: "back" }, total, { weight: 12.5, dir: "go" }])).toEqual(["left", "center", "right"]);
+    expect(seats([{ weight: 12.5, dir: "back" }, total])).toEqual(["left", "center"]);
+    expect(seats([total, { weight: 12.5, dir: "go" }])).toEqual(["center", "right"]);
+    expect(seats([total, { weight: 12.5, dir: "back" }, { weight: 12.5, dir: "go" }])).toEqual(["center", "left", "right"]);
+  });
+
+  it("同格は全員が主役", () => {
+    expect(seats([{ weight: 18 }, { weight: 18 }, { weight: 18 }])).toEqual(["center", "center", "center"]);
+    expect(seats([{}, {}])).toEqual(["center", "center"]);
   });
 
   it("入るうちは一行（案内ボタン6つ）", () => {

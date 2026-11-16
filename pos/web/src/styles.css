@@ -837,7 +837,8 @@ body.dragging .drop-hint { display: inline; }
 .screen-main > .welcome-band { flex: none; position: static; margin-bottom: 0; }
 .welcome-band ~ :is(.scan-welcome, .staff-operated-welcome) { flex: 1 0 auto; min-height: 0; margin-top: 0; }
 /* 帯の中の位置はレイアウトの法則（law.ts）が決める。下の flex は法則を当てはめる前の仮の並び */
-.screen-main > .welcome-band { display: block; }
+/* 行は帯の上下の中央に置く（呼び鈴のない帯では行がボタンの高さだけになり、上に寄っていた） */
+.screen-main > .welcome-band { display: flex; flex-direction: column; justify-content: center; align-items: stretch; }
 .welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: var(--gap); }
 .welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--s6, 48px); height: var(--s6, 48px); }
 /* 帯の Language・電子マネーは大ボタン（青銅比）。縮まない（user 2026-11-17：ボタンは青銅比か白銀比のどちらかに必ず一致） */

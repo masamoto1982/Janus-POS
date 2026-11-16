@@ -1,4 +1,3 @@
-import { langOf } from "./i18n";
 import type {
   Action,
   ActionState,
@@ -48,45 +47,43 @@ function find(actions: ActionState[], name: Action): Gate {
   return actions.find((a) => a.action === name) ?? { action: name, allowed: false, reason: null };
 }
 
-/** FF 単品ボタンの表示名。白銀比の特大ボタンに入るよう、主役は 3 文字まで・残りは添え字（user 2026-11-17）。
- * 一行で入る名前は載せない（商品名のまま）。明細・レシートは商品名のまま */
-const FF_LABEL: Record<string, string> = {
-  FF01: "チキン\nフライド",
-  FF02: "チキン\nスパイシー",
-  FF03: "ドック\nアメリカン",
-  FF21: "焼き鳥\nモモシオ",
-  FF22: "焼き鳥\nモモタレ",
-  FF31: "珈琲\nホット S",
-  FF32: "珈琲\nホット M",
-  FF33: "珈琲\nホット L",
-  FF34: "珈琲\nアイス S",
-  FF35: "珈琲\nアイス M",
-  FF36: "珈琲\nアイス L",
-  FF37: "ラテ\nホット S",
-  FF39: "ラテ\nアイス S",
-  FF51: "ミルク\nソフトコーン",
-  FF52: "ミルク\nソフトカップ",
-  FF53: "チョコ\nソフトコーン",
-  FF54: "チョコ\nソフトカップ",
-  FF77: "ごぼう\n巻き",
-  FF79: "昆布\n結び",
+/** FF 単品ボタンの絵文字。ボタンは一行目に絵文字、二行目に商品名を一行で（user 2026-11-17：主役＋添え字の二行表記は廃止）。
+ * 絵文字のない商品は、絵文字のある商品へメニューごと差し替えた（user 同日の許可）。名前は明細・レシートと同じ商品名 */
+export const FF_EMOJI: Record<string, string> = {
+  FF01: "🍗",
+  FF02: "🌶️",
+  FF03: "🌭",
+  FF04: "🍟",
+  FF21: "🍤",
+  FF22: "🐟",
+  FF23: "🍠",
+  FF24: "🍩",
+  FF31: "☕",
+  FF32: "☕",
+  FF33: "☕",
+  FF34: "🧊",
+  FF35: "🧊",
+  FF36: "🧊",
+  FF37: "🍵",
+  FF39: "🥛",
+  FF51: "🍦",
+  FF52: "🍨",
+  FF53: "🍧",
+  FF54: "🥤",
+  FF05: "🥟",
+  FF61: "🍕",
+  FF62: "🫘",
+  FF63: "🍛",
+  FF71: "🥔",
+  FF72: "🐙",
+  FF73: "🍢",
+  FF74: "🥚",
+  FF76: "🦐",
+  FF77: "🥬",
+  FF78: "🦑",
+  FF79: "🍄",
 };
-/** 英語では主役と添え字の並びが日本語と逆になるもの（それ以外は主役・添え字をそれぞれ訳す） */
-const FF_LABEL_EN: Record<string, string> = {
-  FF01: "Fried\nchicken",
-  FF02: "Spicy\nchicken",
-  FF21: "Salt\nyakitori",
-  FF22: "Sauce\nyakitori",
-  FF31: "S\nhot coffee",
-  FF32: "M\nhot coffee",
-  FF33: "L\nhot coffee",
-  FF34: "S\niced coffee",
-  FF35: "M\niced coffee",
-  FF36: "L\niced coffee",
-  FF37: "S\nhot latte",
-  FF39: "S\niced latte",
-};
-const ffLabel = (code: string, name: string, lang: string): string => (lang === "en" && FF_LABEL_EN[code]) || FF_LABEL[code] || name;
+const ffLabel = (code: string, name: string): string => (FF_EMOJI[code] ? `${FF_EMOJI[code]}\n${name}` : name);
 const twoLine = (label: string): string => {
   const [main, sub] = label.split("\n");
   return sub === undefined ? esc(label) : `<b>${esc(main)}</b><small>${esc(sub)}</small>`;
@@ -1516,7 +1513,6 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.pickup_handover && !r.staff.lines.length) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
-  const lang = langOf(reg, side);
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
   const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
   const page = Math.min(ui.page, pages - 1);
@@ -1527,17 +1523,16 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
     .map((f) => {
       const cmd: Command = { type: "register_ff", register: reg, side, code: f.code, qty: 1 };
-      if (f.level !== "out" || !can.allowed) return btn(ffLabel(f.code, f.name, lang), cmd, can, `ff-item ${f.level}`);
-      return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${twoLine(ffLabel(f.code, f.name, lang))}</button>`;
+      if (f.level !== "out" || !can.allowed) return btn(ffLabel(f.code, f.name), cmd, can, `ff-item ${f.level}`);
+      return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${twoLine(ffLabel(f.code, f.name))}</button>`;
     })
     .join("");
-  // ページ送りは右端の ▲（前）・▼（次）（user 2026-11-16：スワイプでのページ送りは廃止）。押せない側は同じ大きさの空きにして、もう一方の位置を動かさない
-  const arrow = (dir: -1 | 1, show: boolean) =>
-    show
-      ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "▲" : "▼"}</button>`
-      : `<span class="ff-arrow-space"></span>`;
-  const arrows = pages < 2 ? "" : `<div class="ff-arrows">${arrow(-1, page > 0)}${arrow(1, page < pages - 1)}</div>`;
-  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page"><div class="ff-grid">${grid}</div>${arrows}</div>`;
+  // ページ送りは、隠れたページがある側の縁に押せる「<」（前）・「>」（次）（user 2026-11-17）。単品の群とは列を分け、
+  // 群の両脇の空きの縁に置く（ボタンの上に重ねない：重ねた «» は押そうとして下のボタンを誤って押した、PR #328）。
+  // 隠れたページのない側は何も置かない
+  const arrow = (dir: -1 | 1) =>
+    `<button type="button" class="ff-arrow ${dir < 0 ? "prev" : "next"}" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "&lt;" : "&gt;"}</button>`;
+  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page">${page > 0 ? arrow(-1) : ""}<div class="ff-grid">${grid}</div>${page < pages - 1 ? arrow(1) : ""}</div>`;
 }
 
 const MENU_LABEL: Record<MenuScreen, string> = {

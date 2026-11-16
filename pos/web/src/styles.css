@@ -145,15 +145,17 @@ button { touch-action: manipulation; }
 .ff-tab { padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; }
 /* FF のタブは五つを帯の幅に等分し、高さは幅÷青銅比（user 2026-11-17） */
 .ff-tabs button.tab { height: auto; aspect-ratio: var(--bronze, 3.3028); }
-/* FF の単品の群が主役で段の中央、▲▼（ページ送り）は向きのある脇役で右の縁（レイアウトの法則）。左の列は右と同じ幅の空き */
+/* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
+   左右の列は同じ幅なので、矢印のあるなしで群は動かない */
 .ff-page { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: center; gap: var(--gap); }
-/* ページ送りは右端の ▲（前）・▼（次）を縦に並べる（user 2026-11-16：スワイプは廃止）。枠のない記号だけ */
-.ff-arrows { grid-column: 3; justify-self: end; display: flex; flex-direction: column; justify-content: center; gap: var(--s13, 4px); }
+/* 「<」「>」は枠のない記号だけ。押す場所は単品と同じ高さの縦長の白銀比（列が狭い画面では列と段の縁の余白の幅まで）で、単品とは列で離れている */
 .screen .ff-arrow { border: none; background: none; color: var(--accent); }
-/* ▲▼は縦長の青銅比（幅＝小ボタンの高さ、高さ＝小ボタンの幅） */
-.ff-arrow, .ff-arrow-space { flex: none; width: var(--btn-sm-h, 20px); height: var(--btn-sm-w, 40px); padding: 0; font-size: var(--text-sm); }
+.ff-arrow { flex: none; grid-row: 1; height: var(--sq-xl-h); width: calc(100% + var(--gap)); max-width: calc(var(--sq-xl-h) / var(--silver, 1.4142)); padding: 0; font-size: var(--text-sm); }
+/* 列が狭いときは、単品の側ではなく段の縁の余白（--gap）へはみ出して押す場所を確保する */
+.ff-arrow.prev { grid-column: 1; justify-self: start; margin-left: calc(-1 * var(--gap)); }
+.ff-arrow.next { grid-column: 3; justify-self: end; margin-right: calc(-1 * var(--gap)); }
 /* FF の単品は特大の白銀比を一行に四つ（user 2026-11-17：将来商品画像を入れるので正方形に近い形） */
-.ff-grid { grid-column: 2; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, var(--sq-xl-w)); grid-template-rows: var(--sq-xl-h); justify-content: center; align-content: center; gap: var(--gap); }
+.ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, var(--sq-xl-w)); grid-template-rows: var(--sq-xl-h); justify-content: center; align-content: center; gap: var(--gap); }
 .ff-item { box-sizing: border-box; width: var(--sq-xl-w); height: var(--sq-xl-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
    無し＝グレーアウト（長押しで予約注文） */

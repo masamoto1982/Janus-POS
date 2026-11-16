@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="196" viewBox="0 0 640 196" font-family="'Hiragino Sans','Noto Sans JP',sans-serif">
+<rect width="640" height="196" fill="#ffffff"/>
+<text x="16" y="24" font-size="14" font-weight="700" fill="#4a4a4a">Janus-POS ボタンの形 4（レジ画面の中だけ）　上＝消極、下＝積極</text>
+<text x="90" y="50" font-size="12" font-weight="700" text-anchor="middle" fill="#4a4a4a">弱い角丸</text>
+<text x="90" y="66" font-size="11" text-anchor="middle" fill="#555">--shape-soft</text>
+<rect x="32" y="76" width="116" height="48" rx="8" fill="none" stroke="#284e99" stroke-width="1.5"/><text x="90" y="105" font-size="12" font-weight="400" text-anchor="middle" fill="#284e99">お会計</text>
+<rect x="32" y="136" width="116" height="48" rx="8" fill="#284e99" stroke="#284e99" stroke-width="1.5"/><text x="90" y="165" font-size="12" font-weight="700" text-anchor="middle" fill="#ffffff">お会計</text>
+<text x="250" y="50" font-size="12" font-weight="700" text-anchor="middle" fill="#4a4a4a">強い角丸</text>
+<text x="250" y="66" font-size="11" text-anchor="middle" fill="#555">--shape-pill</text>
+<rect x="194" y="87" width="112" height="26" rx="13" fill="none" stroke="#284e99" stroke-width="1.5"/><text x="250" y="105" font-size="12" font-weight="400" text-anchor="middle" fill="#284e99">商品</text>
+<rect x="194" y="147" width="112" height="26" rx="13" fill="#284e99" stroke="#284e99" stroke-width="1.5"/><text x="250" y="165" font-size="12" font-weight="700" text-anchor="middle" fill="#ffffff">商品</text>
+<text x="410" y="50" font-size="12" font-weight="700" text-anchor="middle" fill="#4a4a4a">タブ</text>
+<text x="410" y="66" font-size="11" text-anchor="middle" fill="#555">--shape-tab</text>
+<path d="M352 124 V82 a6 6 0 0 1 6 -6 H462 a6 6 0 0 1 6 6 V124" fill="none" stroke="#284e99" stroke-width="1.5"/><line x1="338" y1="124" x2="482" y2="124" stroke="#878787" stroke-width="1.5"/><text x="410" y="105" font-size="12" font-weight="400" text-anchor="middle" fill="#284e99">揚げ物</text>
+<path d="M352 184 V142 a6 6 0 0 1 6 -6 H462 a6 6 0 0 1 6 6 V184" fill="#284e99" stroke="#284e99" stroke-width="1.5"/><line x1="338" y1="184" x2="482" y2="184" stroke="#878787" stroke-width="1.5"/><text x="410" y="165" font-size="12" font-weight="700" text-anchor="middle" fill="#ffffff">揚げ物</text>
+<text x="560" y="50" font-size="12" font-weight="700" text-anchor="middle" fill="#4a4a4a">円</text>
+<text x="560" y="66" font-size="11" text-anchor="middle" fill="#555">--shape-round</text>
+<circle cx="560" cy="100" r="24" fill="#ffd88a" stroke="#284e99" stroke-width="1.5"/><path d="M551 106 h18 l-3 -4 v-6 a6 6 0 0 0 -12 0 v6 z M557 108 a3 3 0 0 0 6 0 z" fill="#284e99"/>
+<text x="560" y="165" font-size="11" text-anchor="middle" fill="#555">積極の円はない</text>
+</svg>

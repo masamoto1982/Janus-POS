@@ -3,6 +3,10 @@
   --btn-w: 116px; --btn-h: 48px;
   --btn-sm-w: 56px; --btn-sm-h: 26px;
   --btn-md-w: 64px; --btn-md-h: 34px;
+  /* ボタンの形は四種：弱い角丸（積極・消極）・強い角丸（案内）・タブ（上の角だけ丸い）・円（呼び鈴・歯車）。
+     セレクタ（チェックボックス・プルダウン）と入力フォーム（角丸なし）はボタンではないので例外。
+     デザイン言語（文字・色・濃度・ボタンの形と大きさ）が及ぶのはレジ画面の中だけ。周辺機器とシミュレーターまわりは対象外 */
+  --shape-soft: 8px; --shape-pill: 999px; --shape-tab: 6px 6px 0 0; --shape-round: 50%;
   --gap: 6px;
   /* 色は四つ（カラーユニバーサルデザインの赤 #FF4B00・青 #005AFF・緑 #03AF7A・橙 #F6AA00）。濃度は四段：3＝その色そのもの、1＝淡・2＝薄は白を混ぜて明るさ 0.95・0.87、4＝濃は黒を混ぜて 0.44。白・黒・グレーは色に数えない無彩色（グレーは 0.95・0.87・0.52・0.44） */
   --grey-1: oklch(0.95 0 0); --grey-2: oklch(0.87 0 0); --grey-3: oklch(0.52 0 0); --grey-4: oklch(0.44 0 0);
@@ -184,7 +188,7 @@ button { touch-action: manipulation; }
 .row.center, .center { justify-content: center; text-align: center; }
 
 button {
-  border: 1.5px solid transparent; border-radius: 8px; padding: 8px 12px; cursor: pointer;
+  border: 1.5px solid transparent; border-radius: var(--shape-soft); padding: 8px 12px; cursor: pointer;
   background: var(--btn-on); color: var(--btn-on-ink);
 }
 button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
@@ -194,11 +198,11 @@ button.neg, button.skip, button.ghost, button.seg, button.danger, button.ff,
 }
 button:not(:disabled):active, .pressed { transform: translate(1px, 2px); }
 .guide-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }
-button.seg { border-radius: 999px; }
+button.seg { border-radius: var(--shape-pill); }
 button.seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }
 /* 支払方法のボタンは画面遷移を伴わず案内を出すだけの第三のボタン。待ち受けの案内ボタンと同じ形：
    角の丸みが強く、選択中は濃い背景・白文字・枠線なし。もう一度押すと選択を外す */
-.method-row button, .method-list .seg { border-radius: 999px; }
+.method-row button, .method-list .seg { border-radius: var(--shape-pill); }
 .method-row button.seg.on, .method-list .seg.on {
   background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; text-decoration: none;
 }
@@ -206,7 +210,7 @@ button.seg.on { background: var(--btn-on); color: var(--btn-on-ink); border-colo
    選ばれていない消極タブ（濃い枠線・濃い文字・背景なし）の二種類。上の角だけ丸く、下は線に付く。押しても位置はズレない */
 .tabs { display: flex; gap: var(--gap); align-items: flex-end; border-bottom: var(--frame-w) solid var(--border); }
 button.tab {
-  flex: 1 1 0; min-width: 0; white-space: nowrap; border-radius: 6px 6px 0 0;
+  flex: 1 1 0; min-width: 0; white-space: nowrap; border-radius: var(--shape-tab);
   background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-bottom: none;
 }
 button.tab.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }
@@ -298,7 +302,7 @@ details summary h3 { display: inline; }
 .welcome p { margin: 4px 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: 8px; }
-.guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 2px; border-radius: 999px; white-space: nowrap; }
+.guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 2px; border-radius: var(--shape-pill); white-space: nowrap; }
 .welcome .guide { margin-top: 8px; font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-weight: 700; }
@@ -322,7 +326,7 @@ details summary h3 { display: inline; }
 .flag {
   box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 6px;
   font: inherit; font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap;
-  background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-radius: 8px;
+  background: transparent; color: var(--msg-strong); border: 1.5px solid var(--msg-strong); border-radius: var(--shape-soft);
 }
 button.flag { cursor: pointer; }
 .ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; text-align: center; }
@@ -363,10 +367,6 @@ button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(-
 .toast.show { opacity: .95; transform: none; }
 .toast.error { background: var(--danger); }
 
-button.cash { min-width: 56px; color: var(--ink); }
-button.cash.bill { background: var(--bill-bg); color: var(--ink); border: 1px solid var(--border); }
-button.cash.coin { background: var(--orange-2); color: var(--black); border-radius: 999px; }
-button.emoney { background: var(--blue-2); color: var(--black); }
 
 
 .bells { display: flex; gap: var(--gap); flex-wrap: wrap; }
@@ -550,7 +550,7 @@ body.dragging .drop-hint { display: inline; }
 .lines.rules select { font-size: var(--text-sm); padding: 3px 6px; }
 .idle { margin-left: 6px; font-size: var(--text-sm); font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
-.icon-btn { width: var(--btn-sm-h); height: var(--btn-sm-h); padding: 0; border-radius: 50%; font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
+.icon-btn { width: var(--btn-sm-h); height: var(--btn-sm-h); padding: 0; border-radius: var(--shape-round); font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .icon-btn:hover { color: var(--ink); }
 .rules-dlg h3 { font-size: var(--text-sm); margin: 14px 0 6px; }
 .rules-dlg h4 { font-size: var(--text-sm); margin: 14px 0 6px; }
@@ -632,7 +632,7 @@ body.dragging .drop-hint { display: inline; }
 .screen.sos .call-row.calling :is(.big, p.small) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(1px, 2px); }
-.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 2px 6px; border-radius: 8px; line-height: 1.2; }
+.call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 2px 6px; border-radius: var(--shape-soft); line-height: 1.2; }
 .call-btn b { font-size: var(--text-sm); }
 .call-btn small { font-size: var(--text-sm); }
 
@@ -746,7 +746,7 @@ body.dragging .drop-hint { display: inline; }
    呼び鈴は黄背景を保つため青のランプ（#ramp）を通さないので、ベルも縁も青のランプが濃いグレー（--msg-strong）を
    写す先の青（main.ts RAMP_STEPS の 0x53）を直接使い、操作可能部品の青と一致させる */
 :root { --operable-blue: var(--blue-4); --bell-bg: var(--call-soft); --bell-ink: var(--operable-blue); --bell-ring: var(--operable-blue); }
-.bell-btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-sm-h); height: var(--btn-sm-h); padding: 0; border-radius: 50%; line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.bell-btn { display: inline-flex; align-items: center; justify-content: center; width: var(--btn-sm-h); height: var(--btn-sm-h); padding: 0; border-radius: var(--shape-round); line-height: 1; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .screen .bell-btn, .screen .bell-btn:disabled { filter: none !important; opacity: 1 !important; }
 .screen .bell-btn:not(:disabled) { background: var(--bell-bg); color: var(--bell-ink); border: 1.5px solid var(--bell-ring); }
 /* 呼び出し中は呼び鈴の黄もヘッダーと同じ拍で切り替える：ヘッダーが黄のときは同じ黄、ヘッダーが戻るときはやわらかい黄（--alert-bg） */

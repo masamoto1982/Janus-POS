@@ -426,6 +426,8 @@ function render(): void {
       if (!head) continue;
       head.classList.toggle("sos", r.emergency);
       head.classList.toggle("calling", r.lamp && !r.emergency);
+      // 右スワイプで店舗メニューを開けるあいだ、スタッフ側ヘッダーの左1/4を左ほど白くする（user 2026-11-16）
+      head.classList.toggle("swipe-open", side === "staff" && storeMenuUsable(r) && !r.menu);
       const lang = langOf(r.id, side);
       app.querySelector(`[data-drop="${r.id}:${side}"]`)?.setAttribute("lang", lang);
       if (r.lamp) {
@@ -973,12 +975,6 @@ app.addEventListener("click", (e) => {
   if (b.dataset.fftab) {
     const [reg, tab] = b.dataset.fftab.split(":");
     ffTabs.set(Number(reg), { tab, page: 0 });
-    return frame();
-  }
-  if (b.dataset.ffpage) {
-    const [reg, d] = b.dataset.ffpage.split(":").map(Number);
-    const u = ffUi(reg);
-    ffTabs.set(reg, { tab: u.tab, page: Math.max(0, u.page + d) });
     return frame();
   }
   if (b.dataset.outlet) {

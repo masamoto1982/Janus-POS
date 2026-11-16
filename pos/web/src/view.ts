@@ -1480,12 +1480,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${esc(f.name)}</button>`;
     })
     .join("");
-  // ページは左右に広げる（user 2026-11-16）：前のページ◀は左、次のページ▶は右。押せない側は同じ幅の空きにして、単品ボタンの位置を動かさない
-  const side_ = (dir: -1 | 1, show: boolean) =>
-    pages < 2 ? "" : show
-      ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "◀" : "▶"}</button>`
-      : `<span class="ff-arrow-space"></span>`;
-  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page" data-ffpages="${reg}:${pages}">${side_(-1, page > 0)}<div class="ff-grid">${grid}</div>${side_(1, page < pages - 1)}</div>`;
+  // 隠れたページがある側の端にだけ白いグラデーションを置く（user 2026-11-16：◀▶ の代わり）。ページは左右のスワイプでめくる
+  const more = pages < 2 ? "" : `${page > 0 ? " more-prev" : ""}${page < pages - 1 ? " more-next" : ""}`;
+  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page${more}" data-ffpages="${reg}:${pages}"><div class="ff-grid">${grid}</div></div>`;
 }
 
 const MENU_LABEL: Record<MenuScreen, string> = {

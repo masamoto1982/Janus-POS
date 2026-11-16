@@ -117,6 +117,7 @@ function start(): void {
   });
   wireSwipe();
   wireMenuSwipe();
+  wireFfSwipe();
   wireForceRegister();
   rulesDlg().addEventListener("close", lockRules);
   rulesDlg()
@@ -1266,6 +1267,39 @@ function wireForceRegister(): void {
   app.addEventListener("contextmenu", (e) => {
     if ((e.target as Element).closest("[data-ffforce]")) e.preventDefault();
   });
+}
+
+/// FF のページは左右のスワイプでもめくれる（user 2026-11-16）：左へ払うと次のページ、右へ払うと前のページ。
+/// 払ったあとの click は単品の登録にしない
+function wireFfSwipe(): void {
+  let start: { reg: number; pages: number; x: number; y: number; id: number } | null = null;
+  let swipedAt = 0;
+  app.addEventListener("pointerdown", (e) => {
+    const page = (e.target as Element).closest<HTMLElement>("[data-ffpages]");
+    if (!page || e.button !== 0) return;
+    const [reg, pages] = page.dataset.ffpages!.split(":").map(Number);
+    start = { reg, pages, x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  window.addEventListener("pointerup", (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    const { reg, pages, x, y } = start;
+    start = null;
+    const dx = e.clientX - x;
+    if (Math.abs(dx) < MENU_SWIPE_PX || Math.abs(e.clientY - y) > Math.abs(dx) / 2) return;
+    swipedAt = Date.now();
+    const u = ffUi(reg);
+    const next = Math.min(pages - 1, Math.max(0, u.page + (dx < 0 ? 1 : -1)));
+    if (next === u.page) return;
+    ffTabs.set(reg, { tab: u.tab, page: next });
+    frame();
+  });
+  window.addEventListener("pointercancel", () => (start = null));
+  app.addEventListener("click", (e) => {
+    if (Date.now() - swipedAt < 400 && (e.target as Element).closest("[data-ffpages]")) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }, true);
 }
 
 function wireMenuSwipe(): void {

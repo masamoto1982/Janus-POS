@@ -1384,7 +1384,7 @@ export const FF_TABS = [
   ["bun", "中華まん"],
   ["oden", "おでん"],
 ] as const;
-export const FF_PER_PAGE = 3;
+export const FF_PER_PAGE = 6;
 export type FfUi = { tab: string; page: number };
 
 /** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・サービス・たばこの段と同じ位置・高さ）に流すサイネージ。
@@ -1410,7 +1410,7 @@ export function firstWelcome(r: RegisterView, side: Side): string {
   const band = staffOp
     ? welcomeBand(r, side, find(r.staff.actions, "emoney"), side === "customer")
     : welcomeBand(r, side, find(r.customer.actions, "emoney"), false);
-  return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
+  return `${band}<div class="first-welcome"><b class="mode-big" style="--len:${staffOp ? 4 : 5}">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
 }
 
 /** スタッフ側で店舗メニューを開いている間のお客様側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
@@ -1480,13 +1480,12 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${esc(f.name)}</button>`;
     })
     .join("");
-  const arrows =
-    pages > 1
-      ? `<div class="ff-arrows">${
-          page > 0 ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:-1" aria-label="前のページ">▲</button>` : "<span></span>"
-        }${page < pages - 1 ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:1" aria-label="次のページ">▼</button>` : "<span></span>"}</div>`
-      : "";
-  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page"><div class="ff-grid">${grid}</div>${arrows}</div>`;
+  // ページは左右に広げる（user 2026-11-16）：前のページ◀は左、次のページ▶は右。押せない側は同じ幅の空きにして、単品ボタンの位置を動かさない
+  const side_ = (dir: -1 | 1, show: boolean) =>
+    pages < 2 ? "" : show
+      ? `<button type="button" class="ff-arrow" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "◀" : "▶"}</button>`
+      : `<span class="ff-arrow-space"></span>`;
+  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page" data-ffpages="${reg}:${pages}">${side_(-1, page > 0)}<div class="ff-grid">${grid}</div>${side_(1, page < pages - 1)}</div>`;
 }
 
 const MENU_LABEL: Record<MenuScreen, string> = {

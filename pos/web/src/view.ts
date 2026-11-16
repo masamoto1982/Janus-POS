@@ -1,3 +1,4 @@
+import { langOf } from "./i18n";
 import type {
   Action,
   ActionState,
@@ -47,10 +48,56 @@ function find(actions: ActionState[], name: Action): Gate {
   return actions.find((a) => a.action === name) ?? { action: name, allowed: false, reason: null };
 }
 
+/** FF 単品ボタンの表示名。白銀比の特大ボタンに入るよう、主役は 3 文字まで・残りは添え字（user 2026-11-17）。
+ * 一行で入る名前は載せない（商品名のまま）。明細・レシートは商品名のまま */
+const FF_LABEL: Record<string, string> = {
+  FF01: "チキン\nフライド",
+  FF02: "チキン\nスパイシー",
+  FF03: "ドック\nアメリカン",
+  FF21: "焼き鳥\nモモシオ",
+  FF22: "焼き鳥\nモモタレ",
+  FF31: "珈琲\nホット S",
+  FF32: "珈琲\nホット M",
+  FF33: "珈琲\nホット L",
+  FF34: "珈琲\nアイス S",
+  FF35: "珈琲\nアイス M",
+  FF36: "珈琲\nアイス L",
+  FF37: "ラテ\nホット S",
+  FF39: "ラテ\nアイス S",
+  FF51: "ミルク\nソフトコーン",
+  FF52: "ミルク\nソフトカップ",
+  FF53: "チョコ\nソフトコーン",
+  FF54: "チョコ\nソフトカップ",
+  FF77: "ごぼう\n巻き",
+  FF79: "昆布\n結び",
+};
+/** 英語では主役と添え字の並びが日本語と逆になるもの（それ以外は主役・添え字をそれぞれ訳す） */
+const FF_LABEL_EN: Record<string, string> = {
+  FF01: "Fried\nchicken",
+  FF02: "Spicy\nchicken",
+  FF21: "Salt\nyakitori",
+  FF22: "Sauce\nyakitori",
+  FF31: "S\nhot coffee",
+  FF32: "M\nhot coffee",
+  FF33: "L\nhot coffee",
+  FF34: "S\niced coffee",
+  FF35: "M\niced coffee",
+  FF36: "L\niced coffee",
+  FF37: "S\nhot latte",
+  FF39: "S\niced latte",
+};
+const ffLabel = (code: string, name: string, lang: string): string => (lang === "en" && FF_LABEL_EN[code]) || FF_LABEL[code] || name;
+const twoLine = (label: string): string => {
+  const [main, sub] = label.split("\n");
+  return sub === undefined ? esc(label) : `<b>${esc(main)}</b><small>${esc(sub)}</small>`;
+};
+
 export function btn(label: string, cmd: Command, a?: Gate, cls = ""): string {
   const disabled = a && !a.allowed;
   const title = disabled && a.reason ? ` title="${esc(a.reason)}"` : "";
-  return `<button class="${cls}" data-cmd="${esc(JSON.stringify(cmd))}"${disabled ? " disabled" : ""}${title}>${esc(label)}</button>`;
+  // 二行のボタンは主役（一行目）と添え字（二行目）で文字の段を分ける（同じ大きさの文字で二行にしない、user 2026-11-17）
+  const inner = twoLine(label);
+  return `<button class="${cls}" data-cmd="${esc(JSON.stringify(cmd))}"${disabled ? " disabled" : ""}${title}>${inner}</button>`;
 }
 
 export function backBtn(cmd: Command, a?: Gate): string {
@@ -1256,13 +1303,13 @@ function emoneyScreen(r: RegisterView, side: Side): string {
       // スタッフを呼んだあとは「他の決済を使う」も出さない（押されるとスタッフの無駄足になる）
       const buttons = called
         ? ""
-        : `<div class="point-choices pair">${choice("チャージまたは\n現金併用", "staff", "ghost")}${choice("他の決済を使う", "cancel", "primary")}</div>`;
+        : `<div class="point-choices pair">${choice("チャージまたは現金併用", "staff", "ghost")}${choice("他の決済を使う", "cancel", "primary")}</div>`;
       return `<div class="point-screen emoney-screen emoney-short">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>${called ? "<br>スタッフが向かっています" : ""}`)}
         ${ro ? "" : buttons}
       </div>`;
     }
-    const buttons = `<div class="point-choices pair">${choice("不足額を\n現金で払う", "cash", "primary")}${choice("電子マネーを\nチャージする", "charge", "primary")}</div>`;
+    const buttons = `<div class="point-choices pair">${choice("不足額を現金で払う", "cash", "primary")}${choice("電子マネーをチャージする", "charge", "primary")}</div>`;
     return `<div class="point-screen emoney-screen emoney-short">
         ${msg("電子マネーの残高が足りません", `不足額 <b>${yen(short)}</b>`)}
         ${ro ? "" : buttons}
@@ -1456,7 +1503,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。文は受け取り方に誤りの余地がない一番具体的な表現なので、ボタン群の上に置く（user 2026-11-17）
     return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${[
-      callBtn("FF", "揚げ物・中華まん", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
+      callBtn("FF", "揚げ物など", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("金券", "切手・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
@@ -1469,6 +1516,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.pickup_handover && !r.staff.lines.length) return "";
   const view = r.staff;
   const can = find(view.actions, "register_ff");
+  const lang = langOf(reg, side);
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
   const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
   const page = Math.min(ui.page, pages - 1);
@@ -1479,8 +1527,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
     .map((f) => {
       const cmd: Command = { type: "register_ff", register: reg, side, code: f.code, qty: 1 };
-      if (f.level !== "out" || !can.allowed) return btn(f.name, cmd, can, `ff-item ${f.level}`);
-      return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${esc(f.name)}</button>`;
+      if (f.level !== "out" || !can.allowed) return btn(ffLabel(f.code, f.name, lang), cmd, can, `ff-item ${f.level}`);
+      return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${twoLine(ffLabel(f.code, f.name, lang))}</button>`;
     })
     .join("");
   // ページ送りは右端の ▲（前）・▼（次）（user 2026-11-16：スワイプでのページ送りは廃止）。押せない側は同じ大きさの空きにして、もう一方の位置を動かさない

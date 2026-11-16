@@ -209,7 +209,6 @@ const STEPS = [2, 2 * Math.SQRT2, 4, 4 * Math.SQRT2];
 export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
 
 export function fitText(root: ParentNode): void {
-  const over = (b: HTMLElement) => b.scrollWidth > b.clientWidth + 1 || b.scrollHeight > b.clientHeight + 1;
   const buttons = [...root.querySelectorAll<HTMLElement>(".screen button")].filter(
     (b) => !b.matches(".pad-field, .birth-field, .ffv-input") && b.getClientRects().length > 0,
   );
@@ -218,6 +217,16 @@ export function fitText(root: ParentNode): void {
     const sub = b.querySelector<HTMLElement>(":scope > small");
     return main && sub && sub.getClientRects().length ? { main, sub } : null;
   };
+  // ボタンの内側の余白は四辺とも B÷8、主役と添え字の間は B÷16（user 2026-11-17：文字が枠に貼り付いていた）。
+  // 文字の段は、この余白を除いた内側に収まるかで決める
+  const pad = (b: HTMLElement) => Math.min(b.offsetWidth, b.offsetHeight) / 8;
+  const over = (b: HTMLElement) => {
+    const r = document.createRange();
+    r.selectNodeContents(b);
+    const c = r.getBoundingClientRect();
+    const p = pad(b);
+    return c.width > b.clientWidth - 2 * p + 0.5 || c.height > b.clientHeight - 2 * p + 0.5;
+  };
   const apply = (b: HTMLElement, k: number) => {
     const base = Math.min(b.offsetWidth, b.offsetHeight);
     const two = parts(b);
@@ -225,10 +234,12 @@ export function fitText(root: ParentNode): void {
     b.style.fontSize = `${base / STEPS[k]}px`;
     b.style.lineHeight = "1";
     b.style.whiteSpace = "nowrap";
+    b.style.padding = `${pad(b)}px`;
     for (const el of b.querySelectorAll<HTMLElement>("*")) el.style.fontSize = "inherit";
     if (two) {
       two.main.style.fontSize = `${base / STEPS[k]}px`;
       two.sub.style.fontSize = `${base / STEPS[k + 2]}px`;
+      two.sub.style.marginTop = `${base / 16}px`;
     }
   };
   const pick = new Map<HTMLElement, number>();
@@ -241,13 +252,13 @@ export function fitText(root: ParentNode): void {
     }
     pick.set(b, Math.min(k, last));
   }
-  // 同じ行（同じ親）に並ぶ同じ大きさのボタンは同じ段に
+  // 同じ行（同じ親）に並ぶ同じ大きさのボタンは同じ段に（一行と二行は別々に：二行の主役は大までなので）
   const groups = new Map<string, HTMLElement[]>();
   const ids = new Map<Element, number>();
   for (const b of buttons) {
     const p = b.parentElement!;
     if (!ids.has(p)) ids.set(p, ids.size);
-    const key = `${ids.get(p)}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;
+    const key = `${ids.get(p)}:${parts(b) ? 2 : 1}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;
     groups.set(key, [...(groups.get(key) ?? []), b]);
   }
   for (const g of groups.values()) {

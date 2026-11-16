@@ -132,12 +132,12 @@ button { touch-action: manipulation; }
 .parcel-error { color: var(--danger); font-weight: 700; }
 .ff-tabs { flex: none; margin-top: var(--s13, 5px); }
 .ff-tab { padding: var(--s15, 2px) var(--s13, 4px); font-size: var(--text-sm); }
-.ff-page { position: relative; flex: 1; min-height: 0; display: flex; touch-action: pan-y; }
-/* ページは左右のスワイプでめくる。◀▶ の代わりに、隠れたページがある側の端にだけ白いグラデーションを置く（user 2026-11-16） */
-.ff-page.more-prev::before, .ff-page.more-next::after {
-  content: ""; position: absolute; top: 0; bottom: 0; z-index: 1; width: var(--s9, 20px); pointer-events: none; }
-.ff-page.more-prev::before { left: 0; background: linear-gradient(to right, var(--white), transparent); }
-.ff-page.more-next::after { right: 0; background: linear-gradient(to left, var(--white), transparent); }
+.ff-page { flex: 1; min-height: 0; display: flex; touch-action: pan-y; }
+/* ページは左右のスワイプでめくる。◀▶ の代わりに、隠れたページがある側の端を白くする（user 2026-11-16）。
+   最下段の背景として塗り、ボタンやタブより後ろに置く（ボタンを覆わない） */
+.screen-items:has(> .ff-page.more-prev) { background-image: linear-gradient(to right, var(--white), transparent 25%); }
+.screen-items:has(> .ff-page.more-next) { background-image: linear-gradient(to left, var(--white), transparent 25%); }
+.screen-items:has(> .ff-page.more-prev.more-next) { background-image: linear-gradient(to right, var(--white), transparent 25%, transparent 75%, var(--white)); }
 .ff-grid { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); gap: var(--s13, 4px); }
 .ff-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: var(--s17, 1px) var(--s14, 3px); font-size: var(--text-sm); line-height: 1.15; word-break: keep-all; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、

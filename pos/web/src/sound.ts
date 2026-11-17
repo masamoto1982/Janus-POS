@@ -61,23 +61,40 @@ export function beepError(): void {
   tone(220, 0.2, 0.22, "square", 0.07);
 }
 
-let ring: { bus: GainNode; timer: number } | null = null;
+let ring: { bus: GainNode; timer: number; sos: boolean } | null = null;
 
+/** ふだんの呼び出し：やわらかい下がる二音「ピン・ポーン」 */
 function ringPattern(bus: GainNode): void {
   tone(1320, 0, 0.18, "triangle", 0.28, bus);
   tone(990, 0.2, 0.25, "triangle", 0.28, bus);
 }
 
-export function setBellRinging(on: boolean, volume: number): void {
+const SOS_EVERY_MS = 480;
+
+/** 非常事態モード：高い二音を短く速く交互に打つ警報「ピーポーピーポー」。
+ *  矩形波の二本を少しずらして重ね、耳に刺さる濁りを出す（ふだんの呼び出しとは音色・高さ・速さのすべてで別物にする） */
+function sosPattern(bus: GainNode): void {
+  const step = SOS_EVERY_MS / 4 / 1000;
+  [1760, 1318, 1760, 1318].forEach((f, i) => {
+    tone(f, i * step, step * 0.92, "square", 0.11, bus);
+    tone(f * 1.012, i * step, step * 0.92, "sawtooth", 0.07, bus);
+  });
+}
+
+function stopRing(): void {
+  if (!ring) return;
+  window.clearInterval(ring.timer);
+  ring.bus.disconnect();
+  ring = null;
+}
+
+export function setBellRinging(on: boolean, volume: number, sos = false): void {
   if (!on || !ready() || !ctx) {
-    if (ring) {
-      window.clearInterval(ring.timer);
-      ring.bus.disconnect();
-      ring = null;
-    }
+    stopRing();
     return;
   }
   const v = Math.max(0.05, Math.min(1, volume || 0.25));
+  if (ring && ring.sos !== sos) stopRing();
   if (ring) {
     ring.bus.gain.value = v;
     return;
@@ -85,6 +102,7 @@ export function setBellRinging(on: boolean, volume: number): void {
   const bus = ctx.createGain();
   bus.gain.value = v;
   bus.connect(ctx.destination);
-  ringPattern(bus);
-  ring = { bus, timer: window.setInterval(() => ringPattern(bus), 500) };
+  const pattern = sos ? sosPattern : ringPattern;
+  pattern(bus);
+  ring = { bus, timer: window.setInterval(() => pattern(bus), sos ? SOS_EVERY_MS : 500), sos };
 }

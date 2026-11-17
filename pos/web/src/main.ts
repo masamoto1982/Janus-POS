@@ -554,6 +554,7 @@ function frame(): void {
   setBellRinging(
     snap.bells.some((m) => m.buzzing),
     Math.max(0, ...snap.registers.map((r) => r.ring_volume)),
+    snap.registers.some((r) => r.emergency),
   );
   render();
   if (performance.now() - lastSave >= SAVE_EVERY_MS) save();

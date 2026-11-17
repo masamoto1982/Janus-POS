@@ -101,7 +101,8 @@ button { touch-action: manipulation; }
   --text-xl: calc(var(--W) / 5.657); --text-num: calc(var(--W) / 16); --text-lg: calc(var(--W) / 22.627); --text-sm: calc(var(--W) / 32);
   /* ボタンと入力欄の形は白銀比 1:√2 だけ（user 2026-11-17、青銅比は退役）。高さは白銀比の段（特大 W/8・大 W/11.3・小 W/16・極小 W/22.6）、
      幅＝高さ×√2（W=400 で 特大 71×50・大 50×35・小 35×25・極小 25×18）。白銀比に中身がうまく収まらないときだけ、
-     同じ高さのまま幅をちょうど 2 倍か 3 倍にする（calc(var(--btn-w) * 2) のように書く。間隔は足さない） */
+     同じ高さのまま幅をちょうど 2 倍か 3 倍にする（calc(var(--btn-w) * 2) のように書く。間隔は足さない）。
+     ただしレジ画面のボタンの幅は law.ts fitText が「文字＋左右の余白 B÷4＋枠」で上書きする（user 2026-11-17、白銀比の倍数は退役）。ここの幅は初期値 */
   --silver: 1.4142;
   --btn-xl-h: calc(var(--W) / 8); --btn-xl-w: calc(var(--btn-xl-h) * var(--silver));
   --btn-h: calc(var(--W) / 11.314); --btn-w: calc(var(--btn-h) * var(--silver));
@@ -321,7 +322,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 /* 確認・案内画面の配置（アプリ全体で共通）
    上から 大きなテキスト→小さなテキスト（4px）→ボタン（16px）を一つのまとまりにし、領域の上下左右の中央へ
    バックなど引き返すボタンは左下の角、スキップなど先へ進む補助ボタンは右下の角。角のボタンの有無でまとまりの位置が変わらないよう、上下に同じ余白を取る */
-.confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: var(--s9, 16px); padding-block: calc(var(--btn-md-h) + var(--s13, 4px)); }
+.confirm { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: var(--s9, 16px); padding-block: calc(var(--btn-h) + var(--s13, 4px)); }
 .confirm > * { max-width: 100%; }
 .confirm .row { justify-content: center; }
 .confirm .paybox { border: none; }
@@ -389,10 +390,12 @@ button.ffv-input { box-sizing: border-box; width: var(--btn-md-w); height: var(-
 .confirm > .paybox > :is(p, .row) { margin: 0; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
 .skip-foot { position: absolute; right: 0; bottom: 0; }
-.confirm button.skip.md, button.skip.md { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+button.skip.md { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+/* 確認画面の四隅のバック・スキップ（現金）は大の高さ＝文字が大（user 2026-11-17）。幅は中身で白銀比の倍数（law.ts fitText） */
+.confirm button:is(.back-btn, .skip.md) { width: calc(var(--btn-w) * 2); height: var(--btn-h); }
 .menu-screen { display: flex; flex-direction: column; min-height: 100%; }
 .qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
-.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 /* 「他の決済を使う」など小ボタンに入らない長い戻るボタンは大ボタン（白銀比の 2 倍） */
 .confirm button.back-btn.wide, button.back-btn.wide { width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: 0 var(--s15, 2px); }
 

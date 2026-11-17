@@ -1084,8 +1084,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     (ro || paying
         ? ""
         : ffFirst && !expiredAny
-          ? `<button type="button" class="primary" data-ffverify="${reg}:${side}">会計</button>`
-          : btn("会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
+          ? `<button type="button" class="primary" data-ffverify="${reg}:${side}">お会計</button>`
+          : btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.max_items,
     r.points,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),

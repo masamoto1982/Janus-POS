@@ -65,3 +65,17 @@ describe("ボタンの形は四種", () => {
     }
   });
 });
+
+/// ボタンと入力欄の形（user 2026-11-17）：白銀比 1:√2 だけ。青銅比は退役。
+/// 中身がうまく収まらないときだけ、同じ高さのまま幅をちょうど 2 倍か 3 倍にする
+describe("ボタンの形は白銀比とその 2 倍・3 倍だけ", () => {
+  it("青銅比が残っていない", () => {
+    expect(css).not.toMatch(/--bronze|--sq-/);
+  });
+
+  it("幅の倍率は 2 か 3", () => {
+    const factors = [...css.matchAll(/calc\(var\(--btn-(?:xl-|md-|sm-)?w(?:, [^)]*)?\) \* ([\d.]+)\)/g)].map((m) => m[1]);
+    expect(factors.length).toBeGreaterThan(0);
+    for (const f of factors) expect(["2", "3"]).toContain(f);
+  });
+});

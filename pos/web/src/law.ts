@@ -216,7 +216,7 @@ export function applyLaw(root: ParentNode): void {
         el.style.left = `${p.x - offset}px`;
         el.style.top = `${p.y + padTop}px`;
         el.style.width = `${p.w}px`;
-        // 縮めるときは縦も同じ比率で縮める（ボタンの縦横比は青銅比・白銀比から外さない）。文字は縮んだボタンから決め直す
+        // 縮めるときは縦も同じ比率で縮める（ボタンの縦横比は白銀比とその 2 倍・3 倍から外さない）。文字は縮んだボタンから決め直す
         const natural = u.unit.widths[j];
         if (p.w < natural - 0.5) {
           el.style.height = `${(u.unit.heights![j] * p.w) / natural}px`;
@@ -230,7 +230,7 @@ export function applyLaw(root: ParentNode): void {
 
 /**
  * ボタンの文字の大きさは、親要素であるボタン自身を基準に四段で自動的に決める（user 2026-11-17）。
- * 基準はボタンの短い辺 B（青銅比・白銀比の横長ボタンでは高さ、縦長の ▲▼ では幅）。
+ * 基準はボタンの短い辺 B（横長のボタンでは高さ、縦長の ▲▼ では幅）。
  *   特大 B÷2・大 B÷2√2・小 B÷4・極小 B÷4√2（√2 ずつ）
  * 一行の文字は、入る中でいちばん大きい段。二行（主役＋添え字）は主役と添え字を二段離す（特大＋小、入らなければ大＋極小）。
  * 同じ行に並ぶ同じ大きさのボタンは、いちばん小さい段にそろえる（並びの中で文字の大きさが揃うように）。

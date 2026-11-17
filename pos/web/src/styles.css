@@ -99,24 +99,19 @@ button { touch-action: manipulation; }
   --s12: calc(var(--W) / 64); --s13: calc(var(--W) / 90.51); --s14: calc(var(--W) / 128); --s15: calc(var(--W) / 181.019); --s16: calc(var(--W) / 256); --s17: calc(var(--W) / 362.039);
   --shape-soft: var(--s11); --shape-tab: var(--s12) var(--s12) 0 0;
   --text-xl: calc(var(--W) / 5.657); --text-num: calc(var(--W) / 16); --text-lg: calc(var(--W) / 22.627); --text-sm: calc(var(--W) / 32);
-  /* ボタンの縦横比は青銅比 1:(3+√13)/2（user 2026-11-17）。高さは白銀比の段（特大 s6・大 s7・中 s8・小 s9）、幅＝高さ×青銅比 */
-  --bronze: 3.3028;
-  --btn-xl-h: calc(var(--W) / 8); --btn-xl-w: calc(var(--btn-xl-h) * var(--bronze));
-  --btn-h: calc(var(--W) / 11.314); --btn-w: calc(var(--btn-h) * var(--bronze));
-  --btn-md-h: calc(var(--W) / 16); --btn-md-w: calc(var(--btn-md-h) * var(--bronze));
-  --btn-sm-h: calc(var(--W) / 22.627); --btn-sm-w: calc(var(--btn-sm-h) * var(--bronze));
-  /* 正方形に近い形を使いたいときは白銀比 1:√2（user 2026-11-17）：明細の削除・数量・＋、テンキーのキー、セルフ最下段、FF 単品（将来商品画像を入れるため）。
-     高さは青銅比のボタンと同じ段、幅＝高さ×√2（W=400 で 特大 71×50・大 50×35・中 35×25・小 25×18） */
+  /* ボタンと入力欄の形は白銀比 1:√2 だけ（user 2026-11-17、青銅比は退役）。高さは白銀比の段（特大 W/8・大 W/11.3・小 W/16・極小 W/22.6）、
+     幅＝高さ×√2（W=400 で 特大 71×50・大 50×35・小 35×25・極小 25×18）。白銀比に中身がうまく収まらないときだけ、
+     同じ高さのまま幅をちょうど 2 倍か 3 倍にする（calc(var(--btn-w) * 2) のように書く。間隔は足さない） */
   --silver: 1.4142;
-  --sq-xl-h: var(--btn-xl-h); --sq-xl-w: calc(var(--sq-xl-h) * var(--silver));
-  --sq-h: var(--btn-h); --sq-w: calc(var(--sq-h) * var(--silver));
-  --sq-md-h: var(--btn-md-h); --sq-md-w: calc(var(--sq-md-h) * var(--silver));
-  --sq-sm-h: var(--btn-sm-h); --sq-sm-w: calc(var(--sq-sm-h) * var(--silver));
+  --btn-xl-h: calc(var(--W) / 8); --btn-xl-w: calc(var(--btn-xl-h) * var(--silver));
+  --btn-h: calc(var(--W) / 11.314); --btn-w: calc(var(--btn-h) * var(--silver));
+  --btn-md-h: calc(var(--W) / 16); --btn-md-w: calc(var(--btn-md-h) * var(--silver));
+  --btn-sm-h: calc(var(--W) / 22.627); --btn-sm-w: calc(var(--btn-sm-h) * var(--silver));
   --gap: calc(var(--W) / 45.255);
   --head-h: calc(var(--W) / 11.314); --band-h: calc(var(--W) / 5.657); --items-h: calc(var(--head-h) * 3); --tier3-h: calc(var(--head-h) * 10);
   font-size: var(--text-sm); position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: calc(var(--s15, 2px) + var(--head-h) + var(--band-h) + var(--tier3-h) + var(--items-h)); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); height: var(--head-h);
-  padding: 0 calc(var(--s11, 8px) + max(0px, (100% - var(--s9, 16px) - 4 * var(--btn-w) - 3 * var(--gap)) / 5)); border-bottom: var(--s17, 1px) solid var(--border); background: var(--head-bg); }
+  padding: 0 var(--s11, 8px); border-bottom: var(--s17, 1px) solid var(--border); background: var(--head-bg); }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s15, 2px); min-width: 0; }
 .staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; }
@@ -141,22 +136,22 @@ button { touch-action: manipulation; }
 /* 意味の色はレジ画面でもグレーにしない：否定・エラー＝警告の赤（釣り銭の取り忘れと同じ）、完了＝緑 */
 .screen { --danger: var(--alert-ink); }
 .parcel-error { color: var(--danger); font-weight: 700; }
-.ff-tabs { flex: none; margin-top: var(--s13, 5px); }
+.ff-tabs { flex: none; margin-top: var(--s13, 5px); justify-content: center; }
 .ff-tab { padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; }
-/* FF のタブは五つを帯の幅に等分し、高さは幅÷青銅比（user 2026-11-17） */
-.ff-tabs button.tab { height: auto; aspect-ratio: var(--bronze, 3.3028); }
+/* FF のタブは小の高さで、幅は白銀比の 2 倍（user 2026-11-17：青銅比は退役）。五つを帯の中央に並べ、入らない狭い画面では縦横比を保って縮む */
+.ff-tabs button.tab { flex: none; width: min(calc(var(--btn-md-w) * 2), calc((100% - 4 * var(--gap)) / 5)); height: auto; aspect-ratio: calc(2 * var(--silver)); }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない */
 .ff-page { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: center; gap: var(--gap); }
 /* 「<」「>」は枠のない記号だけ。押す場所は単品と同じ高さの縦長の白銀比（列が狭い画面では列と段の縁の余白の幅まで）で、単品とは列で離れている */
 .screen .ff-arrow { border: none; background: none; color: var(--accent); }
-.ff-arrow { flex: none; grid-row: 1; height: var(--sq-xl-h); width: calc(100% + var(--gap)); max-width: calc(var(--sq-xl-h) / var(--silver, 1.4142)); padding: 0; font-size: var(--text-sm); }
+.ff-arrow { flex: none; grid-row: 1; height: var(--btn-xl-h); width: calc(100% + var(--gap)); max-width: calc(var(--btn-xl-h) / var(--silver, 1.4142)); padding: 0; font-size: var(--text-sm); }
 /* 列が狭いときは、単品の側ではなく段の縁の余白（--gap）へはみ出して押す場所を確保する */
 .ff-arrow.prev { grid-column: 1; justify-self: start; margin-left: calc(-1 * var(--gap)); }
 .ff-arrow.next { grid-column: 3; justify-self: end; margin-right: calc(-1 * var(--gap)); }
 /* FF の単品は特大の白銀比を一行に四つ（user 2026-11-17：将来商品画像を入れるので正方形に近い形） */
-.ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, var(--sq-xl-w)); grid-template-rows: var(--sq-xl-h); justify-content: center; align-content: center; gap: var(--gap); }
-.ff-item { box-sizing: border-box; width: var(--sq-xl-w); height: var(--sq-xl-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
+.ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, var(--btn-xl-w)); grid-template-rows: var(--btn-xl-h); justify-content: center; align-content: center; gap: var(--gap); }
+.ff-item { box-sizing: border-box; width: var(--btn-xl-w); height: var(--btn-xl-h); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
    無し＝グレーアウト（長押しで予約注文） */
 .screen [data-region] button.ff-item.out {
@@ -171,7 +166,7 @@ button { touch-action: manipulation; }
 .lines.cols3 td { overflow-wrap: anywhere; }
 /* 明細は品目｜数量｜小計。数量は小計の側に寄せ、残りの幅はすべて品目に渡す（user 2026-11-17：数量を中央に置くと
    品目の列が狭くなり、限定n などのフラグが改行されやすかった）。数量の欄の幅は両画面・どの行でも同じ */
-.lines.cols3 col.c-qty { width: calc(var(--sq-md-w) * 3 + 2 * var(--gap) + 2 * var(--s13, 4px)); }
+.lines.cols3 col.c-qty { width: calc(var(--btn-md-w) * 3 + 2 * var(--gap) + 2 * var(--s13, 4px)); }
 .lines.cols3 col.c-amt { width: var(--s5, 60px); }
 .lines.cols3 td.empty { text-align: center; }
 .lines th { text-align: left; font-weight: 500; font-size: var(--text-sm); color: var(--msg-weak); }
@@ -190,8 +185,8 @@ button { touch-action: manipulation; }
 .reg-top .yen { font-size: inherit; font-weight: 400; }
 .reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
-/* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大ボタン（user 2026-11-12）。縦横比は青銅比（user 2026-11-17） */
-.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; flex: none; width: var(--btn-w); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+/* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大ボタン（user 2026-11-12）。幅は白銀比の 2 倍（user 2026-11-17） */
+.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; flex: none; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 .reg-top { container-type: inline-size; }
 @container (max-width: 380px) {
   .reg-top .mid { --sum-h: var(--s8, 26px); }
@@ -232,11 +227,14 @@ button {
   border: var(--s16, 1.5px) solid transparent; border-radius: var(--shape-soft); padding: var(--s11, 8px) var(--s10, 12px); cursor: pointer;
   background: var(--btn-on); color: var(--btn-on-ink);
 }
-/* レジ画面の中のボタンは、大きさを指定していなければ小ボタン（縦横比は青銅比、user 2026-11-17）。
-   青銅比は背が低いので、行の高さは文字の高さそのもの・上下の余白なし。大きさを決めている規則（クラス付き）が優先する。
+/* レジ画面の中のボタンは、大きさを指定していなければ極小ボタンの白銀比の 2 倍（user 2026-11-17）。
+   行の高さは文字の高さそのもの・上下の余白なし。大きさを決めている規則（クラス付き）が優先する。
    入力フォーム（数字を打つ欄）はボタンではないので除く */
-:where(.screen) button:where(:not(.pad-field, .birth-field, .ffv-input)) { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 var(--s15, 2px); line-height: 1; }
+:where(.screen) button:where(:not(.pad-field, .birth-field, .ffv-input)) { box-sizing: border-box; width: calc(var(--btn-sm-w) * 2); height: var(--btn-sm-h); padding: 0 var(--s15, 2px); line-height: 1; }
 :where(.screen) button:where(.pad-field, .birth-field, .ffv-input) { line-height: 1; }
+/* 入力欄も白銀比（user 2026-11-17）：大きさを指定していなければ小の高さで幅は 2 倍。数量・FF の照合数は小の白銀比ちょうど、
+   長さ・郵便番号・枚数・ポイント数は大の 2 倍、生年月日は特大の 3 倍、店舗メニューの金額・パスワードは小の 3 倍 */
+:where(.screen) button.pad-field { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s13, 4px); white-space: nowrap; overflow: hidden; }
 /* 二行のボタン（主役＋添え字）は縦に積む。文字の大きさは law.ts の fitText がボタンの短い辺から決める */
 .screen button:has(> b + small) { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
 .screen button > :is(b, small) { display: block; line-height: 1; }
@@ -287,7 +285,7 @@ button.pad-field .placeholder { color: var(--line); font-weight: 400; }
 button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-offset: var(--s17, 1px); }
 
 .tag {
-  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s15, 2px);
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px);
   font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap;
   background: transparent; border: none; color: var(--flag-plain);
 }
@@ -344,7 +342,8 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .confirm .paybox { border: none; }
 .paybox { border: var(--s17, 1px) dashed var(--border); border-radius: var(--s11, 8px); padding: var(--s11, 8px); margin: var(--s11, 8px) 0; }
 .svc { display: flex; gap: var(--gap); margin-top: var(--s13, 4px); }
-.svc input { width: 7em; }
+/* 金額の入力欄は大の高さで幅は白銀比の 2 倍（user 2026-11-17） */
+.svc input { box-sizing: border-box; width: calc(var(--btn-w) * 2); height: var(--btn-h); }
 details summary { cursor: pointer; margin-top: var(--s12, 6px); }
 details summary h3 { display: inline; }
 
@@ -352,7 +351,7 @@ details summary h3 { display: inline; }
 .welcome p { margin: var(--s13, 4px) 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: var(--s11, 8px); }
-.guide-btn { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 var(--s15, 2px); border-radius: var(--shape-pill); white-space: nowrap; }
+.guide-btn { box-sizing: border-box; width: calc(var(--btn-sm-w) * 2); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 var(--s15, 2px); border-radius: var(--shape-pill); white-space: nowrap; }
 .welcome .guide { margin-top: var(--s11, 8px); font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-weight: 700; }
@@ -364,18 +363,18 @@ details summary h3 { display: inline; }
 .point-service { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); min-width: var(--s4, 96px); padding: var(--s11, 8px) var(--s10, 12px); font-size: var(--text-sm); }
 .point-service .icon { font-size: var(--text-num); line-height: 1; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: var(--text-sm); }
-.confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: var(--btn-w); max-width: 100%; height: var(--btn-h); padding: 0 var(--s15, 2px); }
+.confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: calc(var(--btn-w) * 2); max-width: 100%; height: var(--btn-h); padding: 0 var(--s15, 2px); }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
-/* 支払方法は文字なりの幅をやめて、いちばん長い「クレジットカード」が入る大ボタン（青銅比）にそろえる（user 2026-11-17）。対になるお客様側の一覧も同じ */
-.method-row button { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); white-space: nowrap; }
+/* 支払方法は文字なりの幅をやめて、いちばん長い「クレジットカード」が入る大ボタン（白銀比の 3 倍）にそろえる（user 2026-11-17）。対になるお客様側の一覧も同じ */
+.method-row button { box-sizing: border-box; width: calc(var(--btn-w) * 3); height: var(--btn-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); white-space: nowrap; }
 /* お客様側の支払方法一覧（スタッフ操作モード、表示のみ）はスタッフ側の支払方法ボタンと同じ大きさ（user 2026-11-12） */
-.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: var(--btn-w); height: var(--btn-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); line-height: 1; white-space: nowrap; }
+.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--btn-w) * 3); height: var(--btn-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); line-height: 1; white-space: nowrap; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
    （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
 */
 .lines tr.flagged > td { background: var(--flag-row); }
 .flag {
-  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s15, 2px);
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px);
   font: inherit; font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap;
   background: transparent; color: var(--msg-strong); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--shape-soft);
 }
@@ -387,7 +386,7 @@ button.flag { cursor: pointer; }
 .ffv-screen .lines.ffv td { vertical-align: middle; text-align: left; }
 .ffv-screen .lines.ffv td.num, .ffv-screen .lines.ffv th.num { text-align: right; }
 .ffv-screen .lines.ffv .ffv-judge { text-align: center; width: var(--s6, 48px); }
-button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(--btn-sm-h); padding: 0 var(--s13, 4px); }
+button.ffv-input { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s13, 4px); }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* チケットの受け取り枚数（お客様側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
@@ -403,12 +402,12 @@ button.ffv-input { box-sizing: border-box; width: var(--btn-sm-w); height: var(-
 .confirm > .paybox > :is(p, .row) { margin: 0; }
 .back-foot { position: absolute; left: 0; bottom: 0; }
 .skip-foot { position: absolute; right: 0; bottom: 0; }
-.confirm button.skip.md, button.skip.md { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+.confirm button.skip.md, button.skip.md { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 .menu-screen { display: flex; flex-direction: column; min-height: 100%; }
 .qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
-.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
-/* 「他の決済を使う」など中ボタンに入らない長い戻るボタンは大ボタン（青銅比） */
-.confirm button.back-btn.wide, button.back-btn.wide { width: var(--btn-w); height: var(--btn-h); padding: 0 var(--s15, 2px); }
+.confirm button.back-btn, button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+/* 「他の決済を使う」など小ボタンに入らない長い戻るボタンは大ボタン（白銀比の 2 倍） */
+.confirm button.back-btn.wide, button.back-btn.wide { width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: 0 var(--s15, 2px); }
 
 .toast {
   position: absolute; left: 10px; right: 10px; bottom: 8px; padding: 8px 10px; border-radius: 8px;
@@ -582,12 +581,14 @@ body.dragging .drop-hint { display: inline; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: var(--s11, 8px) var(--s9, 16px); justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: var(--s11, 8px); font-size: var(--text-sm); }
 .points-amount { align-items: center; }
-/* 空のときも数字が入ったときと同じ高さ（空だと潰れて見えるため） */
-.parcel-fields button.pad-field { box-sizing: border-box; width: var(--s5, 84px); height: var(--s7, 40px); font-size: var(--text-lg); padding: var(--s12, 6px) var(--s11, 8px); }
+/* 入力欄も白銀比：大の高さで幅は 2 倍（郵便番号 123-4567 が入る、user 2026-11-17）。空のときも同じ大きさ */
+.parcel-fields button.pad-field { box-sizing: border-box; width: calc(var(--btn-w, 42px) * 2); height: var(--btn-h, 40px); font-size: var(--text-lg); padding: var(--s12, 6px) var(--s11, 8px); }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-no { margin-right: var(--s11, 8px); }
 .parcel-fee { margin-left: var(--s11, 8px); }
-.id-entry button.birth-field { justify-content: center; height: auto; min-height: 1.5em; width: var(--s0, 370px); max-width: 100%; box-sizing: border-box; text-align: center; font-size: var(--text-lg); padding: var(--s11, 10px) var(--s10, 12px); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+/* 生年月日の入力欄は特大の高さで幅は白銀比の 3 倍（user 2026-11-17） */
+.id-entry button.birth-field { justify-content: center; height: var(--btn-xl-h, 64px); width: calc(var(--btn-xl-w, 90px) * 3); max-width: 100%; box-sizing: border-box; text-align: center; font-size: var(--text-lg); padding: var(--s11, 10px) var(--s10, 12px); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.id-entry button.birth-field .placeholder { font-size: var(--text-sm); letter-spacing: 0; }
 .collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s11, 8px); min-width: min(var(--s0, 370px), 100%); }
 .collect-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--s9, 16px); padding: var(--s11, 8px) var(--s10, 12px); border: var(--s16, 1.5px) solid var(--border); font-size: var(--text-lg); text-align: left; }
 /* 照合イベントが済んだ印：意味色のグリーン（安全・肯定）の丸に白い✓ */
@@ -623,10 +624,12 @@ body.dragging .drop-hint { display: inline; }
 /* 店舗メニューの項目の並びはレイアウトの法則（law.ts）が決める（同じ種類の群＝中央、入らなければ殻の折り返し）。下の flex は当てはめる前の仮の並び */
 .menu-list { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .menu-list + .menu-list { margin-top: var(--s11, 10px); padding-top: var(--s11, 10px); border-top: var(--s17, 1px) solid var(--border); }
-/* 店舗メニューの項目は大ボタン（青銅比）を三列に並べる。長い名前は二行に折り返す（user 2026-11-17 青銅比） */
-.menu-item { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); text-align: center; padding: 0 var(--s15, 2px); line-height: 1.1; }
+/* 店舗メニューの項目は大ボタン（白銀比の 2 倍）を三列に並べる。長い名前は二行に折り返す（user 2026-11-17） */
+.menu-item { box-sizing: border-box; width: calc(var(--btn-w) * 2); height: var(--btn-h); text-align: center; padding: 0 var(--s15, 2px); line-height: 1.1; }
 .menu-form { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); }
 .menu-form input { flex: 0 1 8em; min-width: 0; }
+.screen .menu-form button.pad-field { width: calc(var(--btn-md-w) * 3); height: var(--btn-md-h); }
+.screen .menu-form button:not(.pad-field) { width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); }
 .money-io { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 8px; }
 .money-io-staff { grid-column: 1; min-width: 0; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
@@ -685,7 +688,7 @@ body.dragging .drop-hint { display: inline; }
 .first-welcome .mode-big { color: var(--msg-strong); font-size: min(var(--text-xl), calc(82cqi / var(--len, 1))); white-space: nowrap; font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
 .call-row { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; gap: var(--gap); }
 /* セルフ最下段は特大の白銀比を四つ（user 2026-11-17） */
-.call-row:not(.calling) > .call-btn { box-sizing: border-box; width: var(--sq-xl-w); min-width: 0; }
+.call-row:not(.calling) > .call-btn { box-sizing: border-box; width: var(--btn-xl-w); min-width: 0; }
 /* 呼び出し中の最下段：案内を中央に */
 .call-row.calling { display: flex; align-items: center; justify-content: center; padding: 0 var(--gap); }
 .call-row.calling .msg { flex: 1; min-width: 0; }
@@ -708,7 +711,7 @@ body.dragging .drop-hint { display: inline; }
 .call-btn small, .welcome-band .band-btn small { line-height: 1; }
 /* 添え字が一行に収まらないときは「・」の後ろで折り返し、ボタンの高さを伸ばす（文字がボタンからはみ出さないように） */
 .call-btn small { word-break: keep-all; overflow-wrap: anywhere; }
-.call-row .call-btn { height: var(--sq-xl-h); max-height: none; padding: 0 var(--s15, 2px); }
+.call-row .call-btn { height: var(--btn-xl-h); max-height: none; padding: 0 var(--s15, 2px); }
 .call-row .call-btn :is(b, small) { line-height: 1; }
 
 .coupon-list { margin: 0; padding: 0; list-style: none; color: var(--msg-strong); font-size: var(--text-sm); }
@@ -727,9 +730,9 @@ body.dragging .drop-hint { display: inline; }
 .lines.cols3 :is(th, td):nth-child(2) { text-align: center; }
 .qty-step { display: flex; align-items: center; justify-content: center; gap: var(--gap); white-space: nowrap; }
 /* 明細の削除・数量・＋は中の白銀比（user 2026-11-17） */
-.screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--sq-md-w); width: var(--sq-md-w); height: var(--sq-md-h); min-width: 0; padding: 0 var(--s15, 2px); font-size: var(--text-sm); }
+.screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-md-w); width: var(--btn-md-w); height: var(--btn-md-h); min-width: 0; padding: 0 var(--s15, 2px); font-size: var(--text-sm); }
 .screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: var(--text-sm); }
-.qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--sq-md-w); width: var(--sq-md-w); min-width: 0; text-align: center; }
+.qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-md-w); width: var(--btn-md-w); min-width: 0; text-align: center; }
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, var(--black) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--s11, 10px); padding: var(--s11, 8px); width: max-content; max-width: calc(100% - var(--s9, 16px)); max-height: calc(100% - var(--s10, 12px)); display: flex; flex-direction: column; gap: var(--s11, 8px); box-shadow: 0 var(--s12, 6px) var(--s9, 18px) color-mix(in oklch, var(--black) 25%, transparent); }
 /* テンキーも席順：見出しと入力欄が主役で上・中央、添え書きはその下、戻る（←・バック）は左、決定は右 */
@@ -738,11 +741,11 @@ body.dragging .drop-hint { display: inline; }
 .qty-pop-value { border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: 0; padding: var(--s15, 2px) var(--s11, 8px); text-align: center; font-size: var(--text-lg); font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
 .qty-pop-value .muted { font-size: var(--text-sm); font-weight: 400; }
 .qty-pop .pad-error { color: var(--alert-ink); font-size: var(--text-sm); line-height: 1.4; }
-/* テンキーのキーは大の白銀比を 3 列に（user 2026-11-17）。下のバック・決定は長方形なので青銅比の中ボタン */
-.qty-pop-keys { display: grid; grid-template-columns: repeat(3, var(--sq-w)); gap: var(--gap); justify-content: center; flex: 1 1 auto; min-height: 0; }
-.qty-pop-keys .pad-key { box-sizing: border-box; width: var(--sq-w); height: var(--sq-h); padding: 0; font-size: var(--text-lg); font-weight: 600; min-height: 0; }
+/* テンキーのキーは大の白銀比を 3 列に（user 2026-11-17）。下のバック・決定は小ボタン（白銀比の 2 倍） */
+.qty-pop-keys { display: grid; grid-template-columns: repeat(3, var(--btn-w)); gap: var(--gap); justify-content: center; flex: 1 1 auto; min-height: 0; }
+.qty-pop-keys .pad-key { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); padding: 0; font-size: var(--text-lg); font-weight: 600; min-height: 0; }
 .qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
-.qty-pop-foot button { box-sizing: border-box; flex: none; width: var(--btn-md-w); height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
+.qty-pop-foot button { box-sizing: border-box; flex: none; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
 
 .point-choices.pair > button { white-space: pre-line; line-height: 1.25; }
 .emoney-screen .emoney-balance { display: block; font-size: var(--text-num); font-variant-numeric: tabular-nums; }
@@ -851,8 +854,8 @@ body.dragging .drop-hint { display: inline; }
 .screen-main > .welcome-band { display: flex; flex-direction: column; justify-content: center; align-items: stretch; }
 .welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: var(--gap); }
 .welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--s6, 48px); height: var(--s6, 48px); }
-/* 帯の Language・電子マネーは大ボタン（青銅比）。縮まない（user 2026-11-17：ボタンは青銅比か白銀比のどちらかに必ず一致） */
-.welcome-band .band-btn { flex: none; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: var(--btn-w); height: var(--btn-h); padding: 0 var(--s15, 2px); line-height: 1; white-space: nowrap; }
+/* 帯の Language・電子マネーは大ボタン（白銀比の 2 倍）。縮まない（user 2026-11-17：ボタンは白銀比か、その幅の 2 倍・3 倍） */
+.welcome-band .band-btn { flex: none; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: 0 var(--s15, 2px); line-height: 1; white-space: nowrap; }
 .welcome-band .band-row:has(> .msg) { height: var(--s6, 48px); }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }
 /* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードのお客様側）でも押せる＝青 */

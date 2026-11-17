@@ -23,9 +23,9 @@ const SIZES = [
   ["大", "--text-lg", "22.627", 9, 700],
   ["小", "--text-sm", "32", 10, 400],
 ];
-// ボタンは青銅比 1:(3+√13)/2（長方形）か白銀比 1:√2（正方形に近い形）のどちらかに必ず一致する（円を除く、user 2026-11-17）。
+// ボタンと入力欄は白銀比 1:√2（円を除く、user 2026-11-17。青銅比は退役）。中身がうまく収まらないときだけ、同じ高さで幅をちょうど 2 倍か 3 倍にする。
 // 大きさは四段（特大・大・小・極小）で、高さが白銀比の段、幅＝高さ×比。ボタンの中の文字はボタンの短い辺 B から四段（特大 B/2・大 B/2√2・小 B/4・極小 B/4√2）で入る最大を自動で選ぶ（law.ts fitText）。添え字は特大に小、大に極小
-const BRONZE = 3.3028;
+const SILVER = 1.4142;
 const BUTTONS = [
   ["特大", "--btn-xl-w", "--btn-xl-h", "8", 6],
   ["大", "--btn-w", "--btn-h", "11.314", 7],
@@ -56,10 +56,11 @@ const checkDiv = (varName, div) => {
   if (!screenRule.includes(`${varName}: calc(var(--W) / ${div})`)) throw new Error(`.screen の ${varName} が W / ${div} ではない。SIZES・BUTTONS を直す`);
 };
 for (const [, varName, div] of SIZES) checkDiv(varName, div);
-if (!screenRule.includes(`--bronze: ${BRONZE};`)) throw new Error(`.screen の --bronze が ${BRONZE} ではない。BRONZE を直す`);
+if (!screenRule.includes(`--silver: ${SILVER};`)) throw new Error(`.screen の --silver が ${SILVER} ではない。SILVER を直す`);
+if (/bronze|青銅比 1:/.test(css)) throw new Error("styles.css に青銅比が残っている（退役済み）");
 for (const [, wv, hv, hd] of BUTTONS) {
   checkDiv(hv, hd);
-  if (!screenRule.includes(`${wv}: calc(var(${hv}) * var(--bronze))`)) throw new Error(`.screen の ${wv} が ${hv}×青銅比ではない。BUTTONS を直す`);
+  if (!screenRule.includes(`${wv}: calc(var(${hv}) * var(--silver))`)) throw new Error(`.screen の ${wv} が ${hv}×白銀比ではない。BUTTONS を直す`);
 }
 
 const toRgb = (oklch) => {
@@ -212,7 +213,7 @@ UI はレゴのように、少ない部品の掛け合わせで組み立てる�
 | 色 | 青 #005AFF（操作可能）・緑 #03AF7A（安全・肯定）・赤 #FF4B00（危険・否定）・橙 #F6AA00（着目・注意喚起）。白・黒・グレーは色に数えない無彩色 |
 | 濃度 | 1 淡（明るさ 0.95）・2 薄（0.87）・3 中（その色そのもの。グレーは 0.52）・4 濃（0.44） |
 | ボタンの形 | ${SHAPES.map(([n, v]) => `${n}（\`${v}\`）`).join("・")} |
-| ボタンの大きさ | ${BUTTONS.map(([n, , , hd, hk]) => `${n} 高さ W÷√2${SUP(hk)}（W=400 で ${Math.round(atW(hd) * BRONZE * 10) / 10}×${atW(hd)}）`).join("・")}。幅＝高さ×青銅比 ${BRONZE}（長方形）か×√2（正方形に近い形、\`--sq-*\`）。円を除くすべてのボタンがどちらかに一致する。ボタンの中の文字はボタンの短い辺 B から四段（特大 B÷2・大 B÷2√2・小 B÷4・極小 B÷4√2）で、内側の余白（四辺とも B÷8）を除いた中に入るいちばん大きい段を自動で選ぶ。添え字は特大に小、大に極小（大・小に添え字は付かない）、主役との間は B÷16 |
+| ボタンの大きさ | ${BUTTONS.map(([n, , , hd, hk]) => `${n} 高さ W÷√2${SUP(hk)}（W=400 で ${Math.round(atW(hd) * SILVER * 10) / 10}×${atW(hd)}）`).join("・")}。幅＝高さ×白銀比 √2。中身がうまく収まらないときだけ、同じ高さのまま幅をちょうど 2 倍か 3 倍にする（間隔は足さない）。円を除くすべてのボタンと入力欄（数字を打つ欄）がこの三つの幅のどれかに一致する。ボタンの中の文字はボタンの短い辺 B から四段（特大 B÷2・大 B÷2√2・小 B÷4・極小 B÷4√2）で、内側の余白（四辺とも B÷8）を除いた中に入るいちばん大きい段を自動で選ぶ。添え字は特大に小、大に極小（大・小に添え字は付かない）、主役との間は B÷16 |
 
 ## 適用範囲
 

@@ -1499,6 +1499,10 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
             advance(&mut s, 50);
             ok(&mut s, json!({"type":"release_call","register":1}));
             advance(&mut s, 20_000);
+            // 呼び鈴の配達だけを見る：放置で入った非常事態モードの鳴り続けは別の試験で見る
+            if reg(&s, 1).emergency {
+                ok(&mut s, json!({"type":"end_emergency","register":1}));
+            }
             let snap = s.snapshot();
             assert_eq!(
                 snap.bells[0].rings,

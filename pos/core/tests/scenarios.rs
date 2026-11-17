@@ -1499,6 +1499,10 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
             advance(&mut s, 50);
             ok(&mut s, json!({"type":"release_call","register":1}));
             advance(&mut s, 20_000);
+            // 呼び鈴の配達だけを見る：放置で入った非常事態モードの鳴り続けは別の試験で見る
+            if reg(&s, 1).emergency {
+                ok(&mut s, json!({"type":"end_emergency","register":1}));
+            }
             let snap = s.snapshot();
             assert_eq!(
                 snap.bells[0].rings,
@@ -3827,6 +3831,24 @@ fn anyone_can_end_emergency_without_logging_in() {
     assert_eq!(v.mode, Mode::SelfOperated);
     assert!(!v.lamp);
     assert!(v.waiting_calls.is_empty());
+}
+
+/// 仕様 11.4：非常事態モードに入ったら、届く呼び鈴は解除まで鳴り続ける（OFF・不通の端末は鳴らない）
+#[test]
+fn bells_keep_ringing_until_emergency_ends() {
+    let mut s = Store::new(1, 1, 1);
+    enter_emergency(&mut s, 1);
+    advance(&mut s, 60_000);
+    assert!(
+        s.snapshot().bells.iter().any(|m| m.buzzing),
+        "rings with nobody pressing"
+    );
+    ok(&mut s, json!({"type":"end_emergency","register":1}));
+    advance(&mut s, 1_000);
+    assert!(
+        s.snapshot().bells.iter().all(|m| !m.buzzing),
+        "stops once ended"
+    );
 }
 
 /// 仕様 11.4：解除の前から残っているほかの呼び出しは、解除した時刻から数え直す

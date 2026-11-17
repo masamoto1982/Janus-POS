@@ -835,7 +835,6 @@ const HTML_RULES: HtmlRule[] = [
     /^(.+?)で <b>(.+?)<\/b>、切手・チケット・お支払いの <b>(.+?)<\/b> はそのあと現金で$/,
     (m) => `<b>${yenify(m[2])}</b> by ${t(m[1]).toLowerCase()}, then stamps, tickets and bills (<b>${yenify(m[3])}</b>) in cash`,
   ],
-  [/^あと <b>(.+?)<\/b> 不足しています$/, (m) => `<b>${yenify(m[1])}</b> short`],
   [/^ポイント残高 ([\d,]+P)、ご利用可能 <b>([\d,]+P)<\/b>$/, (m) => `Point balance ${m[1]}, usable <b>${m[2]}</b>`],
   [
     /^(\d+)サイズ・(.*?)あて（〒(.*?)）<b class="parcel-fee">(.+?)<\/b>$/,

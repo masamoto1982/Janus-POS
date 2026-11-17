@@ -243,11 +243,17 @@ const STEPS = [2, 2 * Math.SQRT2, 4, 4 * Math.SQRT2];
 export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
 
 /**
- * 強い角丸のボタン（第三のボタン：案内・支払方法・両替の金種）は、どの画面でも小の高さ・特大の文字（user 2026-11-17）。
- * 幅は中身で決める：白銀比に入ればそのまま、入らなければ白銀比の 2 倍、それでも入らなければ 3 倍（user 2026-11-17：
- * 一律 3 倍では中身に対して横長すぎた）。3 倍でも入らないときだけ文字を一段下げる
+ * ボタンの文字は固定し、ボタンの幅で合わせる（user 2026-11-17：文字を固定してボタンで調整するのか、
+ * ボタンを固定して文字で調整するのかが曖昧だった → 前者）。
+ * 文字はボタンの高さ B から決まる：一行は特大 B÷2、二行（主役＋添え字）は大＋極小（特大＋小の二行は縦に入らない）。
+ * 幅は無段階ではなく白銀比の倍数：白銀比に入ればそのまま、入らなければ 2 倍、それでも入らなければ 3 倍。
+ * 同じ並び（同じ親）の同じ種類のボタンは、いちばん広いものの倍率にそろえる（強い角丸のボタンは中身ごと）。
+ * 並ぶ数が決まっていて幅を変えられないボタン（FF の単品・セルフの最下段・テンキー・明細の − ＋・FF のタブ）は
+ * 白銀比のまま。
+ * 3 倍でも入らないとき・幅を変えられないボタンに入らないときだけ、文字を一段ずつ下げる（例外）
  */
 const PILL = ".guide-btn, button.seg";
+const RIGID = ".call-btn, .ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
 
 export function fitText(root: ParentNode): void {
   const buttons = [...root.querySelectorAll<HTMLElement>(".screen button")].filter(
@@ -258,15 +264,14 @@ export function fitText(root: ParentNode): void {
     const sub = b.querySelector<HTMLElement>(":scope > small");
     return main && sub && sub.getClientRects().length ? { main, sub } : null;
   };
-  // ボタンの内側の余白は四辺とも B÷8、主役と添え字の間は B÷16（user 2026-11-17：文字が枠に貼り付いていた）。
-  // 文字の段は、この余白を除いた内側に収まるかで決める
+  // ボタンの内側の余白は四辺とも B÷8、主役と添え字の間は B÷16（user 2026-11-17：文字が枠に貼り付いていた）
   const pad = (b: HTMLElement) => Math.min(b.offsetWidth, b.offsetHeight) / 8;
   const over = (b: HTMLElement) => {
     const r = document.createRange();
     r.selectNodeContents(b);
     const c = r.getBoundingClientRect();
     const p = pad(b);
-    return c.width > b.clientWidth - 2 * p + 0.5 || c.height > b.clientHeight - 2 * p + 0.5;
+    return c.width > b.offsetWidth - 2 * p + 0.5 || c.height > b.offsetHeight - 2 * p + 0.5;
   };
   const apply = (b: HTMLElement, k: number) => {
     const base = Math.min(b.offsetWidth, b.offsetHeight);
@@ -275,7 +280,8 @@ export function fitText(root: ParentNode): void {
     b.style.fontSize = `${base / STEPS[k]}px`;
     b.style.lineHeight = "1";
     b.style.whiteSpace = "nowrap";
-    b.style.padding = `${pad(b)}px`;
+    // 余白 B÷8 はボタンの外形から測る（枠線はその中に含める）
+    b.style.padding = `${Math.max(0, pad(b) - (parseFloat(getComputedStyle(b).borderTopWidth) || 0))}px`;
     for (const el of b.querySelectorAll<HTMLElement>("*")) el.style.fontSize = "inherit";
     if (two) {
       two.main.style.fontSize = `${base / STEPS[k]}px`;
@@ -283,32 +289,55 @@ export function fitText(root: ParentNode): void {
       two.sub.style.marginTop = `${base / 16}px`;
     }
   };
+  /** 決めた文字の段：一行は特大、二行は大＋極小 */
+  const tierOf = (b: HTMLElement) => (parts(b) ? 1 : 0);
+  const setN = (b: HTMLElement, n: number) => {
+    b.style.width = b.dataset.fitW = `${b.offsetHeight * Math.SQRT2 * n}px`;
+    b.dataset.n = String(n);
+  };
+  // 1. 幅：決めた文字が入るいちばん小さい倍率
+  const flex = buttons.filter((b) => !b.matches(RIGID));
+  for (const b of flex) {
+    b.style.removeProperty("width");
+    delete b.dataset.fitW;
+    let n = 1;
+    for (; n <= 3; n++) {
+      setN(b, n);
+      apply(b, tierOf(b));
+      if (!over(b)) break;
+    }
+    if (n > 3) setN(b, 3);
+  }
+  // 2. 同じ並びの同じ種類はいちばん広いものにそろえる（合計の帯の取引中止と会計は一つの並び）
+  const rows = new Map<string, HTMLElement[]>();
+  const ids = new Map<Element, number>();
+  const rowOf = (b: HTMLElement) => b.closest(".reg-top") ?? b.parentElement!;
+  for (const b of flex) {
+    if (b.matches(PILL)) continue;
+    const p = rowOf(b);
+    if (!ids.has(p)) ids.set(p, ids.size);
+    const key = `${ids.get(p)}:${b.classList.contains("primary") || b.closest(".reg-top") ? "act" : b.classList[0] ?? ""}:${Math.round(b.offsetHeight)}`;
+    rows.set(key, [...(rows.get(key) ?? []), b]);
+  }
+  for (const g of rows.values()) {
+    const n = Math.max(...g.map((b) => Number(b.dataset.n)));
+    for (const b of g) if (Number(b.dataset.n) !== n) setN(b, n);
+  }
+  // 3. 文字：決めた段。入らないときだけ一段ずつ下げる（例外）
   const pick = new Map<HTMLElement, number>();
   for (const b of buttons) {
     const last = parts(b) ? 1 : 3;
-    if (b.matches(PILL)) {
-      b.style.removeProperty("width");
-      delete b.dataset.fitW;
-      const unit = b.offsetHeight * Math.SQRT2;
-      for (let n = 1; n <= 3; n++) {
-        b.style.width = b.dataset.fitW = `${unit * n}px`;
-        apply(b, 0);
-        if (!over(b)) break;
-      }
-    }
-    let k = 0;
+    let k = tierOf(b);
     for (; k <= last; k++) {
       apply(b, k);
       if (!over(b)) break;
     }
     pick.set(b, Math.min(k, last));
   }
-  // 同じ行（同じ親）に並ぶ同じ大きさのボタンは同じ段に（一行と二行は別々に：二行の主役は大までなので）
+  // 幅を変えられない並び（同じ親・同じ大きさ）は、文字の段もそろえる
   const groups = new Map<string, HTMLElement[]>();
-  const ids = new Map<Element, number>();
   for (const b of buttons) {
-    // 強い角丸のボタンは幅を中身で決めたので、並びの中でも文字は特大のまま（入らない一つだけが一段下がる）
-    if (b.matches(PILL)) continue;
+    if (!b.matches(RIGID)) continue;
     const p = b.parentElement!;
     if (!ids.has(p)) ids.set(p, ids.size);
     const key = `${ids.get(p)}:${parts(b) ? 2 : 1}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;

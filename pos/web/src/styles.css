@@ -138,8 +138,9 @@ button { touch-action: manipulation; }
 .parcel-error { color: var(--danger); font-weight: 700; }
 .ff-tabs { flex: none; margin-top: var(--s13, 5px); justify-content: center; }
 .ff-tab { padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; }
-/* FF のタブは小の高さで、幅は白銀比の 2 倍（user 2026-11-17：青銅比は退役）。五つを帯の中央に並べ、入らない狭い画面では縦横比を保って縮む */
-.ff-tabs button.tab { flex: none; width: min(calc(var(--btn-md-w) * 2), calc((100% - 4 * var(--gap)) / 5)); height: auto; aspect-ratio: calc(2 * var(--silver)); }
+/* タブは白銀比のボタンを上下に二分割した形（user 2026-11-17）：FF のタブは特大の白銀比ボタンの上半分（幅 特大×√2・高さ 特大÷2、縦横比 1:2√2）。
+   モバイルの画面切り替えタブも同じ形を横に並べたもの。五つを帯の中央に並べ、入らない狭い画面では縦横比を保って縮む */
+.ff-tabs button.tab { flex: none; width: min(var(--btn-xl-w), calc((100% - 4 * var(--gap)) / 5)); height: auto; aspect-ratio: calc(2 * var(--silver)); }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない */
 .ff-page { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: center; gap: var(--gap); }
@@ -792,10 +793,10 @@ body.dragging .drop-hint { display: inline; }
   .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: var(--text-sm); margin-bottom: 4px; }
   .register h2 .idle { font-size: var(--text-sm); }
   .swipe-tabs { display: flex; border-bottom: none; }
-  /* 画面切り替えのタブは横いっぱいのまま白銀比の倍数（user 2026-11-17）：見ている側が白銀比の 3 倍、見ていない側が 2 倍。
-     幅は帯を 3：2 に分け、高さはその幅から逆算（縦横比 1:3√2 と 1:2√2、二つとも同じ高さになる） */
-  .swipe-tabs .tab { flex: none; box-sizing: border-box; width: calc((100% - var(--gap, 8px)) * 2 / 5); height: auto; aspect-ratio: calc(2 * 1.4142); padding: 0 4px; font-size: var(--text-sm); line-height: 1; transition: width .2s; }
-  .swipe-tabs .tab.on { width: calc((100% - var(--gap, 8px)) * 3 / 5); aspect-ratio: calc(3 * 1.4142); }
+  /* 画面切り替えのタブは横いっぱいのまま、白銀比のボタンを上下に二分割した形（FF のタブと同じ、縦横比 1:2√2）を
+     見ている側に 3 つ分・見ていない側に 2 つ分（user 2026-11-17）。高さは幅から逆算（以前の半分） */
+  .swipe-tabs .tab { flex: none; box-sizing: border-box; width: calc((100% - var(--gap, 8px)) * 2 / 5); height: auto; aspect-ratio: calc(2 * 2 * 1.4142); padding: 0 4px; font-size: var(--text-sm); line-height: 1; transition: width .2s; }
+  .swipe-tabs .tab.on { width: calc((100% - var(--gap, 8px)) * 3 / 5); aspect-ratio: calc(3 * 2 * 1.4142); }
   .swipe-tabs .tab.operable { filter: url(#ramp); }
   .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .screens::-webkit-scrollbar { display: none; }

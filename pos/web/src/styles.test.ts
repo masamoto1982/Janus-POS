@@ -64,6 +64,12 @@ describe("ボタンの形は四種", () => {
       expect(SHAPES.map(s => `var(${s})`), `${r.selector} の border-radius: ${v}`).toContain(v);
     }
   });
+
+  it("FF のページ送り「<」「>」は円（user 2026-11-17：枠のない記号は五種目の形になっていた）", () => {
+    const r = rules.find(r => r.selector === ".ff-arrow");
+    expect(r && decl(r.body, "border-radius")).toBe("var(--shape-round)");
+    expect(css).not.toMatch(/\.ff-arrow\s*\{[^}]*border:\s*none/);
+  });
 });
 
 /// ボタンと入力欄の形（user 2026-11-17）：白銀比 1:√2 だけ。青銅比は退役。

@@ -4451,6 +4451,7 @@ impl Store {
 
     pub fn snapshot(&self) -> Snapshot {
         let now = self.now;
+        let sos = self.registers.iter().any(|r| r.emergency.is_some());
         Snapshot {
             now,
             registers: self
@@ -4465,7 +4466,8 @@ impl Store {
                 .map(|(i, m)| BellView {
                     id: m.id.clone(),
                     kind: bell_kind(i as u8),
-                    buzzing: m.buzzing(now),
+                    // 非常事態モードのあいだは、届く呼び鈴が解除まで鳴り続ける（警報音は画面側）
+                    buzzing: m.buzzing(now) || (sos && m.bell_on && !m.offline),
                     link_ok: m.rx_ok(now),
                     rings: m.rings,
                     offline: m.offline,

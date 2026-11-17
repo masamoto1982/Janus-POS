@@ -1066,6 +1066,7 @@ npm run build
   - 呼び鈴が不通でも入る（スタッフが応答しない状況には違いない）（`emergency_also_while_the_bell_cannot_reach_anyone`）
   - スタッフ操作モードでは入らない（`no_emergency_in_staff_operated_mode`）
   - 解除はログインなしで誰でもでき、呼び鈴の呼び出しも片付いて通常運転に戻る（`anyone_can_end_emergency_without_logging_in`）
+  - 非常事態モードに入ったら、届く呼び鈴は解除まで鳴り続ける（OFF・不通の端末は鳴らない）（`bells_keep_ringing_until_emergency_ends`）
   - 解除の前から残っているほかの呼び出しは、解除した時刻から数え直す（`calls_left_after_ending_emergency_count_from_the_end`）
   - ログインだけでは続き、解除で発動・解除時刻のレシートを出して通常運転に戻る（`emergency_lasts_until_ended`）
 - **12 取引中止・無操作・休止**：シナリオなし

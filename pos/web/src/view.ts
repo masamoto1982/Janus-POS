@@ -1066,7 +1066,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : v.method ? "" : methodList(v.method, v.inserted, r.unavailable)}
         ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due, v.method) : side === "customer" && v.method && !v.inserted && !v.payment_blocker ? customerPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r) + pointNote(r)}
-        ${v.method === "cash" && !ro ? `<div class="finish-row">${finishInsert(reg, v.inserted, v.due, a("insert_cash"))}</div>` : ""}
+        ${v.method === "cash" && !ro && v.inserted > 0 && v.due <= 0 ? `<div class="finish-row">${finishInsert(reg, v.inserted, v.due, a("insert_cash"))}</div>` : ""}
       </div>`
     : agePending
       ? ageStep(reg, v, side, a)
@@ -1226,7 +1226,7 @@ export function withRejection(html: string, reason: string | undefined): string 
 
 /** 現金の投入が始まったら、帯の合計の位置に「合計」「お預かり」「お釣り」（足りなければ赤の「不足」）を並べる（B-4）。
  *  合計は残りのお支払い額（電子マネー・ポイントで先に払った分を引いた額）。両画面に同じ数字を出し、
- *  お客様側は一行、スタッフ側は左の取引中止を残して中央に二段で組む *
+ *  お客様側は一行、スタッフ側は左の取引中止を残して中央に二段で組む */
 export function tenderSum(total: number, inserted: number, twoRows: boolean): string {
   const diff = inserted - total;
   const cell = (label: string, amount: number, cls = "") => `<span class="tender-cell${cls}"><small>${label}</small><b>${amount.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>`;

@@ -3688,7 +3688,7 @@ fn ring(s: &mut Store, r: u8) {
     advance(s, 200);
 }
 
-/// 呼び鈴を 3 分以内に 10 回鳴らしたところ（非常事態モードに入る）
+/// 呼び鈴を 3 分以内に 30 回鳴らしたところ（非常事態モードに入る）
 fn enter_emergency(s: &mut Store, r: u8) {
     for _ in 0..EMERGENCY_PRESSES {
         ring(s, r);
@@ -3696,20 +3696,20 @@ fn enter_emergency(s: &mut Store, r: u8) {
     assert!(reg(s, r).emergency);
 }
 
-/// 仕様 11.4：3 分以内に 10 回鳴らすと入る。9 回では入らない
+/// 仕様 11.4：3 分以内に 30 回鳴らすと入る。29 回では入らない
 #[test]
-fn emergency_after_ten_rings_within_three_minutes() {
+fn emergency_after_thirty_rings_within_three_minutes() {
     let mut s = Store::new(1, 1, 1);
     advance(&mut s, 2_000);
     for _ in 0..EMERGENCY_PRESSES - 1 {
         ring(&mut s, 1);
     }
-    assert!(!reg(&s, 1).emergency, "9 rings");
+    assert!(!reg(&s, 1).emergency, "29 rings");
     ring(&mut s, 1);
-    assert!(reg(&s, 1).emergency, "10 rings");
+    assert!(reg(&s, 1).emergency, "30 rings");
 }
 
-/// 仕様 11.4：10 回でも 3 分を超えて間をあけて鳴らしたものは数えない
+/// 仕様 11.4：30 回でも 3 分を超えて間をあけて鳴らしたものは数えない
 #[test]
 fn rings_spread_over_more_than_three_minutes_do_not_count() {
     let mut s = Store::new(1, 1, 1);

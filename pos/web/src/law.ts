@@ -251,7 +251,7 @@ export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
  * 並ぶ数が決まっていて幅を変えられないボタン（FF の単品・セルフの最下段・テンキー・明細の − ＋・FF のタブ）は
  * 段の幅のまま。入らないときだけ、文字を一段ずつ下げる（例外）
  */
-const RIGID = ".call-btn, .ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
+const RIGID = ".ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
 
 export function fitText(root: ParentNode): void {
   const buttons = [...root.querySelectorAll<HTMLElement>(".screen button, .screen .method-list .seg")].filter(
@@ -288,7 +288,8 @@ export function fitText(root: ParentNode): void {
     }
   };
   /** 決めた文字の段：一行は特大、二行は大＋極小 */
-  const tierOf = (b: HTMLElement) => (parts(b) ? 1 : 0);
+  // 二行のボタンと同じ並びにある一行のボタン（セルフ最下段の「その他」など）は、隣の主役と同じ大にそろえる
+  const tierOf = (b: HTMLElement) => (parts(b) || [...(b.parentElement?.children ?? [])].some((x) => x !== b && x instanceof HTMLElement && x.matches("button") && parts(x)) ? 1 : 0);
   // 1. 幅：文字＋左右の余白 B÷4＋枠（同じ並びでもボタンごと、そろえない）
   const flex = buttons.filter((b) => !b.matches(RIGID));
   for (const b of flex) {

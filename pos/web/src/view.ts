@@ -1343,9 +1343,7 @@ function cashBackNote(side: Side, amount: number): string {
 function pointsUse(r: RegisterView, side: Side, st: Gate, head: string | null): string {
   const p = r.points;
   const reg = r.id;
-  // ポイント残高は合計の下の帯に出ているので、ここではご利用可能なポイントだけ
-  const sub = `ご利用可能 ${pt(p.usable)}`;
-  if (head === null) return `<div class="point-screen pair-note">${msg("ポイントのご利用方法をお申しつけください", sub)}</div>`;
+  if (head === null) return `<div class="point-screen pair-note">${msg("ポイントのご利用方法をお申しつけください")}</div>`;
   const use = (how: "all" | "fraction"): Command => ({ type: "use_points", register: reg, side, how });
   const amount = padValue.get(padValueKey(reg, "ppt")) ?? "";
   // 端数がない、またはご利用可能なポイントが端数に満たないときは「端数〇円をポイントで払う」を出さない。
@@ -1356,7 +1354,7 @@ function pointsUse(r: RegisterView, side: Side, st: Gate, head: string | null): 
       ? `<div class="parcel-fields points-amount"><label>ポイント数を指定${padField(reg, side, "ppt", amount, "", "使うポイント数", undefined, "", st)}<span>P</span></label></div>`
       : "";
   return `<div class="point-screen points-use">
-      ${msg(head, sub)}
+      ${msg(head)}
       <div class="point-choices pair">${btn("保有ポイントをすべて使う", use("all"), st, "primary")}${fraction}</div>
       ${specify}
     </div>`;

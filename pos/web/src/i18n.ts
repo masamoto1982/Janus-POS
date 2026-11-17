@@ -747,7 +747,6 @@ const RULES: Rule[] = [
   [/^内税 (.*)$/, (m) => `Tax incl. ${yenify(m[1])}`],
   [/^ポイント ([\d,]+P)（今回 \+([\d,]+P)）$/, (m) => `Points ${m[1]} (+${m[2]} this time)`],
   [/^ポイント ([\d,]+P)$/, (m) => `Points ${m[1]}`],
-  [/^ご利用可能 ([\d,]+P)$/, (m) => `Usable ${m[1]}`],
   [/^端数([\d,]+)円をポイントで払う$/, (m) => `Pay the odd ¥${m[1]} with points`],
   [/^(?:ご利用 ([\d,]+P)、)?付与 ([\d,]+P)、ポイント残高 ([\d,]+P)$/, (m) => `${m[1] ? `Used ${m[1]}, earned` : "Earned"} ${m[2]}, point balance ${m[3]}`],
   [/^ポイントで払った ([\d,]+P) は残高に戻ります$/, (m) => `The ${m[1]} paid with points go back to the card`],

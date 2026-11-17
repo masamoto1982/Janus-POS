@@ -394,7 +394,6 @@ button.skip.md { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heigh
 /* 確認画面の四隅のバック・スキップ（現金）は大の高さ＝文字が大（user 2026-11-17）。幅は中身で白銀比の倍数（law.ts fitText） */
 .confirm button:is(.back-btn, .skip.md) { width: calc(var(--btn-w) * 2); height: var(--btn-h); }
 .menu-screen { display: flex; flex-direction: column; min-height: 100%; }
-.qty-pop-foot button.back-btn { flex: 0 0 auto; align-self: flex-end; }
 button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 /* 「他の決済を使う」など小ボタンに入らない長い戻るボタンは大ボタン（白銀比の 2 倍） */
 .confirm button.back-btn.wide, button.back-btn.wide { width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: 0 var(--s15, 2px); }
@@ -734,8 +733,6 @@ body.dragging .drop-hint { display: inline; }
 /* テンキーのキーは大の白銀比を 3 列に（user 2026-11-17）。下のバック・決定は小ボタン（白銀比の 2 倍） */
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, var(--btn-w)); gap: var(--gap); justify-content: center; flex: 1 1 auto; min-height: 0; }
 .qty-pop-keys .pad-key { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); padding: 0; font-size: var(--text-lg); font-weight: 600; min-height: 0; }
-.qty-pop-foot { display: flex; justify-content: space-between; gap: var(--gap); }
-.qty-pop-foot button { box-sizing: border-box; flex: none; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding-top: 0; padding-bottom: 0; }
 
 .point-choices.pair > button { white-space: pre-line; line-height: 1.25; }
 .emoney-screen .emoney-balance { display: block; font-size: var(--text-num); font-variant-numeric: tabular-nums; }

@@ -315,13 +315,13 @@ export function fitText(root: ParentNode): void {
     }
     pick.set(b, Math.min(k, last));
   }
-  // 幅を変えられない並び（同じ親・同じ大きさ）は、文字の段もそろえる
+  // 幅を変えられない並び（同じ親・同じ種類・同じ大きさ）は、文字の段もそろえる（テンキーのバック・決定は数字にそろえない）
   const groups = new Map<string, HTMLElement[]>();
   for (const b of buttons) {
     if (!b.matches(RIGID)) continue;
     const p = b.parentElement!;
     if (!ids.has(p)) ids.set(p, ids.size);
-    const key = `${ids.get(p)}:${parts(b) ? 2 : 1}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;
+    const key = `${ids.get(p)}:${b.className}:${parts(b) ? 2 : 1}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;
     groups.set(key, [...(groups.get(key) ?? []), b]);
   }
   for (const g of groups.values()) {

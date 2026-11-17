@@ -704,6 +704,9 @@ function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Ga
   return `<span class="qty-step">${minus}${key}${plus}</span>`;
 }
 
+/** テンキーの空きのます目 */
+const PAD_GAP = `<span class="pad-gap"></span>`;
+
 export function qtyPopup(r: RegisterView, side: Side): string {
   const reg = r.id;
   const e = qtyEntry.get(`${reg}:${side}`);
@@ -716,8 +719,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(l.name)}</div>
         <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
         <div class="qty-pop-note muted">いまの数量 ${l.qty}</div>
-        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${k("back", "←", "pad-key neg")}${k("0")}</div>
-        <div class="qty-pop-foot">${k("cancel", "バック", "md ghost back-btn")}<button type="button" class="primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${PAD_GAP}${k("0")}${PAD_GAP}${k("cancel", "バック", "pad-key ghost back-btn")}${k("back", "←", "pad-key neg")}<button type="button" class="pad-key primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -766,7 +768,8 @@ export function padPopup(r: RegisterView, side: Side): string {
   const now = e.target === "inlet" && inserted ? `<div class="qty-pop-note muted">入金済み ${yen(inserted)}</div>` : "";
   const name = e.target === "ffv" ? r.staff.lines.find((l) => l.id === e.line)?.name : undefined;
   const title = name ? `${name}の${side === "customer" ? "お受け取り数" : "お渡し数"}` : d.title;
-  const last = `${k("back", "←", "pad-key neg")}${k("0")}${d.decimal ? k(".", ".") : ""}`;
+  // 最下段は左から バック・削除（←）・決定、どれも数字のキーと同じ大きさ（user 2026-11-17）
+  const last = `${PAD_GAP}${k("0")}${d.decimal ? k(".", ".") : PAD_GAP}${k("cancel", "バック", "pad-key ghost back-btn")}${k("back", "←", "pad-key neg")}<button type="button" class="pad-key primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button>`;
   const shown = padShow(e.target, e.digits);
   // チケットの枚数はお客様側・スタッフ側それぞれ専用の入力。その側では操作可能部品として青で描く
   const only = e.target === "tkr" ? " customer-only" : e.target === "tkh" ? " staff-only" : "";
@@ -776,7 +779,6 @@ export function padPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
         ${now}${e.error ? `<div class="pad-error" role="alert">${esc(e.error)}</div>` : ""}
         <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}</div>
-        <div class="qty-pop-foot">${k("cancel", "バック", "md ghost back-btn")}<button type="button" class="primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }

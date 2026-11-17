@@ -351,7 +351,9 @@ details summary h3 { display: inline; }
 .welcome p { margin: var(--s13, 4px) 0 0; }
 .thanks { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); text-align: center; }
 .guide-row { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin-top: var(--s11, 8px); }
-.guide-btn { box-sizing: border-box; width: calc(var(--btn-sm-w) * 2); height: var(--btn-sm-h); font-size: var(--text-sm); padding: 0 var(--s15, 2px); border-radius: var(--shape-pill); white-space: nowrap; }
+/* 強い角丸のボタン（第三のボタン：待ち受けの案内・支払方法・両替の金種）はどこでも同じ大きさ：小の高さで幅は白銀比の 3 倍（user 2026-11-17：
+   支払方法は大きすぎ、待ち受けは小さすぎて一貫性がなかった）。「クレジットカード」が入る幅 */
+.guide-btn, .screen button.seg, .screen .method-row button, .screen .method-list .seg { box-sizing: border-box; width: calc(var(--btn-md-w, 34px) * 3); height: var(--btn-md-h, 24px); padding: 0 var(--s15, 2px); font-size: var(--text-sm); border-radius: var(--shape-pill); white-space: nowrap; }
 .welcome .guide { margin-top: var(--s11, 8px); font-weight: 700; }
 .staff-operated-welcome .mirror-only { pointer-events: none; cursor: default; }
 .big { font-weight: 700; }
@@ -365,10 +367,10 @@ details summary h3 { display: inline; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: var(--text-sm); }
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: calc(var(--btn-w) * 2); max-width: 100%; height: var(--btn-h); padding: 0 var(--s15, 2px); }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
-/* 支払方法は文字なりの幅をやめて、いちばん長い「クレジットカード」が入る大ボタン（白銀比の 3 倍）にそろえる（user 2026-11-17）。対になるお客様側の一覧も同じ */
-.method-row button { box-sizing: border-box; width: calc(var(--btn-w) * 3); height: var(--btn-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); white-space: nowrap; }
+/* 支払方法は文字なりの幅をやめて、いちばん長い「クレジットカード」が入る幅（強い角丸のボタンの大きさは .guide-btn の規則）（user 2026-11-17）。対になるお客様側の一覧も同じ */
+
 /* お客様側の支払方法一覧（スタッフ操作モード、表示のみ）はスタッフ側の支払方法ボタンと同じ大きさ（user 2026-11-12） */
-.method-list .seg { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--btn-w) * 3); height: var(--btn-h); padding: 0 var(--s12, 6px); font-size: var(--text-sm); line-height: 1; white-space: nowrap; }
+.method-list .seg { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
    （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
 */

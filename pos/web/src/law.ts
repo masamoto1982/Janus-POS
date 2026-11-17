@@ -240,6 +240,10 @@ export function applyLaw(root: ParentNode): void {
 const STEPS = [2, 2 * Math.SQRT2, 4, 4 * Math.SQRT2];
 export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
 
+/** 強い角丸のボタン（第三のボタン：案内・支払方法）はどの画面でも同じ大きさ。文字もどこでも同じ大の段にする（user 2026-11-17：
+ *  いちばん長い「クレジットカード」が特大に入らないので、短い案内も大にそろえる） */
+const PILL = ".guide-btn, button.seg";
+
 export function fitText(root: ParentNode): void {
   const buttons = [...root.querySelectorAll<HTMLElement>(".screen button")].filter(
     (b) => !b.matches(".pad-field, .birth-field, .ffv-input") && b.getClientRects().length > 0,
@@ -277,7 +281,7 @@ export function fitText(root: ParentNode): void {
   const pick = new Map<HTMLElement, number>();
   for (const b of buttons) {
     const last = parts(b) ? 1 : 3;
-    let k = 0;
+    let k = b.matches(PILL) ? 1 : 0;
     for (; k <= last; k++) {
       apply(b, k);
       if (!over(b)) break;

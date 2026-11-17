@@ -178,7 +178,9 @@ export function applyLaw(root: ParentNode): void {
     area.classList.remove("law-on");
     // 前回縮めていたら、文字もその大きさで決めてあるので、元の大きさで決め直す
     let shrunk = kids.some((k) => k.style.height !== "");
+    // 幅を中身で決めたボタン（強い角丸）は、その幅に戻す
     for (const k of kids) for (const p of ["left", "top", "width", "height"]) k.style.removeProperty(p);
+    for (const k of kids) if (k.dataset.fitW) k.style.width = k.dataset.fitW;
     if (shrunk) fitText(area);
     const shown = kids.filter((k) => k.getClientRects().length > 0);
     if (!shown.length) continue;
@@ -240,8 +242,11 @@ export function applyLaw(root: ParentNode): void {
 const STEPS = [2, 2 * Math.SQRT2, 4, 4 * Math.SQRT2];
 export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
 
-/** 強い角丸のボタン（第三のボタン：案内・支払方法）はどの画面でも同じ大きさ。文字もどこでも同じ大の段にする（user 2026-11-17：
- *  いちばん長い「クレジットカード」が特大に入らないので、短い案内も大にそろえる） */
+/**
+ * 強い角丸のボタン（第三のボタン：案内・支払方法・両替の金種）は、どの画面でも小の高さ・特大の文字（user 2026-11-17）。
+ * 幅は中身で決める：白銀比に入ればそのまま、入らなければ白銀比の 2 倍、それでも入らなければ 3 倍（user 2026-11-17：
+ * 一律 3 倍では中身に対して横長すぎた）。3 倍でも入らないときだけ文字を一段下げる
+ */
 const PILL = ".guide-btn, button.seg";
 
 export function fitText(root: ParentNode): void {
@@ -281,7 +286,17 @@ export function fitText(root: ParentNode): void {
   const pick = new Map<HTMLElement, number>();
   for (const b of buttons) {
     const last = parts(b) ? 1 : 3;
-    let k = b.matches(PILL) ? 1 : 0;
+    if (b.matches(PILL)) {
+      b.style.removeProperty("width");
+      delete b.dataset.fitW;
+      const unit = b.offsetHeight * Math.SQRT2;
+      for (let n = 1; n <= 3; n++) {
+        b.style.width = b.dataset.fitW = `${unit * n}px`;
+        apply(b, 0);
+        if (!over(b)) break;
+      }
+    }
+    let k = 0;
     for (; k <= last; k++) {
       apply(b, k);
       if (!over(b)) break;
@@ -292,6 +307,8 @@ export function fitText(root: ParentNode): void {
   const groups = new Map<string, HTMLElement[]>();
   const ids = new Map<Element, number>();
   for (const b of buttons) {
+    // 強い角丸のボタンは幅を中身で決めたので、並びの中でも文字は特大のまま（入らない一つだけが一段下がる）
+    if (b.matches(PILL)) continue;
     const p = b.parentElement!;
     if (!ids.has(p)) ids.set(p, ids.size);
     const key = `${ids.get(p)}:${parts(b) ? 2 : 1}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;

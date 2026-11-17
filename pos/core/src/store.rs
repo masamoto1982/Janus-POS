@@ -1687,7 +1687,7 @@ pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 /// 実機もシミュレーターも同じ 3 分（連打なら待たずに確かめられる）
 pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
 /// 非常事態モード：EMERGENCY_WINDOW_MS 以内にこの回数以上、呼び鈴が鳴らされると発動する
-pub const EMERGENCY_PRESSES: usize = 10;
+pub const EMERGENCY_PRESSES: usize = 30;
 /// 非常事態モードの解除のあと、スタッフ側に「レシートを出力しました」と発動・解除時刻を出しておく時間
 pub const EMERGENCY_LOG_MS: u64 = 10_000;
 

@@ -604,7 +604,7 @@ function payHint(method: string | null, blocker: string | null, inserted: number
     return `${guide}${op}${split}</p>`;
   }
   if (selfOperated) return "";
-  if (inserted && due > 0) return staff ? `<div class="big">あと <b>${yen(due)}</b> 不足しています</div>` : `<div class="big">不足額 ${yen(due)}</div>`;
+  if (inserted && due > 0) return `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
   if (inserted) return staff ? `<div class="big">${sec}秒の無操作で、お支払いを確定します</div>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
   if (method === "cash" && staff) return `${guide}お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;

@@ -246,11 +246,11 @@ export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
  * ボタンの文字は固定し、ボタンの幅で合わせる（user 2026-11-17：文字を固定してボタンで調整するのか、
  * ボタンを固定して文字で調整するのかが曖昧だった → 前者）。
  * 文字はボタンの高さ B から決まる：一行は特大 B÷2、二行（主役＋添え字）は大＋極小（特大＋小の二行は縦に入らない）。
- * 幅は無段階ではなく白銀比の倍数：白銀比に入ればそのまま、入らなければ 2 倍、それでも入らなければ 3 倍。
+ * 幅は無段階ではなく白銀比の倍数：白銀比に入ればそのまま、入らなければ 2 倍、3 倍、4 倍…と入るまで広げる。
  * 同じ並び（同じ親）の同じ種類のボタンは、いちばん広いものの倍率にそろえる（強い角丸のボタンは中身ごと）。
  * 並ぶ数が決まっていて幅を変えられないボタン（FF の単品・セルフの最下段・テンキー・明細の − ＋・FF のタブ）は
  * 白銀比のまま。
- * 3 倍でも入らないとき・幅を変えられないボタンに入らないときだけ、文字を一段ずつ下げる（例外）
+ * 幅を変えられないボタンに入らないときだけ、文字を一段ずつ下げる（例外）
  */
 const PILL = ".guide-btn, button.seg";
 const RIGID = ".call-btn, .ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
@@ -300,13 +300,12 @@ export function fitText(root: ParentNode): void {
   for (const b of flex) {
     b.style.removeProperty("width");
     delete b.dataset.fitW;
-    let n = 1;
-    for (; n <= 3; n++) {
+    // 倍率に上限は設けない（user 2026-11-17：4 倍でもよい。大きくするなら白銀比の倍数で）
+    for (let n = 1; n <= 12; n++) {
       setN(b, n);
       apply(b, tierOf(b));
       if (!over(b)) break;
     }
-    if (n > 3) setN(b, 3);
   }
   // 2. 同じ並びの同じ種類はいちばん広いものにそろえる（合計の帯の取引中止と会計は一つの並び）
   const rows = new Map<string, HTMLElement[]>();

@@ -351,12 +351,22 @@ export function fitText(root: ParentNode): void {
 /** 合計の帯の中央（合計・点数）は、左右の大ボタンを縮めないかわりに、入りきらなければ文字を一段ずつ（÷√2）下げる */
 export function fitSum(root: ParentNode): void {
   const over = (b: HTMLElement) => b.scrollWidth > b.clientWidth + 1;
-  for (const m of root.querySelectorAll<HTMLElement>(".screen .reg-top .mid")) {
-    const parts = [m, ...m.querySelectorAll<HTMLElement>("*")];
-    for (const el of parts) el.style.removeProperty("font-size");
-    for (let k = 1; k <= 2 && over(m); k++) {
-      const sizes = parts.map((el) => parseFloat(getComputedStyle(el).fontSize));
-      parts.forEach((el, i) => (el.style.fontSize = `${sizes[i] / Math.SQRT2}px`));
-    }
+  const shrink = (els: HTMLElement[]) => {
+    const sizes = els.map((el) => parseFloat(getComputedStyle(el).fontSize));
+    els.forEach((el, i) => (el.style.fontSize = `${sizes[i] / Math.SQRT2}px`));
+  };
+  // スタッフ側とお客様側の帯は同じ形・同じ大きさにそろえる（対の部品は両側同じ大きさ）ので、レジごとにまとめて縮める
+  const groups = new Set<ParentNode>();
+  const own = root instanceof Element ? root.closest(".register") : null;
+  if (own) groups.add(own);
+  for (const m of root.querySelectorAll<HTMLElement>(".screen .reg-top .mid")) groups.add(m.closest(".register") ?? root);
+  for (const g of groups) {
+    const mids = [...g.querySelectorAll<HTMLElement>(".screen .reg-top .mid")];
+    const all = mids.flatMap((m) => [m, ...m.querySelectorAll<HTMLElement>("*")]);
+    for (const el of all) el.style.removeProperty("font-size");
+    // 合計の下の行（ポイント・お預かり・お釣り）だけがはみ出すなら、その行だけ一段下げる
+    const infos = mids.flatMap((m) => [...m.querySelectorAll<HTMLElement>(".info")]);
+    if (infos.some((i) => i.scrollWidth > (i.closest<HTMLElement>(".mid")?.clientWidth ?? Infinity) + 1)) shrink(infos.flatMap((i) => [i, ...i.querySelectorAll<HTMLElement>("*")]));
+    for (let k = 1; k <= 2 && mids.some(over); k++) shrink(all);
   }
 }

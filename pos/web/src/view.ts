@@ -1088,7 +1088,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     r.points,
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
     "",
-    paying && v.method === "cash" && v.inserted > 0 ? tenderSum(v.total - r.prepaid, v.inserted, !ro) : "",
+    paying && v.method === "cash" && v.inserted > 0 ? tenderSum(v.total - r.prepaid, v.inserted) : "",
   );
   const back = ro
     ? ""
@@ -1224,24 +1224,19 @@ export function withRejection(html: string, reason: string | undefined): string 
   return note + html;
 }
 
-/** 現金の投入が始まったら、帯の合計の位置に「合計」「お預かり」「お釣り」（足りなければ赤の「不足」）を並べる（B-4）。
- *  合計は残りのお支払い額（電子マネー・ポイントで先に払った分を引いた額）。両画面に同じ数字を出し、
- *  お客様側は一行、スタッフ側は左の取引中止を残して中央に二段で組む */
-export function tenderSum(total: number, inserted: number, twoRows: boolean): string {
+/** 現金の投入が始まったら、帯の合計の下（ポイントの行の位置）に「お預かり」「お釣り」（足りなければ赤の「不足」）を出す（B-4）。
+ *  合計の行は投入前と同じ形のまま（合計は残りのお支払い額）。両画面に同じ形・同じ数字で出す */
+export function tenderSum(total: number, inserted: number): string {
   const diff = inserted - total;
-  const cell = (label: string, amount: number, cls = "") => `<span class="tender-cell${cls}"><small>${label}</small><b>${amount.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>`;
-  const rest = `${cell("お預かり", inserted)}${diff >= 0 ? cell("お釣り", diff) : cell("不足", -diff, " short")}`;
-  return twoRows
-    ? `<span class="tender two-rows"><span class="tender-row">${cell("合計", total)}</span><span class="tender-row">${rest}</span></span>`
-    : `<span class="tender"><span class="tender-row">${cell("合計", total)}${rest}</span></span>`;
+  const cell = (label: string, amount: number, cls = "") => `<span class="tender-cell${cls}">${label} <b>${amount.toLocaleString("ja-JP")}</b>円</span>`;
+  return `${cell("お預かり", inserted)}${diff >= 0 ? cell("お釣り", diff) : cell("不足", -diff, " short")}`;
 }
 
 export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = ""): string {
   // ポイントカードだけ読んだときも、取引中止と読んだポイントを出す
   if (count === 0 && (points?.balance ?? null) === null) return "";
-  if (tender) return `<div class="reg-top tendering"><span class="void">${voidHtml}</span><span class="mid">${tender}</span><span class="action">${action}</span></div>${BAND_END}`;
   const full = count >= max ? `<small class="full">上限</small>` : "";
-  const point = pointInfo(points);
+  const point = tender || pointInfo(points);
   const info = point ? `<small class="info">${point}</small>` : "";
   const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
   return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>${BAND_END}`;

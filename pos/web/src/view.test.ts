@@ -178,14 +178,15 @@ describe("view helpers", () => {
   });
 
   it("shows total, tendered and change (or a red shortage) while cash goes in (B-4)", () => {
-    const ok = tenderSum(640, 1000, false);
-    expect(ok).toContain("<small>お預かり</small><b>1,000</b>");
-    expect(ok).toContain("<small>お釣り</small><b>360</b>");
-    const short = tenderSum(640, 500, true);
-    expect(short).toContain('class="tender-cell short"><small>不足</small><b>140</b>');
-    expect(short).toContain("two-rows");
-    // 先に払った分を引いた残りが合計
-    expect(regTop(1200, 3, "", Infinity, undefined, "", "", tenderSum(1200, 2000, true))).toContain("<b>800</b>");
+    const ok = tenderSum(640, 1000);
+    expect(ok).toContain("お預かり <b>1,000</b>円");
+    expect(ok).toContain("お釣り <b>360</b>円");
+    const short = tenderSum(640, 500);
+    expect(short).toContain('class="tender-cell short">不足 <b>140</b>円');
+    // 合計の行は投入前と同じ形のまま、その下に出す
+    const band = regTop(1200, 3, "", Infinity, undefined, "", "", tenderSum(1200, 2000));
+    expect(band).toContain('<b class="total">1,200</b>');
+    expect(band).toContain("お釣り <b>800</b>円");
   });
 });
 

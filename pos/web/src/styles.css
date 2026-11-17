@@ -143,9 +143,9 @@ button { touch-action: manipulation; }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない */
 .ff-page { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: center; gap: var(--gap); }
-/* 「<」「>」は枠のない記号だけ。押す場所は単品と同じ高さの縦長の白銀比（列が狭い画面では列と段の縁の余白の幅まで）で、単品とは列で離れている */
+/* 「<」「>」は枠のない記号だけ。押す場所は単品と同じ高さの縦長の白銀比（列が狭い画面では列と段の縁の余白の幅まで縮み、高さも縦横比を保って縮む）で、単品とは列で離れている */
 .screen .ff-arrow { border: none; background: none; color: var(--accent); }
-.ff-arrow { flex: none; grid-row: 1; height: var(--btn-xl-h); width: calc(100% + var(--gap)); max-width: calc(var(--btn-xl-h) / var(--silver, 1.4142)); padding: 0; font-size: var(--text-sm); }
+.ff-arrow { flex: none; grid-row: 1; height: auto; aspect-ratio: 1 / var(--silver, 1.4142); width: calc(100% + var(--gap)); max-width: calc(var(--btn-xl-h) / var(--silver, 1.4142)); padding: 0; font-size: var(--text-sm); }
 /* 列が狭いときは、単品の側ではなく段の縁の余白（--gap）へはみ出して押す場所を確保する */
 .ff-arrow.prev { grid-column: 1; justify-self: start; margin-left: calc(-1 * var(--gap)); }
 .ff-arrow.next { grid-column: 3; justify-self: end; margin-right: calc(-1 * var(--gap)); }
@@ -792,8 +792,9 @@ body.dragging .drop-hint { display: inline; }
   .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: var(--text-sm); margin-bottom: 4px; }
   .register h2 .idle { font-size: var(--text-sm); }
   .swipe-tabs { display: flex; border-bottom: none; }
-  .swipe-tabs .tab { min-height: var(--btn-md-h); padding: 2px 4px; font-size: var(--text-sm); line-height: 1.2; transition: flex-grow .2s; }
-  .swipe-tabs .tab.on { flex-grow: 2; }
+  /* 画面切り替えのタブも白銀比の倍数（user 2026-11-17）：高さ --btn-md-h、幅は白銀比の 2 倍、見ている側は 3 倍（以前は 1/3 と 2/3 で帯の幅いっぱい） */
+  .swipe-tabs .tab { flex: none; box-sizing: border-box; height: var(--btn-md-h); width: calc(var(--btn-md-h) * 1.4142 * 2); padding: 0 4px; font-size: var(--text-sm); line-height: 1; transition: width .2s; }
+  .swipe-tabs .tab.on { width: calc(var(--btn-md-h) * 1.4142 * 3); }
   .swipe-tabs .tab.operable { filter: url(#ramp); }
   .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
   .screens::-webkit-scrollbar { display: none; }

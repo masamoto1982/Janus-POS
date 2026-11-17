@@ -243,20 +243,18 @@ const STEPS = [2, 2 * Math.SQRT2, 4, 4 * Math.SQRT2];
 export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
 
 /**
- * ボタンの文字は固定し、ボタンの幅で合わせる（user 2026-11-17：文字を固定してボタンで調整するのか、
- * ボタンを固定して文字で調整するのかが曖昧だった → 前者）。
- * 文字はボタンの高さ B から決まる：一行は特大 B÷2、二行（主役＋添え字）は大＋極小（特大＋小の二行は縦に入らない）。
- * 幅は無段階ではなく白銀比の倍数：白銀比に入ればそのまま、入らなければ 2 倍、3 倍、4 倍…と入るまで広げる。
- * 同じ並び（同じ親）の同じ種類のボタンは、いちばん広いものの倍率にそろえる（強い角丸のボタンは中身ごと）。
+ * ボタンの文字は固定し、ボタンの幅は中身で決める（user 2026-11-17）。
+ * 文字はボタンの高さ B から決まる：一行は特大 B÷2、二行（主役＋添え字）は大＋極小。
+ * 幅は愚直に「文字＋内側の余白＋枠」：左右の余白は上下の余白と同じ B÷4（一行の文字の上下に残る余白と同じ）。
+ * 白銀比の倍数で幅を決める方式（2 倍・3 倍…と入るまで広げる）は退役（user 2026-11-17：失敗だった）。
+ * 枠の外側の余白は、並びの最小間隔 --gap（配置の法則）。
  * 並ぶ数が決まっていて幅を変えられないボタン（FF の単品・セルフの最下段・テンキー・明細の − ＋・FF のタブ）は
- * 白銀比のまま。
- * 幅を変えられないボタンに入らないときだけ、文字を一段ずつ下げる（例外）
+ * 段の幅のまま。入らないときだけ、文字を一段ずつ下げる（例外）
  */
-const PILL = ".guide-btn, button.seg";
 const RIGID = ".call-btn, .ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
 
 export function fitText(root: ParentNode): void {
-  const buttons = [...root.querySelectorAll<HTMLElement>(".screen button")].filter(
+  const buttons = [...root.querySelectorAll<HTMLElement>(".screen button, .screen .method-list .seg")].filter(
     (b) => !b.matches(".pad-field, .birth-field, .ffv-input") && b.getClientRects().length > 0,
   );
   const parts = (b: HTMLElement) => {
@@ -291,37 +289,21 @@ export function fitText(root: ParentNode): void {
   };
   /** 決めた文字の段：一行は特大、二行は大＋極小 */
   const tierOf = (b: HTMLElement) => (parts(b) ? 1 : 0);
-  const setN = (b: HTMLElement, n: number) => {
-    b.style.width = b.dataset.fitW = `${b.offsetHeight * Math.SQRT2 * n}px`;
-    b.dataset.n = String(n);
-  };
-  // 1. 幅：決めた文字が入るいちばん小さい倍率
+  // 1. 幅：文字＋左右の余白 B÷4＋枠（同じ並びでもボタンごと、そろえない）
   const flex = buttons.filter((b) => !b.matches(RIGID));
   for (const b of flex) {
     b.style.removeProperty("width");
     delete b.dataset.fitW;
-    // 倍率に上限は設けない（user 2026-11-17：4 倍でもよい。大きくするなら白銀比の倍数で）
-    for (let n = 1; n <= 12; n++) {
-      setN(b, n);
-      apply(b, tierOf(b));
-      if (!over(b)) break;
-    }
+    apply(b, tierOf(b));
+    const r = document.createRange();
+    r.selectNodeContents(b);
+    const text = r.getBoundingClientRect().width;
+    const border = parseFloat(getComputedStyle(b).borderLeftWidth) || 0;
+    const w = Math.ceil(text + b.offsetHeight / 2 + 2 * border);
+    b.style.width = b.dataset.fitW = `${w}px`;
+    b.style.paddingLeft = b.style.paddingRight = "0";
   }
-  // 2. 同じ並びの同じ種類はいちばん広いものにそろえる（合計の帯の取引中止と会計は一つの並び）
-  const rows = new Map<string, HTMLElement[]>();
   const ids = new Map<Element, number>();
-  const rowOf = (b: HTMLElement) => b.closest(".reg-top") ?? b.parentElement!;
-  for (const b of flex) {
-    if (b.matches(PILL)) continue;
-    const p = rowOf(b);
-    if (!ids.has(p)) ids.set(p, ids.size);
-    const key = `${ids.get(p)}:${b.classList.contains("primary") || b.closest(".reg-top") ? "act" : b.classList[0] ?? ""}:${Math.round(b.offsetHeight)}`;
-    rows.set(key, [...(rows.get(key) ?? []), b]);
-  }
-  for (const g of rows.values()) {
-    const n = Math.max(...g.map((b) => Number(b.dataset.n)));
-    for (const b of g) if (Number(b.dataset.n) !== n) setN(b, n);
-  }
   // 3. 文字：決めた段。入らないときだけ一段ずつ下げる（例外）
   const pick = new Map<HTMLElement, number>();
   for (const b of buttons) {

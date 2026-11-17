@@ -101,7 +101,8 @@ button { touch-action: manipulation; }
   --text-xl: calc(var(--W) / 5.657); --text-num: calc(var(--W) / 16); --text-lg: calc(var(--W) / 22.627); --text-sm: calc(var(--W) / 32);
   /* ボタンと入力欄の形は白銀比 1:√2 だけ（user 2026-11-17、青銅比は退役）。高さは白銀比の段（特大 W/8・大 W/11.3・小 W/16・極小 W/22.6）、
      幅＝高さ×√2（W=400 で 特大 71×50・大 50×35・小 35×25・極小 25×18）。白銀比に中身がうまく収まらないときだけ、
-     同じ高さのまま幅をちょうど 2 倍か 3 倍にする（calc(var(--btn-w) * 2) のように書く。間隔は足さない） */
+     同じ高さのまま幅をちょうど 2 倍か 3 倍にする（calc(var(--btn-w) * 2) のように書く。間隔は足さない）。
+     ただしレジ画面のボタンの幅は law.ts fitText が「文字＋左右の余白 B÷4＋枠」で上書きする（user 2026-11-17、白銀比の倍数は退役）。ここの幅は初期値 */
   --silver: 1.4142;
   --btn-xl-h: calc(var(--W) / 8); --btn-xl-w: calc(var(--btn-xl-h) * var(--silver));
   --btn-h: calc(var(--W) / 11.314); --btn-w: calc(var(--btn-h) * var(--silver));

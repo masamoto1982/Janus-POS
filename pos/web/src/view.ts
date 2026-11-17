@@ -1067,7 +1067,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
         ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : v.method ? "" : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due, v.method) : side === "customer" && v.method && !v.inserted && !v.payment_blocker ? customerPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r) + pointNote(r)}
+        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due, v.method) : side === "customer" && v.method && !v.inserted && !v.payment_blocker ? customerPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r)}
         ${v.method === "cash" && !ro && v.inserted > 0 ? `<div class="finish-row">${finishInsert(reg, v.inserted, v.due, a("insert_cash"))}</div>` : ""}
       </div>`
     : agePending
@@ -1343,29 +1343,23 @@ function cashBackNote(side: Side, amount: number): string {
 function pointsUse(r: RegisterView, side: Side, st: Gate, head: string | null): string {
   const p = r.points;
   const reg = r.id;
-  const sub = `ポイント残高 ${pt(p.balance ?? 0)}、ご利用可能 ${pt(p.usable)}`;
+  // ポイント残高は合計の下の帯に出ているので、ここではご利用可能なポイントだけ
+  const sub = `ご利用可能 ${pt(p.usable)}`;
   if (head === null) return `<div class="point-screen pair-note">${msg("ポイントのご利用方法をお申しつけください", sub)}</div>`;
   const use = (how: "all" | "fraction"): Command => ({ type: "use_points", register: reg, side, how });
   const amount = padValue.get(padValueKey(reg, "ppt")) ?? "";
-  // 端数がない、またはご利用可能なポイントが端数に満たないときは「端数を払う」を出さない。
-  // ご利用可能なポイントが 1P だけなら、指定しても「全部使う」と同じなので指定欄を出さない
-  const fraction = p.fraction > 0 && p.fraction <= p.usable ? btn(`端数を払う\n${pt(p.fraction)}`, use("fraction"), st, "primary") : "";
+  // 端数がない、またはご利用可能なポイントが端数に満たないときは「端数〇円をポイントで払う」を出さない。
+  // ご利用可能なポイントが 1P だけなら、指定しても「保有ポイントをすべて使う」と同じなので指定欄を出さない
+  const fraction = p.fraction > 0 && p.fraction <= p.usable ? btn(`端数${yen(p.fraction)}をポイントで払う`, use("fraction"), st, "primary") : "";
   const specify =
     p.usable > 1
       ? `<div class="parcel-fields points-amount"><label>ポイント数を指定${padField(reg, side, "ppt", amount, "", "使うポイント数", undefined, "", st)}<span>P</span></label></div>`
       : "";
   return `<div class="point-screen points-use">
       ${msg(head, sub)}
-      <div class="point-choices pair">${btn(`全部使う\n${pt(p.usable)}`, use("all"), st, "primary")}${fraction}</div>
+      <div class="point-choices pair">${btn("保有ポイントをすべて使う", use("all"), st, "primary")}${fraction}</div>
       ${specify}
     </div>`;
-}
-
-/** 支払方法を選ぶ前に、読み取ったカードで使えるポイントを出す（スタッフ側・お客様側で同じ言い回し） */
-function pointNote(r: RegisterView): string {
-  const p = r.points;
-  if (p.balance === null || r.prepaid || !p.usable) return "";
-  return `<p>ポイント残高 ${pt(p.balance)}、ご利用可能 <b>${pt(p.usable)}</b></p>`;
 }
 
 function cashOnlyNote(r: RegisterView): string {
@@ -1671,7 +1665,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying")
     return screen(`<div class="paybox pay-stage">
         <div class="big">お支払い方法を選択してください</div>
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due, c.method) : !c.method && !c.inserted && !c.payment_blocker && (r.cash_only || r.points.usable) ? cashOnlyNote(r) + pointNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true, side === "staff")}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due, c.method) : !c.method && !c.inserted && !c.payment_blocker && r.cash_only ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true, side === "staff")}
       </div>${cashCorner(reg, side, c.method, a("select_payment"))}`);
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));
@@ -1957,7 +1951,7 @@ const WALLET_PURPOSE: Record<string, string> = {
   "cash:5": "硬貨、レジ袋など1円単位の端数をちょうど払う場面を確かめる",
   "cash:1": "硬貨、レジ袋など1円単位の端数をちょうど払う場面を確かめる",
   PC12345678: "ポイントカード（はじめの残高 1,250P）、付与対象の商品 200円につき1P付き、ポイント利用で対象の商品の分を払い切れることを確かめる",
-  PC87654321: "スマートフォンのポイントアプリ（はじめの残高 1P）、使えるのが 1P だけのときは「全部使う」だけになり、残りを別の支払方法で払うことを確かめる",
+  PC87654321: "スマートフォンのポイントアプリ（はじめの残高 1P）、使えるのが 1P だけのときは「保有ポイントをすべて使う」だけになり、残りを別の支払方法で払うことを確かめる",
   CP0001: "ソフトドリンク1個無料の引換券、対象商品がないときの扱いも確かめる",
   CP0002: "サンドイッチ50円引きの割引券、明細に値引きが付くことを確かめる",
   "pay:qr": "バーコード決済、選んだ支払方法と違うものは受け付けないことを確かめる",

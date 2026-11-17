@@ -844,7 +844,8 @@ body.dragging .drop-hint { display: inline; }
 .welcome-band .band-row { display: flex; align-items: center; justify-content: center; gap: var(--gap); }
 .welcome-band .bell-slot { flex: none; display: flex; justify-content: center; width: var(--s6, 48px); height: var(--s6, 48px); }
 /* 帯の Language・電子マネーは大ボタン（白銀比の 2 倍）。縮まない（user 2026-11-17：ボタンは白銀比か、その幅の 2 倍・3 倍） */
-.welcome-band .band-btn { flex: none; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: 0 var(--s15, 2px); line-height: 1; white-space: nowrap; }
+.welcome-band .band-btn { flex: none; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; width: calc(var(--btn-w) * 2); height: var(--btn-xl-h); padding: 0 var(--s15, 2px); line-height: 1; white-space: nowrap; }
+/* 第二待ち受けの Language・電子マネーは主役が大・添え字が極小（user 2026-11-17）：二行の文字はボタンの高さ B から 大 B÷2√2・極小 B÷4√2 なので、高さを特大 W/8 にして主役＝大 W/22.6 */
 .welcome-band .band-row:has(> .msg) { height: var(--s6, 48px); }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }
 /* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードのお客様側）でも押せる＝青 */

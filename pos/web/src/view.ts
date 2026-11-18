@@ -845,7 +845,7 @@ export function callScreen(r: RegisterView): string {
   // 用件だけを第一待ち受けの「セルフレジ」と同じ特大の文字で（呼び鈴の絵・詳細・経過時間は出さない。経過秒数は最下段に出す、user 2026-11-14）。
   // 公共料金の枚数だけは対応の準備に要るので残す。長い用件は画面の幅に収まるよう文字を小さくする
   return `<div class="call-screen">
-      <b class="call-reason mode-big" style="--len:${[...reason].length}">${esc(reason)}</b>
+      <b class="call-reason mode-big">${esc(reason)}</b>
       ${bill ? `<p class="bill-call"><span class="bill-n">${esc(bill.detail)}</span></p>` : ""}
       <p class="small">鳴動を止めるにはログインしてください</p>
     </div>`;
@@ -1444,7 +1444,7 @@ export function firstWelcome(r: RegisterView, side: Side): string {
   const band = staffOp
     ? welcomeBand(r, side, find(r.staff.actions, "emoney"), side === "customer")
     : welcomeBand(r, side, find(r.customer.actions, "emoney"), false);
-  return `${band}<div class="first-welcome"><b class="mode-big" style="--len:${staffOp ? 4 : 5}">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
+  return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
 }
 
 /** スタッフ側で店舗メニューを開いている間のお客様側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。

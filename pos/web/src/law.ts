@@ -176,12 +176,9 @@ export function applyLaw(root: ParentNode): void {
     // 測り直すために、前回の当てはめを外す
     area.style.removeProperty("height");
     area.classList.remove("law-on");
-    // 前回縮めていたら、文字もその大きさで決めてあるので、元の大きさで決め直す
-    let shrunk = kids.some((k) => k.style.height !== "");
     // 幅を中身で決めたボタン（強い角丸）は、その幅に戻す
     for (const k of kids) for (const p of ["left", "top", "width", "height"]) k.style.removeProperty(p);
     for (const k of kids) if (k.dataset.fitW) k.style.width = k.dataset.fitW;
-    if (shrunk) fitText(area);
     const shown = kids.filter((k) => k.getClientRects().length > 0);
     if (!shown.length) continue;
     const tier = area.closest<HTMLElement>(".screen-main, .screen-items") ?? area.parentElement!;
@@ -206,7 +203,6 @@ export function applyLaw(root: ParentNode): void {
       } else units.push({ els: [k], unit: { widths: [sizes[i].width], heights: [sizes[i].height], height: sizes[i].height, weight: weightOf(k), dir: dirOf(k) } });
     });
     const placed = arrange(units.map((u) => u.unit), L, gap, maxHeight);
-    shrunk = false;
     const offset = area.getBoundingClientRect().left - tierLeft;
     // 部品は行の内側（padding の内側）に置く
     const padTop = parseFloat(getComputedStyle(area).paddingTop) || 0;
@@ -217,16 +213,10 @@ export function applyLaw(root: ParentNode): void {
         const p = placed[i].items[j];
         el.style.left = `${p.x - offset}px`;
         el.style.top = `${p.y + padTop}px`;
-        el.style.width = `${p.w}px`;
-        // 縮めるときは縦も同じ比率で縮める（ボタンの縦横比は白銀比とその 2 倍・3 倍から外さない）。文字は縮んだボタンから決め直す
-        const natural = u.unit.widths[j];
-        if (p.w < natural - 0.5) {
-          el.style.height = `${(u.unit.heights![j] * p.w) / natural}px`;
-          shrunk = true;
-        }
+        // 入りきらなくても部品と文字は縮めない（user 2026-11-18：表示エリアに合わせて文字を可変にする仕組みは廃止）
+        el.style.width = `${Math.max(p.w, u.unit.widths[j])}px`;
       }),
     );
-    if (shrunk) fitText(area);
   }
 }
 
@@ -234,8 +224,7 @@ export function applyLaw(root: ParentNode): void {
  * ボタンの文字の大きさは、親要素であるボタン自身を基準に四段で自動的に決める（user 2026-11-17）。
  * 基準はボタンの短い辺 B（横長のボタンでは高さ、縦長の ▲▼ では幅）。
  *   特大 B÷2・大 B÷2√2・小 B÷4・極小 B÷4√2（√2 ずつ）
- * 一行の文字は、入る中でいちばん大きい段。二行（主役＋添え字）は主役と添え字を二段離す（特大＋小、入らなければ大＋極小）。
- * 同じ行に並ぶ同じ大きさのボタンは、いちばん小さい段にそろえる（並びの中で文字の大きさが揃うように）。
+ * 一行の文字は特大、二行（主役＋添え字）は大＋極小。入らなくても段は下げない（user 2026-11-18：表示エリアに合わせて文字を可変にする仕組みは廃止）。
  * 一つのボタンの中で同じ大きさの文字が二行になることはないので、一行の文字は折り返さない。
  * 入力欄（数字を打つ欄）はボタンではないので対象外。ボタン以外の文字は、表示エリア（レジ画面の内幅 W）を基準にした四段
  */
@@ -249,7 +238,7 @@ export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
  * 白銀比の倍数で幅を決める方式（2 倍・3 倍…と入るまで広げる）は退役（user 2026-11-17：失敗だった）。
  * 枠の外側の余白は、並びの最小間隔 --gap（配置の法則）。
  * 並ぶ数が決まっていて幅を変えられないボタン（FF の単品・セルフの最下段・テンキー・明細の − ＋・FF のタブ）は
- * 段の幅のまま。入らないときだけ、文字を一段ずつ下げる（例外）
+ * 段の幅のまま。文字も決めた段のまま（入らないときに下げる例外は 2026-11-18 に廃止）
  */
 const RIGID = ".ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
 
@@ -264,13 +253,6 @@ export function fitText(root: ParentNode): void {
   };
   // ボタンの内側の余白は四辺とも B÷8、主役と添え字の間は B÷16（user 2026-11-17：文字が枠に貼り付いていた）
   const pad = (b: HTMLElement) => Math.min(b.offsetWidth, b.offsetHeight) / 8;
-  const over = (b: HTMLElement) => {
-    const r = document.createRange();
-    r.selectNodeContents(b);
-    const c = r.getBoundingClientRect();
-    const p = pad(b);
-    return c.width > b.offsetWidth - 2 * p + 0.5 || c.height > b.offsetHeight - 2 * p + 0.5;
-  };
   const apply = (b: HTMLElement, k: number) => {
     const base = Math.min(b.offsetWidth, b.offsetHeight);
     const two = parts(b);
@@ -304,52 +286,7 @@ export function fitText(root: ParentNode): void {
     b.style.width = b.dataset.fitW = `${w}px`;
     b.style.paddingLeft = b.style.paddingRight = "0";
   }
-  const ids = new Map<Element, number>();
-  // 3. 文字：決めた段。入らないときだけ一段ずつ下げる（例外）
-  const pick = new Map<HTMLElement, number>();
-  for (const b of buttons) {
-    const last = parts(b) ? 1 : 3;
-    let k = tierOf(b);
-    for (; k <= last; k++) {
-      apply(b, k);
-      if (!over(b)) break;
-    }
-    pick.set(b, Math.min(k, last));
-  }
-  // 幅を変えられない並び（同じ親・同じ種類・同じ大きさ）は、文字の段もそろえる（テンキーのバック・決定は数字にそろえない）
-  const groups = new Map<string, HTMLElement[]>();
-  for (const b of buttons) {
-    if (!b.matches(RIGID)) continue;
-    const p = b.parentElement!;
-    if (!ids.has(p)) ids.set(p, ids.size);
-    const key = `${ids.get(p)}:${b.className}:${parts(b) ? 2 : 1}:${Math.round(b.offsetWidth)}x${Math.round(b.offsetHeight)}`;
-    groups.set(key, [...(groups.get(key) ?? []), b]);
-  }
-  for (const g of groups.values()) {
-    const k = Math.max(...g.map((b) => pick.get(b)!));
-    for (const b of g) if (pick.get(b) !== k) apply(b, k);
-  }
+  // 2. 幅を変えられないボタン（RIGID）も文字は決めた段のまま。表示エリアに合わせて文字を下げる仕組みは廃止（user 2026-11-18）
+  for (const b of buttons) if (b.matches(RIGID)) apply(b, tierOf(b));
 }
 
-/** 合計の帯の中央（合計・点数）は、左右の大ボタンを縮めないかわりに、入りきらなければ文字を一段ずつ（÷√2）下げる */
-export function fitSum(root: ParentNode): void {
-  const over = (b: HTMLElement) => b.scrollWidth > b.clientWidth + 1;
-  const shrink = (els: HTMLElement[]) => {
-    const sizes = els.map((el) => parseFloat(getComputedStyle(el).fontSize));
-    els.forEach((el, i) => (el.style.fontSize = `${sizes[i] / Math.SQRT2}px`));
-  };
-  // スタッフ側とお客様側の帯は同じ形・同じ大きさにそろえる（対の部品は両側同じ大きさ）ので、レジごとにまとめて縮める
-  const groups = new Set<ParentNode>();
-  const own = root instanceof Element ? root.closest(".register") : null;
-  if (own) groups.add(own);
-  for (const m of root.querySelectorAll<HTMLElement>(".screen .reg-top .mid")) groups.add(m.closest(".register") ?? root);
-  for (const g of groups) {
-    const mids = [...g.querySelectorAll<HTMLElement>(".screen .reg-top .mid")];
-    const all = mids.flatMap((m) => [m, ...m.querySelectorAll<HTMLElement>("*")]);
-    for (const el of all) el.style.removeProperty("font-size");
-    // 合計の下の行（ポイント・お預かり・お釣り）だけがはみ出すなら、その行だけ一段下げる
-    const infos = mids.flatMap((m) => [...m.querySelectorAll<HTMLElement>(".info")]);
-    if (infos.some((i) => i.scrollWidth > (i.closest<HTMLElement>(".mid")?.clientWidth ?? Infinity) + 1)) shrink(infos.flatMap((i) => [i, ...i.querySelectorAll<HTMLElement>("*")]));
-    for (let k = 1; k <= 2 && mids.some(over); k++) shrink(all);
-  }
-}

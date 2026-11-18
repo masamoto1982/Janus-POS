@@ -79,7 +79,7 @@ button { touch-action: manipulation; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 /* レジ画面の寸法は絶対値でなく、画面の内幅 W を白銀比（1:√2）で割った階段から選ぶ（user 2026-11-16）。
    W÷√2ⁿ：n＝1 三段目／3 特大ボタンの幅／4 大ボタンの幅・特大テキスト…と、偶数の段は W の 1/4・1/8・1/16・1/32 になる。
-   実機の POS は画面の大きさが決まっているので W がそのまま基準になる。シミュレーターでは小テキストが 12〜16px に収まるよう W を 384〜512px で止める。
+   実機の POS は画面の大きさが決まっているので W がそのまま基準になる。シミュレーターでは小テキストが 12〜16px に収まるよう W を 384〜512px で止める（モバイルモードは下限なし）。
    W は @property で長さとして登録し、.screen で一度だけ解決する（中の container（.reg-top）で cqi が測り直されないように）
    縦幅：画面全体を縦長の白銀長方形（縦＝W×√2、A判の紙と同じ形）にし、ヘッダー（W÷√2⁷）16個分を四段に分ける（user 2026-11-16）
    一段目＝ヘッダー 1（W÷√2⁷）
@@ -176,8 +176,9 @@ button { touch-action: manipulation; }
 .lines td, .lines th { padding: var(--s13, 4px) var(--s13, 4px); border-bottom: var(--s17, 1px) solid var(--border); vertical-align: middle; }
 .num { text-align: right; white-space: nowrap; }
 
-.reg-top { --sum-h: var(--s7); --row: calc(var(--s6) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: grid; grid-template-columns: minmax(calc(var(--btn-w) * 2), 1fr) minmax(0, max-content) minmax(calc(var(--btn-w) * 2), 1fr); align-items: center; gap: 0 var(--s11, 8px); min-height: var(--s6); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
-.reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; overflow: hidden; }
+.reg-top { --sum-h: var(--s7); --row: calc(var(--s6) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: grid; grid-template-columns: max-content minmax(max-content, 1fr) max-content; align-items: center; gap: 0 var(--s11, 8px); min-height: var(--s6); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
+/* 中央（合計・お預かり・お釣り）は文字を縮めない（user 2026-11-18）。左右のボタンの残りの幅の真ん中に置く（ボタンと重ならない） */
+.reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .reg-top .total { font-size: var(--text-num); }
 .reg-top .info { height: var(--row); line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 0 var(--s10, 14px); font-size: var(--text-sm); white-space: nowrap; }
 .reg-top .info .point { color: var(--msg-weak); }
@@ -189,12 +190,6 @@ button { touch-action: manipulation; }
 .reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
 /* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大ボタン（user 2026-11-12）。幅は白銀比の 2 倍（user 2026-11-17） */
 .reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; flex: none; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
-.reg-top { container-type: inline-size; }
-@container (max-width: 380px) {
-  .reg-top .mid { --sum-h: var(--s8, 26px); }
-  .reg-top .total, .reg-top .count b { font-size: var(--text-lg); }
-  .reg-top .sum { font-size: var(--text-sm); }
-}
 .reg-top .count .full { margin-left: var(--s11, 8px); font-weight: 700; }
 /* 現金の投入中：合計の下（ポイントの行）にお預かり・お釣り（不足）を出す（B-4）。両画面同じ形 */
 .reg-top .info:has(.tender-cell) { gap: 0 var(--s11, 8px); }
@@ -286,7 +281,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .banner.call { background: var(--call-bg); color: var(--call); }
 .call-screen { box-sizing: border-box; margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)); min-height: calc(100% + var(--s9, 16px)); text-align: center; padding: var(--s9, 16px) var(--s10, 12px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s11, 8px); color: var(--call); }
 .call-screen .banner { align-self: stretch; }
-.call-screen .call-reason { color: var(--msg-strong); font-size: min(var(--text-xl), calc(82cqi / var(--len, 1))); white-space: nowrap; font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
+.call-screen .call-reason { color: var(--msg-strong); font-size: var(--text-xl); overflow-wrap: anywhere; font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
 .call-screen p { margin: 0; }
 .banner.danger { background: var(--danger-bg); color: var(--danger); }
 /* 釣り銭の取り忘れ（両画面）：お釣り・お礼の案内を置き換える案内画面。大きなテキスト＝警告の赤、背景＝やわらかい黄色（領域いっぱい）
@@ -676,7 +671,7 @@ body.dragging .drop-hint { display: inline; }
 .first-welcome { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 var(--s9, 16px); text-align: center; }
 .first-welcome:has(> .mode-sub) { flex-direction: column; gap: var(--s13, 4px); }
 .first-welcome .mode-sub { color: var(--msg-weak); font-size: var(--text-sm); font-weight: 400; line-height: 1.35; }
-.first-welcome .mode-big { color: var(--msg-strong); font-size: min(var(--text-xl), calc(82cqi / var(--len, 1))); white-space: nowrap; font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
+.first-welcome .mode-big { color: var(--msg-strong); font-size: var(--text-xl); white-space: nowrap; font-weight: 800; line-height: 1.15; letter-spacing: 0.04em; }
 .call-row { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; gap: var(--gap); }
 /* セルフ最下段は特大の白銀比を四つ（user 2026-11-17） */
 .call-row:not(.calling) > .call-btn { box-sizing: border-box; min-width: 0; }
@@ -882,3 +877,6 @@ body.dragging .drop-hint { display: inline; }
    次の行の余地がなければ縮む。当てはめる前（初回の描画）は各行の flex の仮の並び */
 [data-law].law-on { position: relative; display: block; flex: none; }
 [data-law].law-on > * { position: absolute; margin: 0; box-sizing: border-box; max-width: none; }
+/* モバイルモードでは W の下限 384px をなくし、画面の内幅そのものにする（user 2026-11-18：表示エリアの制約による便宜的措置。
+   文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
+@media (max-width: 760px) { .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); } }

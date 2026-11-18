@@ -43,6 +43,9 @@ import {
   sharedScreen,
   withRejection,
   REJECT_SHOW_MS,
+  IMPOSSIBLE,
+  IMPOSSIBLE_SHOW_MS,
+  impossibleFlash,
 } from "./view";
 
 declare global {
@@ -742,6 +745,23 @@ function rejection(reg: number, side: Side): string | undefined {
   return rejected.get(key)?.text;
 }
 
+/** 選択の余地のない、完全に不可能な操作の案内を、操作した側の登録画面の中央に一瞬だけ重ねる（user 2026-11-18）。
+ *  背後の登録画面はぼかして読めなくする。案内は画面の描き直しの外に置くので、表示中に画面が変わっても最後まで出る。
+ *  ポインターは素通しにし、表示中もすべての操作を受け付ける */
+function flashImpossible(reg: number, side: Side, reason: string): void {
+  const body = app.querySelector(`[data-region="${side}-${reg}"]`)?.parentElement;
+  if (!body) return;
+  body.querySelector(".impossible-flash")?.remove();
+  const el = document.createElement("div");
+  el.className = "impossible-flash";
+  el.setAttribute("role", "alert");
+  el.style.setProperty("--flash-ms", `${IMPOSSIBLE_SHOW_MS}ms`);
+  el.innerHTML = impossibleFlash(langOf(reg, side) === "ja" ? reason : trText(reason));
+  body.append(el);
+  el.addEventListener("animationend", () => el.remove());
+  window.setTimeout(() => el.remove(), IMPOSSIBLE_SHOW_MS + 200);
+}
+
 function send(cmd: Command): boolean {
   const fx = deviceFx(cmd);
   sim.tick(performance.now() - t0);
@@ -761,6 +781,8 @@ function send(cmd: Command): boolean {
     if (res.ok) {
       rejected.delete(`${cmd.register}:counter`);
       rejected.delete(`${cmd.register}:floor`);
+    } else if (side !== "store" && IMPOSSIBLE.has(res.error ?? "")) {
+      flashImpossible(cmd.register, side, res.error!);
     } else if (side !== "store" && !OWN_ERROR.has(cmd.type) && !res.error?.includes("買い物点数の上限") && !/は1回のお会計で\d+点までです$/.test(res.error ?? "") && !insertShort(cmd, res.error)) {
       rejected.set(`${cmd.register}:${side}`, { text: res.error ?? "操作できません", at: Date.now() });
     }

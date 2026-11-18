@@ -2129,7 +2129,7 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
         json!({"type":"scan","register":1,"side":"counter","code":BILL}),
     )
     .unwrap_err();
-    assert!(e.contains("一緒に登録できません"), "{e}");
+    assert!(e.contains("お支払い同士なら幾つでも一緒に会計できます"), "{e}");
     ok(
         &mut s,
         json!({"type":"void_transaction","register":1,"side":"counter"}),
@@ -2141,7 +2141,7 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
         json!({"type":"register_ff","register":1,"code":"FF01","qty":1}),
     ] {
         let e = run(&mut s, cmd).unwrap_err();
-        assert!(e.contains("一緒に登録できません"), "{e}");
+        assert!(e.contains("お支払い同士なら幾つでも一緒に会計できます"), "{e}");
     }
     assert_eq!(reg(&s, 1).counter.lines.len(), 1);
 }
@@ -5249,7 +5249,7 @@ fn a_rejected_scan_returns_its_reason_and_the_next_scan_goes_through() {
         json!({"type":"scan","register":1,"side":"floor","code":PARCEL}),
     )
     .unwrap_err();
-    assert!(err.contains("荷物の発送は、ほかの商品と一緒に会計できません"), "{err}");
+    assert!(err.contains("お荷物同士なら、何個でも一緒に会計できます"), "{err}");
     scan(&mut s, 1, "floor", BREAD);
     assert_eq!(reg(&s, 1).floor.lines.len(), 2);
 }

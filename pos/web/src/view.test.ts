@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, withRejection } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, withRejection, impossibleFlash } from "./view";
 import { trCore } from "./i18n";
 
 describe("view helpers", () => {
@@ -160,8 +160,16 @@ describe("view helpers", () => {
     expect(signage(0)).not.toContain("<button");
   });
 
+  it("splits an impossible-operation reason into a large first line and a small rest", () => {
+    expect(impossibleFlash("会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます")).toBe(
+      '<p class="big">会計を分けてください</p><p class="sub">お荷物同士なら、何個でも一緒に会計できます</p>',
+    );
+    expect(impossibleFlash("サービス商品の個数は変えられません")).toBe('<p class="big">サービス商品の個数は変えられません</p>');
+    expect(impossibleFlash("Please pay separately\nAny number of parcels can be paid together")).toContain('<p class="sub">Any number of parcels can be paid together</p>');
+  });
+
   it("puts a rejected reason in red under the band, in place of the tax row (B-2)", () => {
-    const reason = "荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）";
+    const reason = "お会計中です（登録に戻ってから伝票を読み取ってください）";
     const band = regTop(150, 1, "");
     const screen = `${band}<div class="staff-head"><span class="muted tax-note">内税 8% 11円</span></div><table></table>`;
     const html = withRejection(screen, reason);
@@ -174,7 +182,7 @@ describe("view helpers", () => {
     expect(withRejection(`<div class="confirm"></div>`, reason).startsWith('<p class="reject-note"')).toBe(true);
     expect(withRejection(screen, undefined)).toBe(screen);
     // 英語の画面では英語で出る
-    expect(trCore(reason)).toBe("Parcels to send can't be paid with other items (any number of parcels can be paid together)");
+    expect(trCore(reason)).toBe("Checking out (go back to registration, then scan the slip)");
   });
 
   it("shows total, tendered and change (or a red shortage) while cash goes in (B-4)", () => {

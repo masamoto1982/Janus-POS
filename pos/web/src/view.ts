@@ -1295,6 +1295,28 @@ export function withRejection(html: string, reason: string | undefined): string 
   return note + html;
 }
 
+/** 選択の余地のない、完全に不可能な操作の理由（user 2026-11-18）。帯の下の赤文字ではなく、
+ *  登録画面の中央にぼかした登録画面を背にして一瞬だけ出す（IMPOSSIBLE_SHOW_MS）。ほかの理由は今までどおり帯の下 */
+export const IMPOSSIBLE = new Set([
+  "会計を分けてください\nお支払い同士なら幾つでも一緒に会計できます",
+  "会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます",
+  "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです",
+  "会計を分けてください\nチケットは一件ずつのお取り扱いです",
+  "日配食品は数量を増やせません\n一点ずつスキャンしてください",
+  "サービス商品の個数は変えられません",
+]);
+
+/** 不可能な操作の案内を出している時間。現れて、読めるあいだ留まり、消える */
+export const IMPOSSIBLE_SHOW_MS = 1800;
+
+/** 不可能な操作の案内の中身：一行目は大テキスト、改行やかっこ書きの続きは小テキストで添える */
+export function impossibleFlash(reason: string): string {
+  const m = /^([^\n（(]+?)(?:\n| ?[（(])([\s\S]*?)[）)]?$/.exec(reason);
+  const big = m ? m[1]! : reason;
+  const sub = m ? m[2]! : "";
+  return `<p class="big">${esc(big)}</p>${sub ? `<p class="sub">${esc(sub)}</p>` : ""}`;
+}
+
 /** 現金の投入が始まったら、帯の合計の下（ポイントの行の位置）に「お預かり」「お釣り」（足りなければ赤の「不足」）を出す（B-4）。
  *  合計の行は投入前と同じ形のまま（合計は残りのお支払い額）。両画面に同じ形・同じ数字で出す */
 export function tenderSum(total: number, inserted: number): string {

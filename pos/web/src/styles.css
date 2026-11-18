@@ -370,6 +370,9 @@ details summary h3 { display: inline; }
   background: transparent; color: var(--msg-strong); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--shape-soft);
 }
 button.flag { cursor: pointer; }
+/* 適用先のないクーポンの行は品目の代わりにフラグ一つ（「割引 50 サンドイッチ」）。名前が入るので幅は文字に合わせる */
+.flag.coupon-flag.wait { width: auto; max-width: 100%; height: auto; min-height: var(--btn-md-h); padding: var(--s15, 2px) var(--s11, 8px); white-space: normal; line-height: 1.2; text-align: center; flex-wrap: wrap; column-gap: 0.3em; }
+.flag.coupon-flag.wait > span { white-space: nowrap; }
 .ffv-screen { align-self: stretch; flex: 1 0 auto; display: flex; flex-direction: column; align-items: center; gap: var(--s15, 2px); padding: 0; text-align: center; }
 .ffv-screen .lines.ffv { margin-bottom: auto; }
 .ffv-screen .lines.ffv td, .ffv-screen .lines.ffv th { padding-top: var(--s17, 1px); padding-bottom: var(--s17, 1px); }

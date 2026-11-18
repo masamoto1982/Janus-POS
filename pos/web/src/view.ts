@@ -904,10 +904,18 @@ export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Gate,
     .filter((c) => c.line_id === null)
     .map((c) => [
       c.id,
-      `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${
+      `<tr class="coupon ${flash(reg, c.id)}"><td>${waitingFlag(c)}</td><td class="num">${
         ro ? "1" : qtyCell(reg, side, { id: c.id, qty: 1 }, st, { type: "remove_coupon", register: reg, side, coupon_id: c.id }, true)
       }</td><td class="num"><span class="muted">対象商品待ち</span></td></tr>`,
     ]);
+}
+
+/** 適用先のないクーポンは品目の欄にフラグ一つだけ：「割引 50 サンドイッチ」「引換券 ソフトドリンク」。
+ *  対象商品が見つかるとこのフラグが対象商品の明細へ移り（「値引き 50」「お引換え」）、紐づいたことが見て取れる */
+function waitingFlag(c: Coupon): string {
+  const head = c.kind.kind === "discount" ? `割引 ${c.kind.yen.toLocaleString("ja-JP")}` : "引換券";
+  // 狭い欄では「割引 50」と商品名の間で折り返す（語の途中で折らない）
+  return `<span class="flag coupon-flag wait"><span>${esc(head)}</span> <span>${esc(c.target_name)}</span></span>`;
 }
 
 /** 明細に効いているクーポンのフラグ。割引券は「値引き 50」（値引き額の合計）、引換券は「お引換え」。

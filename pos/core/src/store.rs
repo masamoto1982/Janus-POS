@@ -1591,6 +1591,8 @@ pub struct CouponView {
     pub id: u32,
     pub code: &'static str,
     pub name: &'static str,
+    /// 対象商品の名前（適用先のないクーポンの行に「割引 50 サンドイッチ」「引換券 ソフトドリンク」と出す）
+    pub target_name: &'static str,
     pub kind: catalog::CouponKind,
     /// 値引き額（引換券は対象商品 1 個の価格）。適用先がなければ None
     pub discount: Option<u32>,
@@ -4612,6 +4614,7 @@ impl Store {
                 id,
                 code: c.code,
                 name: c.name,
+                target_name: catalog::find(c.target).map_or("", |p| p.name),
                 kind: c.kind,
                 discount: u.map(|(yen, _, _)| yen),
                 line_id: u.map(|(_, _, line)| line),

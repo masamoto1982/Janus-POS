@@ -467,7 +467,9 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
    消えている側を段の色（--head-bg＝透明）に任せると、段の色を塗り替えたときに黄とグレー・緑の点滅に化けるので、
    消えている側も黄で明示する（styles.test.ts で守る） */
 .screen-head.calling { --head-call-bg: var(--call-soft); --head-call-off: var(--alert-bg); }
-.screen-head.sos { --head-call-bg: var(--sos-head); --head-call-off: var(--head-bg); }
+/* 非常事態モード中のヘッダーは赤（--sos-head）と濃い黄（--call-soft）を行き来する＝四段目（最下段）と同じ二色（user 2026-11-18）。
+   消えている側を段の色に任せると薄い黄（--alert-bg）になり、四段目とそろわない */
+.screen-head.sos { --head-call-bg: var(--sos-head); --head-call-off: var(--call-soft); }
 .screen-head:is(.calling, .sos) { background: color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-call-off)); }
 .screen-head.sos :is(.mode-title, .clock) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), currentColor); }
 

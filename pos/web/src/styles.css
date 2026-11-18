@@ -28,6 +28,7 @@
   --muted: var(--grey-3);
   --line: var(--grey-2); --border: var(--grey-3); --msg-strong: var(--grey-4); --msg-weak: var(--grey-3); --off-bg: var(--grey-2); --off-ink: var(--grey-3);
   --accent: var(--blue-3);
+  --input-hint: var(--blue-2);
   --frame-w: 1.5px;
   --accent-ink: var(--white);
   --reg-top-ink: var(--black);
@@ -265,7 +266,8 @@ input, select, button.pad-field {
 input:disabled, select:disabled { border-color: var(--border); }
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
 input::placeholder { color: var(--line); opacity: 1; }
-button.pad-field .placeholder { color: var(--line); font-weight: 400; }
+/* 入力例は小テキスト・青の濃度2（user 2026-11-18：一番薄い青1は白・緑1の段で読めない） */
+button.pad-field .placeholder { color: var(--input-hint); font-size: var(--text-sm); font-weight: 400; }
 button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-offset: var(--s17, 1px); }
 
 .tag {
@@ -570,14 +572,13 @@ body.dragging .drop-hint { display: inline; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: var(--s11, 8px) var(--s9, 16px); justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: var(--s11, 8px); font-size: var(--text-sm); }
 .points-amount { align-items: center; }
-/* 入力欄も白銀比：大の高さで幅は 2 倍（郵便番号 123-4567 が入る、user 2026-11-17）。空のときも同じ大きさ */
-.parcel-fields button.pad-field { box-sizing: border-box; width: calc(var(--btn-w, 42px) * 2); height: var(--btn-h, 40px); font-size: var(--text-lg); padding: var(--s12, 6px) var(--s11, 8px); }
+/* 入力フォームの共通の大きさ（user 2026-11-18）：入力例を小テキストで考え、それが収まる枠。高さ＝小（W/16）、幅＝W/4
+   （「例 19821002」「例 100-0001」が小テキストで左右に余白を残して入り、打ち込んだ数字＝大の 8 桁も入る）。
+   宅配便の長さ・重さ・郵便番号、年確の生年月日、チケット枚数・ポイント数の欄はすべてこの一つの大きさ */
+.screen :is(.parcel-fields, .parcel-entry, .id-entry) button.pad-field { box-sizing: border-box; width: var(--s4, 100px); height: var(--btn-md-h, 26px); font-size: var(--text-lg); padding: 0 var(--s13, 4px); }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-no { margin-right: var(--s11, 8px); }
 .parcel-fee { margin-left: var(--s11, 8px); }
-/* 生年月日の入力欄は特大の高さで幅は白銀比の 3 倍（user 2026-11-17） */
-.id-entry button.birth-field { justify-content: center; height: var(--btn-xl-h, 64px); width: calc(var(--btn-xl-w, 90px) * 3); max-width: 100%; box-sizing: border-box; text-align: center; font-size: var(--text-lg); padding: var(--s11, 10px) var(--s10, 12px); letter-spacing: .08em; font-variant-numeric: tabular-nums; }
-.id-entry button.birth-field .placeholder { font-size: var(--text-sm); letter-spacing: 0; }
 .collect-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s11, 8px); min-width: min(var(--s0, 370px), 100%); }
 .collect-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--s9, 16px); padding: var(--s11, 8px) var(--s10, 12px); border: var(--s16, 1.5px) solid var(--border); font-size: var(--text-lg); text-align: left; }
 /* 照合イベントが済んだ印：意味色のグリーン（安全・肯定）の丸に白い✓ */

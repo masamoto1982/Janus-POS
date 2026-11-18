@@ -656,7 +656,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
     ro ? ageFlag(l) : ageFlag(l, { type: "early_age_check", register: reg, side: "staff", start: true }, find(v.actions, "early_age_check")),
     limitFlag(l),
   ].filter(Boolean);
-  const coupon = couponFlags(reg, side, v.coupons, l.id, find(v.actions, "remove_coupon"), ro);
+  const coupon = couponFlags(reg, side, v.coupons, l.id, l.qty, find(v.actions, "remove_coupon"), ro);
   const remove = find(v.actions, "remove_line");
   let svc = "";
   if (l.kind === "service" && !l.done && !ro && !l.parcel && !l.pickup) {
@@ -918,18 +918,20 @@ function waitingFlag(c: Coupon): string {
   return `<span class="flag coupon-flag wait"><span>${esc(head)}</span> <span>${esc(c.target_name)}</span></span>`;
 }
 
-/** 明細に効いているクーポンのフラグ。割引券は「値引き 50」（値引き額の合計）、引換券は「お引換え」。
+/** 明細に効いているクーポンのフラグ。割引券は「値引き 50」、引換券は「お引換え」。数量が 2 以上の明細には
+ *  効いている枚数を添える（「お引換え ×1」「値引き 50 ×2」）。三本のうち一本だけ引き換えたことが見て取れるように。
  *  取引を止めないので行は警告色に染めない。操作できる側では押すとそのクーポンを取り消す（返却の案内が出る） */
-export function couponFlags(reg: number, side: Side, coupons: Coupon[], lineId: number, st: Gate, ro: boolean): string[] {
+export function couponFlags(reg: number, side: Side, coupons: Coupon[], lineId: number, qty: number, st: Gate, ro: boolean): string[] {
   const on = coupons.filter((c) => c.line_id === lineId);
   const groups: [string, Coupon[]][] = [
     ["お引換え", on.filter((c) => c.kind.kind === "exchange")],
-    ["", on.filter((c) => c.kind.kind === "discount")],
+    ["値引き", on.filter((c) => c.kind.kind === "discount")],
   ];
   return groups
     .filter(([, cs]) => cs.length)
     .map(([label, cs]) => {
-      const text = label || `値引き ${cs.reduce((n, c) => n + (c.discount ?? 0), 0).toLocaleString("ja-JP")}`;
+      const each = label === "値引き" ? ` ${(cs[0].discount ?? 0).toLocaleString("ja-JP")}` : "";
+      const text = `${label}${each}${qty >= 2 ? ` ×${cs.length}` : ""}`;
       const last = cs[cs.length - 1];
       if (ro || !st.allowed) return `<span class="flag coupon-flag">${esc(text)}</span>`;
       return btn(text, { type: "remove_coupon", register: reg, side, coupon_id: last.id }, st, "flag coupon-flag");
@@ -1665,7 +1667,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
         c.phase === "registering" && !fixedHere && !(l.expired && side === "customer")
           ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, c.lines))
           : `${n}`;
-      const coupon = couponFlags(reg, side, c.coupons, l.id, a("remove_coupon"), false);
+      const coupon = couponFlags(reg, side, c.coupons, l.id, l.qty, a("remove_coupon"), false);
       return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(l.name)} ${[...tags, ...coupon].join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, c.coupons, l.id)}</td></tr>`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);

@@ -926,18 +926,21 @@ struct Txn {
 }
 
 impl Txn {
-    /// クーポンの適用先。クーポンを読んだ順に、対象商品の明細を登録の順に一個ずつ割り当てる
-    /// （明細の数量の数までクーポンが効く）。適用先は（値引き額、税率、明細の番号）
+    /// クーポンの適用先。クーポンは一番近くの対象商品に付く：クーポンより前に登録した対象商品の明細のうち
+    /// 一番新しいもの、なければクーポンより後に登録した一番古いもの（明細の数量の数までクーポンが効く）。
+    /// あとから読んだ商品が付いているクーポンを奪うことはない。適用先は（値引き額、税率、明細の番号）
     fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, u32, u32)>)> {
         let mut used: Vec<(u32, u32)> = vec![];
         self.coupons
             .iter()
             .map(|&(id, c)| {
-                let line = self.lines.iter().find(|l| {
+                let free = |l: &&Line| {
                     l.code == c.target
                         && l.kind == LineKind::Item
                         && used.iter().find(|(i, _)| *i == l.id).map_or(0, |e| e.1) < l.qty
-                });
+                };
+                let before = self.lines.iter().filter(free).filter(|l| l.id < id).max_by_key(|l| l.id);
+                let line = before.or_else(|| self.lines.iter().filter(free).filter(|l| l.id > id).min_by_key(|l| l.id));
                 let Some(l) = line else {
                     return (id, c, None);
                 };

@@ -2477,6 +2477,31 @@ fn a_coupon_points_at_the_line_it_applies_to() {
     assert_eq!(v.staff.coupons[1].line_id, None);
 }
 
+/// 仕様 5.4：クーポンは一番近くの対象商品に付く（前に登録した一番新しい明細、なければ後の一番古い明細）
+#[test]
+fn a_coupon_goes_to_the_nearest_target() {
+    const PAN: &str = "4900000000011";
+    let mut s = Store::new(1, 2, 1);
+    for code in [TEA, PAN, TEA, PAN, TEA] {
+        scan(&mut s, 1, "customer", code);
+    }
+    scan(&mut s, 1, "customer", "CP0001");
+    let v = reg(&s, 1);
+    let teas: Vec<u32> = v.staff.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).collect();
+    let last = *teas.iter().max().unwrap();
+    assert_eq!(v.staff.coupons[0].line_id, Some(last));
+    // 先に読んだクーポンは後から登録した一番古い対象商品に付き、さらに後の商品に奪われない
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", "CP0001");
+    scan(&mut s, 1, "customer", PAN);
+    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "customer", PAN);
+    scan(&mut s, 1, "customer", TEA);
+    let v = reg(&s, 1);
+    let first = v.staff.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).min().unwrap();
+    assert_eq!(v.staff.coupons[0].line_id, Some(first));
+}
+
 /// 仕様 5.4：適用先のないクーポンは返却まで決済を止める
 #[test]
 fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {

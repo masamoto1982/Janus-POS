@@ -1343,6 +1343,12 @@ struct Register {
     id: u8,
     mode: Mode,
     staff: Option<StaffSession>,
+    /// 今の取引の担当スタッフ。取引中にスタッフがログインしていた時点で決まり、取引が終わるまで変わらない。
+    /// 担当が決まった取引には、ほかのスタッフはログインできない（ログアウトしたあとも）。取引が終わると担当はログアウトし、
+    /// レジはセルフ操作モードに戻る（取引ごとにログインし直す）
+    owner: Option<&'static auth::StaffAccount>,
+    /// 担当のいる取引を終えて、後始末を待っている
+    closing: bool,
     txn: Txn,
     drawer: Drawer,
     last_receipt: Option<Receipt>,
@@ -1485,6 +1491,52 @@ impl Register {
     fn idle_revert_in(&self, now: u64) -> u64 {
         let counted_until = self.idle_hold.unwrap_or(now).max(self.last_op);
         IDLE_REVERT_MS.saturating_sub(counted_until - self.last_op)
+    }
+
+    /// 取引の中身がある（明細・クーポン・会計中・電子マネーの手続き・ポイントカード）
+    fn busy(&self) -> bool {
+        !self.idle() || self.txn.point_card.is_some()
+    }
+
+    /// 決済後のお渡し（払込票・控え伝票・荷物・収入印紙・チケット）が残っている
+    fn handover_pending(&self) -> bool {
+        self.bill_handover.is_some()
+            || self.parcel_handover.is_some()
+            || self.pickup_handover.is_some()
+            || self.receipt_stamp.is_some()
+            || !self.ticket_handover.is_empty()
+            || self.held_change.total() > 0
+    }
+
+    /// 取引中：取引の中身があるあいだと、終えた取引の後始末（お渡し・お釣り・「ありがとうございました」）が済むまで
+    fn in_txn(&self) -> bool {
+        self.busy()
+            || (self.closing
+                && (self.handover_pending() || self.last_receipt.is_some() || self.outlet.total() > 0))
+    }
+
+    /// 取引中にログインしているスタッフを担当にする。担当のいる取引を終えたら、後始末が済んだところで担当をログアウトさせ、
+    /// セルフ操作モードに戻す。後始末の途中で次の取引が始まったときも、そこでログアウトさせる（次の取引は改めてログインする）
+    fn sync_owner(&mut self) {
+        if self.closing && (self.busy() || !self.in_txn()) {
+            self.closing = false;
+            if self.owner.take().is_some() {
+                self.staff = None;
+            }
+        }
+        if self.busy() {
+            if self.owner.is_none() {
+                self.owner = self.staff.map(|s| s.account);
+            }
+        } else if !self.closing {
+            self.owner = None;
+        }
+        self.sync_mode();
+    }
+
+    /// 取引を終えた（決済・取引中止・荷物が見つからないお受け取り・電子マネーのチャージ）
+    fn end_txn(&mut self) {
+        self.closing = self.owner.is_some();
     }
 
     fn staff_state(&self) -> StaffState {
@@ -1738,6 +1790,8 @@ impl Store {
                 id,
                 mode: Mode::SelfOperated,
                 staff: None,
+                owner: None,
+                closing: false,
                 txn: Txn::default(),
                 drawer: Drawer::default(),
                 last_receipt: None,
@@ -1813,6 +1867,7 @@ impl Store {
             {
                 r.last_receipt = None;
             }
+            r.sync_owner();
         }
         let done_ids: Vec<u8> = self
             .registers
@@ -1905,6 +1960,8 @@ impl Store {
                     r.staff = None;
                     r.mode = Mode::SelfOperated;
                 }
+                r.owner = None;
+                r.closing = false;
                 r.menu = None;
                 r.bill_handover = None;
                 r.parcel_handover = None;
@@ -1920,6 +1977,7 @@ impl Store {
             return 0;
         };
         r.menu = None;
+        r.end_txn();
         let txn = std::mem::take(&mut r.txn);
         r.outlet.merge(&txn.inserted);
         let mut back = txn.inserted.total();
@@ -2092,7 +2150,7 @@ impl Store {
             }
         }
         for r in &mut self.registers {
-            r.sync_mode();
+            r.sync_owner();
         }
         self.raise_required_calls();
         self.hold_idle_countdowns();
@@ -2351,6 +2409,7 @@ impl Store {
                     .into());
                 }
                 let no = pk.no.clone();
+                r.end_txn();
                 r.txn = Txn::default();
                 r.last_receipt = None;
                 self.calls.resolve(register, CallKind::Service, now);
@@ -3513,6 +3572,18 @@ impl Store {
             let acc = auth::account(id).ok_or("登録されていないスタッフバーコードです")?;
             let now = self.now;
             let r = self.reg_mut(register)?;
+            if let Some(o) = r.owner.filter(|o| o.id != acc.id) {
+                if r.busy() || r.handover_pending() {
+                    return Err(format!(
+                        "取引中は担当スタッフを切り替えられません\n{}さんの取引です",
+                        o.name
+                    ));
+                }
+            }
+            if r.closing && !r.handover_pending() {
+                r.closing = false;
+                r.owner = None;
+            }
             let was = r.staff_state();
             let resumed = std::mem::take(&mut r.paused);
             let took_over = r.txn.floor_turn;
@@ -4091,6 +4162,9 @@ impl Store {
                 let cash = std::mem::take(inserted);
                 r.drawer.cash.merge(&cash);
                 r.emoney = None;
+                if r.txn.lines.is_empty() && !r.txn.paying {
+                    r.end_txn();
+                }
                 self.emoney_balance += amount;
                 let now = self.emoney_balance;
                 done(if paying_emoney {
@@ -4242,6 +4316,7 @@ impl Store {
         } else {
             r.outlet.merge(&change);
         }
+        r.end_txn();
         let txn = std::mem::take(&mut r.txn);
         let slips = txn.bill_slips();
         r.bill_handover = (slips > 0).then_some(slips);

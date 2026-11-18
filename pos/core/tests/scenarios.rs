@@ -2450,6 +2450,33 @@ fn coupons_apply_whenever_the_target_is_registered() {
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 420);
 }
 
+/// 仕様 5.4：クーポンは適用先の明細に付き、間に別の商品が挟まっても対象商品の明細を指す
+#[test]
+fn a_coupon_points_at_the_line_it_applies_to() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "customer", SANDWICH);
+    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "customer", "CP0002");
+    let v = reg(&s, 1);
+    let sandwich = v.staff.lines.iter().find(|l| l.line.code == SANDWICH).unwrap().line.id;
+    assert_eq!(v.staff.coupons[0].line_id, Some(sandwich));
+    assert_eq!(v.customer.coupons[0].line_id, Some(sandwich));
+    assert_eq!(v.customer.coupons[0].discount, Some(50));
+    scan(&mut s, 1, "customer", "CP0002");
+    scan(&mut s, 1, "customer", SANDWICH);
+    let v = reg(&s, 1);
+    let second = v.staff.lines.iter().filter(|l| l.line.code == SANDWICH).map(|l| l.line.id).max().unwrap();
+    assert_ne!(second, sandwich);
+    assert_eq!(v.staff.coupons[1].line_id, Some(second));
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"customer","line_id":sandwich}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.staff.coupons[0].line_id, Some(second));
+    assert_eq!(v.staff.coupons[1].line_id, None);
+}
+
 /// 仕様 5.4：適用先のないクーポンは返却まで決済を止める
 #[test]
 fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {

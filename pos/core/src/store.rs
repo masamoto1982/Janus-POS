@@ -926,32 +926,26 @@ struct Txn {
 }
 
 impl Txn {
-    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, u32)>)> {
-        let mut used: Vec<(&str, u32)> = vec![];
+    /// クーポンの適用先。クーポンを読んだ順に、対象商品の明細を登録の順に一個ずつ割り当てる
+    /// （明細の数量の数までクーポンが効く）。適用先は（値引き額、税率、明細の番号）
+    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, u32, u32)>)> {
+        let mut used: Vec<(u32, u32)> = vec![];
         self.coupons
             .iter()
             .map(|&(id, c)| {
-                let have: u32 = self
-                    .lines
-                    .iter()
-                    .filter(|l| l.code == c.target && l.kind == LineKind::Item)
-                    .map(|l| l.qty)
-                    .sum();
-                let n = used.iter().find(|(t, _)| *t == c.target).map_or(0, |e| e.1);
-                if n >= have {
+                let line = self.lines.iter().find(|l| {
+                    l.code == c.target
+                        && l.kind == LineKind::Item
+                        && used.iter().find(|(i, _)| *i == l.id).map_or(0, |e| e.1) < l.qty
+                });
+                let Some(l) = line else {
                     return (id, c, None);
-                }
-                match used.iter_mut().find(|(t, _)| *t == c.target) {
+                };
+                match used.iter_mut().find(|(i, _)| *i == l.id) {
                     Some(e) => e.1 += 1,
-                    None => used.push((c.target, 1)),
+                    None => used.push((l.id, 1)),
                 }
-                let p = catalog::find(c.target);
-                let rate = self
-                    .lines
-                    .iter()
-                    .find(|l| l.code == c.target && l.kind == LineKind::Item)
-                    .map_or(0, |l| l.rate_bp);
-                (id, c, p.map(|p| (c.discount(p.price), rate)))
+                (id, c, Some((c.discount(l.unit_price), l.rate_bp, l.id)))
             })
             .collect()
     }
@@ -960,8 +954,8 @@ impl Txn {
         self.coupon_uses()
             .iter()
             .filter_map(|(_, _, u)| *u)
-            .filter(|(_, t)| rate.is_none_or(|r| r == *t))
-            .map(|(yen, _)| yen)
+            .filter(|(_, t, _)| rate.is_none_or(|r| r == *t))
+            .map(|(yen, _, _)| yen)
             .sum()
     }
 
@@ -998,12 +992,9 @@ impl Txn {
         let discount: u32 = self
             .coupon_uses()
             .iter()
-            .filter(|(_, c, _)| {
-                self.lines
-                    .iter()
-                    .any(|l| l.code == c.target && l.kind == LineKind::Item && l.earns_points())
-            })
-            .filter_map(|(_, _, u)| u.map(|(yen, _)| yen))
+            .filter_map(|(_, _, u)| *u)
+            .filter(|(_, _, line)| self.lines.iter().any(|l| l.id == *line && l.earns_points()))
+            .map(|(yen, _, _)| yen)
             .sum();
         gross.saturating_sub(discount)
     }
@@ -1600,7 +1591,11 @@ pub struct CouponView {
     pub id: u32,
     pub code: &'static str,
     pub name: &'static str,
+    pub kind: catalog::CouponKind,
+    /// 値引き額（引換券は対象商品 1 個の価格）。適用先がなければ None
     pub discount: Option<u32>,
+    /// 適用先の明細。画面はクーポンの行を出さず、この明細に値引き・お引換えのフラグを立てる
+    pub line_id: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -4617,7 +4612,9 @@ impl Store {
                 id,
                 code: c.code,
                 name: c.name,
-                discount: u.map(|(yen, _)| yen),
+                kind: c.kind,
+                discount: u.map(|(yen, _, _)| yen),
+                line_id: u.map(|(_, _, line)| line),
             })
             .collect();
         let returned: Vec<ReturnedCoupon> = t

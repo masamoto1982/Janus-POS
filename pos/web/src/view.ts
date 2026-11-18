@@ -640,7 +640,7 @@ function methodList(method: string | null, inserted: number, unavailable: Unavai
   return `<div class="row wrap method-list">${METHODS.map((m) => `<span class="seg ${method === m ? "on" : ""}${unavailable.some((u) => u.method === m) ? " off" : ""}">${METHOD_LABEL[m]}</span>`).join("")}</div>`;
 }
 
-const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col class="c-amt" /></colgroup>`;
+const LINE_COLS = `<colgroup><col /><col class="c-qty" /><col /></colgroup>`;
 
 function taxNote(v: { taxes: TaxTotal[] }): string {
   return `<span class="muted tax-note">内税 ${v.taxes.map((t) => `${esc(t.rate)} ${yen(t.tax)}`).join(" / ")}</span>`;
@@ -656,6 +656,7 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
     ro ? ageFlag(l) : ageFlag(l, { type: "early_age_check", register: reg, side: "staff", start: true }, find(v.actions, "early_age_check")),
     limitFlag(l),
   ].filter(Boolean);
+  const coupon = couponFlags(reg, side, v.coupons, l.id, find(v.actions, "remove_coupon"), ro);
   const remove = find(v.actions, "remove_line");
   let svc = "";
   if (l.kind === "service" && !l.done && !ro && !l.parcel && !l.pickup) {
@@ -672,9 +673,9 @@ function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string 
       ? `${n}`
       : qtyCell(reg, side, { id: l.id, qty: n }, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, v.lines));
   return `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}">
-    <td>${esc(l.name)} ${tags.join(" ")}${svc}</td>
+    <td>${esc(l.name)} ${[...tags, ...coupon].join(" ")}${svc}</td>
     <td class="num">${qty}</td>
-    <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td>
+    <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, v.coupons, l.id)}</td>
   </tr>`;
 }
 
@@ -897,13 +898,42 @@ function ageStep(reg: number, v: StaffView, side: Side, a: (n: Action) => Gate):
 export const flashing = new Set<string>();
 const flash = (reg: number, id: number): string => (flashing.has(`${reg}:${id}`) ? "flash" : "");
 
+/** 適用先の決まっていないクーポンだけ行を出す。適用先が決まると行は消え、対象商品の明細にフラグが立つ */
 export function couponRows(reg: number, side: Side, coupons: Coupon[], st: Gate, ro = false): Row[] {
-  return coupons.map((c) => [
-    c.id,
-    `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${
-      ro ? "1" : qtyCell(reg, side, { id: c.id, qty: 1 }, st, { type: "remove_coupon", register: reg, side, coupon_id: c.id }, true)
-    }</td><td class="num">${c.discount === null ? `<span class="muted">対象商品待ち</span>` : `−${yen(c.discount)}`}</td></tr>`,
-  ]);
+  return coupons
+    .filter((c) => c.line_id === null)
+    .map((c) => [
+      c.id,
+      `<tr class="coupon ${flash(reg, c.id)}"><td>${esc(c.name)} <span class="tag">クーポン</span></td><td class="num">${
+        ro ? "1" : qtyCell(reg, side, { id: c.id, qty: 1 }, st, { type: "remove_coupon", register: reg, side, coupon_id: c.id }, true)
+      }</td><td class="num"><span class="muted">対象商品待ち</span></td></tr>`,
+    ]);
+}
+
+/** 明細に効いているクーポンのフラグ。割引券は「値引き 50」（値引き額の合計）、引換券は「お引換え」。
+ *  取引を止めないので行は警告色に染めない。操作できる側では押すとそのクーポンを取り消す（返却の案内が出る） */
+export function couponFlags(reg: number, side: Side, coupons: Coupon[], lineId: number, st: Gate, ro: boolean): string[] {
+  const on = coupons.filter((c) => c.line_id === lineId);
+  const groups: [string, Coupon[]][] = [
+    ["お引換え", on.filter((c) => c.kind.kind === "exchange")],
+    ["", on.filter((c) => c.kind.kind === "discount")],
+  ];
+  return groups
+    .filter(([, cs]) => cs.length)
+    .map(([label, cs]) => {
+      const text = label || `値引き ${cs.reduce((n, c) => n + (c.discount ?? 0), 0).toLocaleString("ja-JP")}`;
+      const last = cs[cs.length - 1];
+      if (ro || !st.allowed) return `<span class="flag coupon-flag">${esc(text)}</span>`;
+      return btn(text, { type: "remove_coupon", register: reg, side, coupon_id: last.id }, st, "flag coupon-flag");
+    });
+}
+
+/** 小計。クーポンが効いている明細は小計に取り消し線を引き、その左に値引き後の金額（0 円なら「無料」）を出す */
+export function amountCell(amount: number, coupons: Coupon[], lineId: number): string {
+  const off = coupons.filter((c) => c.line_id === lineId).reduce((n, c) => n + (c.discount ?? 0), 0);
+  if (!off) return yen(amount);
+  const net = Math.max(0, amount - off);
+  return `<span class="net">${net === 0 ? "無料" : yen(net)}</span><s class="gross">${yen(amount)}</s>`;
 }
 
 type Row = [number, string];
@@ -1627,7 +1657,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
         c.phase === "registering" && !fixedHere && !(l.expired && side === "customer")
           ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, c.lines))
           : `${n}`;
-      return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(l.name)} ${tags.join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : yen(l.amount)}</td></tr>`];
+      const coupon = couponFlags(reg, side, c.coupons, l.id, a("remove_coupon"), false);
+      return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(l.name)} ${[...tags, ...coupon].join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, c.coupons, l.id)}</td></tr>`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 

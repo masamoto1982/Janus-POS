@@ -79,7 +79,7 @@ button { touch-action: manipulation; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 /* レジ画面の寸法は絶対値でなく、画面の内幅 W を白銀比（1:√2）で割った階段から選ぶ（user 2026-11-16）。
    W÷√2ⁿ：n＝1 三段目／3 特大ボタンの幅／4 大ボタンの幅・特大テキスト…と、偶数の段は W の 1/4・1/8・1/16・1/32 になる。
-   実機の POS は画面の大きさが決まっているので W がそのまま基準になる。シミュレーターでは小テキストが 12〜16px に収まるよう W を 384〜512px で止める。
+   実機の POS は画面の大きさが決まっているので W がそのまま基準になる。シミュレーターでは小テキストが 12〜16px に収まるよう W を 384〜512px で止める（モバイルモードは下限なし）。
    W は @property で長さとして登録し、.screen で一度だけ解決する（中の container（.reg-top）で cqi が測り直されないように）
    縦幅：画面全体を縦長の白銀長方形（縦＝W×√2、A判の紙と同じ形）にし、ヘッダー（W÷√2⁷）16個分を四段に分ける（user 2026-11-16）
    一段目＝ヘッダー 1（W÷√2⁷）
@@ -875,3 +875,6 @@ body.dragging .drop-hint { display: inline; }
    次の行の余地がなければ縮む。当てはめる前（初回の描画）は各行の flex の仮の並び */
 [data-law].law-on { position: relative; display: block; flex: none; }
 [data-law].law-on > * { position: absolute; margin: 0; box-sizing: border-box; max-width: none; }
+/* モバイルモードでは W の下限 384px をなくし、画面の内幅そのものにする（user 2026-11-18：表示エリアの制約による便宜的措置。
+   文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
+@media (max-width: 760px) { .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); } }

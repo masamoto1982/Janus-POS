@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, withRejection } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, withRejection, impossibleFlash } from "./view";
 import { trCore } from "./i18n";
 
 describe("view helpers", () => {
@@ -158,6 +158,15 @@ describe("view helpers", () => {
     expect(signage(SIGNAGE_MS)).toContain(SIGNAGE[1][0]);
     expect(signage(SIGNAGE_MS * SIGNAGE.length)).toContain(SIGNAGE[0][0]);
     expect(signage(0)).not.toContain("<button");
+  });
+
+  it("splits an impossible-operation reason into a large first line and a small rest", () => {
+    expect(impossibleFlash("公共料金のお支払いは、ほかの商品と一緒に登録できません")).toBe('<p class="big">公共料金のお支払いは、<br>ほかの商品と一緒に登録できません</p>');
+    expect(impossibleFlash("荷物の発送は、ほかの商品と一緒に会計できません（荷物どうしは何個でも一緒に会計できます）")).toBe(
+      '<p class="big">荷物の発送は、<br>ほかの商品と一緒に会計できません</p><p class="sub">荷物どうしは何個でも一緒に会計できます</p>',
+    );
+    expect(impossibleFlash("日配食品は数量を増やせません\n一点ずつスキャンしてください")).toBe('<p class="big">日配食品は数量を増やせません</p><p class="sub">一点ずつスキャンしてください</p>');
+    expect(impossibleFlash("Parcels to send can't be paid with other items (any number of parcels can be paid together)")).toContain('<p class="sub">any number of parcels can be paid together</p>');
   });
 
   it("puts a rejected reason in red under the band, in place of the tax row (B-2)", () => {

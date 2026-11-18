@@ -320,6 +320,16 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 /* 受け付けなかった理由（B-2）：二段目の帯の直下、内税の行の位置に赤文字で一行。何も覆わず、閉じるボタンも置かない */
 .screen .reject-note { flex: none; margin: 0; padding: var(--s13, 4px) 0; color: var(--alert-ink); font-size: var(--text-lg); font-weight: 700; line-height: 1.35; text-align: center; }
 .screen-main > .reject-note + .confirm { flex: 1; }
+/* 選択の余地のない、完全に不可能な操作の案内（user 2026-11-18）：登録画面の上に重ね、中央に赤褐色の大テキストを一瞬だけ出す。
+   背後の登録画面はぼかして読めなくする（覆うのはこの案内だけ）。ポインターは素通しで、表示中も操作を妨げない */
+.screen .impossible-flash { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s13, 4px);
+  padding: var(--s9, 16px); text-align: center; background: color-mix(in oklch, var(--white) 55%, transparent);
+  -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px)); animation: impossible-flash var(--flash-ms, 1800ms) ease-out forwards; }
+.screen .impossible-flash p { margin: 0; max-width: 100%; color: var(--alert-ink); line-height: 1.35; word-break: auto-phrase; text-wrap: balance; }
+.screen .impossible-flash .big { font-size: var(--text-num); font-weight: 700; }
+.screen .impossible-flash .sub { font-size: var(--text-lg); font-weight: 700; }
+@keyframes impossible-flash { 0% { opacity: 0; } 8% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .screen .impossible-flash { animation-timing-function: steps(1, end); } }
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }
 .screen-main > .reg-top, .screen-main > .banner { flex: none; }
 /* 確認・案内画面の配置（アプリ全体で共通）
@@ -706,7 +716,7 @@ body.dragging .drop-hint { display: inline; }
 /* 二行のボタンは主役（ボタンの名前）を大テキスト、脇役（添え字）を小テキストに分けてメリハリを付ける（user 2026-11-16） */
 .call-btn small, .welcome-band .band-btn small { line-height: 1; }
 /* 添え字が一行に収まらないときは「・」の後ろで折り返し、ボタンの高さを伸ばす（文字がボタンからはみ出さないように） */
-.call-btn small { word-break: keep-all; overflow-wrap: anywhere; }
+.call-btn small { text-wrap: balance; }
 .call-row .call-btn { height: var(--btn-xl-h); max-height: none; padding: 0 var(--s15, 2px); }
 .call-row .call-btn :is(b, small) { line-height: 1; }
 

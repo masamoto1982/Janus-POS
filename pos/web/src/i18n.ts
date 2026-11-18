@@ -204,7 +204,7 @@ const DICT: Record<string, string> = {
 
   // 年齢確認
   身分証の生年月日を入力してください: "Enter the date of birth on the ID",
-  "西暦8桁 例 19821002": "8 digits, e.g. 19821002",
+  "例 19821002": "e.g. 19821002",
   "身分証の生年月日（西暦8桁）": "Date of birth on ID (8 digits)",
   年齢確認が必要な商品が含まれています: "Some items require age verification",
   免許証またはマイナンバーカードの提示をお願いいたします: "Please show your driver's licence or My Number Card",
@@ -392,6 +392,8 @@ const DICT: Record<string, string> = {
   "荷物の三辺の合計（cm）": "Sum of the parcel's three sides (cm)",
   "荷物の重さ（kg）": "Parcel weight (kg)",
   "例 100-0001": "e.g. 100-0001",
+  "例 120": "e.g. 120",
+  "例 4.5": "e.g. 4.5",
   "お届け先の郵便番号（7桁）": "Destination postal code (7 digits)",
   "同じお届け先の荷物はありますか？": "Another parcel to the same address?",
   ある: "Yes",

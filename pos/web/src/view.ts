@@ -205,7 +205,7 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: Action) => Gate):
   const ids = v.age_official_id ? "運転免許証またはマイナンバーカードで確認してください<br>在留カード・特別永住者証明書・パスポートも可" : "学生証など顔写真付きの身分証で確認できます<br>デジタル身分証は不可";
   return `<div class="point-screen id-entry">
       ${msg("身分証の生年月日を入力してください", ids)}
-      ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "西暦8桁　例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field", st)}
+      ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field", st)}
     </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
 }
 
@@ -381,13 +381,13 @@ function parcelStep(reg: number, l: StaffLine, st: Gate, count: number): string 
   if (!p.size && !p.sum_cm) {
     return `<div class="point-screen parcel-entry">
         ${msg(`${no}取り扱いサイズを決定してください`, parcelErr(reg) || "三辺の長さの合計を入力してください")}
-        <div class="parcel-fields"><label>長さ${field("pcm", "", "荷物の三辺の合計（cm）")}<span>cm</span></label></div>
+        <div class="parcel-fields"><label>長さ${field("pcm", "例 120", "荷物の三辺の合計（cm）")}<span>cm</span></label></div>
       </div>${back()}`;
   }
   if (!p.size) {
     return `<div class="point-screen parcel-entry">
         ${msg(`${no}取り扱いサイズを決定してください`, parcelErr(reg) || "重量を入力してください")}
-        <div class="parcel-fields"><label>重さ${field("pkg", "", "荷物の重さ（kg）")}<span>kg</span></label></div>
+        <div class="parcel-fields"><label>重さ${field("pkg", "例 4.5", "荷物の重さ（kg）")}<span>kg</span></label></div>
       </div>${back()}`;
   }
   return `<div class="point-screen parcel-entry">

@@ -1091,6 +1091,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
     "",
     paying && v.method === "cash" && v.inserted > 0 ? tenderSum(v.total - r.prepaid, v.inserted) : "",
+    !ro,
   );
   const back = ro
     ? ""
@@ -1234,9 +1235,15 @@ export function tenderSum(total: number, inserted: number): string {
   return `${cell("お預かり", inserted)}${diff >= 0 ? cell("お釣り", diff) : cell("不足", -diff, " short")}`;
 }
 
-export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = ""): string {
+/** 取引中止・お会計が消える段階でも、同じ幅の見えない席を残す（合計の位置を全段階で動かさない、user 2026-11-18） */
+const bandSlot = (label: string) => `<button type="button" class="band-slot" aria-hidden="true" tabindex="-1" disabled>${label}</button>`;
+
+/** slots＝この面が取引中止・お会計を持つ（操作できる側）。持つ面では、ボタンが消えても席を残す */
+export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = "", slots = false): string {
   // ポイントカードだけ読んだときも、取引中止と読んだポイントを出す
   if (count === 0 && (points?.balance ?? null) === null) return "";
+  if (slots && !voidHtml) voidHtml = bandSlot("取引中止");
+  if (slots && !action) action = bandSlot("お会計");
   const full = count >= max ? `<small class="full">上限</small>` : "";
   const point = tender || pointInfo(points);
   const info = point ? `<small class="info">${point}</small>` : "";
@@ -1633,6 +1640,9 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
     r.max_items,
     r.points,
     voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
+    "",
+    "",
+    true,
   );
 
   if (!c.lines.length && !c.coupons.length && !c.point_card) voidAsk.delete(reg);

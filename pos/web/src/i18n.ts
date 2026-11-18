@@ -118,6 +118,9 @@ const DICT: Record<string, string> = {
   受付待ち: "Waiting",
   受付中: "In progress",
   対象商品待ち: "Awaiting item",
+  お引換え: "Redeemed",
+  引換券: "Voucher",
+  取り消す枚数: "Coupons to cancel",
   照合済: "Matched",
   照合待ち: "To match",
   見つかりません: "Not found",
@@ -757,6 +760,11 @@ const RULES: Rule[] = [
   [/^ご利用可能なポイントは ([\d,]+)P までです$/, (m) => `You can use up to ${m[1]}P`],
   [/^レジ(\d+)はありません$/, (m) => `No register ${m[1]}`],
   [/^スタッフをお呼びください$/, () => "Please call a staff member"],
+  [/^値引き ([\d,]+)(?: ×(\d+))?$/, (m) => `−¥${m[1]}${m[2] ? ` ×${m[2]}` : ""}`],
+  [/^お引換え ×(\d+)$/, (m) => `Redeemed ×${m[1]}`],
+  [/^割引 ([\d,]+)$/, (m) => `¥${m[1]} off`],
+  [/^(.+)を取り消します$/, (m) => `Cancel ${t(m[1])}`],
+  [/^(.+)に (\d+)枚 適用中$/, (m) => `${plural(m[2], "coupon")} applied to ${t(m[1])}`],
 ];
 
 function t(s: string): string {

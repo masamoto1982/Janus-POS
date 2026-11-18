@@ -72,7 +72,11 @@ export type Confiscated = { name: string, qty: number, };
 
 export type CouponKind = { "kind": "exchange" } | { "kind": "discount", "yen": number };
 
-export type CouponView = { id: number, code: string, name: string, kind: CouponKind, 
+export type CouponView = { id: number, code: string, name: string, 
+/**
+ * 対象商品の名前（適用先のないクーポンの行に「割引 50 サンドイッチ」「引換券 ソフトドリンク」と出す）
+ */
+target_name: string, kind: CouponKind, 
 /**
  * 値引き額（引換券は対象商品 1 個の価格）。適用先がなければ None
  */

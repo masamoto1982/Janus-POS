@@ -17,6 +17,17 @@ describe("呼び出し中の黄の点滅", () => {
     expect(decl(blink!.body, "background")).toBe("color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-call-off))");
   });
 
+  it("非常事態モードのヘッダーは赤と濃い黄を行き来する（四段目と同じ二色）", () => {
+    const sos = rules.find(r => r.selector === ".screen-head.sos");
+    expect(decl(sos!.body, "--head-call-bg")).toBe("var(--sos-head)");
+    expect(decl(sos!.body, "--head-call-off")).toBe("var(--call-soft)");
+    const sosRoot = rules.find(r => r.selector === ":root .screen.sos.sos.sos");
+    const tokens = rules.filter(r => r.selector === ":root").map(r => r.body).join(";");
+    // 四段目の消えている側（--tier-deep）は --alert-deep＝濃い黄と同じ色
+    expect(decl(sosRoot!.body, "--tier-deep")).toBe("var(--alert-deep)");
+    expect(decl(tokens, "--alert-deep")).toBe(decl(tokens, "--call-soft"));
+  });
+
   it("薄い黄と濃い黄は同じ橙の濃度1と濃度2", () => {
     const tokens = rules.filter(r => r.selector === ":root").map(r => r.body).join(";");
     expect(decl(tokens, "--alert-bg")).toBe("var(--orange-1)");

@@ -321,9 +321,9 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .screen .reject-note { flex: none; margin: 0; padding: var(--s13, 4px) 0; color: var(--alert-ink); font-size: var(--text-lg); font-weight: 700; line-height: 1.35; text-align: center; }
 .screen-main > .reject-note + .confirm { flex: 1; }
 /* 選択の余地のない、完全に不可能な操作の案内（user 2026-11-18）：登録画面の上に重ね、中央に赤褐色の案内（一行目＝大・二行目＝小）を一瞬だけ出す。
-   背後の登録画面はぼかして読めなくする（覆うのはこの案内だけ）。ポインターは素通しで、表示中も操作を妨げない */
+   背後の登録画面はぼかして読めなくし、注意喚起の薄い黄色（--alert-bg）を重ねる（覆うのはこの案内だけ）。ポインターは素通しで、表示中も操作を妨げない */
 .screen .impossible-flash { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s13, 4px);
-  padding: var(--s9, 16px); text-align: center; background: color-mix(in oklch, var(--white) 55%, transparent);
+  padding: var(--s9, 16px); text-align: center; background: color-mix(in oklch, var(--alert-bg) 70%, transparent);
   -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px)); animation: impossible-flash var(--flash-ms, 1800ms) ease-out forwards; }
 .screen .impossible-flash p { margin: 0; max-width: 100%; color: var(--alert-ink); line-height: 1.35; word-break: auto-phrase; text-wrap: balance; }
 .screen .impossible-flash .big { font-size: var(--text-lg); font-weight: 700; }

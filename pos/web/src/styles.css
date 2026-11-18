@@ -176,10 +176,10 @@ button { touch-action: manipulation; }
 .lines td, .lines th { padding: var(--s13, 4px) var(--s13, 4px); border-bottom: var(--s17, 1px) solid var(--border); vertical-align: middle; }
 .num { text-align: right; white-space: nowrap; }
 
-.reg-top { --sum-h: var(--s7); --row: calc(var(--s6) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: grid; grid-template-columns: max-content minmax(max-content, 1fr) max-content; align-items: center; gap: 0 var(--s11, 8px); min-height: var(--s6); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
-/* 中央（合計・お預かり・お釣り）は文字を縮めない（user 2026-11-18）。左右のボタン（取引中止・お会計）の残りの幅の真ん中に置く（重ならない）。
-   消えたボタンの席は残すので、合計の位置はどの段階でも動かない（user 2026-11-18） */
-.reg-top .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.reg-top { --sum-h: var(--s7); --row: calc(var(--s6) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: flex; justify-content: center; align-items: center; gap: 0 var(--gap); min-height: var(--s6); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
+/* 取引中止・合計・お会計は、第二待ち受けの帯（Language・呼び鈴・電子マネー）と同じく最小間隔で寄り添い、群ごと中央に置く（user 2026-11-18）。
+   中央（合計・お預かり・お釣り）は文字を縮めない。消えたボタンの席は残すので、合計の位置はどの段階でも動かない */
+.reg-top .mid { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .reg-top .total { font-size: var(--text-num); }
 .reg-top .info { height: var(--row); line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 0 var(--s10, 14px); font-size: var(--text-sm); white-space: nowrap; }
 .reg-top .info .point { color: var(--msg-weak); }
@@ -187,8 +187,8 @@ button { touch-action: manipulation; }
 .reg-top .sum { height: var(--sum-h); font-size: var(--text-lg); white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 0 var(--s13, 4px); line-height: 1.2; }
 .reg-top .count b, .reg-top .total { font-size: var(--text-num); }
 .reg-top .yen { font-size: inherit; font-weight: 400; }
-.reg-top .void { display: flex; justify-content: flex-start; min-width: 0; }
-.reg-top .action { display: flex; justify-content: flex-end; gap: var(--gap); min-width: 0; }
+.reg-top .void { display: flex; flex: none; }
+.reg-top .action { display: flex; flex: none; gap: var(--gap); }
 /* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大ボタン（user 2026-11-12）。幅は白銀比の 2 倍（user 2026-11-17） */
 .reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; flex: none; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 /* 消えたボタンの席（見えない・押せない）。幅は本物と同じく law.ts fitText が文字から決める */

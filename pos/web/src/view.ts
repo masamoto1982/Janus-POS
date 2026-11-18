@@ -725,7 +725,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt" | "cpn";
 /** error：テンキーの「決定」で送った入力が受け付けられなかった理由。テンキーを開いたまま表示し、次のキーで消す */
 export type PadEntry = { target: PadTarget; line?: number; digits: string; error?: string };
 export const padEntry = new Map<string, PadEntry>();
@@ -743,6 +743,7 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   mamt: { title: "出金する金額", unit: "円", max: 6 },
   mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
   ppt: { title: "使うポイント数", unit: "P", max: 5 },
+  cpn: { title: "取り消す枚数", unit: "枚", max: 3 },
 };
 export const padShow = (target: PadTarget, digits: string): string =>
   target === "mpw" ? "●".repeat(digits.length) : target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits;
@@ -934,8 +935,33 @@ export function couponFlags(reg: number, side: Side, coupons: Coupon[], lineId: 
       const text = `${label}${each}${qty >= 2 ? ` ×${cs.length}` : ""}`;
       const last = cs[cs.length - 1];
       if (ro || !st.allowed) return `<span class="flag coupon-flag">${esc(text)}</span>`;
-      return btn(text, { type: "remove_coupon", register: reg, side, coupon_id: last.id }, st, "flag coupon-flag");
+      // 一枚なら押すとそのまま取り消す。複数なら取り消す枚数を入力する画面を開く
+      if (cs.length === 1) return btn(text, { type: "remove_coupon", register: reg, side, coupon_id: last.id }, st, "flag coupon-flag");
+      return `<button type="button" class="flag coupon-flag" data-couponcancel="${reg}:${side}:${lineId}:${cs[0].kind.kind}">${esc(text)}</button>`;
     });
+}
+
+/** 取り消す枚数を入力する画面を開いている明細とクーポンの種類（レジ:側 → 明細の番号・種類） */
+export const couponCancel = new Map<string, { line: number; kind: string }>();
+
+/** 同じ明細に同じ種類のクーポンが複数付いているときの取り消し画面。取り消す枚数を入力欄に打ち込み、テンキーの決定で取り消す
+ *  （新しく読んだクーポンから取り消す）。開く元の明細やクーポンが減って一枚以下になれば閉じる */
+export function couponCancelTarget(reg: number, side: Side, coupons: Coupon[]): Coupon[] | null {
+  const e = couponCancel.get(`${reg}:${side}`);
+  if (!e) return null;
+  const cs = coupons.filter((c) => c.line_id === e.line && c.kind.kind === e.kind);
+  if (cs.length < 2) {
+    couponCancel.delete(`${reg}:${side}`);
+    return null;
+  }
+  return cs;
+}
+
+function couponCancelScreen(reg: number, side: Side, name: string, cs: Coupon[], st: Gate): string {
+  const value = padValue.get(padValueKey(reg, "cpn")) ?? "";
+  return `${msg(`${cs[0].name}を取り消します`, `${name}に ${cs.length}枚 適用中`)}
+    <div class="parcel-fields"><label>取り消す枚数${padField(reg, side, "cpn", value, `例 1`, "取り消す枚数", undefined, "", st)}<span>枚</span></label></div>
+    <div class="back-foot"><button type="button" class="md ghost back-btn" data-couponclose="${reg}:${side}">バック</button></div>`;
 }
 
 /** 小計。クーポンが効いている明細は小計に取り消し線を引き、その左に値引き後の金額（0 円なら「無料」）を出す */
@@ -1182,6 +1208,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (payStage) return screen(pay);
   if (!paying && r.limit_alert)
     return screen(limitScreen(reg, side, r.limit_alert, ro || !a("remove_line").allowed ? null : a("remove_line"), side === "staff"));
+  const cancelling = !ro ? couponCancelTarget(reg, side, v.coupons) : null;
+  if (cancelling) return `${top}${confirm(couponCancelScreen(reg, side, v.lines.find((l) => l.id === cancelling[0].line_id)?.name ?? "", cancelling, a("remove_coupon")))}`;
   if (!ro && !paying && a("remove_line").allowed && expiredOpen(reg, side, v.lines))
     return screen(expiredScreen(reg, side, v.lines, a("remove_line"), true));
   if (ro && !paying && v.lines.some((l) => l.expired)) return screen(expiredScreen(reg, side, v.lines, null, false));
@@ -1700,6 +1728,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   if (c.phase === "registering" && r.limit_alert)
     return screen(limitScreen(reg, side, r.limit_alert, a("remove_line").allowed ? a("remove_line") : null, side === "staff"));
+  const cancelling = couponCancelTarget(reg, side, c.coupons);
+  if (cancelling) return `${top}${confirm(couponCancelScreen(reg, side, c.lines.find((l) => l.id === cancelling[0].line_id)?.name ?? "", cancelling, a("remove_coupon")))}`;
   if (c.phase === "registering" && a("remove_line").allowed && expiredOpen(reg, side, c.lines))
     return screen(expiredScreen(reg, side, c.lines, side === "staff" ? a("remove_line") : null, side === "staff"));
   const card = firstOf([

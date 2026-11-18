@@ -6,6 +6,8 @@ import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlo
 import logoUrl from "./logo.jpg";
 import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
 import {
+  couponCancel,
+  couponCancelTarget,
   esc,
   FF_TABS,
   ffVerifying,
@@ -634,6 +636,20 @@ function padKey(key: string, k: string): void {
       const ffKey = `${register}:${side}:${e.line}`;
       ffvInput.set(ffKey, String(value));
       send({ type: "check_ff", register, side: side as Side, line_id: e.line!, handed: value });
+    } else if (e.target === "cpn") {
+      // 取り消す枚数：新しく読んだクーポンから、その枚数だけ取り消す（返却の案内が出る）
+      if (e.digits === "") return;
+      const r = snap.registers.find((x) => x.id === register);
+      const coupons = (side === "staff" ? r?.staff.coupons : r?.customer.coupons) ?? [];
+      const cs = couponCancelTarget(register, side as Side, coupons) ?? [];
+      if (value < 1 || value > cs.length) {
+        e.error = `1〜${cs.length}枚で入力してください`;
+        frame();
+        return;
+      }
+      for (const c of cs.slice(-value).reverse()) send({ type: "remove_coupon", register, side: side as Side, coupon_id: c.id });
+      couponCancel.delete(`${register}:${side}`);
+      padValue.delete(padValueKey(register, "cpn"));
     } else if (e.target in SUBMIT) {
       // 入力欄ひとつの画面：テンキーの「決定」でそのまま送る。受け付けられなければ理由を出してテンキーを開いたままにする
       if (e.digits === "") return;
@@ -1019,6 +1035,18 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.ffverify) {
     ffVerifying.add(b.dataset.ffverify);
+    frame();
+    return;
+  }
+  if (b.dataset.couponcancel) {
+    const [reg, side, line, kind] = b.dataset.couponcancel.split(":");
+    couponCancel.set(`${reg}:${side}`, { line: Number(line), kind });
+    frame();
+    return;
+  }
+  if (b.dataset.couponclose) {
+    couponCancel.delete(b.dataset.couponclose);
+    padValue.delete(padValueKey(Number(b.dataset.couponclose.split(":")[0]), "cpn"));
     frame();
     return;
   }

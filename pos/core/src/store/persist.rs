@@ -18,7 +18,7 @@ use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
 
 /// 保存の形式。既定の販売規則（年齢制限・個数制限）や商品を変えたら上げ、古い保存を捨てて新しい既定値で始める
-pub const SCHEMA: u32 = 3;
+pub const SCHEMA: u32 = 4;
 
 fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
@@ -208,7 +208,7 @@ struct SavedTxn {
     point_declined: bool,
     inserted: Cash,
     inserted_at: u64,
-    customer_turn: bool,
+    floor_turn: bool,
     prepaid: u32,
     prepaid_method: Option<PaymentMethod>,
     emoney_short: bool,
@@ -355,7 +355,7 @@ impl SavedTxn {
             point_declined: t.point_declined,
             inserted: t.inserted.clone(),
             inserted_at: t.inserted_at,
-            customer_turn: t.customer_turn,
+            floor_turn: t.floor_turn,
             prepaid: t.prepaid,
             prepaid_method: t.prepaid_method,
             emoney_short: t.emoney_short,
@@ -407,7 +407,7 @@ impl SavedTxn {
             point_declined: self.point_declined,
             inserted: self.inserted,
             inserted_at: self.inserted_at,
-            customer_turn: self.customer_turn,
+            floor_turn: self.floor_turn,
             prepaid: self.prepaid,
             prepaid_method: self.prepaid_method,
             emoney_short: self.emoney_short,

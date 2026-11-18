@@ -34,7 +34,7 @@
   --reg-top-ink: var(--black);
   --staff-bg: var(--grey-4);
   --staff-ink: var(--white);
-  --cust-bg: var(--white);
+  --screen-bg: var(--white);
   --warn: var(--orange-4);
   --danger: var(--red-4);
   --danger-bg: var(--red-1);
@@ -115,7 +115,7 @@ button { touch-action: manipulation; }
 .screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); height: var(--head-h);
   padding: 0 var(--s11, 8px); border-bottom: var(--s17, 1px) solid var(--border); background: var(--head-bg); }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s15, 2px); min-width: 0; }
-.staff-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.counter-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; }
 /* スタッフがログインして応答した呼び出しの用件（たばこ など）。担当スタッフ名の右に */
 .staff-head .answered-topic { margin-left: var(--s11, 8px); font-weight: 700; color: var(--msg-strong); white-space: nowrap; }
@@ -161,8 +161,8 @@ button { touch-action: manipulation; }
   background: var(--off-bg); color: var(--off-ink); border: var(--s16, 1.5px) solid var(--border); filter: grayscale(1);
   cursor: pointer; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
-.staff-screen { background: var(--cust-bg); border: var(--s16, 1.5px) solid var(--border); }
-.customer-screen { background: var(--cust-bg); border: var(--s16, 1.5px) solid var(--border); }
+.counter-screen { background: var(--screen-bg); border: var(--s16, 1.5px) solid var(--border); }
+.floor-screen { background: var(--screen-bg); border: var(--s16, 1.5px) solid var(--border); }
 
 .lines { width: 100%; border-collapse: collapse; margin: var(--s13, 4px) 0 var(--s11, 8px); }
 .lines.cols3 { table-layout: fixed; }
@@ -194,7 +194,7 @@ button { touch-action: manipulation; }
 .reg-top .void { display: flex; flex: none; }
 .reg-top .action { display: flex; flex: none; gap: var(--gap); }
 /* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大ボタン（user 2026-11-12）。幅は白銀比の 2 倍（user 2026-11-17） */
-.reg-top .void > button, .reg-top .action > button, .reg-top .action > .staff-only > button { box-sizing: border-box; flex: none; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
+.reg-top .void > button, .reg-top .action > button, .reg-top .action > .counter-only > button { box-sizing: border-box; flex: none; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 /* 消えたボタンの席（見えない・押せない）。幅は本物と同じく law.ts fitText が文字から決める */
 .reg-top .band-slot { visibility: hidden; }
 .reg-top .count .full { margin-left: var(--s11, 8px); font-weight: 700; }
@@ -544,14 +544,14 @@ body.dragging .drop-hint { display: inline; }
 .copyright a { color: var(--muted); }
 .copyright a:hover { color: var(--accent); }
 
-.staff-screen, .customer-screen {
+.counter-screen, .floor-screen {
   --accent: var(--grey-4); --staff-bg: var(--grey-4); --staff-ink: var(--white); --call: var(--grey-4); --call-bg: var(--grey-1);
   --flash: var(--grey-2); --bill-bg: var(--grey-1); --coin-bg: var(--grey-1); --pay-bg: var(--grey-1);
 }
 .screen :is(button, input, select, summary) { filter: grayscale(1); }
 .screen.operable [data-region] :is(button, input, select, summary),
-.staff-screen [data-region] .staff-only button,
-.customer-screen [data-region] .customer-only button { filter: url(#ramp); }
+.counter-screen [data-region] .counter-only button,
+.floor-screen [data-region] .floor-only button { filter: url(#ramp); }
 .screen [data-region] input:disabled, .screen [data-region] select:disabled { filter: grayscale(1); }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
 /* ボタン操作で出すガイダンス（案内ボタン・支払方法の選択）は青文字（濃いグレーを青のランプで青にする） */
@@ -562,7 +562,7 @@ body.dragging .drop-hint { display: inline; }
 .screen.inactive [data-region] select, .screen.inactive [data-region] summary {
   pointer-events: none;
 }
-.staff-screen.inactive [data-region] .staff-only button:not(:disabled) { pointer-events: auto; opacity: 1; }
+.counter-screen.inactive [data-region] .counter-only button:not(:disabled) { pointer-events: auto; opacity: 1; }
 .screen button:disabled {
   opacity: 1 !important; filter: grayscale(1) !important; background: var(--off-bg) !important; color: var(--off-ink) !important; border-color: var(--border);
 }
@@ -571,9 +571,9 @@ body.dragging .drop-hint { display: inline; }
    ボタンにランプ（#ramp）やグレーの filter を掛けると絵文字まで染まるので、単品ボタンだけ filter を外し、
    ランプが出していた色（グレー4→操作の青）を直接指定する。押せないときのグレーは上の :disabled・.out の指定のまま */
 .screen [data-region] button.ff-item { filter: none !important; }
-:is(.screen.operable [data-region], .staff-screen [data-region] .staff-only) button.ff-item:not(:disabled, .out) { border-color: var(--operable-blue); }
-:is(.screen.operable [data-region], .staff-screen [data-region] .staff-only) button.ff-item.made_to_order:not(:disabled) { background: var(--operable-blue); }
-:is(.screen.operable [data-region], .staff-screen [data-region] .staff-only) button.ff-item:is(.plenty, .low):not(:disabled) { color: var(--operable-blue); }
+:is(.screen.operable [data-region], .counter-screen [data-region] .counter-only) button.ff-item:not(:disabled, .out) { border-color: var(--operable-blue); }
+:is(.screen.operable [data-region], .counter-screen [data-region] .counter-only) button.ff-item.made_to_order:not(:disabled) { background: var(--operable-blue); }
+:is(.screen.operable [data-region], .counter-screen [data-region] .counter-only) button.ff-item:is(.plenty, .low):not(:disabled) { color: var(--operable-blue); }
 .pickup-no { font-size: var(--text-num); font-weight: 700; letter-spacing: .04em; margin: 0; font-variant-numeric: tabular-nums; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: var(--s11, 8px) var(--s9, 16px); justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: var(--s11, 8px); font-size: var(--text-sm); }
@@ -590,7 +590,7 @@ body.dragging .drop-hint { display: inline; }
 /* 照合イベントが済んだ印：意味色のグリーン（安全・肯定）の丸に白い✓ */
 .pass-mark { width: var(--s6, 48px); height: var(--s6, 48px); border-radius: 50%; background: var(--ok); color: var(--white); font-size: var(--text-num); font-weight: 700; line-height: var(--s6, 48px); text-align: center; }
 
-.mirror { background: var(--cust-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
+.mirror { background: var(--screen-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
 .mirror .muted { color: var(--muted); }
 .login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: var(--text-sm); font-weight: 500; color: var(--muted); }
 .login-sel select { font-size: var(--text-sm); padding: 4px 8px; }
@@ -627,10 +627,10 @@ body.dragging .drop-hint { display: inline; }
 .screen .menu-form button.pad-field { width: calc(var(--btn-md-w) * 3); height: var(--btn-md-h); }
 .screen .menu-form button:not(.pad-field) { width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); }
 .money-io { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 8px; }
-.money-io-staff { grid-column: 1; min-width: 0; }
+.money-io-counter { grid-column: 1; min-width: 0; }
 .money-io-boxes { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-.money-io-cust { grid-column: 2; min-width: 0; }
-.money-io-cust > *, .money-io-boxes > * { min-width: 0; }
+.money-io-floor { grid-column: 2; min-width: 0; }
+.money-io-floor > *, .money-io-boxes > * { min-width: 0; }
 /* 稼働モード表示は背景も枠線もない、ただのテキスト（濃い背景・白文字は FF 単品ボタンと紛れるため） */
 .mode-title { display: inline-flex; align-items: center; height: var(--s8, 24px); font-size: var(--text-sm); font-weight: 700; line-height: 1; white-space: nowrap; color: var(--msg-strong); }
 .money-io .inlet, .money-io .outlet, .money-io .terminal {
@@ -673,7 +673,7 @@ body.dragging .drop-hint { display: inline; }
   .money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { animation-duration: 0.01s; }
 }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
-@media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-staff, .money-io-cust { grid-column: 1; } }
+@media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-counter, .money-io-floor { grid-column: 1; } }
 
 /* スタッフ操作モードの売り場側の最下段＝サイネージ（セール情報・詐欺防止の呼びかけ）。押せる部品は置かない */
 .signage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -795,7 +795,7 @@ body.dragging .drop-hint { display: inline; }
   .screen-cap { display: none; }
   .screen, [data-inlet], [data-terminal], [data-scanner] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .money-io { margin-top: 6px; }
-  .money-io.face-staff .money-io-cust, .money-io.face-customer .money-io-staff { display: none; }
+  .money-io.face-counter .money-io-floor, .money-io.face-floor .money-io-counter { display: none; }
   .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
 }
 
@@ -818,7 +818,7 @@ body.dragging .drop-hint { display: inline; }
 .receipt-stamp-table th:nth-child(3), .receipt-stamp-table th:nth-child(4) { width: 16%; }
 .bill-no { font-variant-numeric: tabular-nums; letter-spacing: .02em; white-space: nowrap; }
 
-.staff-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }
+.counter-screen.inactive [data-region] .bell-btn:not(:disabled) { pointer-events: auto; opacity: 1; }
 /* 呼び鈴：操作可能部品の青でベルを描き、背景は注意喚起の黄＝呼び出し中のヘッダーと同じ黄（--call-soft）。押せないときはグレー。
    呼び出し中のヘッダーと重なっても、青い縁取りで呼び鈴の形がわかる。
    呼び鈴は黄背景を保つため青のランプ（#ramp）を通さないので、ベルも縁も青のランプが濃いグレー（--msg-strong）を
@@ -867,18 +867,18 @@ body.dragging .drop-hint { display: inline; }
    呼び出し中のレジカウンター側画面は、エマージェンシーと同じやわらかい黄色を同じ塗り分けで */
 :root { --mode-staff-bg: var(--white); --mode-staff-deep: var(--grey-1);
   --mode-self-bg: var(--white); --mode-self-deep: var(--grey-1); --alert-deep: var(--orange-2); }
-:root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
-:root .screen.mode-self { --cust-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
+:root .screen.mode-staff { --screen-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
+:root .screen.mode-self { --screen-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
 /* 操作できる側（アクティブ側）の画面は肯定の緑、操作できない側は否定の赤：一段目・三段目は淡（濃度1）、二段目（帯）と四段目（最下段）は薄（濃度2） */
-:root .screen.operable { --cust-bg: var(--green-1); --tier-deep: var(--green-2); }
-:root .screen:not(.operable) { --cust-bg: var(--red-1); --tier-deep: var(--red-2); }
+:root .screen.operable { --screen-bg: var(--green-1); --tier-deep: var(--green-2); }
+:root .screen:not(.operable) { --screen-bg: var(--red-1); --tier-deep: var(--red-2); }
 /* セルフ操作モードのレジカウンター側（操作できない側）は、赤だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
-:root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--grey-1); --tier-deep: var(--grey-2); }
+:root .counter-screen.mode-self:not(.operable, .calling) { --screen-bg: var(--grey-1); --tier-deep: var(--grey-2); }
 /* 呼び出し中のレジカウンター側は黄の段が優先。段の色の規則を足すときは :not(.calling) で呼び出し中を外す（styles.test.ts で守る） */
-:root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
+:root .counter-screen.calling { --screen-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。
    ヘッダー・最下段は消えているあいだもこの黄なので、黄と赤（--sos-head）で点滅する（user 2026-11-14） */
-:root .screen.sos.sos.sos { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
+:root .screen.sos.sos.sos { --screen-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 商品が登録された行を一瞬だけ染めるエフェクトも、濃いめの段と同じモードの色 */
 :root .screen:is(.mode-staff, .mode-self) { --flash: var(--tier-deep); }
 

@@ -43,7 +43,7 @@ fn reg(s: &Store, id: u8) -> RegisterView {
 
 fn allowed(v: &RegisterView, side: Side, a: Action) -> bool {
     v.active_side.is_none_or(|s| s == side)
-        && v.staff
+        && v.counter
             .actions
             .iter()
             .find(|x| x.action == a)
@@ -65,13 +65,13 @@ fn login(s: &mut Store, r: u8) {
 fn open_staff_menu(s: &mut Store, r: u8) {
     ok(
         s,
-        json!({"type":"open_menu","register":r,"side":"staff","screen":"top"}),
+        json!({"type":"open_menu","register":r,"side":"counter","screen":"top"}),
     );
 }
 
 fn login_as(s: &mut Store, r: u8, badge: &str) {
-    scan(s, r, "staff", badge);
-    ok(s, json!({"type":"claim","register":r,"side":"staff"}));
+    scan(s, r, "counter", badge);
+    ok(s, json!({"type":"claim","register":r,"side":"counter"}));
 }
 
 fn no_id_check(s: &mut Store, r: u8) {
@@ -83,8 +83,8 @@ fn no_id_check(s: &mut Store, r: u8) {
 
 fn confirm_point(s: &mut Store, r: u8) {
     let side = match reg(s, r).active_side {
-        Some(Side::Customer) => "customer",
-        _ => "staff",
+        Some(Side::Floor) => "floor",
+        _ => "counter",
     };
     ok(
         s,
@@ -105,17 +105,17 @@ fn advance(s: &mut Store, ms: u64) {
 fn any_barcode_is_accepted_in_any_order() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
-    scan(&mut s, 1, "customer", "PC12345678");
-    scan(&mut s, 1, "staff", "2000000000015");
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
+    scan(&mut s, 1, "floor", "PC12345678");
+    scan(&mut s, 1, "counter", "2000000000015");
+    scan(&mut s, 1, "floor", BREAD);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.len(), 3);
-    assert_eq!(v.staff.total, 160 * 2 + 3);
-    assert!(v.customer.point_card);
+    assert_eq!(v.counter.lines.len(), 3);
+    assert_eq!(v.counter.total, 160 * 2 + 3);
+    assert!(v.floor.point_card);
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":"0000"})
+        json!({"type":"scan","register":1,"side":"counter","code":"0000"})
     )
     .is_err());
 }
@@ -125,25 +125,25 @@ fn any_barcode_is_accepted_in_any_order() {
 fn scanning_on_payment_screen_returns_to_registering() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":100,"count":1}),
     );
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.phase, Phase::Registering);
-    assert_eq!(v.staff.inserted, 100);
+    assert_eq!(v.counter.phase, Phase::Registering);
+    assert_eq!(v.counter.inserted, 100);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
-    assert!(!reg(&s, 1).staff.point_pending);
+    assert!(!reg(&s, 1).counter.point_pending);
     ok(
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":500,"count":1}),
@@ -158,37 +158,37 @@ fn scanning_on_payment_screen_returns_to_registering() {
 fn age_check_happens_at_checkout_and_blocks_payment() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "counter", BEER);
     assert_eq!(
-        reg(&s, 1).staff.required_age,
+        reg(&s, 1).counter.required_age,
         None,
         "no age check at scan time"
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     let v = reg(&s, 1);
-    assert!(v.staff.age_choice_pending);
-    assert!(!v.staff.point_pending);
+    assert!(v.counter.age_choice_pending);
+    assert!(!v.counter.point_pending);
     assert!(run(
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":1000,"count":1})
     )
     .is_err());
     no_id_check(&mut s, 1);
-    assert!(!reg(&s, 1).staff.age_choice_pending);
+    assert!(!reg(&s, 1).counter.age_choice_pending);
     confirm_point(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "counter", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     assert!(
-        !reg(&s, 1).staff.point_pending,
+        !reg(&s, 1).counter.point_pending,
         "point card asked once per txn"
     );
-    assert!(!reg(&s, 1).staff.age_choice_pending);
+    assert!(!reg(&s, 1).counter.age_choice_pending);
     ok(
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":1000,"count":1}),
@@ -199,10 +199,10 @@ fn age_check_happens_at_checkout_and_blocks_payment() {
 #[test]
 fn self_operated_age_check_calls_staff() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", BEER);
+    scan(&mut s, 2, "floor", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"}),
+        json!({"type":"checkout","register":2,"side":"floor"}),
     );
     assert!(s
         .snapshot()
@@ -211,15 +211,15 @@ fn self_operated_age_check_calls_staff() {
         .any(|c| c.register == 2 && c.kind == CallKind::AgeCheck));
     assert!(!allowed(
         &reg(&s, 2),
-        Side::Customer,
+        Side::Floor,
         Action::ChooseAgeCheck
     ));
-    assert_eq!(reg(&s, 2).customer.age_wait, Some(20));
-    scan(&mut s, 2, "staff", "ST002");
-    assert_eq!(reg(&s, 2).customer.age_wait, None);
+    assert_eq!(reg(&s, 2).floor.age_wait, Some(20));
+    scan(&mut s, 2, "counter", "ST002");
+    assert_eq!(reg(&s, 2).floor.age_wait, None);
     no_id_check(&mut s, 2);
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
-    assert_eq!(reg(&s, 2).staff.state, StaffState::Ready);
+    assert_eq!(reg(&s, 2).counter.state, StaffState::Ready);
     assert!(s.snapshot().calls.is_empty());
 }
 
@@ -227,14 +227,14 @@ fn self_operated_age_check_calls_staff() {
 #[test]
 fn ff_button_works_while_age_check_call_is_open() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", BEER);
+    scan(&mut s, 2, "floor", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"}),
+        json!({"type":"checkout","register":2,"side":"floor"}),
     );
     let v = reg(&s, 2);
-    assert!(allowed(&v, Side::Customer, Action::FfButton));
-    assert!(allowed(&v, Side::Customer, Action::CallStaff));
+    assert!(allowed(&v, Side::Floor, Action::FfButton));
+    assert!(allowed(&v, Side::Floor, Action::CallStaff));
     ok(&mut s, json!({"type":"ff_button","register":2}));
     let calls = s.snapshot().calls;
     assert!(calls
@@ -261,13 +261,13 @@ fn only_owner_changes_age_rules() {
         json!({"type":"remove_age_rule","owner_id":"000","password":"9999","rule_id":1})
     )
     .is_err());
-    scan(&mut s, 1, "staff", SANDWICH);
-    scan(&mut s, 1, "staff", LIGHTER);
+    scan(&mut s, 1, "counter", SANDWICH);
+    scan(&mut s, 1, "counter", LIGHTER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
-    assert_eq!(reg(&s, 1).staff.required_age, Some(20));
+    assert_eq!(reg(&s, 1).counter.required_age, Some(20));
     assert_eq!(s.snapshot().age_rules.history.len(), 1);
 }
 
@@ -276,34 +276,34 @@ fn only_owner_changes_age_rules() {
 fn customer_cannot_take_over_staff_operated_register() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     assert!(run(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"})
+        json!({"type":"checkout","register":1,"side":"floor"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     assert!(run(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"qr"})
+        json!({"type":"select_payment","register":1,"side":"floor","method":"qr"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+        json!({"type":"back_to_registering","register":1,"side":"counter"}),
     );
-    assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
+    assert_eq!(reg(&s, 1).counter.phase, Phase::Registering);
 }
 
 /// 仕様 8：セルフ操作モードの FF は呼び出しからスタッフが登録する
 #[test]
 fn fast_food_flow_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", BREAD);
+    scan(&mut s, 2, "floor", BREAD);
     assert!(run(
         &mut s,
         json!({"type":"register_ff","register":2,"code":"FF01","qty":1})
@@ -325,17 +325,17 @@ fn fast_food_flow_in_self_operated_mode() {
     );
     assert!(run(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"})
+        json!({"type":"checkout","register":2,"side":"floor"})
     )
     .is_err());
     let e = run(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     )
     .unwrap_err();
     assert!(e.contains("お渡し確認"), "{e}");
     let ff = reg(&s, 2)
-        .staff
+        .counter
         .lines
         .iter()
         .find(|l| l.line.code == "FF01")
@@ -344,26 +344,26 @@ fn fast_food_flow_in_self_operated_mode() {
         .id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":1}),
+        json!({"type":"check_ff","register":2,"side":"counter","line_id":ff,"handed":1}),
     );
     assert!(run(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"})
+        json!({"type":"checkout","register":2,"side":"counter"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2}),
+        json!({"type":"check_ff","register":2,"side":"counter","line_id":ff,"handed":2}),
     );
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
     confirm_point(&mut s, 2);
     assert!(run(
         &mut s,
-        json!({"type":"check_ff","register":2,"side":"staff","line_id":ff,"handed":2})
+        json!({"type":"check_ff","register":2,"side":"counter","line_id":ff,"handed":2})
     )
     .is_err());
     assert_eq!(
@@ -373,12 +373,12 @@ fn fast_food_flow_in_self_operated_mode() {
     );
     assert!(run(
         &mut s,
-        json!({"type":"select_payment","register":2,"side":"customer","method":"emoney"})
+        json!({"type":"select_payment","register":2,"side":"floor","method":"emoney"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"select_payment","register":2,"side":"staff","method":"emoney"}),
+        json!({"type":"select_payment","register":2,"side":"counter","method":"emoney"}),
     );
     ok(&mut s, json!({"type":"tap_emoney","register":2}));
     assert_eq!(reg(&s, 2).last_receipt.unwrap().total, 160 + 440);
@@ -388,7 +388,7 @@ fn fast_food_flow_in_self_operated_mode() {
 #[test]
 fn pickup_matches_the_parcel_then_hands_it_over() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", RECEIVE);
+    scan(&mut s, 2, "floor", RECEIVE);
     assert!(s
         .snapshot()
         .calls
@@ -397,34 +397,34 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     for code in [RECEIVE, BREAD, PARCEL] {
         assert!(run(
             &mut s,
-            json!({"type":"scan","register":2,"side":"customer","code":code})
+            json!({"type":"scan","register":2,"side":"floor","code":code})
         )
         .is_err());
     }
     login_as(&mut s, 2, "ST001");
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
-    let no = reg(&s, 2).staff.lines[0]
+    let no = reg(&s, 2).counter.lines[0]
         .line
         .pickup
         .clone()
         .expect("お預かりの番号")
         .no;
-    let amount = reg(&s, 2).staff.lines[0]
+    let amount = reg(&s, 2).counter.lines[0]
         .line
         .pickup
         .clone()
         .unwrap()
         .amount;
     assert!(amount > 0);
-    assert_eq!(reg(&s, 2).customer.total, amount);
+    assert_eq!(reg(&s, 2).floor.total, amount);
     assert!(run(&mut s, json!({"type":"pickup_handover","register":2})).is_err());
-    let id = reg(&s, 2).staff.lines[0].line.id;
+    let id = reg(&s, 2).counter.lines[0].line.id;
     assert!(run(
         &mut s,
         json!({"type":"complete_service","register":2,"line_id":id,"amount":0})
     )
     .is_err());
-    assert!(!allowed(&reg(&s, 2), Side::Staff, Action::Checkout));
+    assert!(!allowed(&reg(&s, 2), Side::Counter, Action::Checkout));
     let other = if no.starts_with('9') {
         "PK000000000000"
     } else {
@@ -432,10 +432,10 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     };
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":2,"side":"staff","code":other})
+        json!({"type":"scan","register":2,"side":"counter","code":other})
     )
     .is_err());
-    assert!(reg(&s, 2).staff.lines[0]
+    assert!(reg(&s, 2).counter.lines[0]
         .line
         .pickup
         .as_ref()
@@ -445,24 +445,24 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     let right = format!("PK{}", no.replace('-', ""));
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":2,"side":"customer","code":right})
+        json!({"type":"scan","register":2,"side":"floor","code":right})
     )
     .is_err());
-    scan(&mut s, 2, "staff", &right);
-    let pk = reg(&s, 2).staff.lines[0].line.pickup.clone().unwrap();
+    scan(&mut s, 2, "counter", &right);
+    let pk = reg(&s, 2).counter.lines[0].line.pickup.clone().unwrap();
     assert!(pk.matched && pk.wrong.is_none());
     let v = reg(&s, 2);
     assert!(pk.amount >= 1_000);
-    assert_eq!(v.customer.total, pk.amount);
+    assert_eq!(v.floor.total, pk.amount);
     assert!(run(&mut s, json!({"type":"pickup_handover","register":2})).is_err());
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
-    assert!(!reg(&s, 2).staff.point_pending);
+    assert!(!reg(&s, 2).counter.point_pending);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":2,"side":"staff","method":"cash"}),
+        json!({"type":"select_payment","register":2,"side":"counter","method":"cash"}),
     );
     ok(
         &mut s,
@@ -474,22 +474,22 @@ fn pickup_matches_the_parcel_then_hands_it_over() {
     assert_eq!(v.pickup_handover.as_deref(), Some(pk.no.as_str()));
     ok(&mut s, json!({"type":"pickup_handover","register":2}));
     let v = reg(&s, 2);
-    assert!(v.staff.lines.is_empty() && v.pickup_handover.is_none());
+    assert!(v.counter.lines.is_empty() && v.pickup_handover.is_none());
     assert!(!s
         .snapshot()
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Service && c.register == 2));
-    scan(&mut s, 2, "staff", BREAD);
+    scan(&mut s, 2, "counter", BREAD);
 }
 
 /// 仕様 10.2：保管場所の荷物は有り・無しで決める
 #[test]
 fn pickup_can_be_decided_by_found_or_missing() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", RECEIVE);
+    scan(&mut s, 2, "floor", RECEIVE);
     login_as(&mut s, 2, "ST001");
-    let pk = |s: &Store| reg(s, 2).staff.lines[0].line.pickup.clone().unwrap();
+    let pk = |s: &Store| reg(s, 2).counter.lines[0].line.pickup.clone().unwrap();
     ok(
         &mut s,
         json!({"type":"pickup_found","register":2,"found":false}),
@@ -505,8 +505,8 @@ fn pickup_can_be_decided_by_found_or_missing() {
         json!({"type":"pickup_found","register":2,"found":false}),
     );
     ok(&mut s, json!({"type":"pickup_handover","register":2}));
-    assert!(reg(&s, 2).staff.lines.is_empty());
-    scan(&mut s, 2, "staff", RECEIVE);
+    assert!(reg(&s, 2).counter.lines.is_empty());
+    scan(&mut s, 2, "counter", RECEIVE);
     ok(
         &mut s,
         json!({"type":"pickup_found","register":2,"found":true}),
@@ -519,10 +519,10 @@ fn pickup_can_be_decided_by_found_or_missing() {
         )
         .is_err());
     }
-    let id = reg(&s, 2).staff.lines[0].line.id;
+    let id = reg(&s, 2).counter.lines[0].line.id;
     assert!(run(
         &mut s,
-        json!({"type":"remove_line","register":2,"side":"staff","line_id":id})
+        json!({"type":"remove_line","register":2,"side":"counter","line_id":id})
     )
     .is_err());
     assert!(pk(&s).matched);
@@ -530,7 +530,7 @@ fn pickup_can_be_decided_by_found_or_missing() {
 
 fn pending_parcel(s: &Store, r: u8) -> u32 {
     reg(s, r)
-        .staff
+        .counter
         .lines
         .iter()
         .find(|l| matches!(l.line.kind, LineKind::Service { done: false, .. }))
@@ -542,7 +542,7 @@ fn pending_parcel(s: &Store, r: u8) -> u32 {
 #[test]
 fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL_COLLECT);
+    scan(&mut s, 2, "floor", PARCEL_COLLECT);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
@@ -553,14 +553,14 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
     );
-    let pc = |s: &Store, i: usize| reg(s, 2).staff.lines[i].line.parcel.clone().unwrap();
+    let pc = |s: &Store, i: usize| reg(s, 2).counter.lines[i].line.parcel.clone().unwrap();
     assert!(pc(&s, 0).collect && pc(&s, 0).fee == 940);
-    assert_eq!(reg(&s, 2).customer.total, 0);
+    assert_eq!(reg(&s, 2).floor.total, 0);
     assert!(
-        !reg(&s, 2).staff.parcel_ask,
+        !reg(&s, 2).counter.parcel_ask,
         "複数口でなければ伝票ごとに受付が済む"
     );
-    scan(&mut s, 2, "staff", PARCEL_COLLECT);
+    scan(&mut s, 2, "counter", PARCEL_COLLECT);
     let id2 = pending_parcel(&s, 2);
     ok(
         &mut s,
@@ -576,33 +576,33 @@ fn collect_parcel_is_free_and_registered_parcel_is_cancelled_by_its_slip() {
     assert_eq!(slip.len(), 12);
     assert!(run(
         &mut s,
-        json!({"type":"remove_line","register":2,"side":"staff","line_id":id})
+        json!({"type":"remove_line","register":2,"side":"counter","line_id":id})
     )
     .is_err());
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":2,"side":"customer","code":format!("PS{slip}")})
+        json!({"type":"scan","register":2,"side":"floor","code":format!("PS{slip}")})
     )
     .is_err());
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":2,"side":"staff","code":"PS000000000000"})
+        json!({"type":"scan","register":2,"side":"counter","code":"PS000000000000"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"scan","register":2,"side":"staff","code":format!("PS{slip}")}),
+        json!({"type":"scan","register":2,"side":"counter","code":format!("PS{slip}")}),
     );
     let v = reg(&s, 2);
-    assert_eq!(v.staff.lines.len(), 1);
-    assert_eq!(v.staff.lines[0].line.id, id2);
+    assert_eq!(v.counter.lines.len(), 1);
+    assert_eq!(v.counter.lines[0].line.id, id2);
 }
 
 /// 仕様 10.1：着払いだけなら会計で支払方法を選ばずに終わる
 #[test]
 fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL_COLLECT);
+    scan(&mut s, 2, "floor", PARCEL_COLLECT);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
@@ -613,13 +613,13 @@ fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
     );
-    assert!(!reg(&s, 2).staff.parcel_ask);
+    assert!(!reg(&s, 2).counter.parcel_ask);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
     let v = reg(&s, 2);
-    assert!(v.staff.lines.is_empty(), "取引はもう終わっている");
+    assert!(v.counter.lines.is_empty(), "取引はもう終わっている");
     let rc = v.last_receipt.unwrap();
     assert_eq!((rc.total, rc.paid, rc.change_total), (0, 0, 0));
     assert_eq!(rc.method, "着払い");
@@ -629,7 +629,7 @@ fn collect_parcels_finish_on_checkout_without_choosing_a_payment() {
 #[test]
 fn a_parcel_for_another_address_is_scanned_even_while_asking_for_more() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL_MULTI);
+    scan(&mut s, 2, "floor", PARCEL_MULTI);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
@@ -640,14 +640,14 @@ fn a_parcel_for_another_address_is_scanned_even_while_asking_for_more() {
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
     );
-    assert!(reg(&s, 2).staff.parcel_ask);
-    scan(&mut s, 2, "staff", PARCEL_COLLECT);
+    assert!(reg(&s, 2).counter.parcel_ask);
+    scan(&mut s, 2, "counter", PARCEL_COLLECT);
     let v = reg(&s, 2);
-    assert!(!v.staff.parcel_ask);
+    assert!(!v.counter.parcel_ask);
     let id2 = pending_parcel(&s, 2);
     assert_ne!(id, id2);
     let p2 = v
-        .staff
+        .counter
         .lines
         .iter()
         .find(|l| l.line.id == id2)
@@ -660,7 +660,7 @@ fn a_parcel_for_another_address_is_scanned_even_while_asking_for_more() {
 #[test]
 fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "floor", PARCEL);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
@@ -671,7 +671,7 @@ fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
     );
-    scan(&mut s, 2, "staff", PARCEL_COLLECT);
+    scan(&mut s, 2, "counter", PARCEL_COLLECT);
     let id2 = pending_parcel(&s, 2);
     ok(
         &mut s,
@@ -683,10 +683,10 @@ fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
     let v = reg(&s, 2);
-    assert_eq!(v.staff.lines.len(), 2, "発払いの分を払うまで取引は続く");
+    assert_eq!(v.counter.lines.len(), 2, "発払いの分を払うまで取引は続く");
     assert!(v.last_receipt.is_none());
 }
 
@@ -694,12 +694,12 @@ fn prepaid_and_collect_parcels_together_still_ask_for_a_payment() {
 #[test]
 fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "floor", PARCEL);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     let parcel = |s: &Store, id: u32| {
         reg(s, 2)
-            .staff
+            .counter
             .lines
             .iter()
             .find(|l| l.line.id == id)
@@ -734,9 +734,9 @@ fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
         &mut s,
         json!({"type":"parcel_back","register":2,"line_id":id}),
     );
-    assert!(reg(&s, 2).staff.lines.is_empty());
-    assert!(!reg(&s, 2).staff.parcel_ask);
-    scan(&mut s, 2, "customer", PARCEL_MULTI);
+    assert!(reg(&s, 2).counter.lines.is_empty());
+    assert!(!reg(&s, 2).counter.parcel_ask);
+    scan(&mut s, 2, "floor", PARCEL_MULTI);
     let id = pending_parcel(&s, 2);
     ok(
         &mut s,
@@ -756,15 +756,15 @@ fn parcel_size_is_decided_in_two_steps_and_back_steps_back() {
         json!({"type":"parcel_back","register":2,"line_id":id2}),
     );
     let v = reg(&s, 2);
-    assert_eq!(v.staff.lines.len(), 1);
-    assert!(v.staff.parcel_ask);
+    assert_eq!(v.counter.lines.len(), 1);
+    assert!(v.counter.parcel_ask);
 }
 
 /// 仕様 10.1：料金はサイズと郵便番号で決まる
 #[test]
 fn parcel_fee_comes_from_size_and_postal_code() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "floor", PARCEL);
     assert!(s
         .snapshot()
         .calls
@@ -805,10 +805,10 @@ fn parcel_fee_comes_from_size_and_postal_code() {
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
     );
     let v = reg(&s, 2);
-    assert_eq!(v.customer.total, 940);
-    assert!(!v.staff.parcel_ask && !v.customer.parcel_ask);
+    assert_eq!(v.floor.total, 940);
+    assert!(!v.counter.parcel_ask && !v.floor.parcel_ask);
     // お届け先の違う荷物は、その荷物の伝票を新しく読んで受け付ける
-    scan(&mut s, 2, "staff", PARCEL);
+    scan(&mut s, 2, "counter", PARCEL);
     let id2 = pending_parcel(&s, 2);
     assert_ne!(id, id2);
     ok(
@@ -819,20 +819,20 @@ fn parcel_fee_comes_from_size_and_postal_code() {
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id2,"postal":"530-0001"}),
     );
-    assert_eq!(reg(&s, 2).customer.total, 940 + 1230 + 240);
+    assert_eq!(reg(&s, 2).floor.total, 940 + 1230 + 240);
     let v = reg(&s, 2);
-    assert!(!v.staff.parcel_ask);
-    assert!(allowed(&v, Side::Staff, Action::Checkout));
-    scan(&mut s, 2, "staff", "PC12345678");
+    assert!(!v.counter.parcel_ask);
+    assert!(allowed(&v, Side::Counter, Action::Checkout));
+    scan(&mut s, 2, "counter", "PC12345678");
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
     let v = reg(&s, 2);
-    assert!(!v.staff.point_pending);
+    assert!(!v.counter.point_pending);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":2,"side":"staff","method":"cash"}),
+        json!({"type":"select_payment","register":2,"side":"counter","method":"cash"}),
     );
     ok(
         &mut s,
@@ -846,7 +846,7 @@ fn parcel_fee_comes_from_size_and_postal_code() {
 #[test]
 fn parcel_skips_point_card_check() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "floor", PARCEL);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
@@ -859,38 +859,38 @@ fn parcel_skips_point_card_check() {
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
-    assert!(!reg(&s, 2).staff.point_pending);
+    assert!(!reg(&s, 2).counter.point_pending);
 }
 
 /// 仕様 5.2：荷物を送るはほかの商品と一緒にできない
 #[test]
 fn parcel_cannot_be_mixed_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", BREAD);
+    scan(&mut s, 2, "floor", BREAD);
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":2,"side":"customer","code":PARCEL})
+        json!({"type":"scan","register":2,"side":"floor","code":PARCEL})
     )
     .is_err());
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL);
-    scan(&mut s, 2, "customer", PARCEL);
-    assert_eq!(reg(&s, 2).customer.lines.len(), 2);
+    scan(&mut s, 2, "floor", PARCEL);
+    scan(&mut s, 2, "floor", PARCEL);
+    assert_eq!(reg(&s, 2).floor.lines.len(), 2);
     assert!(run(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"})
+        json!({"type":"checkout","register":2,"side":"floor"})
     )
     .is_err());
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":2,"side":"customer","code":BREAD})
+        json!({"type":"scan","register":2,"side":"floor","code":BREAD})
     )
     .is_err());
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":2,"side":"customer","code":RECEIVE})
+        json!({"type":"scan","register":2,"side":"floor","code":RECEIVE})
     )
     .is_err());
 }
@@ -931,7 +931,7 @@ fn cash_out_only_inside_the_store_menu() {
 
 /// 仕様 13：店舗メニューはレジカウンター側でだけ開く
 #[test]
-fn store_menu_opens_only_on_the_staff_side() {
+fn store_menu_opens_only_on_the_counter_side() {
     let mut s = Store::new(1, 2, 1);
     let open = json!({"type":"open_menu","register":1,"screen":"top"});
     assert!(
@@ -943,7 +943,7 @@ fn store_menu_opens_only_on_the_staff_side() {
     ok(&mut s, open);
     let v = reg(&s, 1);
     assert!(v.menu.is_some());
-    assert_eq!(v.active_side, Some(Side::Staff));
+    assert_eq!(v.active_side, Some(Side::Counter));
     ok(
         &mut s,
         json!({"type":"open_menu","register":1,"screen":null}),
@@ -958,9 +958,9 @@ fn calls_stay_on_originating_register() {
     ok(&mut s, json!({"type":"call_staff","register":2}));
     ok(&mut s, json!({"type":"call_staff","register":4}));
     let snap = s.snapshot();
-    assert_eq!(snap.registers[1].staff.calls.len(), 1);
-    assert!(snap.registers[0].staff.calls.is_empty());
-    assert!(snap.registers[2].staff.calls.is_empty());
+    assert_eq!(snap.registers[1].counter.calls.len(), 1);
+    assert!(snap.registers[0].counter.calls.is_empty());
+    assert!(snap.registers[2].counter.calls.is_empty());
     login_as(&mut s, 4, "ST002");
     let snap = s.snapshot();
     assert_eq!(snap.calls.len(), 1);
@@ -999,66 +999,66 @@ fn bell_rings_despite_loss_and_reports_link_down() {
     let snap = s.snapshot();
     assert!(!snap.bells[0].link_ok);
     assert_eq!(
-        snap.registers[0].staff.bell_down,
+        snap.registers[0].counter.bell_down,
         vec!["据え付け端末".to_string()]
     );
 }
 
 /// 仕様 4.2：売り場側にはスタッフだけの情報を出さない
 #[test]
-fn customer_view_hides_staff_only_information() {
+fn floor_view_hides_counter_only_information() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
-    scan(&mut s, 1, "staff", "PC12345678");
+    scan(&mut s, 1, "counter", BEER);
+    scan(&mut s, 1, "counter", "PC12345678");
     let v = serde_json::to_value(reg(&s, 1)).unwrap();
-    let c = v["customer"].to_string();
+    let c = v["floor"].to_string();
     assert!(!c.contains("alcohol") && !c.contains(BEER) && !c.contains("12345678"));
-    assert_eq!(v["staff"]["lines"][0]["age"], 20);
+    assert_eq!(v["counter"]["lines"][0]["age"], 20);
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
 }
 
 /// 仕様 4.2：レジカウンター側と売り場側は同時には操作できない
 #[test]
-fn staff_and_customer_screens_are_exclusive() {
+fn counter_and_floor_screens_are_exclusive() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
-    assert_eq!(v.active_side, Some(Side::Customer));
+    assert_eq!(v.active_side, Some(Side::Floor));
     assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"qr"}),
     );
-    scan(&mut s, 1, "staff", "ST002");
+    scan(&mut s, 1, "counter", "ST002");
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::StaffOperated);
     assert_eq!(v.active_side, None);
     ok(
         &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+        json!({"type":"back_to_registering","register":1,"side":"counter"}),
     );
-    assert_eq!(reg(&s, 1).active_side, Some(Side::Staff));
+    assert_eq!(reg(&s, 1).active_side, Some(Side::Counter));
     assert!(run(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"})
+        json!({"type":"checkout","register":1,"side":"floor"})
     )
     .is_err());
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
-    assert_eq!(v.active_side, Some(Side::Customer));
+    assert_eq!(v.active_side, Some(Side::Floor));
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
-    assert!(!reg(&s, 1).customer.point_pending);
+    assert!(!reg(&s, 1).floor.point_pending);
 }
 
 /// 仕様 14.1：オーナーが商品ごとに年齢制限を決める
@@ -1088,7 +1088,7 @@ fn mode_follows_staff_badge() {
         .snapshot()
         .registers
         .iter()
-        .all(|r| r.mode == Mode::SelfOperated && r.staff.state == StaffState::Absent));
+        .all(|r| r.mode == Mode::SelfOperated && r.counter.state == StaffState::Absent));
     login(&mut s, 1);
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
@@ -1101,7 +1101,7 @@ fn customer_cannot_register_ff_in_self_operated() {
     let mut s = Store::new(1, 2, 1);
     assert!(run(
         &mut s,
-        json!({"type":"register_ff","register":2,"side":"customer","code":"FF01","qty":1})
+        json!({"type":"register_ff","register":2,"side":"floor","code":"FF01","qty":1})
     )
     .is_err());
     ok(&mut s, json!({"type":"ff_button","register":2}));
@@ -1113,20 +1113,20 @@ fn idle_register_returns_to_self_operated() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 2);
     advance(&mut s, 4 * 60_000);
-    scan(&mut s, 2, "staff", BREAD);
+    scan(&mut s, 2, "counter", BREAD);
     ok(&mut s, json!({"type":"void_transaction","register":2}));
     advance(&mut s, 4 * 60_000);
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
     advance(&mut s, 61_000);
     let v = reg(&s, 2);
     assert_eq!(v.mode, Mode::SelfOperated);
-    assert_eq!(v.staff.state, StaffState::Absent);
+    assert_eq!(v.counter.state, StaffState::Absent);
     assert!(v.idle_revert_in.is_none());
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
@@ -1142,19 +1142,19 @@ fn idle_register_returns_to_self_operated() {
     advance(&mut s, 61_000);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
-    assert!(v.customer.lines.is_empty());
-    assert_eq!(v.customer.inserted, 0);
+    assert!(v.floor.lines.is_empty());
+    assert_eq!(v.floor.inserted, 0);
     assert_eq!(v.outlet, 100);
-    scan(&mut s, 2, "customer", BREAD);
+    scan(&mut s, 2, "floor", BREAD);
     assert!(reg(&s, 2).idle_voids);
     advance(&mut s, 5 * 60_000 + 1_000);
-    assert!(reg(&s, 2).customer.lines.is_empty());
+    assert!(reg(&s, 2).floor.lines.is_empty());
     assert!(reg(&s, 2).idle_revert_in.is_none());
 }
 
 /// 仕様 13：店舗メニューから入金・出金する
 #[test]
-fn cash_in_and_out_from_the_customer_side_menu() {
+fn cash_in_and_out_from_the_floor_side_menu() {
     let mut s = Store::new(1, 2, 1);
     let cin = json!({"type":"cash_in","register":1,"kind":"deposit","amount":3000});
     assert!(run(&mut s, cin.clone()).is_err());
@@ -1164,21 +1164,21 @@ fn cash_in_and_out_from_the_customer_side_menu() {
         "店舗メニューの外では入金できない"
     );
     open_staff_menu(&mut s, 1);
-    let before = reg(&s, 1).staff.drawer_total;
+    let before = reg(&s, 1).counter.drawer_total;
     ok(&mut s, cin);
     ok(
         &mut s,
         json!({"type":"cash_in","register":1,"kind":"changer_refill","amount":1500}),
     );
-    assert_eq!(reg(&s, 1).staff.drawer_total, before + 4500);
+    assert_eq!(reg(&s, 1).counter.drawer_total, before + 4500);
     ok(
         &mut s,
         json!({"type":"cash_out","register":1,"kind":"changer_collect","amount":4500,"password":"7777"}),
     );
-    assert_eq!(reg(&s, 1).staff.drawer_total, before);
+    assert_eq!(reg(&s, 1).counter.drawer_total, before);
     let ops: Vec<_> = s.snapshot().audit.iter().map(|a| a.operation).collect();
     assert_eq!(ops, vec!["取引外入金", "釣銭補充", "釣銭機回収"]);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     assert!(run(
         &mut s,
         json!({"type":"cash_in","register":1,"kind":"deposit","amount":100})
@@ -1190,13 +1190,13 @@ fn cash_in_and_out_from_the_customer_side_menu() {
 #[test]
 fn inlet_pays_and_change_waits_in_outlet() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
     login(&mut s, 1);
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
@@ -1206,9 +1206,9 @@ fn inlet_pays_and_change_waits_in_outlet() {
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.inserted, 1100);
+    assert_eq!(v.counter.inserted, 1100);
     assert_eq!(
-        v.staff.method,
+        v.counter.method,
         Some(PaymentMethod::Cash),
         "cash picks itself"
     );
@@ -1237,7 +1237,7 @@ fn inlet_pays_and_change_waits_in_outlet() {
 fn store_menu_uses_inlet_and_outlet() {
     let mut s = Store::new(1, 2, 1);
     let open =
-        |screen: &str| json!({"type":"open_menu","register":1,"side":"staff","screen":screen});
+        |screen: &str| json!({"type":"open_menu","register":1,"side":"counter","screen":screen});
     assert!(
         run(&mut s, open("top")).is_err(),
         "only for logged-in staff"
@@ -1245,20 +1245,20 @@ fn store_menu_uses_inlet_and_outlet() {
     login(&mut s, 1);
     open_staff_menu(&mut s, 1);
     let v = reg(&s, 1);
-    assert_eq!(v.active_side, Some(Side::Staff));
+    assert_eq!(v.active_side, Some(Side::Counter));
     ok(&mut s, open("deposit"));
-    let before = reg(&s, 1).staff.drawer_total;
+    let before = reg(&s, 1).counter.drawer_total;
     ok(&mut s, json!({"type":"insert","register":1,"amount":2000}));
-    assert_eq!(reg(&s, 1).staff.drawer_total, before + 2000);
+    assert_eq!(reg(&s, 1).counter.drawer_total, before + 2000);
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"side":"staff","screen":"changer","exchange_to":1000}),
+        json!({"type":"open_menu","register":1,"side":"counter","screen":"changer","exchange_to":1000}),
     );
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1500})).is_err());
     ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));
     let v = reg(&s, 1);
     assert_eq!(v.outlet_detail, vec![(1000, 10)]);
-    assert_eq!(v.staff.drawer_total, before + 2000);
+    assert_eq!(v.counter.drawer_total, before + 2000);
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     ok(&mut s, open("emergency"));
     ok(
@@ -1268,7 +1268,7 @@ fn store_menu_uses_inlet_and_outlet() {
     assert_eq!(reg(&s, 1).outlet, 5000);
     ok(
         &mut s,
-        json!({"type":"open_menu","register":1,"side":"staff","screen":null}),
+        json!({"type":"open_menu","register":1,"side":"counter","screen":null}),
     );
     advance(&mut s, 1_000);
     assert_eq!(reg(&s, 1).active_side, None);
@@ -1279,7 +1279,7 @@ fn store_menu_uses_inlet_and_outlet() {
     );
     ok(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":"ST002"}),
+        json!({"type":"scan","register":1,"side":"counter","code":"ST002"}),
     );
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert!(reg(&s, 1).menu.is_none());
@@ -1289,48 +1289,48 @@ fn store_menu_uses_inlet_and_outlet() {
 #[test]
 fn staff_operated_screens_lock_only_while_touched() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::StaffOperated);
     assert_eq!(v.active_side, None);
-    assert!(allowed(&v, Side::Customer, Action::RegisterFf));
-    assert!(allowed(&v, Side::Staff, Action::RegisterFf));
+    assert!(allowed(&v, Side::Floor, Action::RegisterFf));
+    assert!(allowed(&v, Side::Counter, Action::RegisterFf));
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"customer","code":"FF01","qty":1}),
+        json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1}),
     );
-    assert!(reg(&s, 1).staff.calls.is_empty());
-    assert_eq!(reg(&s, 1).active_side, Some(Side::Customer));
-    let e = run(&mut s, json!({"type":"claim","register":1,"side":"staff"})).unwrap_err();
+    assert!(reg(&s, 1).counter.calls.is_empty());
+    assert_eq!(reg(&s, 1).active_side, Some(Side::Floor));
+    let e = run(&mut s, json!({"type":"claim","register":1,"side":"counter"})).unwrap_err();
     assert!(e.contains("操作中"), "{e}");
     assert!(run(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"staff","code":"FF02","qty":1})
+        json!({"type":"register_ff","register":1,"side":"counter","code":"FF02","qty":1})
     )
     .is_err());
     advance(&mut s, 1_000);
     assert_eq!(reg(&s, 1).active_side, None);
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"staff","code":"FF02","qty":1}),
+        json!({"type":"register_ff","register":1,"side":"counter","code":"FF02","qty":1}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.len(), 2);
-    assert!(!allowed(&v, Side::Staff, Action::Checkout));
-    assert!(allowed(&v, Side::Staff, Action::CheckFf));
-    let ids: Vec<u32> = v.staff.lines.iter().map(|l| l.line.id).collect();
+    assert_eq!(v.counter.lines.len(), 2);
+    assert!(!allowed(&v, Side::Counter, Action::Checkout));
+    assert!(allowed(&v, Side::Counter, Action::CheckFf));
+    let ids: Vec<u32> = v.counter.lines.iter().map(|l| l.line.id).collect();
     let check = |id: u32, side: &str| json!({"type":"check_ff","register":1,"side":side,"line_id":id,"handed":1});
-    assert!(run(&mut s, check(ids[0], "customer")).is_err());
-    ok(&mut s, check(ids[0], "staff"));
-    assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
+    assert!(run(&mut s, check(ids[0], "floor")).is_err());
+    ok(&mut s, check(ids[0], "counter"));
+    assert!(!allowed(&reg(&s, 1), Side::Counter, Action::Checkout));
     advance(&mut s, 1_000);
-    assert!(run(&mut s, check(ids[1], "customer")).is_err());
-    ok(&mut s, check(ids[1], "staff"));
+    assert!(run(&mut s, check(ids[1], "floor")).is_err());
+    ok(&mut s, check(ids[1], "counter"));
     advance(&mut s, 1_000);
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
 }
@@ -1339,10 +1339,10 @@ fn staff_operated_screens_lock_only_while_touched() {
 #[test]
 fn called_register_lamp_lights_at_once_until_staff_arrives() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BEER);
+    scan(&mut s, 1, "floor", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     assert!(reg(&s, 1).lamp);
     assert!(!reg(&s, 2).lamp, "only the calling register lights");
@@ -1359,7 +1359,7 @@ fn called_register_lamp_lights_at_once_until_staff_arrives() {
         reg(&s, 1).lamp && reg(&s, 2).lamp,
         "stays lit while waiting"
     );
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     assert!(!reg(&s, 1).lamp, "staff arrived");
     assert!(reg(&s, 2).lamp);
 }
@@ -1368,15 +1368,15 @@ fn called_register_lamp_lights_at_once_until_staff_arrives() {
 #[test]
 fn wallet_card_must_match_chosen_method() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"credit"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"credit"}),
     );
     let e = run(
         &mut s,
@@ -1401,16 +1401,16 @@ fn neglected_calls_ring_louder() {
     assert_eq!(ring_volume(RING_FULL_MS * 2), 1.0);
     assert!(ring_volume(10_000) < ring_volume(30_000));
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BEER);
+    scan(&mut s, 1, "floor", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     advance(&mut s, 20_000);
-    scan(&mut s, 2, "customer", BEER);
+    scan(&mut s, 2, "floor", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"}),
+        json!({"type":"checkout","register":2,"side":"floor"}),
     );
     let (r1, r2) = (reg(&s, 1), reg(&s, 2));
     assert!(
@@ -1418,7 +1418,7 @@ fn neglected_calls_ring_louder() {
         "the first caller is louder"
     );
     assert_eq!(r1.call_waiting_ms, Some(20_000));
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     assert_eq!(reg(&s, 1).ring_volume, 0.0);
 }
 
@@ -1427,7 +1427,7 @@ fn neglected_calls_ring_louder() {
 fn shortcut_buttons_call_staff() {
     let mut s = Store::new(1, 2, 1);
     let kinds = |s: &Store, r: u8| -> Vec<CallKind> {
-        reg(s, r).staff.calls.iter().map(|c| c.kind).collect()
+        reg(s, r).counter.calls.iter().map(|c| c.kind).collect()
     };
     ok(
         &mut s,
@@ -1448,7 +1448,7 @@ fn shortcut_buttons_call_staff() {
     ok(&mut s, json!({"type":"release_call","register":1}));
     advance(&mut s, 60_000);
     assert_eq!(kinds(&s, 1).len(), 3);
-    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "floor", PARCEL);
     assert!(kinds(&s, 2).contains(&CallKind::Service));
     login(&mut s, 1);
     assert!(kinds(&s, 1).is_empty());
@@ -1474,7 +1474,7 @@ fn staff_bell_calls_colleagues_without_call_screen() {
     advance(&mut s, 1_000);
     assert!(s.snapshot().bells[0].buzzing, "SOS rings the bell");
     assert!(
-        reg(&s, 1).staff.calls.is_empty(),
+        reg(&s, 1).counter.calls.is_empty(),
         "no call record, so no call screen"
     );
     ok(&mut s, json!({"type":"release_call","register":1}));
@@ -1529,17 +1529,17 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
 
 /// 仕様 12.3：売り場側が操作中でもログアウトでセルフ操作モードに戻る
 #[test]
-fn logout_returns_to_self_operated_even_while_customer_screen_holds() {
+fn logout_returns_to_self_operated_even_while_floor_screen_holds() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     assert_eq!(reg(&s, 1).active_side, None);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"customer","code":"FF01","qty":1}),
+        json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1}),
     );
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
@@ -1547,83 +1547,83 @@ fn logout_returns_to_self_operated_even_while_customer_screen_holds() {
 
 /// 仕様 6.1：売り場側から会計し、ポイントカードの確認に進む
 #[test]
-fn checkout_from_held_customer_screen_then_point_card_check() {
+fn checkout_from_held_floor_screen_then_point_card_check() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     assert_eq!(reg(&s, 1).active_side, None);
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"customer","code":"FF01","qty":1}),
+        json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1}),
     );
-    let id = reg(&s, 1).customer.lines[0].id;
+    let id = reg(&s, 1).floor.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":id,"handed":1}),
     );
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.customer.phase, Phase::Paying);
-    assert!(v.customer.point_pending);
+    assert_eq!(v.floor.phase, Phase::Paying);
+    assert!(v.floor.point_pending);
     assert!(run(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"})
+        json!({"type":"select_payment","register":1,"side":"floor","method":"cash"})
     )
     .is_err());
-    scan(&mut s, 1, "customer", "PC12345678");
+    scan(&mut s, 1, "floor", "PC12345678");
     let v = reg(&s, 1);
-    assert_eq!(v.customer.phase, Phase::Paying);
-    assert!(!v.customer.point_pending && v.customer.point_card);
+    assert_eq!(v.floor.phase, Phase::Paying);
+    assert!(!v.floor.point_pending && v.floor.point_card);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"cash"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 220);
 
-    scan(&mut s, 1, "customer", "PC12345678");
+    scan(&mut s, 1, "floor", "PC12345678");
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"customer","code":"FF03","qty":1}),
+        json!({"type":"register_ff","register":1,"side":"floor","code":"FF03","qty":1}),
     );
-    let id = reg(&s, 1).customer.lines[0].id;
+    let id = reg(&s, 1).floor.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":id,"handed":1}),
     );
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
-    assert!(!reg(&s, 1).customer.point_pending);
+    assert!(!reg(&s, 1).floor.point_pending);
 }
 
 /// 仕様 4.2：年齢確認のほかはどちらの画面からも操作できる
 #[test]
 fn either_screen_can_operate_except_age_confirmation() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     assert_eq!(reg(&s, 1).active_side, None);
-    scan(&mut s, 1, "customer", BEER);
+    scan(&mut s, 1, "floor", BEER);
     assert!(allowed(
         &reg(&s, 1),
-        Side::Customer,
+        Side::Floor,
         Action::VoidTransaction
     ));
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     let v = reg(&s, 1);
-    assert!(v.staff.age_choice_pending);
+    assert!(v.counter.age_choice_pending);
     assert!(run(
         &mut s,
-        json!({"type":"choose_age_check","register":1,"side":"customer","id_check":false})
+        json!({"type":"choose_age_check","register":1,"side":"floor","id_check":false})
     )
     .is_err());
     no_id_check(&mut s, 1);
@@ -1635,30 +1635,30 @@ fn either_screen_can_operate_except_age_confirmation() {
 fn staff_skipping_the_age_check_needs_no_customer_button() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "counter", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     let v = reg(&s, 1);
-    assert!(!v.staff.age_choice_pending && !v.staff.id_pending);
-    assert!(v.staff.point_pending);
+    assert!(!v.counter.age_choice_pending && !v.counter.id_pending);
+    assert!(v.counter.point_pending);
     confirm_point(&mut s, 1);
-    assert_eq!(reg(&s, 1).staff.payment_blocker, None);
+    assert_eq!(reg(&s, 1).counter.payment_blocker, None);
 }
 
 fn check_bill(s: &mut Store, r: u8, line_id: u32, checked: bool) {
     ok(
         s,
-        json!({"type":"check_bill","register":r,"side":"staff","line_id":line_id,"checked":checked}),
+        json!({"type":"check_bill","register":r,"side":"counter","line_id":line_id,"checked":checked}),
     );
 }
 
 fn affix_stamp(s: &mut Store, r: u8, line_id: u32, affixed: bool) {
     ok(
         s,
-        json!({"type":"affix_stamp","register":r,"side":"staff","line_id":line_id,"affixed":affixed}),
+        json!({"type":"affix_stamp","register":r,"side":"counter","line_id":line_id,"affixed":affixed}),
     );
 }
 
@@ -1667,22 +1667,22 @@ fn affix_stamp(s: &mut Store, r: u8, line_id: u32, affixed: bool) {
 fn revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_then() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BILL);
+    scan(&mut s, 1, "counter", BILL);
     let id = bill_ids(&s, 1)[0];
     affix_stamp(&mut s, 1, id, true);
     affix_stamp(&mut s, 1, id, false);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     check_bill(&mut s, 1, id, true);
     assert!(reg(&s, 1)
-        .staff
+        .counter
         .payment_blocker
         .unwrap()
         .contains("収入印紙"));
     affix_stamp(&mut s, 1, id, true);
-    assert_eq!(reg(&s, 1).staff.payment_blocker, None);
+    assert_eq!(reg(&s, 1).counter.payment_blocker, None);
     ok(&mut s, json!({"type":"insert","register":1,"amount":50000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).bill_handover, Some(1));
@@ -1693,11 +1693,11 @@ fn revenue_stamp_can_be_confirmed_while_registering_and_blocks_payment_until_the
 fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", TAX_BILL);
+    scan(&mut s, 1, "counter", TAX_BILL);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.bills[0].amount, 50_000);
-    assert_eq!(v.staff.bills[0].stamp, 0);
-    assert!(!v.staff.stamp_pending);
+    assert_eq!(v.counter.bills[0].amount, 50_000);
+    assert_eq!(v.counter.bills[0].stamp, 0);
+    assert!(!v.counter.stamp_pending);
     let id = bill_ids(&s, 1)[0];
     assert!(run(
         &mut s,
@@ -1706,10 +1706,10 @@ fn a_tax_slip_of_the_same_amount_needs_no_revenue_stamp() {
     .is_err());
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     check_bill(&mut s, 1, id, true);
-    assert_eq!(reg(&s, 1).staff.payment_blocker, None);
+    assert_eq!(reg(&s, 1).counter.payment_blocker, None);
     ok(&mut s, json!({"type":"insert","register":1,"amount":50000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).bill_handover, Some(1));
@@ -1720,7 +1720,7 @@ fn big_basket(s: &mut Store, side: &str) {
     for (code, qty) in [("4900000000158", 9), ("4910000000069", 1)] {
         scan(s, 1, side, code);
         let id = reg(s, 1)
-            .staff
+            .counter
             .lines
             .iter()
             .map(|l| l.line.id)
@@ -1733,7 +1733,7 @@ fn big_basket(s: &mut Store, side: &str) {
             );
         }
     }
-    assert_eq!(reg(s, 1).staff.total, 56_200);
+    assert_eq!(reg(s, 1).counter.total, 56_200);
 }
 
 /// 仕様 10.4：税抜 5 万円の現金のお買い物はレシートに印紙が要る
@@ -1741,10 +1741,10 @@ fn big_basket(s: &mut Store, side: &str) {
 fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    big_basket(&mut s, "staff");
+    big_basket(&mut s, "counter");
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     confirm_point(&mut s, 1);
@@ -1760,12 +1760,12 @@ fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
     );
     assert!(run(
         &mut s,
-        json!({"type":"affix_receipt_stamp","register":1,"side":"customer"})
+        json!({"type":"affix_receipt_stamp","register":1,"side":"floor"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
+        json!({"type":"affix_receipt_stamp","register":1,"side":"counter"}),
     );
     assert_eq!(reg(&s, 1).receipt_stamp, None);
     advance(&mut s, 10_000);
@@ -1777,20 +1777,20 @@ fn a_cash_purchase_of_50000_yen_before_tax_needs_a_stamp_on_the_receipt() {
 fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
     let mut s = Store::new(1, 2, 1);
     // 化粧品 2,200円×25＝55,000円（税抜 50,000円）
-    scan(&mut s, 1, "customer", "4910000000069");
-    let id = reg(&s, 1).customer.lines[0].id;
+    scan(&mut s, 1, "floor", "4910000000069");
+    let id = reg(&s, 1).floor.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":25}),
+        json!({"type":"set_qty","register":1,"side":"floor","line_id":id,"qty":25}),
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"qr"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"qr"}),
     );
     ok(
         &mut s,
@@ -1804,13 +1804,13 @@ fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
         .any(|c| c.kind == CallKind::ReceiptStamp));
     assert!(run(
         &mut s,
-        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"})
+        json!({"type":"affix_receipt_stamp","register":1,"side":"counter"})
     )
     .is_err());
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"affix_receipt_stamp","register":1,"side":"staff"}),
+        json!({"type":"affix_receipt_stamp","register":1,"side":"counter"}),
     );
     assert!(s.snapshot().calls.is_empty());
 }
@@ -1820,16 +1820,16 @@ fn a_self_operated_purchase_needing_a_stamp_calls_staff() {
 fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    big_basket(&mut s, "staff");
+    big_basket(&mut s, "counter");
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"credit"}),
     );
     ok(
         &mut s,
@@ -1842,18 +1842,18 @@ fn a_receipt_under_50000_yen_before_tax_or_paid_by_credit_needs_no_stamp() {
 #[test]
 fn revenue_stamp_waits_for_staff_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BILL);
+    scan(&mut s, 1, "floor", BILL);
     let id = bill_ids(&s, 1)[0];
     assert!(run(
         &mut s,
-        json!({"type":"affix_stamp","register":1,"side":"staff","line_id":id,"affixed":true})
+        json!({"type":"affix_stamp","register":1,"side":"counter","line_id":id,"affixed":true})
     )
     .is_err());
-    assert!(reg(&s, 1).customer.stamp_pending);
+    assert!(reg(&s, 1).floor.stamp_pending);
 }
 
 fn bill_ids(s: &Store, r: u8) -> Vec<u32> {
-    reg(s, r).staff.bills.iter().map(|b| b.line_id).collect()
+    reg(s, r).counter.bills.iter().map(|b| b.line_id).collect()
 }
 
 /// 仕様 10.3：払込票は会計の後にスタッフが確かめ、現金で払う
@@ -1862,17 +1862,17 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     for code in [BILL, WATER_BILL, WATER_BILL, BILL] {
-        scan(&mut s, 1, "staff", code);
+        scan(&mut s, 1, "counter", code);
     }
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     let v = reg(&s, 1);
-    assert!(!v.staff.point_pending && !v.staff.age_choice_pending);
-    assert_eq!(v.staff.method, Some(PaymentMethod::Cash));
-    assert!(v.staff.bill_unchecked);
-    let rows: Vec<_> = v.staff.bills.iter().map(|b| (b.name, b.amount)).collect();
+    assert!(!v.counter.point_pending && !v.counter.age_choice_pending);
+    assert_eq!(v.counter.method, Some(PaymentMethod::Cash));
+    assert!(v.counter.bill_unchecked);
+    let rows: Vec<_> = v.counter.bills.iter().map(|b| (b.name, b.amount)).collect();
     assert_eq!(
         rows,
         [
@@ -1882,7 +1882,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
             ("電気料金", 50_000)
         ]
     );
-    let nos: Vec<_> = v.staff.bills.iter().map(|b| b.slip_no.clone()).collect();
+    let nos: Vec<_> = v.counter.bills.iter().map(|b| b.slip_no.clone()).collect();
     for no in &nos {
         assert_eq!(no.len(), 19, "{no}");
         assert!(no
@@ -1891,38 +1891,38 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     }
     assert_ne!(nos[0], nos[3]);
     let ids = bill_ids(&s, 1);
-    assert!(v.staff.payment_blocker.unwrap().contains("公共料金の内容"));
+    assert!(v.counter.payment_blocker.unwrap().contains("公共料金の内容"));
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":20000})).is_err());
     let e = run(
         &mut s,
-        json!({"type":"check_bill","register":1,"side":"customer","line_id":ids[0],"checked":true}),
+        json!({"type":"check_bill","register":1,"side":"floor","line_id":ids[0],"checked":true}),
     )
     .unwrap_err();
     assert!(e.contains("レジカウンター側"), "{e}");
     check_bill(&mut s, 1, ids[0], true);
     let v = reg(&s, 1);
-    assert!(v.staff.bills[0].checked);
+    assert!(v.counter.bills[0].checked);
     assert!(
-        !v.staff.bills[3].checked,
+        !v.counter.bills[3].checked,
         "同じ電気料金でも一枚ずつ確認する"
     );
     check_bill(&mut s, 1, ids[0], false);
-    assert!(!reg(&s, 1).staff.bills[0].checked);
+    assert!(!reg(&s, 1).counter.bills[0].checked);
     for &id in &ids[..3] {
         check_bill(&mut s, 1, id, true);
     }
-    assert!(reg(&s, 1).staff.bill_unchecked);
+    assert!(reg(&s, 1).counter.bill_unchecked);
     check_bill(&mut s, 1, ids[3], true);
     let v = reg(&s, 1);
-    assert!(!v.staff.bill_unchecked);
-    let stamps: Vec<_> = v.staff.bills.iter().map(|b| b.stamp).collect();
+    assert!(!v.counter.bill_unchecked);
+    let stamps: Vec<_> = v.counter.bills.iter().map(|b| b.stamp).collect();
     assert_eq!(
         stamps,
         [200, 0, 0, 200],
         "5万円以上の払込票だけ収入印紙が要る"
     );
-    assert!(v.staff.stamp_pending);
-    assert!(v.staff.payment_blocker.unwrap().contains("収入印紙"));
+    assert!(v.counter.stamp_pending);
+    assert!(v.counter.payment_blocker.unwrap().contains("収入印紙"));
     assert!(run(
         &mut s,
         json!({"type":"insert","register":1,"amount":200000})
@@ -1930,7 +1930,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     .is_err());
     let e = run(
         &mut s,
-        json!({"type":"affix_stamp","register":1,"side":"customer","line_id":ids[0],"affixed":true}),
+        json!({"type":"affix_stamp","register":1,"side":"floor","line_id":ids[0],"affixed":true}),
     )
     .unwrap_err();
     assert!(e.contains("レジカウンター側"), "{e}");
@@ -1943,16 +1943,16 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
         "印紙の要らない払込票は確認しない"
     );
     affix_stamp(&mut s, 1, ids[0], true);
-    assert!(reg(&s, 1).staff.stamp_pending, "一枚ずつ確認する");
+    assert!(reg(&s, 1).counter.stamp_pending, "一枚ずつ確認する");
     affix_stamp(&mut s, 1, ids[3], true);
     let v = reg(&s, 1);
-    assert!(!v.staff.stamp_pending);
-    assert_eq!(v.staff.payment_blocker, None);
+    assert!(!v.counter.stamp_pending);
+    assert_eq!(v.counter.payment_blocker, None);
     for m in ["credit", "qr", "points"] {
         assert!(
             run(
                 &mut s,
-                json!({"type":"select_payment","register":1,"side":"staff","method":m})
+                json!({"type":"select_payment","register":1,"side":"counter","method":m})
             )
             .is_err(),
             "{m}"
@@ -1972,12 +1972,12 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     assert!(reg(&s, 1).last_receipt.is_some());
     assert!(run(
         &mut s,
-        json!({"type":"hand_over_bills","register":1,"side":"customer"})
+        json!({"type":"hand_over_bills","register":1,"side":"floor"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"hand_over_bills","register":1,"side":"staff"}),
+        json!({"type":"hand_over_bills","register":1,"side":"counter"}),
     );
     assert_eq!(reg(&s, 1).bill_handover, None);
     advance(&mut s, 100);
@@ -1988,24 +1988,24 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
 #[test]
 fn self_operated_bill_checkout_calls_staff_to_check_the_slips() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", WATER_BILL);
-    scan(&mut s, 1, "customer", WATER_BILL);
+    scan(&mut s, 1, "floor", WATER_BILL);
+    scan(&mut s, 1, "floor", WATER_BILL);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     let calls = s.snapshot().calls;
     assert!(calls
         .iter()
         .any(|c| c.register == 1 && c.kind == CallKind::Bill && c.detail == "2枚"));
     let v = reg(&s, 1);
-    assert!(v.customer.bill_unchecked && v.customer.staff_called);
-    assert!(!v.customer.point_pending);
+    assert!(v.floor.bill_unchecked && v.floor.staff_called);
+    assert!(!v.floor.point_pending);
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":10000})).is_err());
     let id = bill_ids(&s, 1)[0];
     assert!(run(
         &mut s,
-        json!({"type":"check_bill","register":1,"side":"staff","line_id":id,"checked":true})
+        json!({"type":"check_bill","register":1,"side":"counter","line_id":id,"checked":true})
     )
     .is_err());
     login(&mut s, 1);
@@ -2018,7 +2018,7 @@ fn self_operated_bill_checkout_calls_staff_to_check_the_slips() {
     ok(&mut s, json!({"type":"insert","register":1,"amount":10000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).bill_handover, Some(2));
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     assert_eq!(reg(&s, 1).bill_handover, None);
 }
 
@@ -2027,35 +2027,35 @@ fn self_operated_bill_checkout_calls_staff_to_check_the_slips() {
 fn utility_bills_cannot_share_a_transaction_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":BILL}),
+        json!({"type":"scan","register":1,"side":"counter","code":BILL}),
     )
     .unwrap_err();
     assert!(e.contains("一緒に登録できません"), "{e}");
     ok(
         &mut s,
-        json!({"type":"void_transaction","register":1,"side":"staff"}),
+        json!({"type":"void_transaction","register":1,"side":"counter"}),
     );
-    scan(&mut s, 1, "staff", BILL);
+    scan(&mut s, 1, "counter", BILL);
     for cmd in [
-        json!({"type":"scan","register":1,"side":"staff","code":BREAD}),
+        json!({"type":"scan","register":1,"side":"counter","code":BREAD}),
         json!({"type":"register_ff","register":1,"code":"FF01","qty":1}),
     ] {
         let e = run(&mut s, cmd).unwrap_err();
         assert!(e.contains("一緒に登録できません"), "{e}");
     }
-    assert_eq!(reg(&s, 1).staff.lines.len(), 1);
+    assert_eq!(reg(&s, 1).counter.lines.len(), 1);
 }
 
 /// 仕様 5.3：払込票は明細ごとに取り消せず、取引中止だけ
 #[test]
 fn registered_bill_slips_cannot_be_removed_only_voided() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BILL);
-    scan(&mut s, 1, "customer", WATER_BILL);
-    let id = reg(&s, 1).staff.lines[0].line.id;
+    scan(&mut s, 1, "floor", BILL);
+    scan(&mut s, 1, "floor", WATER_BILL);
+    let id = reg(&s, 1).counter.lines[0].line.id;
     let try_remove = |s: &mut Store, side: &str| {
         let e = run(
             s,
@@ -2064,15 +2064,15 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
         .unwrap_err();
         assert!(e.contains("取引中止"), "{e}");
     };
-    try_remove(&mut s, "customer");
+    try_remove(&mut s, "floor");
     login(&mut s, 1);
-    try_remove(&mut s, "staff");
-    assert_eq!(reg(&s, 1).staff.lines.len(), 2);
+    try_remove(&mut s, "counter");
+    assert_eq!(reg(&s, 1).counter.lines.len(), 2);
     ok(
         &mut s,
-        json!({"type":"void_transaction","register":1,"side":"staff"}),
+        json!({"type":"void_transaction","register":1,"side":"counter"}),
     );
-    assert!(reg(&s, 1).staff.lines.is_empty());
+    assert!(reg(&s, 1).counter.lines.is_empty());
 }
 
 /// 仕様 6.4：ポイント利用は付与対象の商品の分だけ
@@ -2080,12 +2080,12 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
 fn points_pay_only_for_point_eligible_goods() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", "PC12345678");
-    scan(&mut s, 1, "staff", TOBACCO);
-    scan(&mut s, 1, "staff", SANDWICH);
+    scan(&mut s, 1, "counter", "PC12345678");
+    scan(&mut s, 1, "counter", TOBACCO);
+    scan(&mut s, 1, "counter", SANDWICH);
     let price = |s: &Store, code: &str| {
         reg(s, 1)
-            .staff
+            .counter
             .lines
             .iter()
             .find(|l| l.line.code == code)
@@ -2095,25 +2095,25 @@ fn points_pay_only_for_point_eligible_goods() {
     let (tob, sand) = (price(&s, TOBACCO), price(&s, SANDWICH));
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"points"}),
     );
     use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
     assert_eq!(v.prepaid, sand);
-    assert_eq!(v.staff.due, tob);
+    assert_eq!(v.counter.due, tob);
     assert!(run(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"points"})
+        json!({"type":"select_payment","register":1,"side":"counter","method":"points"})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"credit"}),
     );
     ok(
         &mut s,
@@ -2130,11 +2130,11 @@ fn points_pay_only_for_point_eligible_goods() {
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", "PC12345678");
-    scan(&mut s, 1, "staff", TOBACCO);
+    scan(&mut s, 1, "counter", "PC12345678");
+    scan(&mut s, 1, "counter", TOBACCO);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     assert!(reg(&s, 1)
@@ -2147,63 +2147,63 @@ fn points_pay_only_for_point_eligible_goods() {
 #[test]
 fn self_operated_cash_choice_calls_staff() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"cash"}),
     );
-    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "現金"));
+    assert!(reg(&s, 1).counter.calls.iter().any(|c| c.label == "現金"));
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err());
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"emoney"}),
     );
-    assert!(reg(&s, 1).staff.calls.is_empty());
+    assert!(reg(&s, 1).counter.calls.is_empty());
 }
 
 /// 仕様 6.4：現金の案内からバックすると呼び出しを取り下げる
 #[test]
 fn self_operated_back_from_cash_choice_withdraws_the_call() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"cash"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"cash"}),
     );
-    assert!(reg(&s, 1).staff.calls.iter().any(|c| c.label == "現金"));
+    assert!(reg(&s, 1).counter.calls.iter().any(|c| c.label == "現金"));
     ok(
         &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"customer"}),
+        json!({"type":"back_to_registering","register":1,"side":"floor"}),
     );
-    assert!(reg(&s, 1).staff.calls.is_empty());
+    assert!(reg(&s, 1).counter.calls.is_empty());
 }
 
 /// 仕様 6.6：切手はほかの商品と一緒でも現金で払う
 #[test]
 fn stamps_are_paid_in_cash_even_with_other_items() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", STAMP);
+    scan(&mut s, 1, "floor", BREAD);
+    scan(&mut s, 1, "floor", STAMP);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     let v = reg(&s, 1);
-    assert!(v.staff.calls.iter().any(|c| c.label == "現金"));
+    assert!(v.counter.calls.iter().any(|c| c.label == "現金"));
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"emoney"}),
     );
     assert!(run(
         &mut s,
@@ -2212,42 +2212,42 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
     .is_err());
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":500})).is_err());
     login(&mut s, 1);
-    assert!(reg(&s, 1).staff.calls.is_empty());
+    assert!(reg(&s, 1).counter.calls.is_empty());
 
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", STAMP);
+    scan(&mut s, 1, "floor", STAMP);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     for m in ["emoney", "qr", "credit", "points"] {
         assert!(
             run(
                 &mut s,
-                json!({"type":"select_payment","register":1,"side":"customer","method":m})
+                json!({"type":"select_payment","register":1,"side":"floor","method":m})
             )
             .is_err(),
             "{m}"
         );
     }
     assert_eq!(
-        reg(&s, 1).staff.taxes.iter().map(|t| t.tax).sum::<u32>(),
+        reg(&s, 1).counter.taxes.iter().map(|t| t.tax).sum::<u32>(),
         0,
         "非課税"
     );
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", STAMP);
+    scan(&mut s, 1, "floor", BREAD);
+    scan(&mut s, 1, "floor", STAMP);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"emoney"}),
     );
     assert_eq!(reg(&s, 1).cashless_due, 160);
     ok(
@@ -2256,7 +2256,7 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
     );
     let v = reg(&s, 1);
     assert_eq!(emoney_balance(&s), 840);
-    assert_eq!(v.customer.due, 110);
+    assert_eq!(v.floor.due, 110);
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     let v = reg(&s, 1);
@@ -2265,16 +2265,16 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", STAMP);
+    scan(&mut s, 1, "floor", BREAD);
+    scan(&mut s, 1, "floor", STAMP);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"emoney"}),
     );
     ok(
         &mut s,
@@ -2288,29 +2288,29 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
 #[test]
 fn shopping_is_limited_to_100_items() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", SNACK);
-    let id = reg(&s, 1).customer.lines[0].id;
+    scan(&mut s, 1, "floor", SNACK);
+    let id = reg(&s, 1).floor.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":99}),
+        json!({"type":"set_qty","register":1,"side":"floor","line_id":id,"qty":99}),
     );
     login(&mut s, 1);
     advance(&mut s, 1_000);
-    let ff = |qty: u32| json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":qty});
+    let ff = |qty: u32| json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":qty});
     let e = run(&mut s, ff(2)).unwrap_err();
     assert!(e.contains("100点"), "{e}");
     ok(&mut s, ff(1));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 100);
-    assert!(!allowed(&v, Side::Staff, Action::RegisterFf));
+    assert_eq!(v.counter.lines.iter().map(|l| l.line.qty).sum::<u32>(), 100);
+    assert!(!allowed(&v, Side::Counter, Action::RegisterFf));
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":SNACK}),
+        json!({"type":"scan","register":1,"side":"floor","code":SNACK}),
     )
     .unwrap_err();
     assert!(e.contains("100点"), "{e}");
     let ffid = reg(&s, 1)
-        .staff
+        .counter
         .lines
         .iter()
         .map(|l| l.line.id)
@@ -2319,9 +2319,9 @@ fn shopping_is_limited_to_100_items() {
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":ffid}),
+        json!({"type":"remove_line","register":1,"side":"counter","line_id":ffid}),
     );
-    scan(&mut s, 1, "customer", SNACK);
+    scan(&mut s, 1, "floor", SNACK);
 }
 
 /// 仕様 13：取引中は店舗メニューを開けない
@@ -2329,13 +2329,13 @@ fn shopping_is_limited_to_100_items() {
 fn store_menu_cannot_open_during_a_transaction() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     let top = json!({"type":"open_menu","register":1,"screen":"top"});
     assert!(run(&mut s, top.clone()).is_err(), "取引中は開けない");
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     assert!(run(&mut s, top.clone()).is_err(), "会計中も開けない");
     ok(&mut s, json!({"type":"void_transaction","register":1}));
@@ -2355,21 +2355,21 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
     );
     login(&mut s, 1);
     for code in [BREAD, BEER, BEER, LIGHTER] {
-        scan(&mut s, 1, "staff", code);
+        scan(&mut s, 1, "counter", code);
     }
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     advance(&mut s, 1_000);
     let v = reg(&s, 1);
-    assert!(v.staff.age_choice_pending);
+    assert!(v.counter.age_choice_pending);
     let birth = |b: &str| json!({"type":"check_id","register":1,"birth":b,"today":"2026-10-19"});
     assert!(run(&mut s, birth("20070501")).is_err());
     assert!(run(
         &mut s,
-        json!({"type":"choose_age_check","register":1,"side":"customer","id_check":true})
+        json!({"type":"choose_age_check","register":1,"side":"floor","id_check":true})
     )
     .is_err());
     ok(
@@ -2377,25 +2377,25 @@ fn staff_enters_the_birth_date_and_unsellable_items_are_confiscated() {
         json!({"type":"choose_age_check","register":1,"id_check":true}),
     );
     let v = reg(&s, 1);
-    assert!(v.staff.id_pending && !v.staff.age_choice_pending);
+    assert!(v.counter.id_pending && !v.counter.age_choice_pending);
     let cash = json!({"type":"insert_cash","register":1,"denomination":1000,"count":1});
     assert!(run(&mut s, cash.clone()).is_err());
     assert!(run(&mut s, birth("20270101")).is_err());
     let msg = run(&mut s, birth("20070501")).unwrap().unwrap();
     assert!(msg.contains("19歳") && msg.contains("アルコール"), "{msg}");
     let v = reg(&s, 1);
-    let codes: Vec<&str> = v.staff.lines.iter().map(|l| l.line.code).collect();
+    let codes: Vec<&str> = v.counter.lines.iter().map(|l| l.line.code).collect();
     assert!(!codes.contains(&BEER) && codes.contains(&LIGHTER) && codes.contains(&BREAD));
-    assert_eq!(v.staff.confiscated.len(), 1);
-    assert_eq!(v.staff.confiscated[0].qty, 2);
-    assert!(!v.staff.id_pending && v.staff.phase == Phase::Paying);
+    assert_eq!(v.counter.confiscated.len(), 1);
+    assert_eq!(v.counter.confiscated[0].qty, 2);
+    assert!(!v.counter.id_pending && v.counter.phase == Phase::Paying);
     ok(&mut s, json!({"type":"dismiss_confiscated","register":1}));
-    assert!(reg(&s, 1).staff.confiscated.is_empty());
+    assert!(reg(&s, 1).counter.confiscated.is_empty());
     advance(&mut s, 1_000);
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"cash"}),
     );
     ok(&mut s, cash);
 }
@@ -2416,35 +2416,35 @@ fn age_counts_the_birthday() {
 #[test]
 fn coupons_apply_whenever_the_target_is_registered() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", "CP0001");
+    scan(&mut s, 1, "floor", "CP0001");
     let v = reg(&s, 1);
-    assert_eq!(v.customer.coupons.len(), 1);
-    assert_eq!(v.customer.coupons[0].discount, None);
-    assert_eq!(v.customer.total, 0);
-    scan(&mut s, 1, "customer", TEA);
+    assert_eq!(v.floor.coupons.len(), 1);
+    assert_eq!(v.floor.coupons[0].discount, None);
+    assert_eq!(v.floor.total, 0);
+    scan(&mut s, 1, "floor", TEA);
     let v = reg(&s, 1);
-    assert_eq!(v.customer.coupons[0].discount, Some(150));
-    assert_eq!(v.customer.total, 0);
-    scan(&mut s, 1, "customer", "CP0001");
-    assert_eq!(reg(&s, 1).customer.coupons[1].discount, None);
-    scan(&mut s, 1, "customer", TEA);
+    assert_eq!(v.floor.coupons[0].discount, Some(150));
+    assert_eq!(v.floor.total, 0);
+    scan(&mut s, 1, "floor", "CP0001");
+    assert_eq!(reg(&s, 1).floor.coupons[1].discount, None);
+    scan(&mut s, 1, "floor", TEA);
     let v = reg(&s, 1);
-    assert_eq!(v.customer.coupons[1].discount, Some(150));
-    assert_eq!(v.customer.total, 0);
-    scan(&mut s, 1, "customer", SANDWICH);
-    scan(&mut s, 1, "customer", TEA);
-    scan(&mut s, 1, "customer", "CP0002");
+    assert_eq!(v.floor.coupons[1].discount, Some(150));
+    assert_eq!(v.floor.total, 0);
+    scan(&mut s, 1, "floor", SANDWICH);
+    scan(&mut s, 1, "floor", TEA);
+    scan(&mut s, 1, "floor", "CP0002");
     let v = reg(&s, 1);
-    assert_eq!(v.customer.total, 150 + 320 - 50);
-    assert_eq!(v.staff.lines.iter().map(|l| l.line.qty).sum::<u32>(), 4);
+    assert_eq!(v.floor.total, 150 + 320 - 50);
+    assert_eq!(v.counter.lines.iter().map(|l| l.line.qty).sum::<u32>(), 4);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"emoney"}),
     );
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 420);
@@ -2454,27 +2454,27 @@ fn coupons_apply_whenever_the_target_is_registered() {
 #[test]
 fn a_coupon_points_at_the_line_it_applies_to() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", SANDWICH);
-    scan(&mut s, 1, "customer", TEA);
-    scan(&mut s, 1, "customer", "CP0002");
+    scan(&mut s, 1, "floor", SANDWICH);
+    scan(&mut s, 1, "floor", TEA);
+    scan(&mut s, 1, "floor", "CP0002");
     let v = reg(&s, 1);
-    let sandwich = v.staff.lines.iter().find(|l| l.line.code == SANDWICH).unwrap().line.id;
-    assert_eq!(v.staff.coupons[0].line_id, Some(sandwich));
-    assert_eq!(v.customer.coupons[0].line_id, Some(sandwich));
-    assert_eq!(v.customer.coupons[0].discount, Some(50));
-    scan(&mut s, 1, "customer", "CP0002");
-    scan(&mut s, 1, "customer", SANDWICH);
+    let sandwich = v.counter.lines.iter().find(|l| l.line.code == SANDWICH).unwrap().line.id;
+    assert_eq!(v.counter.coupons[0].line_id, Some(sandwich));
+    assert_eq!(v.floor.coupons[0].line_id, Some(sandwich));
+    assert_eq!(v.floor.coupons[0].discount, Some(50));
+    scan(&mut s, 1, "floor", "CP0002");
+    scan(&mut s, 1, "floor", SANDWICH);
     let v = reg(&s, 1);
-    let second = v.staff.lines.iter().filter(|l| l.line.code == SANDWICH).map(|l| l.line.id).max().unwrap();
+    let second = v.counter.lines.iter().filter(|l| l.line.code == SANDWICH).map(|l| l.line.id).max().unwrap();
     assert_ne!(second, sandwich);
-    assert_eq!(v.staff.coupons[1].line_id, Some(second));
+    assert_eq!(v.counter.coupons[1].line_id, Some(second));
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"customer","line_id":sandwich}),
+        json!({"type":"remove_line","register":1,"side":"floor","line_id":sandwich}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.staff.coupons[0].line_id, Some(second));
-    assert_eq!(v.staff.coupons[1].line_id, None);
+    assert_eq!(v.counter.coupons[0].line_id, Some(second));
+    assert_eq!(v.counter.coupons[1].line_id, None);
 }
 
 /// 仕様 5.4：クーポンは一番近くの対象商品に付く（前に登録した一番新しい明細、なければ後の一番古い明細）
@@ -2483,59 +2483,59 @@ fn a_coupon_goes_to_the_nearest_target() {
     const PAN: &str = "4900000000011";
     let mut s = Store::new(1, 2, 1);
     for code in [TEA, PAN, TEA, PAN, TEA] {
-        scan(&mut s, 1, "customer", code);
+        scan(&mut s, 1, "floor", code);
     }
-    scan(&mut s, 1, "customer", "CP0001");
+    scan(&mut s, 1, "floor", "CP0001");
     let v = reg(&s, 1);
-    let teas: Vec<u32> = v.staff.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).collect();
+    let teas: Vec<u32> = v.counter.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).collect();
     let last = *teas.iter().max().unwrap();
-    assert_eq!(v.staff.coupons[0].line_id, Some(last));
+    assert_eq!(v.counter.coupons[0].line_id, Some(last));
     // 先に読んだクーポンは後から登録した一番古い対象商品に付き、さらに後の商品に奪われない
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", "CP0001");
-    scan(&mut s, 1, "customer", PAN);
-    scan(&mut s, 1, "customer", TEA);
-    scan(&mut s, 1, "customer", PAN);
-    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "floor", "CP0001");
+    scan(&mut s, 1, "floor", PAN);
+    scan(&mut s, 1, "floor", TEA);
+    scan(&mut s, 1, "floor", PAN);
+    scan(&mut s, 1, "floor", TEA);
     let v = reg(&s, 1);
-    let first = v.staff.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).min().unwrap();
-    assert_eq!(v.staff.coupons[0].line_id, Some(first));
+    let first = v.counter.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).min().unwrap();
+    assert_eq!(v.counter.coupons[0].line_id, Some(first));
 }
 
 /// 仕様 5.4：適用先のないクーポンは返却まで決済を止める
 #[test]
 fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", "CP0001");
-    scan(&mut s, 1, "customer", "4900000000028");
+    scan(&mut s, 1, "floor", "CP0001");
+    scan(&mut s, 1, "floor", "4900000000028");
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     let v = reg(&s, 1);
-    assert!(v.staff.coupon_unmatched && v.customer.coupon_unmatched);
+    assert!(v.counter.coupon_unmatched && v.floor.coupon_unmatched);
     assert!(v
-        .customer
+        .floor
         .payment_blocker
         .unwrap()
         .contains("適用先のないクーポン"));
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"floor","method":"emoney"}),
     );
     assert!(run(&mut s, json!({"type":"tap_emoney","register":1})).is_err());
-    let id = reg(&s, 1).customer.coupons[0].id;
+    let id = reg(&s, 1).floor.coupons[0].id;
     ok(
         &mut s,
-        json!({"type":"remove_coupon","register":1,"side":"customer","coupon_id":id}),
+        json!({"type":"remove_coupon","register":1,"side":"floor","coupon_id":id}),
     );
     let v = reg(&s, 1);
-    assert!(v.customer.coupons.is_empty() && !v.customer.coupon_unmatched);
-    assert_eq!(v.staff.returned.len(), 1);
-    assert!(v.customer.returned[0].unmatched);
+    assert!(v.floor.coupons.is_empty() && !v.floor.coupon_unmatched);
+    assert_eq!(v.counter.returned.len(), 1);
+    assert!(v.floor.returned[0].unmatched);
     ok(&mut s, json!({"type":"dismiss_returned","register":1}));
-    assert!(reg(&s, 1).staff.returned.is_empty());
+    assert!(reg(&s, 1).counter.returned.is_empty());
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 320);
 }
@@ -2544,14 +2544,14 @@ fn a_coupon_without_its_target_blocks_payment_until_it_is_returned() {
 #[test]
 fn same_item_merges_only_when_scanned_in_a_row() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", SNACK);
-    scan(&mut s, 1, "customer", SNACK);
-    scan(&mut s, 1, "customer", TEA);
-    scan(&mut s, 1, "customer", SNACK);
-    scan(&mut s, 1, "customer", SNACK);
-    scan(&mut s, 1, "customer", SNACK);
+    scan(&mut s, 1, "floor", SNACK);
+    scan(&mut s, 1, "floor", SNACK);
+    scan(&mut s, 1, "floor", TEA);
+    scan(&mut s, 1, "floor", SNACK);
+    scan(&mut s, 1, "floor", SNACK);
+    scan(&mut s, 1, "floor", SNACK);
     let v = reg(&s, 1);
-    let mut lines: Vec<_> = v.customer.lines.iter().collect();
+    let mut lines: Vec<_> = v.floor.lines.iter().collect();
     lines.sort_by_key(|l| std::cmp::Reverse(l.touched));
     let rows: Vec<_> = lines.iter().map(|l| (l.name, l.qty)).collect();
     assert_eq!(rows, [("袋菓子", 3), ("ソフトドリンク", 1), ("袋菓子", 2)]);
@@ -2561,36 +2561,36 @@ fn same_item_merges_only_when_scanned_in_a_row() {
 #[test]
 fn staff_or_customer_changes_a_line_quantity() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", SNACK);
-    scan(&mut s, 1, "customer", SANDWICH);
-    let id = reg(&s, 1).customer.lines[0].id;
+    scan(&mut s, 1, "floor", SNACK);
+    scan(&mut s, 1, "floor", SANDWICH);
+    let id = reg(&s, 1).floor.lines[0].id;
     let set =
-        |qty: u32| json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":qty});
+        |qty: u32| json!({"type":"set_qty","register":1,"side":"floor","line_id":id,"qty":qty});
     ok(&mut s, set(3));
     let v = reg(&s, 1);
-    let top = v.customer.lines.iter().max_by_key(|l| l.touched).unwrap();
+    let top = v.floor.lines.iter().max_by_key(|l| l.touched).unwrap();
     assert_eq!(top.name, "サンドイッチ", "the changed line keeps its place");
-    let bread = v.customer.lines.iter().find(|l| l.id == id).unwrap();
+    let bread = v.floor.lines.iter().find(|l| l.id == id).unwrap();
     assert_eq!(bread.qty, 3);
-    assert_eq!(v.customer.total, 150 * 3 + 320);
+    assert_eq!(v.floor.total, 150 * 3 + 320);
     ok(&mut s, set(99));
     assert!(run(&mut s, set(100)).is_err(), "over the 100-item limit");
     assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
     ok(&mut s, set(1));
-    assert_eq!(reg(&s, 1).customer.total, 150 + 320);
+    assert_eq!(reg(&s, 1).floor.total, 150 + 320);
 }
 
 /// 仕様 5.1：クーポンと明細は同じ通し番号を使う
 #[test]
 fn coupon_and_line_ids_never_collide() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
-    scan(&mut s, 1, "customer", "4900000000028");
-    scan(&mut s, 1, "customer", "CP0002");
-    scan(&mut s, 1, "customer", "4900000000011");
+    scan(&mut s, 1, "floor", BREAD);
+    scan(&mut s, 1, "floor", "4900000000028");
+    scan(&mut s, 1, "floor", "CP0002");
+    scan(&mut s, 1, "floor", "4900000000011");
     let v = reg(&s, 1);
-    let mut ids: Vec<u32> = v.customer.lines.iter().map(|l| l.id).collect();
-    ids.extend(v.customer.coupons.iter().map(|c| c.id));
+    let mut ids: Vec<u32> = v.floor.lines.iter().map(|l| l.id).collect();
+    ids.extend(v.floor.coupons.iter().map(|c| c.id));
     let n = ids.len();
     ids.sort();
     ids.dedup();
@@ -2602,12 +2602,12 @@ fn coupon_and_line_ids_never_collide() {
 fn points_can_pay_once_staff_chooses_them() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
-    scan(&mut s, 1, "staff", "PC12345678");
+    scan(&mut s, 1, "counter", "PC12345678");
     assert!(run(
         &mut s,
         json!({"type":"tap_emoney","register":1,"method":"points"})
@@ -2615,10 +2615,10 @@ fn points_can_pay_once_staff_chooses_them() {
     .is_err());
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"points"}),
     );
     use_points(&mut s, 1, "all", None);
-    assert!(reg(&s, 1).staff.lines.is_empty());
+    assert!(reg(&s, 1).counter.lines.is_empty());
 }
 
 /// 仕様 6.4：カードなしでポイント利用を選ぶとポイントカードの確認に戻る
@@ -2626,43 +2626,43 @@ fn points_can_pay_once_staff_chooses_them() {
 fn points_payment_without_a_card_goes_back_to_the_point_card_check() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
-    let points = json!({"type":"select_payment","register":1,"side":"staff","method":"points"});
+    let points = json!({"type":"select_payment","register":1,"side":"counter","method":"points"});
     ok(&mut s, points.clone());
     let v = reg(&s, 1);
-    assert!(v.staff.point_pending && v.customer.point_pending);
-    assert_eq!(v.staff.method, Some(PaymentMethod::Points));
-    scan(&mut s, 1, "staff", "PC12345678");
+    assert!(v.counter.point_pending && v.floor.point_pending);
+    assert_eq!(v.counter.method, Some(PaymentMethod::Points));
+    scan(&mut s, 1, "counter", "PC12345678");
     let v = reg(&s, 1);
     assert_eq!(
-        v.staff.phase,
+        v.counter.phase,
         Phase::Paying,
         "reading the card keeps the payment screen"
     );
-    assert_eq!(v.staff.method, Some(PaymentMethod::Points));
+    assert_eq!(v.counter.method, Some(PaymentMethod::Points));
     use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
-    assert!(v.staff.lines.is_empty());
+    assert!(v.counter.lines.is_empty());
     assert_eq!(v.last_receipt.map(|r| r.method), Some("ポイント利用"));
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(&mut s, points);
     confirm_point(&mut s, 1);
     let v = reg(&s, 1);
-    assert!(!v.staff.point_pending);
-    assert_eq!(v.staff.method, None);
+    assert!(!v.counter.point_pending);
+    assert_eq!(v.counter.method, None);
 }
 
 /// 仕様 11.3：可搬性端末とストアコンピューターの呼び鈴は切れる
@@ -2681,7 +2681,7 @@ fn handheld_and_store_computer_bells_can_be_turned_off() {
     assert!(!snap.bells[1].buzzing && !snap.bells[2].buzzing);
     assert!(!snap.bells[1].bell_on);
     advance(&mut s, 8_000);
-    assert!(reg(&s, 1).staff.bell_down.is_empty());
+    assert!(reg(&s, 1).counter.bell_down.is_empty());
     ok(&mut s, json!({"type":"set_bell_on","bell":2,"on":true}));
     advance(&mut s, 1_000);
     assert!(s.snapshot().bells[2].buzzing);
@@ -2698,9 +2698,9 @@ fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
     assert!(!reg(&s, 1).tobacco_asked, "self-operated: not yet");
     login(&mut s, 1);
     assert!(reg(&s, 1).tobacco_asked);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     assert!(reg(&s, 1).tobacco_asked);
-    scan(&mut s, 1, "staff", "4900000000127");
+    scan(&mut s, 1, "counter", "4900000000127");
     assert!(!reg(&s, 1).tobacco_asked);
     login(&mut s, 2);
     assert!(!reg(&s, 2).tobacco_asked);
@@ -2711,15 +2711,15 @@ fn tobacco_call_marks_the_register_until_tobacco_is_scanned() {
 fn change_left_in_the_outlet_reminds_then_calls_staff() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"cash"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     ok(&mut s, json!({"type":"finish_insert","register":1}));
@@ -2733,23 +2733,23 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
         v.change_left,
         "staff_operated, 30 seconds: remind the customer"
     );
-    assert!(v.staff.calls.is_empty());
+    assert!(v.counter.calls.is_empty());
     assert_eq!(v.idle_revert_in, Some(frozen), "countdown is paused");
     advance(&mut s, 30_000);
     let v = reg(&s, 1);
     assert_eq!(
-        v.staff.calls.len(),
+        v.counter.calls.len(),
         1,
         "staff_operated, 1 minute: call staff"
     );
-    assert_eq!(v.staff.calls[0].label, "釣銭忘れ");
+    assert_eq!(v.counter.calls[0].label, "釣銭忘れ");
     assert!(
         reg(&s, 1).last_receipt.is_some(),
         "stays on the thank-you screen while change is left"
     );
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     let v = reg(&s, 1);
-    assert!(!v.change_left && v.staff.calls.is_empty());
+    assert!(!v.change_left && v.counter.calls.is_empty());
     advance(&mut s, 100);
     assert!(
         reg(&s, 1).last_receipt.is_some(),
@@ -2781,29 +2781,29 @@ fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
         .find(|p| p.code == TEA)
         .unwrap();
     assert_eq!(item.limit, Some(2));
-    scan(&mut s, 1, "customer", TEA);
-    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "floor", TEA);
+    scan(&mut s, 1, "floor", TEA);
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":TEA}),
+        json!({"type":"scan","register":1,"side":"floor","code":TEA}),
     )
     .unwrap_err();
     assert!(e.contains("2点まで"), "{e}");
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     let id = reg(&s, 1)
-        .customer
+        .floor
         .lines
         .iter()
         .find(|l| l.name == item.name)
         .unwrap()
         .id;
     let set =
-        |qty: u32| json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":qty});
+        |qty: u32| json!({"type":"set_qty","register":1,"side":"floor","line_id":id,"qty":qty});
     assert!(run(&mut s, set(3)).is_err());
     ok(&mut s, set(1));
     ok(&mut s, set(2));
     ok(&mut s, limit("9999", None));
-    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "floor", TEA);
     assert!(s
         .snapshot()
         .age_rules
@@ -2817,8 +2817,8 @@ fn owner_limits_how_many_of_an_item_one_purchase_can_have() {
 fn tax_rates_are_data_and_owner_only() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
-    let t = reg(&s, 1).staff.taxes;
+    scan(&mut s, 1, "counter", BEER);
+    let t = reg(&s, 1).counter.taxes;
     assert_eq!(
         t.iter()
             .map(|x| (x.rate.as_str(), x.base, x.tax))
@@ -2834,9 +2834,9 @@ fn tax_rates_are_data_and_owner_only() {
         &mut s,
         json!({"type":"set_tax_rate","owner_id":"000","password":"9999","class_id":"standard","rate_bp":1200}),
     );
-    scan(&mut s, 1, "staff", TEA);
-    scan(&mut s, 1, "staff", BEER);
-    let t = reg(&s, 1).staff.taxes;
+    scan(&mut s, 1, "counter", TEA);
+    scan(&mut s, 1, "counter", BEER);
+    let t = reg(&s, 1).counter.taxes;
     let rates: Vec<&str> = t.iter().map(|x| x.rate.as_str()).collect();
     assert_eq!(rates, vec!["8%", "10%", "12%"]);
     assert_eq!(t[2].tax, 248 * 1200 / 11200);
@@ -2849,7 +2849,7 @@ fn tax_rates_are_data_and_owner_only() {
         &mut s,
         json!({"type":"set_invoice","owner_id":"000","password":"9999","invoice_no":"T1234567890123","rounding":"half_up"}),
     );
-    assert_eq!(reg(&s, 1).staff.taxes[1].tax, 23);
+    assert_eq!(reg(&s, 1).counter.taxes[1].tax, 23);
     assert_eq!(s.snapshot().tax.invoice_no, "T1234567890123");
     assert_eq!(s.snapshot().age_rules.history.len(), 2);
 }
@@ -2879,8 +2879,8 @@ fn product_tax_class_can_be_changed() {
     );
     assert_eq!(class(&s, BREAD), id);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
-    let t = reg(&s, 1).staff.taxes;
+    scan(&mut s, 1, "counter", BREAD);
+    let t = reg(&s, 1).counter.taxes;
     assert!(t
         .iter()
         .any(|x| x.rate == "5%" && x.base == 160 && x.tax == 7));
@@ -2894,13 +2894,13 @@ fn emoney_balance(s: &Store) -> u32 {
 #[test]
 fn self_operated_emoney_fan_calls_staff_while_shopping() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     ok(
         &mut s,
         json!({"type":"call_staff","register":1,"topic":"emoney"}),
     );
     let kinds =
-        |s: &Store| -> Vec<CallKind> { reg(s, 1).staff.calls.iter().map(|c| c.kind).collect() };
+        |s: &Store| -> Vec<CallKind> { reg(s, 1).counter.calls.iter().map(|c| c.kind).collect() };
     assert!(kinds(&s).contains(&CallKind::Emoney));
     login(&mut s, 1);
     assert!(
@@ -2909,7 +2909,7 @@ fn self_operated_emoney_fan_calls_staff_while_shopping() {
     );
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"staff","kind":"menu"}),
+        json!({"type":"start_emoney","register":1,"side":"counter","kind":"menu"}),
     );
 }
 
@@ -2919,7 +2919,7 @@ fn emoney_inquiry_shows_the_balance() {
     let mut s = Store::new(1, 2, 1);
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"customer","kind":"menu"}),
+        json!({"type":"start_emoney","register":1,"side":"floor","kind":"menu"}),
     );
     assert!(
         run(
@@ -2931,14 +2931,14 @@ fn emoney_inquiry_shows_the_balance() {
     );
     ok(
         &mut s,
-        json!({"type":"close_emoney","register":1,"side":"customer"}),
+        json!({"type":"close_emoney","register":1,"side":"floor"}),
     );
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     for kind in ["menu", "charge", "inquiry"] {
         assert!(
             run(
                 &mut s,
-                json!({"type":"start_emoney","register":1,"side":"customer","kind":kind})
+                json!({"type":"start_emoney","register":1,"side":"floor","kind":kind})
             )
             .is_err(),
             "お買い物の途中はチャージ・残高確認できない"
@@ -2948,7 +2948,7 @@ fn emoney_inquiry_shows_the_balance() {
     let mut s = Store::new(1, 2, 1);
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),
+        json!({"type":"start_emoney","register":1,"side":"floor","kind":"inquiry"}),
     );
     assert_eq!(reg(&s, 1).emoney.unwrap().balance, None);
     ok(
@@ -2958,7 +2958,7 @@ fn emoney_inquiry_shows_the_balance() {
     assert_eq!(reg(&s, 1).emoney.unwrap().balance, Some(1_000));
     ok(
         &mut s,
-        json!({"type":"close_emoney","register":1,"side":"customer"}),
+        json!({"type":"close_emoney","register":1,"side":"floor"}),
     );
     assert!(reg(&s, 1).emoney.is_none());
 }
@@ -2969,26 +2969,26 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
     let mut s = Store::new(1, 2, 1);
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"customer","kind":"inquiry"}),
+        json!({"type":"start_emoney","register":1,"side":"floor","kind":"inquiry"}),
     );
-    assert!(reg(&s, 1).staff.calls.is_empty(), "残高照会は呼ばない");
+    assert!(reg(&s, 1).counter.calls.is_empty(), "残高照会は呼ばない");
     ok(
         &mut s,
-        json!({"type":"close_emoney","register":1,"side":"customer"}),
+        json!({"type":"close_emoney","register":1,"side":"floor"}),
     );
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
+        json!({"type":"start_emoney","register":1,"side":"floor","kind":"charge"}),
     );
     let v = reg(&s, 1);
     assert!(v.emoney.is_none());
-    assert!(v.staff.calls.iter().any(|c| c.label == "電子マネー"));
+    assert!(v.counter.calls.iter().any(|c| c.label == "電子マネー"));
     login(&mut s, 1);
-    assert!(reg(&s, 1).staff.calls.is_empty());
+    assert!(reg(&s, 1).counter.calls.is_empty());
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"staff","kind":"charge"}),
+        json!({"type":"start_emoney","register":1,"side":"counter","kind":"charge"}),
     );
     assert!(
         run(&mut s, json!({"type":"insert","register":1,"amount":500})).is_err(),
@@ -3018,19 +3018,19 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
 
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"staff","kind":"charge"}),
+        json!({"type":"start_emoney","register":1,"side":"counter","kind":"charge"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":2000}));
     ok(
         &mut s,
-        json!({"type":"close_emoney","register":1,"side":"staff"}),
+        json!({"type":"close_emoney","register":1,"side":"counter"}),
     );
     assert_eq!(reg(&s, 1).outlet, 2000);
     assert_eq!(emoney_balance(&s), 16_000);
 }
 
 fn short_checkout(s: &mut Store) {
-    short_checkout_on(s, "customer");
+    short_checkout_on(s, "floor");
 }
 
 fn short_checkout_on(s: &mut Store, side: &str) {
@@ -3051,7 +3051,7 @@ fn short_checkout_on(s: &mut Store, side: &str) {
     assert_eq!(v.emoney_short, Some(1_000));
     assert!(v.last_receipt.is_none());
     assert!(
-        !allowed(&v, Side::Customer, Action::InsertCash),
+        !allowed(&v, Side::Floor, Action::InsertCash),
         "選ぶまで払えない"
     );
 }
@@ -3063,27 +3063,27 @@ fn emoney_short_offers_three_choices() {
     short_checkout(&mut s);
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"floor","choice":"cancel"}),
     );
     let v = reg(&s, 1);
     assert_eq!(v.emoney_short, None);
-    assert_eq!(v.customer.method, None);
+    assert_eq!(v.floor.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
     let mut s = Store::new(1, 2, 1);
     short_checkout(&mut s);
     assert!(run(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cash"})
+        json!({"type":"resolve_emoney_short","register":1,"side":"floor","choice":"cash"})
     )
     .is_err());
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    short_checkout_on(&mut s, "staff");
+    short_checkout_on(&mut s, "counter");
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"counter","choice":"cash"}),
     );
     assert_eq!(reg(&s, 1).emoney_partial, Some(1_000));
     assert!(
@@ -3097,7 +3097,7 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(emoney_balance(&s), 1_000);
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash_confirmed"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"counter","choice":"cash_confirmed"}),
     );
     assert!(
         run(&mut s, json!({"type":"insert","register":1,"amount":1000})).is_err(),
@@ -3109,13 +3109,13 @@ fn emoney_short_offers_three_choices() {
     );
     let v = reg(&s, 1);
     assert_eq!(v.emoney_partial, None);
-    assert_eq!(v.customer.due, 120);
+    assert_eq!(v.floor.due, 120);
     assert_eq!(v.prepaid, 1_000);
     assert_eq!(emoney_balance(&s), 0);
     assert!(
         run(
             &mut s,
-            json!({"type":"back_to_registering","register":1,"side":"staff"})
+            json!({"type":"back_to_registering","register":1,"side":"counter"})
         )
         .is_err(),
         "電子マネーで払った後は登録に戻れない"
@@ -3128,18 +3128,18 @@ fn emoney_short_offers_three_choices() {
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    short_checkout_on(&mut s, "staff");
+    short_checkout_on(&mut s, "counter");
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"counter","choice":"cash"}),
     );
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cancel"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"counter","choice":"cancel"}),
     );
     let v = reg(&s, 1);
     assert_eq!(v.emoney_partial, None);
-    assert_eq!(v.customer.method, None);
+    assert_eq!(v.floor.method, None);
     assert_eq!(emoney_balance(&s), 1_000);
 
     let mut s = Store::new(1, 2, 1);
@@ -3147,7 +3147,7 @@ fn emoney_short_offers_three_choices() {
     assert!(
         run(
             &mut s,
-            json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"charge"})
+            json!({"type":"resolve_emoney_short","register":1,"side":"floor","choice":"charge"})
         )
         .is_err(),
         "セミセルフはお買い物の途中にチャージしない"
@@ -3156,10 +3156,10 @@ fn emoney_short_offers_three_choices() {
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    short_checkout_on(&mut s, "staff");
+    short_checkout_on(&mut s, "counter");
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"charge"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"counter","choice":"charge"}),
     );
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     ok(
@@ -3183,16 +3183,16 @@ fn customer_voids_and_money_comes_back() {
         run(&mut s, json!({"type":"void_transaction","register":1})).is_err(),
         "取引がない"
     );
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":100})).is_err());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     let v = reg(&s, 1);
-    assert!(v.customer.lines.is_empty());
+    assert!(v.floor.lines.is_empty());
     assert_eq!(v.outlet, 0);
 }
 
@@ -3207,7 +3207,7 @@ fn logout_and_pause_from_either_store_menu() {
     assert_eq!(v.mode, Mode::SelfOperated);
     assert!(v.menu.is_none());
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     open_staff_menu(&mut s, 1);
@@ -3218,11 +3218,11 @@ fn logout_and_pause_from_either_store_menu() {
     assert!(v.menu.is_none());
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":BREAD})
+        json!({"type":"scan","register":1,"side":"floor","code":BREAD})
     )
     .is_err());
     assert!(run(&mut s, json!({"type":"call_staff","register":1})).is_err());
-    scan(&mut s, 1, "staff", "ST001");
+    scan(&mut s, 1, "counter", "ST001");
     let v = reg(&s, 1);
     assert!(!v.paused);
     assert_eq!(v.mode, Mode::StaffOperated);
@@ -3241,64 +3241,64 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":2}),
+        json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":2}),
     );
-    let id = reg(&s, 1).staff.lines[0].line.id;
+    let id = reg(&s, 1).counter.lines[0].line.id;
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":2}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":id,"handed":2}),
     );
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
+        json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":3}),
     );
     let v = reg(&s, 1);
     assert!(matches!(
-        v.staff.lines[0].line.kind,
+        v.counter.lines[0].line.kind,
         LineKind::Ff {
             state: FfState::Waiting
         }
     ));
-    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    assert!(!allowed(&v, Side::Counter, Action::Checkout));
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":3}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":id,"handed":3}),
     );
     assert!(matches!(
-        reg(&s, 1).staff.lines[0].line.kind,
+        reg(&s, 1).counter.lines[0].line.kind,
         LineKind::Ff {
             state: FfState::Waiting
         }
     ));
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":id,"handed":1}),
     );
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":2}),
+        json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":2}),
     );
     let v = reg(&s, 1);
     assert!(matches!(
-        v.staff.lines[0].line.kind,
+        v.counter.lines[0].line.kind,
         LineKind::Ff {
             state: FfState::Received
         }
     ));
-    assert_eq!(v.staff.ff_collect.len(), 1);
-    assert_eq!(v.staff.ff_collect[0].qty, 1);
+    assert_eq!(v.counter.ff_collect.len(), 1);
+    assert_eq!(v.counter.ff_collect[0].qty, 1);
     ok(&mut s, json!({"type":"dismiss_ff_collect","register":1}));
-    assert!(reg(&s, 1).staff.ff_collect.is_empty());
+    assert!(reg(&s, 1).counter.ff_collect.is_empty());
     advance(&mut s, 1_000);
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+        json!({"type":"remove_line","register":1,"side":"counter","line_id":id}),
     );
-    assert_eq!(reg(&s, 1).staff.ff_collect[0].qty, 2);
+    assert_eq!(reg(&s, 1).counter.ff_collect[0].qty, 2);
 }
 
 /// 仕様 5.5：たばこ・切手・公共料金・荷物にはポイントを付けない
@@ -3306,12 +3306,12 @@ fn changing_handed_ff_rewinds_or_asks_to_collect() {
 fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", "PC12345678");
-    scan(&mut s, 1, "staff", TOBACCO);
-    scan(&mut s, 1, "staff", STAMP);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", "PC12345678");
+    scan(&mut s, 1, "counter", TOBACCO);
+    scan(&mut s, 1, "counter", STAMP);
+    scan(&mut s, 1, "counter", BREAD);
     let bread = reg(&s, 1)
-        .staff
+        .counter
         .lines
         .iter()
         .find(|l| l.line.code == BREAD)
@@ -3319,12 +3319,12 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
         .unwrap();
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"cash"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"cash"}),
     );
     ok(
         &mut s,
@@ -3335,12 +3335,12 @@ fn points_are_not_earned_on_tobacco_stamps_bills_or_parcels() {
 
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", STAMP);
+    scan(&mut s, 1, "counter", STAMP);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
-    assert!(!reg(&s, 1).staff.point_pending);
+    assert!(!reg(&s, 1).counter.point_pending);
 }
 
 /// 仕様 8：FF のお渡し照合はスタッフだけが行う
@@ -3350,29 +3350,29 @@ fn staff_alone_is_responsible_for_ff_handover() {
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":2}),
+        json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":2}),
     );
-    let id = reg(&s, 1).staff.lines[0].line.id;
+    let id = reg(&s, 1).counter.lines[0].line.id;
     advance(&mut s, 1_000);
-    assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
+    assert!(!allowed(&reg(&s, 1), Side::Counter, Action::Checkout));
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":2}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":id,"handed":2}),
     );
     advance(&mut s, 1_000);
-    assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
+    assert!(allowed(&reg(&s, 1), Side::Counter, Action::Checkout));
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":3}),
+        json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":3}),
     );
     advance(&mut s, 1_000);
-    assert!(!allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
+    assert!(!allowed(&reg(&s, 1), Side::Counter, Action::Checkout));
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":id,"handed":1}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":id,"handed":1}),
     );
     advance(&mut s, 1_000);
-    assert!(allowed(&reg(&s, 1), Side::Staff, Action::Checkout));
+    assert!(allowed(&reg(&s, 1), Side::Counter, Action::Checkout));
 }
 
 /// 仕様 6.5：足りた状態で 30 秒入れなければ投入おわり
@@ -3381,16 +3381,16 @@ fn thirty_seconds_without_insert_means_done_inserting() {
     let mut s = Store::new(1, 2, 1);
     s.tick(1000);
     login(&mut s, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
-    assert_eq!(reg(&s, 1).staff.method, None, "method not chosen yet");
+    assert_eq!(reg(&s, 1).counter.method, None, "method not chosen yet");
     ok(&mut s, json!({"type":"insert","register":1,"amount":100}));
     assert_eq!(
-        reg(&s, 1).staff.method,
+        reg(&s, 1).counter.method,
         Some(PaymentMethod::Cash),
         "inserting skips the method choice"
     );
@@ -3412,12 +3412,12 @@ fn ff_handover_cannot_be_confirmed_after_staff_logs_out() {
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":1}),
+        json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":1}),
     );
-    let id = reg(&s, 1).staff.lines[0].line.id;
+    let id = reg(&s, 1).counter.lines[0].line.id;
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     advance(&mut s, 2_000);
-    for side in ["customer", "staff"] {
+    for side in ["floor", "counter"] {
         assert!(
             run(
                 &mut s,
@@ -3428,7 +3428,7 @@ fn ff_handover_cannot_be_confirmed_after_staff_logs_out() {
         );
     }
     assert!(matches!(
-        reg(&s, 1).staff.lines[0].line.kind,
+        reg(&s, 1).counter.lines[0].line.kind,
         LineKind::Ff {
             state: FfState::Waiting
         }
@@ -3452,18 +3452,18 @@ fn saved_state_restores_every_register() {
     let mut s = Store::new(7, 2, 3);
     let set = json!({"type":"set_product_age","owner_id":"000","password":"9999","code":SANDWICH,"min_age":20});
     ok(&mut s, set);
-    scan(&mut s, 2, "customer", BEER);
-    scan(&mut s, 2, "customer", TEA);
+    scan(&mut s, 2, "floor", BEER);
+    scan(&mut s, 2, "floor", TEA);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"customer"}),
+        json!({"type":"checkout","register":2,"side":"floor"}),
     );
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
-    scan(&mut s, 1, "staff", SANDWICH);
+    scan(&mut s, 1, "counter", BREAD);
+    scan(&mut s, 1, "counter", SANDWICH);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     advance(&mut s, 1500);
     let mut back = same_after_reload(&s);
@@ -3524,7 +3524,7 @@ fn ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved() {
         json!({"type":"register_ff","register":1,"code":"FF63","qty":1,"force":true}),
     );
     assert_eq!(level(&s, "FF63"), StockLevel::Out);
-    assert_eq!(reg(&s, 1).staff.lines.len(), 1);
+    assert_eq!(reg(&s, 1).counter.lines.len(), 1);
     for _ in 0..3 {
         ok(
             &mut s,
@@ -3550,52 +3550,52 @@ fn ff_stock_is_shown_as_four_levels_and_out_of_stock_can_be_reserved() {
 #[test]
 fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(&mut s, json!({"type":"insert","register":1,"amount":1000}));
     ok(
         &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+        json!({"type":"back_to_registering","register":1,"side":"counter"}),
     );
     let v = reg(&s, 1);
     assert_eq!(v.outlet, 1000, "unsettled cash goes to the outlet");
-    assert_eq!(v.staff.inserted, 0);
-    assert_eq!(v.staff.method, None, "back to choosing a method");
-    assert_eq!(v.staff.phase, Phase::Paying, "stays on the payment screen");
+    assert_eq!(v.counter.inserted, 0);
+    assert_eq!(v.counter.method, None, "back to choosing a method");
+    assert_eq!(v.counter.phase, Phase::Paying, "stays on the payment screen");
     assert!(v.last_receipt.is_none());
     advance(&mut s, 40_000);
     assert!(reg(&s, 1).last_receipt.is_none(), "nothing settles itself");
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"emoney"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"emoney"}),
     );
     ok(
         &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+        json!({"type":"back_to_registering","register":1,"side":"counter"}),
     );
-    assert_eq!(reg(&s, 1).staff.phase, Phase::Registering);
+    assert_eq!(reg(&s, 1).counter.phase, Phase::Registering);
 }
 
 /// 仕様 6.4：選んだ支払方法をもう一度押すと選択を外す
 #[test]
 fn pressing_the_chosen_payment_method_again_clears_it() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     confirm_point(&mut s, 1);
-    let pick = json!({"type":"select_payment","register":1,"side":"customer","method":"emoney"});
+    let pick = json!({"type":"select_payment","register":1,"side":"floor","method":"emoney"});
     ok(&mut s, pick.clone());
-    assert_eq!(reg(&s, 1).staff.method, Some(PaymentMethod::Emoney));
+    assert_eq!(reg(&s, 1).counter.method, Some(PaymentMethod::Emoney));
     ok(&mut s, pick);
-    assert_eq!(reg(&s, 1).staff.method, None);
+    assert_eq!(reg(&s, 1).counter.method, None);
     let e = run(
         &mut s,
         json!({"type":"tap_emoney","register":1,"method":"emoney"}),
@@ -3609,36 +3609,36 @@ fn pressing_the_chosen_payment_method_again_clears_it() {
 fn point_card_is_asked_once_but_can_be_read_until_paid() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
-    assert!(reg(&s, 1).staff.point_pending);
+    assert!(reg(&s, 1).counter.point_pending);
     confirm_point(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"qr"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"qr"}),
     );
     ok(
         &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+        json!({"type":"back_to_registering","register":1,"side":"counter"}),
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     let v = reg(&s, 1);
-    assert!(!v.staff.point_pending, "declined once: never asked again");
-    assert!(v.staff.point_card.is_none());
-    scan(&mut s, 1, "customer", "PC12345678");
+    assert!(!v.counter.point_pending, "declined once: never asked again");
+    assert!(v.counter.point_card.is_none());
+    scan(&mut s, 1, "floor", "PC12345678");
     let v = reg(&s, 1);
     assert_eq!(
-        v.staff.phase,
+        v.counter.phase,
         Phase::Paying,
         "reading the card keeps the payment screen"
     );
-    assert!(v.staff.point_card.is_some());
+    assert!(v.counter.point_card.is_some());
     ok(
         &mut s,
         json!({"type":"insert_cash","register":1,"denomination":500,"count":1}),
@@ -3652,22 +3652,22 @@ fn point_card_is_asked_once_but_can_be_read_until_paid() {
 fn staff_can_check_age_early_and_new_age_goods_need_it_again() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
-    scan(&mut s, 1, "staff", BREAD);
-    assert!(allowed(&reg(&s, 1), Side::Staff, Action::EarlyAgeCheck));
+    scan(&mut s, 1, "counter", BEER);
+    scan(&mut s, 1, "counter", BREAD);
+    assert!(allowed(&reg(&s, 1), Side::Counter, Action::EarlyAgeCheck));
     assert!(run(
         &mut s,
-        json!({"type":"early_age_check","register":1,"side":"customer","start":true})
+        json!({"type":"early_age_check","register":1,"side":"floor","start":true})
     )
     .is_err());
     ok(
         &mut s,
-        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+        json!({"type":"early_age_check","register":1,"side":"counter","start":true}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.staff.phase, Phase::Registering);
-    assert!(v.staff.age_choice_pending);
-    assert_eq!(v.staff.required_age, Some(20));
+    assert_eq!(v.counter.phase, Phase::Registering);
+    assert!(v.counter.age_choice_pending);
+    assert_eq!(v.counter.required_age, Some(20));
     ok(
         &mut s,
         json!({"type":"choose_age_check","register":1,"id_check":true}),
@@ -3677,14 +3677,14 @@ fn staff_can_check_age_early_and_new_age_goods_need_it_again() {
         json!({"type":"check_id","register":1,"birth":"20100101","today":"2026-11-09"}),
     );
     let v = reg(&s, 1);
-    assert!(!v.staff.age_early);
-    assert_eq!(v.staff.lines.len(), 1, "beer is removed early");
-    assert!(!allowed(&v, Side::Staff, Action::EarlyAgeCheck));
+    assert!(!v.counter.age_early);
+    assert_eq!(v.counter.lines.len(), 1, "beer is removed early");
+    assert!(!allowed(&v, Side::Counter, Action::EarlyAgeCheck));
 
-    scan(&mut s, 1, "staff", LIGHTER);
+    scan(&mut s, 1, "counter", LIGHTER);
     let v = reg(&s, 1);
     assert!(
-        !v.staff
+        !v.counter
             .lines
             .iter()
             .find(|l| l.age.is_some())
@@ -3693,10 +3693,10 @@ fn staff_can_check_age_early_and_new_age_goods_need_it_again() {
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     assert!(
-        reg(&s, 1).staff.age_choice_pending,
+        reg(&s, 1).counter.age_choice_pending,
         "a lighter added after the check needs the check again"
     );
 }
@@ -3706,29 +3706,29 @@ fn staff_can_check_age_early_and_new_age_goods_need_it_again() {
 fn early_age_check_can_be_cancelled_and_covers_checkout() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "counter", BEER);
     ok(
         &mut s,
-        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+        json!({"type":"early_age_check","register":1,"side":"counter","start":true}),
     );
     ok(
         &mut s,
-        json!({"type":"early_age_check","register":1,"side":"staff","start":false}),
+        json!({"type":"early_age_check","register":1,"side":"counter","start":false}),
     );
-    assert!(!reg(&s, 1).staff.age_choice_pending);
+    assert!(!reg(&s, 1).counter.age_choice_pending);
     ok(
         &mut s,
-        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+        json!({"type":"early_age_check","register":1,"side":"counter","start":true}),
     );
     no_id_check(&mut s, 1);
     let v = reg(&s, 1);
-    assert!(v.staff.lines[0].age_checked);
+    assert!(v.counter.lines[0].age_checked);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     assert!(
-        !reg(&s, 1).staff.age_choice_pending,
+        !reg(&s, 1).counter.age_choice_pending,
         "checked early, not asked again"
     );
 }
@@ -3824,7 +3824,7 @@ fn login_clears_the_ring_count() {
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+        json!({"type":"end_staff_mode","register":1,"side":"counter"}),
     );
     ring(&mut s, 1);
     assert!(!reg(&s, 1).emergency);
@@ -3919,10 +3919,10 @@ fn emergency_lasts_until_ended() {
 fn two_thousand_yen_bill_is_returned_to_the_outlet() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     // 二千円札そのものは受け付けず、出金ボックスへ
@@ -3931,14 +3931,14 @@ fn two_thousand_yen_bill_is_returned_to_the_outlet() {
         json!({"type":"insert_cash","register":1,"denomination":2000,"count":1}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.staff.inserted, 0);
+    assert_eq!(v.counter.inserted, 0);
     assert_eq!(v.outlet, 2000);
     assert_eq!(v.outlet_detail, vec![(2000, 1)]);
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     // テンキーで 2000 と打つのは千円札 2 枚とみなす
     ok(&mut s, json!({"type":"insert","register":1,"amount":2000}));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.inserted, 2000);
+    assert_eq!(v.counter.inserted, 2000);
     assert_eq!(v.outlet, 0);
 }
 
@@ -3949,32 +3949,32 @@ const TICKET: &str = "2100000000074";
 fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matches() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", TICKET);
+    scan(&mut s, 1, "counter", TICKET);
     for code in [TICKET, BREAD] {
         let e = run(
             &mut s,
-            json!({"type":"scan","register":1,"side":"staff","code":code}),
+            json!({"type":"scan","register":1,"side":"counter","code":code}),
         )
         .unwrap_err();
         assert!(e.contains("一件ずつ"), "{code}: {e}");
     }
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.len(), 1, "チケットは一件ずつ");
-    assert_eq!(v.staff.total, 15_600);
+    assert_eq!(v.counter.lines.len(), 1, "チケットは一件ずつ");
+    assert_eq!(v.counter.total, 15_600);
     assert!(v.ticket_handover.is_empty(), "支払い前は発券しない");
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     assert!(
-        !reg(&s, 1).staff.point_pending,
+        !reg(&s, 1).counter.point_pending,
         "ポイント対象外なのでカードの確認はない"
     );
     for m in ["credit", "qr"] {
         assert!(
             run(
                 &mut s,
-                json!({"type":"select_payment","register":1,"side":"staff","method":m})
+                json!({"type":"select_payment","register":1,"side":"counter","method":m})
             )
             .is_err(),
             "チケットは現金のみ: {m}"
@@ -3997,21 +3997,21 @@ fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matc
         "お渡しが済むまでお礼の画面に戻らない"
     );
     assert!(
-        receive_tickets(&mut s, 1, "staff", 2).is_err(),
+        receive_tickets(&mut s, 1, "counter", 2).is_err(),
         "受け取り枚数は売り場側で入力する"
     );
-    let m = receive_tickets(&mut s, 1, "customer", 3).unwrap().unwrap();
+    let m = receive_tickets(&mut s, 1, "floor", 3).unwrap().unwrap();
     assert!(m.contains("一致しません"), "{m}");
     let v = reg(&s, 1);
     assert_eq!(v.tickets_received, Some(3));
     assert_eq!(v.ticket_handover.len(), 1, "枚数が合うまで終わらない");
     assert!(
-        hand_tickets(&mut s, 1, "customer", 2).is_err(),
+        hand_tickets(&mut s, 1, "floor", 2).is_err(),
         "お渡し枚数はレジカウンター側で入力する"
     );
-    let m = hand_tickets(&mut s, 1, "staff", 1).unwrap().unwrap();
+    let m = hand_tickets(&mut s, 1, "counter", 1).unwrap().unwrap();
     assert!(m.contains("発券枚数とお渡し枚数が一致しません"), "{m}");
-    let m = hand_tickets(&mut s, 1, "staff", 2).unwrap().unwrap();
+    let m = hand_tickets(&mut s, 1, "counter", 2).unwrap().unwrap();
     assert!(
         !m.contains("一致しません"),
         "スタッフの入力は発券枚数と比べる: {m}"
@@ -4022,7 +4022,7 @@ fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matc
         1,
         "お客様の入力が発券枚数と一致するまで終わらない"
     );
-    let m = receive_tickets(&mut s, 1, "customer", 2).unwrap().unwrap();
+    let m = receive_tickets(&mut s, 1, "floor", 2).unwrap().unwrap();
     assert!(m.contains("チケット 2枚をお渡ししました"), "{m}");
     let v = reg(&s, 1);
     assert!(v.ticket_handover.is_empty());
@@ -4037,10 +4037,10 @@ fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matc
 fn tickets_cannot_share_a_transaction_with_other_goods() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":TICKET}),
+        json!({"type":"scan","register":1,"side":"counter","code":TICKET}),
     )
     .unwrap_err();
     assert!(e.contains("チケット"), "{e}");
@@ -4050,10 +4050,10 @@ fn tickets_cannot_share_a_transaction_with_other_goods() {
 #[test]
 fn self_operated_ticket_checkout_calls_staff_for_cash() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", TICKET);
+    scan(&mut s, 1, "floor", TICKET);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     let calls = s.snapshot().calls;
     assert!(
@@ -4084,8 +4084,8 @@ fn hand_tickets(s: &mut Store, r: u8, side: &str, handed: u32) -> Result<Option<
 }
 
 fn pay_tickets(s: &mut Store, r: u8) {
-    scan(s, r, "staff", TICKET);
-    ok(s, json!({"type":"checkout","register":r,"side":"staff"}));
+    scan(s, r, "counter", TICKET);
+    ok(s, json!({"type":"checkout","register":r,"side":"counter"}));
     ok(s, json!({"type":"insert","register":r,"amount":16000}));
     ok(s, json!({"type":"finish_insert","register":r}));
 }
@@ -4109,34 +4109,34 @@ fn tickets_are_issued_first_in_first_out_across_registers() {
         "レジ1は発券待ち"
     );
     assert!(
-        receive_tickets(&mut s, 1, "customer", 2).is_err(),
+        receive_tickets(&mut s, 1, "floor", 2).is_err(),
         "発券前は受け取り枚数を入力できない"
     );
     // 発券を待っているあいだも、レジ1はお渡しが済むまで次の取引を始められない
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":BREAD}),
+        json!({"type":"scan","register":1,"side":"counter","code":BREAD}),
     )
     .unwrap_err();
     assert!(e.contains("チケットのお渡し"), "{e}");
     pay_tickets(&mut s, 3);
     assert_eq!(reg(&s, 3).tickets_ahead, 2, "後から支払ったレジ3は列の最後");
-    receive_tickets(&mut s, 2, "customer", 2).unwrap();
+    receive_tickets(&mut s, 2, "floor", 2).unwrap();
     assert!(
         !reg(&s, 2).ticket_handover.is_empty(),
         "スタッフの入力がまだ"
     );
-    hand_tickets(&mut s, 2, "staff", 2).unwrap();
+    hand_tickets(&mut s, 2, "counter", 2).unwrap();
     let (r1, r2) = (reg(&s, 1), reg(&s, 2));
     assert!(r2.ticket_handover.is_empty());
     assert!(
         r1.tickets_issued && r1.tickets_ahead == 0,
         "先のお渡しが済んだので次を発券"
     );
-    hand_tickets(&mut s, 1, "staff", 2).unwrap();
-    receive_tickets(&mut s, 1, "customer", 2).unwrap();
+    hand_tickets(&mut s, 1, "counter", 2).unwrap();
+    receive_tickets(&mut s, 1, "floor", 2).unwrap();
     assert!(reg(&s, 1).ticket_handover.is_empty());
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
 }
 
 /// 仕様 3.4：発券の列は保存と読み込みで残る
@@ -4157,22 +4157,22 @@ fn ticket_queue_survives_save_and_load() {
 fn fresh_food_quantity_cannot_be_raised_on_screen() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
-    let id = reg(&s, 1).staff.lines[0].line.id;
+    scan(&mut s, 1, "counter", BREAD);
+    let id = reg(&s, 1).counter.lines[0].line.id;
     let set =
-        |qty: u32| json!({"type":"set_qty","register":1,"side":"staff","line_id":id,"qty":qty});
+        |qty: u32| json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":qty});
     let e = run(&mut s, set(2)).unwrap_err();
     assert!(e.contains("日配食品"), "{e}");
-    assert!(reg(&s, 1).staff.lines[0].fresh);
+    assert!(reg(&s, 1).counter.lines[0].fresh);
     // 続けて読んでも数量にまとめず、一点ずつ別の行になる
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     let v = reg(&s, 1);
-    assert_eq!(v.staff.lines.len(), 2);
-    assert!(v.staff.lines.iter().all(|l| l.line.qty == 1));
+    assert_eq!(v.counter.lines.len(), 2);
+    assert!(v.counter.lines.iter().all(|l| l.line.qty == 1));
     // 加工食品は数量を変えられる
-    scan(&mut s, 1, "staff", SNACK);
+    scan(&mut s, 1, "counter", SNACK);
     let snack = reg(&s, 1)
-        .staff
+        .counter
         .lines
         .iter()
         .find(|l| l.line.code == SNACK)
@@ -4181,7 +4181,7 @@ fn fresh_food_quantity_cannot_be_raised_on_screen() {
         .id;
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"staff","line_id":snack,"qty":3}),
+        json!({"type":"set_qty","register":1,"side":"counter","line_id":snack,"qty":3}),
     );
 }
 
@@ -4190,34 +4190,34 @@ fn fresh_food_quantity_cannot_be_raised_on_screen() {
 fn expired_onigiri_blocks_checkout_until_removed() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     let m = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":ONIGIRI}),
+        json!({"type":"scan","register":1,"side":"counter","code":ONIGIRI}),
     )
     .unwrap()
     .unwrap();
     assert!(m.contains("販売期限が切れています"), "{m}");
     let v = reg(&s, 1);
     let l = v
-        .staff
+        .counter
         .lines
         .iter()
         .find(|l| l.line.code == ONIGIRI)
         .unwrap();
     assert!(l.expired && l.fresh);
-    assert!(v.customer.lines.iter().any(|l| l.expired));
-    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    assert!(v.floor.lines.iter().any(|l| l.expired));
+    assert!(!allowed(&v, Side::Counter, Action::Checkout));
     let id = l.line.id;
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+        json!({"type":"remove_line","register":1,"side":"counter","line_id":id}),
     );
     let v = reg(&s, 1);
-    assert!(allowed(&v, Side::Staff, Action::Checkout));
+    assert!(allowed(&v, Side::Counter, Action::Checkout));
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
 }
 
@@ -4227,7 +4227,7 @@ fn self_operated_expired_scan_calls_staff() {
     let mut s = Store::new(1, 2, 1);
     let m = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":ONIGIRI}),
+        json!({"type":"scan","register":1,"side":"floor","code":ONIGIRI}),
     )
     .unwrap()
     .unwrap();
@@ -4237,31 +4237,31 @@ fn self_operated_expired_scan_calls_staff() {
         .calls
         .iter()
         .any(|c| c.kind == CallKind::Expired));
-    let id = reg(&s, 1).customer.lines[0].id;
+    let id = reg(&s, 1).floor.lines[0].id;
     assert!(run(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     )
     .is_err());
     // セルフの売り場側には、期限切れの明細を消す手段がない（B-3）
     assert!(run(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"customer","line_id":id}),
+        json!({"type":"remove_line","register":1,"side":"floor","line_id":id}),
     )
     .is_err());
     assert!(run(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"customer","line_id":id,"qty":0}),
+        json!({"type":"set_qty","register":1,"side":"floor","line_id":id,"qty":0}),
     )
     .is_err());
-    assert_eq!(reg(&s, 1).customer.lines.len(), 1);
+    assert_eq!(reg(&s, 1).floor.lines.len(), 1);
     // 消せるのはレジカウンター側の「回収しました」だけ
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"remove_line","register":1,"side":"staff","line_id":id}),
+        json!({"type":"remove_line","register":1,"side":"counter","line_id":id}),
     );
-    assert!(reg(&s, 1).staff.lines.is_empty());
+    assert!(reg(&s, 1).counter.lines.is_empty());
 }
 
 fn open_calls(s: &Store, r: u8) -> Vec<CallKind> {
@@ -4272,13 +4272,13 @@ fn open_calls(s: &Store, r: u8) -> Vec<CallKind> {
 #[test]
 fn expired_call_comes_back_after_logout_without_collecting() {
     let mut s = Store::new(1, 1, 1);
-    scan(&mut s, 1, "customer", ONIGIRI);
+    scan(&mut s, 1, "floor", ONIGIRI);
     assert_eq!(open_calls(&s, 1), vec![CallKind::Expired]);
     login(&mut s, 1);
     assert!(open_calls(&s, 1).is_empty());
     ok(
         &mut s,
-        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+        json!({"type":"end_staff_mode","register":1,"side":"counter"}),
     );
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
@@ -4290,17 +4290,17 @@ fn expired_call_comes_back_after_logout_without_collecting() {
 #[test]
 fn age_check_call_comes_back_after_logout_without_checking() {
     let mut s = Store::new(1, 1, 1);
-    scan(&mut s, 1, "customer", BEER);
+    scan(&mut s, 1, "floor", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     assert!(open_calls(&s, 1).contains(&CallKind::AgeCheck));
     login(&mut s, 1);
     assert!(open_calls(&s, 1).is_empty());
     ok(
         &mut s,
-        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+        json!({"type":"end_staff_mode","register":1,"side":"counter"}),
     );
     assert!(open_calls(&s, 1).contains(&CallKind::AgeCheck));
 }
@@ -4309,25 +4309,25 @@ fn age_check_call_comes_back_after_logout_without_checking() {
 #[test]
 fn bill_and_service_calls_come_back_after_logout() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", WATER_BILL);
+    scan(&mut s, 1, "floor", WATER_BILL);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     assert!(open_calls(&s, 1).contains(&CallKind::Bill));
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"end_staff_mode","register":1,"side":"staff"}),
+        json!({"type":"end_staff_mode","register":1,"side":"counter"}),
     );
     assert!(open_calls(&s, 1).contains(&CallKind::Bill));
 
-    scan(&mut s, 2, "customer", PARCEL);
+    scan(&mut s, 2, "floor", PARCEL);
     assert!(open_calls(&s, 2).contains(&CallKind::Service));
     login(&mut s, 2);
     ok(
         &mut s,
-        json!({"type":"end_staff_mode","register":2,"side":"staff"}),
+        json!({"type":"end_staff_mode","register":2,"side":"counter"}),
     );
     assert!(open_calls(&s, 2).contains(&CallKind::Service));
 }
@@ -4340,24 +4340,24 @@ const FIREWORKS: &str = "4910000000076";
 fn goods_needing_an_age_already_checked_do_not_redo_the_check() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", LIGHTER);
+    scan(&mut s, 1, "counter", LIGHTER);
     ok(
         &mut s,
-        json!({"type":"early_age_check","register":1,"side":"staff","start":true}),
+        json!({"type":"early_age_check","register":1,"side":"counter","start":true}),
     );
     no_id_check(&mut s, 1);
-    scan(&mut s, 1, "staff", CARTON);
+    scan(&mut s, 1, "counter", CARTON);
     let v = reg(&s, 1);
     assert!(
-        v.staff.lines.iter().all(|l| l.age_checked),
+        v.counter.lines.iter().all(|l| l.age_checked),
         "20 is already checked"
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     assert!(
-        !reg(&s, 1).staff.age_choice_pending,
+        !reg(&s, 1).counter.age_choice_pending,
         "a carton after a lighter (both 20) does not redo the check"
     );
 }
@@ -4367,22 +4367,22 @@ fn goods_needing_an_age_already_checked_do_not_redo_the_check() {
 fn an_18_item_after_a_20_check_redoes_the_check_for_18() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "counter", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"back_to_registering","register":1,"side":"staff"}),
+        json!({"type":"back_to_registering","register":1,"side":"counter"}),
     );
-    scan(&mut s, 1, "staff", FIREWORKS);
+    scan(&mut s, 1, "counter", FIREWORKS);
     let v = reg(&s, 1);
-    let fw = v.staff.lines.iter().find(|l| l.age == Some(18)).unwrap();
+    let fw = v.counter.lines.iter().find(|l| l.age == Some(18)).unwrap();
     assert!(!fw.age_checked);
     assert!(
-        v.staff
+        v.counter
             .lines
             .iter()
             .find(|l| l.age == Some(20))
@@ -4391,13 +4391,13 @@ fn an_18_item_after_a_20_check_redoes_the_check_for_18() {
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     let v = reg(&s, 1);
-    assert!(v.staff.age_choice_pending);
-    assert_eq!(v.staff.required_age, Some(18));
+    assert!(v.counter.age_choice_pending);
+    assert_eq!(v.counter.required_age, Some(18));
     no_id_check(&mut s, 1);
-    assert!(reg(&s, 1).staff.lines.iter().all(|l| l.age_checked));
+    assert!(reg(&s, 1).counter.lines.iter().all(|l| l.age_checked));
 }
 
 /// 仕様 6.7：セルフ操作モードの残高不足は頼まれたときだけスタッフを呼ぶ
@@ -4407,29 +4407,29 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
     short_checkout(&mut s);
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
     assert!(
-        reg(&s, 1).staff.calls.is_empty(),
+        reg(&s, 1).counter.calls.is_empty(),
         "残高不足の時点では呼ばない"
     );
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"staff"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"floor","choice":"staff"}),
     );
     assert_eq!(reg(&s, 1).emoney_short, Some(1_000));
     assert!(reg(&s, 1)
-        .staff
+        .counter
         .calls
         .iter()
         .any(|c| c.label == "電子マネー"));
     assert!(
         run(
             &mut s,
-            json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"cancel"})
+            json!({"type":"resolve_emoney_short","register":1,"side":"floor","choice":"cancel"})
         )
         .is_err(),
         "呼んだあとは他の決済に切り替えない（スタッフの無駄足になる）"
     );
     assert!(reg(&s, 1)
-        .staff
+        .counter
         .calls
         .iter()
         .any(|c| c.label == "電子マネー"));
@@ -4439,20 +4439,20 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
     short_checkout(&mut s);
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"customer","choice":"staff"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"floor","choice":"staff"}),
     );
     login(&mut s, 1);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::StaffOperated);
     assert_eq!(v.emoney_short, Some(1_000));
-    assert!(v.staff.calls.is_empty());
+    assert!(v.counter.calls.is_empty());
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"counter","choice":"cash"}),
     );
     ok(
         &mut s,
-        json!({"type":"resolve_emoney_short","register":1,"side":"staff","choice":"cash_confirmed"}),
+        json!({"type":"resolve_emoney_short","register":1,"side":"counter","choice":"cash_confirmed"}),
     );
     ok(
         &mut s,
@@ -4466,7 +4466,7 @@ fn self_operated_emoney_short_calls_staff_only_when_asked() {
 fn pay_cash(s: &mut Store, r: u8) {
     ok(
         s,
-        json!({"type":"select_payment","register":r,"side":"staff","method":"cash"}),
+        json!({"type":"select_payment","register":r,"side":"counter","method":"cash"}),
     );
     ok(
         s,
@@ -4480,17 +4480,17 @@ fn pay_cash(s: &mut Store, r: u8) {
 fn points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", "PC12345678");
-    scan(&mut s, 1, "staff", SANDWICH);
-    scan(&mut s, 1, "staff", SANDWICH);
-    scan(&mut s, 1, "staff", TOBACCO);
+    scan(&mut s, 1, "counter", "PC12345678");
+    scan(&mut s, 1, "counter", SANDWICH);
+    scan(&mut s, 1, "counter", SANDWICH);
+    scan(&mut s, 1, "counter", TOBACCO);
     let v = reg(&s, 1);
     assert!(v.points.eligible);
     assert_eq!(v.points.balance, Some(1_250));
     assert_eq!(v.points.earn, 640 / 200, "tobacco earns nothing");
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     pay_cash(&mut s, 1);
@@ -4500,8 +4500,8 @@ fn points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card() {
         (3, 0, Some(1_253))
     );
 
-    scan(&mut s, 1, "staff", BREAD);
-    scan(&mut s, 1, "staff", "PC12345678");
+    scan(&mut s, 1, "counter", BREAD);
+    scan(&mut s, 1, "counter", "PC12345678");
     assert_eq!(reg(&s, 1).points.balance, Some(1_253));
 }
 
@@ -4510,23 +4510,23 @@ fn points_are_earned_per_200_yen_of_eligible_goods_and_kept_on_the_card() {
 fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", "PC87654321");
-    scan(&mut s, 1, "staff", SANDWICH);
-    scan(&mut s, 1, "staff", TOBACCO);
+    scan(&mut s, 1, "counter", "PC87654321");
+    scan(&mut s, 1, "counter", SANDWICH);
+    scan(&mut s, 1, "counter", TOBACCO);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
     assert_eq!(reg(&s, 1).points.usable, 1);
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"points"}),
     );
     use_points(&mut s, 1, "all", None);
     let v = reg(&s, 1);
-    assert_eq!((v.prepaid, v.staff.due), (1, 919));
-    assert_eq!(v.staff.method, None);
+    assert_eq!((v.prepaid, v.counter.due), (1, 919));
+    assert_eq!(v.counter.method, None);
     assert_eq!(
         v.points.earn,
         (320 - 1) / 200,
@@ -4534,7 +4534,7 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
     );
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"credit"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"credit"}),
     );
     ok(
         &mut s,
@@ -4549,34 +4549,34 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
 fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", "PC87654321");
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", "PC87654321");
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"points"}),
     );
     use_points(&mut s, 1, "all", None);
     assert_eq!(reg(&s, 1).points.balance, Some(0));
     ok(
         &mut s,
-        json!({"type":"void_transaction","register":1,"side":"staff"}),
+        json!({"type":"void_transaction","register":1,"side":"counter"}),
     );
-    scan(&mut s, 1, "staff", BREAD);
-    scan(&mut s, 1, "staff", "PC87654321");
+    scan(&mut s, 1, "counter", BREAD);
+    scan(&mut s, 1, "counter", "PC87654321");
     assert_eq!(reg(&s, 1).points.balance, Some(1));
 
     // 1P を使い切ると、残高 0 のカードではポイント利用を選べない
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     ok(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+        json!({"type":"select_payment","register":1,"side":"counter","method":"points"}),
     );
     use_points(&mut s, 1, "all", None);
     pay_cash(&mut s, 1);
@@ -4584,11 +4584,11 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
         reg(&s, 1).last_receipt.and_then(|r| r.point_balance),
         Some(0)
     );
-    scan(&mut s, 1, "staff", BREAD);
-    scan(&mut s, 1, "staff", "PC87654321");
+    scan(&mut s, 1, "counter", BREAD);
+    scan(&mut s, 1, "counter", "PC87654321");
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     assert!(reg(&s, 1)
         .unavailable
@@ -4596,7 +4596,7 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
         .any(|u| u.method == PaymentMethod::Points));
     assert!(run(
         &mut s,
-        json!({"type":"select_payment","register":1,"side":"staff","method":"points"})
+        json!({"type":"select_payment","register":1,"side":"counter","method":"points"})
     )
     .is_err());
 }
@@ -4606,20 +4606,20 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
 fn only_non_point_goods_skip_the_point_card_check() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", TOBACCO);
+    scan(&mut s, 1, "counter", TOBACCO);
     assert!(!reg(&s, 1).points.eligible);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     no_id_check(&mut s, 1);
-    assert!(!reg(&s, 1).staff.point_pending);
+    assert!(!reg(&s, 1).counter.point_pending);
 }
 
 fn use_points(s: &mut Store, r: u8, how: &str, points: Option<u32>) {
     ok(
         s,
-        json!({"type":"use_points","register":r,"side":"staff","how":how,"points":points}),
+        json!({"type":"use_points","register":r,"side":"counter","how":how,"points":points}),
     );
 }
 
@@ -4628,15 +4628,15 @@ fn use_points(s: &mut Store, r: u8, how: &str, points: Option<u32>) {
 fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
     let start = |s: &mut Store| {
         login(s, 1);
-        scan(s, 1, "staff", "PC12345678");
-        scan(s, 1, "staff", SANDWICH);
-        scan(s, 1, "staff", BREAD);
-        scan(s, 1, "staff", TOBACCO);
-        ok(s, json!({"type":"checkout","register":1,"side":"staff"}));
+        scan(s, 1, "counter", "PC12345678");
+        scan(s, 1, "counter", SANDWICH);
+        scan(s, 1, "counter", BREAD);
+        scan(s, 1, "counter", TOBACCO);
+        ok(s, json!({"type":"checkout","register":1,"side":"counter"}));
         no_id_check(s, 1);
         ok(
             s,
-            json!({"type":"select_payment","register":1,"side":"staff","method":"points"}),
+            json!({"type":"select_payment","register":1,"side":"counter","method":"points"}),
         );
     };
     // 合計 1,080円（うちポイントを使えるのは 480円）
@@ -4647,18 +4647,18 @@ fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
     assert_eq!((v.points.usable, v.points.fraction), (480, 80));
     use_points(&mut s, 1, "fraction", None);
     let v = reg(&s, 1);
-    assert_eq!((v.prepaid, v.staff.due), (80, 1_000));
+    assert_eq!((v.prepaid, v.counter.due), (80, 1_000));
 
     let mut s = Store::new(1, 2, 1);
     start(&mut s);
     assert!(run(
         &mut s,
-        json!({"type":"use_points","register":1,"side":"staff","how":"amount","points":481})
+        json!({"type":"use_points","register":1,"side":"counter","how":"amount","points":481})
     )
     .is_err());
     use_points(&mut s, 1, "amount", Some(300));
     let v = reg(&s, 1);
-    assert_eq!((v.prepaid, v.staff.due), (300, 780));
+    assert_eq!((v.prepaid, v.counter.due), (300, 780));
     assert_eq!(v.points.balance, Some(950));
 
     let mut s = Store::new(1, 2, 1);
@@ -4672,15 +4672,15 @@ fn points_can_pay_all_the_odd_yen_or_a_chosen_amount() {
 fn a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment() {
     let mut s = Store::new(1, 2, 1);
     login_as(&mut s, 2, "ST001");
-    scan(&mut s, 2, "staff", "4900000000035");
-    scan(&mut s, 2, "staff", "CP0001");
-    assert_eq!(reg(&s, 2).customer.total, 0);
+    scan(&mut s, 2, "counter", "4900000000035");
+    scan(&mut s, 2, "counter", "CP0001");
+    assert_eq!(reg(&s, 2).floor.total, 0);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
     let v = reg(&s, 2);
-    assert!(v.staff.lines.is_empty(), "決済手段を選ばずに取引が終わる");
+    assert!(v.counter.lines.is_empty(), "決済手段を選ばずに取引が終わる");
     assert_eq!(v.last_receipt.unwrap().method, "お支払いなし");
 }
 
@@ -4688,7 +4688,7 @@ fn a_zero_yen_purchase_finishes_on_checkout_without_choosing_a_payment() {
 #[test]
 fn multi_piece_parcels_share_the_address_and_only_ask_for_the_size() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL_MULTI);
+    scan(&mut s, 2, "floor", PARCEL_MULTI);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
@@ -4700,8 +4700,8 @@ fn multi_piece_parcels_share_the_address_and_only_ask_for_the_size() {
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
     );
     let v = reg(&s, 2);
-    assert!(v.staff.parcel_ask && v.customer.parcel_ask);
-    assert!(!allowed(&v, Side::Staff, Action::Checkout));
+    assert!(v.counter.parcel_ask && v.floor.parcel_ask);
+    assert!(!allowed(&v, Side::Counter, Action::Checkout));
     ok(
         &mut s,
         json!({"type":"parcel_next","register":2,"more":true}),
@@ -4711,26 +4711,26 @@ fn multi_piece_parcels_share_the_address_and_only_ask_for_the_size() {
         &mut s,
         json!({"type":"parcel_size","register":2,"line_id":id2,"sum_cm":58,"weight_g":1500}),
     );
-    let pc = |s: &Store, i: usize| reg(s, 2).staff.lines[i].line.parcel.clone().unwrap();
+    let pc = |s: &Store, i: usize| reg(s, 2).counter.lines[i].line.parcel.clone().unwrap();
     assert!(pc(&s, 1).multi && !pc(&s, 1).collect);
     assert_eq!(pc(&s, 1).postal, pc(&s, 0).postal);
     assert_ne!(pc(&s, 1).slip, pc(&s, 0).slip);
-    assert!(reg(&s, 2).staff.parcel_ask);
+    assert!(reg(&s, 2).counter.parcel_ask);
     ok(
         &mut s,
         json!({"type":"parcel_next","register":2,"more":false}),
     );
     let v = reg(&s, 2);
-    assert!(!v.staff.parcel_ask);
-    assert_eq!(v.customer.total, 940 * 2);
-    assert!(allowed(&v, Side::Staff, Action::Checkout));
+    assert!(!v.counter.parcel_ask);
+    assert_eq!(v.floor.total, 940 * 2);
+    assert!(allowed(&v, Side::Counter, Action::Checkout));
 }
 
 /// 仕様 10.1：お客様控えは伝票ごとに一枚、複数口は一枚
 #[test]
 fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 2, "customer", PARCEL_COLLECT);
+    scan(&mut s, 2, "floor", PARCEL_COLLECT);
     login_as(&mut s, 2, "ST001");
     let id = pending_parcel(&s, 2);
     ok(
@@ -4741,7 +4741,7 @@ fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
         &mut s,
         json!({"type":"parcel_postal","register":2,"line_id":id,"postal":"1000001"}),
     );
-    scan(&mut s, 2, "staff", PARCEL_MULTI);
+    scan(&mut s, 2, "counter", PARCEL_MULTI);
     for i in 0..3 {
         let id = pending_parcel(&s, 2);
         ok(
@@ -4759,14 +4759,14 @@ fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
             json!({"type":"parcel_next","register":2,"more":i < 2}),
         );
     }
-    assert_eq!(reg(&s, 2).staff.lines.len(), 4);
+    assert_eq!(reg(&s, 2).counter.lines.len(), 4);
     ok(
         &mut s,
-        json!({"type":"checkout","register":2,"side":"staff"}),
+        json!({"type":"checkout","register":2,"side":"counter"}),
     );
     ok(
         &mut s,
-        json!({"type":"select_payment","register":2,"side":"staff","method":"cash"}),
+        json!({"type":"select_payment","register":2,"side":"counter","method":"cash"}),
     );
     ok(
         &mut s,
@@ -4777,7 +4777,7 @@ fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
     assert_eq!(v.parcel_handover, Some(2), "着払い1枚＋複数口1枚");
     ok(
         &mut s,
-        json!({"type":"hand_over_bills","register":2,"side":"staff"}),
+        json!({"type":"hand_over_bills","register":2,"side":"counter"}),
     );
     assert_eq!(reg(&s, 2).parcel_handover, None);
 }
@@ -4786,15 +4786,15 @@ fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
 #[test]
 fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
     let mut s = Store::new(1, 2, 1);
-    scan(&mut s, 1, "customer", "PC12345678");
+    scan(&mut s, 1, "floor", "PC12345678");
     let v = reg(&s, 1);
-    assert!(v.customer.point_card);
-    assert!(allowed(&v, Side::Customer, Action::VoidTransaction));
+    assert!(v.floor.point_card);
+    assert!(allowed(&v, Side::Floor, Action::VoidTransaction));
     ok(
         &mut s,
-        json!({"type":"void_transaction","register":1,"side":"customer"}),
+        json!({"type":"void_transaction","register":1,"side":"floor"}),
     );
-    assert!(!reg(&s, 1).customer.point_card);
+    assert!(!reg(&s, 1).floor.point_card);
 }
 
 /// 仕様 14.2：トレカは既定で 1 回のお会計 3 パックまで
@@ -4815,16 +4815,16 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
     let fireworks = find("4910000000076");
     assert_eq!((fireworks.store_age, fireworks.legal_age), (Some(18), None));
     for _ in 0..3 {
-        scan(&mut s, 1, "customer", card);
+        scan(&mut s, 1, "floor", card);
     }
     let e = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":card}),
+        json!({"type":"scan","register":1,"side":"floor","code":card}),
     )
     .unwrap_err();
     assert!(e.contains("3点まで"), "{e}");
     let qty: u32 = reg(&s, 1)
-        .customer
+        .floor
         .lines
         .iter()
         .filter(|l| l.name == "トレカ")
@@ -4836,20 +4836,20 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
     assert_eq!((alert.name, alert.limit), ("トレカ", 3));
     ok(
         &mut s,
-        json!({"type":"close_limit_alert","register":1,"side":"customer"}),
+        json!({"type":"close_limit_alert","register":1,"side":"floor"}),
     );
     assert!(reg(&s, 1).limit_alert.is_none());
     // 上限内の登録でも案内は閉じる
     let _ = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":card}),
+        json!({"type":"scan","register":1,"side":"floor","code":card}),
     );
     assert!(reg(&s, 1).limit_alert.is_some());
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     assert!(reg(&s, 1).limit_alert.is_none()); // 上限を超えようとした明細にだけ個数制限のフラグ（お会計は止めない）
     let r = reg(&s, 1);
     assert!(
-        r.customer
+        r.floor
             .lines
             .iter()
             .find(|l| l.name == "トレカ")
@@ -4857,7 +4857,7 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
             .limit_hit
     );
     assert!(
-        !r.customer
+        !r.floor
             .lines
             .iter()
             .find(|l| l.name != "トレカ")
@@ -4873,18 +4873,18 @@ fn trading_cards_are_flagged_only_once_over_the_limit() {
     let card = janus_pos_core::catalog::TRADING_CARD;
     login(&mut s, 1);
     for _ in 0..3 {
-        scan(&mut s, 1, "staff", card);
+        scan(&mut s, 1, "counter", card);
     }
-    assert!(!reg(&s, 1).staff.lines[0].limit_hit);
+    assert!(!reg(&s, 1).counter.lines[0].limit_hit);
     assert!(run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"staff","code":card})
+        json!({"type":"scan","register":1,"side":"counter","code":card})
     )
     .is_err());
-    assert!(reg(&s, 1).staff.lines[0].limit_hit);
+    assert!(reg(&s, 1).counter.lines[0].limit_hit);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
 }
 
@@ -4973,7 +4973,7 @@ fn self_emoney_charge_call_waits_like_other_waiting_calls() {
     let mut s = Store::new(3, 2, 1);
     ok(
         &mut s,
-        json!({"type":"start_emoney","register":1,"side":"customer","kind":"charge"}),
+        json!({"type":"start_emoney","register":1,"side":"floor","kind":"charge"}),
     );
     let v = reg(&s, 1);
     assert_eq!(v.waiting_calls, vec![CallKind::Emoney]);
@@ -4990,11 +4990,11 @@ fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
     let mut s = Store::new(3, 2, 1);
     ok(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":"4900000000103"}),
+        json!({"type":"scan","register":1,"side":"floor","code":"4900000000103"}),
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
     assert!(reg(&s, 1).waiting_calls.contains(&CallKind::AgeCheck));
     login_as(&mut s, 1, "ST001");
@@ -5005,10 +5005,10 @@ fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
     let mut s = Store::new(3, 2, 1);
     ok(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":"2100000000014"}),
+        json!({"type":"scan","register":1,"side":"floor","code":"2100000000014"}),
     );
     assert_eq!(reg(&s, 1).waiting_calls, vec![CallKind::Service]);
-    assert_eq!(reg(&s, 1).staff.calls[0].topic, "宅配便");
+    assert_eq!(reg(&s, 1).counter.calls[0].topic, "宅配便");
     login_as(&mut s, 1, "ST001");
     assert_eq!(reg(&s, 1).answered.as_deref(), Some("宅配便"));
 }
@@ -5020,13 +5020,13 @@ fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
     let mut s = Store::new(3, 2, 1);
     ok(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":"2100000000043"}),
+        json!({"type":"scan","register":1,"side":"floor","code":"2100000000043"}),
     );
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"customer"}),
+        json!({"type":"checkout","register":1,"side":"floor"}),
     );
-    assert_eq!(reg(&s, 1).staff.calls[0].topic, "お支払い");
+    assert_eq!(reg(&s, 1).counter.calls[0].topic, "お支払い");
     // 最下段のボタンはボタンの文言そのまま
     for (topic, want) in [
         ("voucher", "金券"),
@@ -5039,7 +5039,7 @@ fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
             json!({"type":"call_staff","register":1,"topic":topic}),
         );
         ok(&mut s, json!({"type":"release_call","register":1}));
-        assert_eq!(reg(&s, 1).staff.calls[0].topic, want);
+        assert_eq!(reg(&s, 1).counter.calls[0].topic, want);
     }
     // 二つ呼んでも、ログイン後の用件は最初の一件だけ
     let mut s = Store::new(3, 2, 1);
@@ -5064,63 +5064,63 @@ fn passing_age_or_ff_check_is_shown_until_staff_moves_on() {
     use janus_pos_core::store::Passed;
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
+    scan(&mut s, 1, "counter", BEER);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     ok(
         &mut s,
-        json!({"type":"choose_age_check","register":1,"side":"staff","id_check":true}),
+        json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}),
     );
-    assert_eq!(reg(&s, 1).staff.passed, None);
+    assert_eq!(reg(&s, 1).counter.passed, None);
     ok(
         &mut s,
         json!({"type":"check_id","register":1,"birth":"19900101","today":"2026-11-14"}),
     );
-    assert_eq!(reg(&s, 1).staff.passed, Some(Passed::Age { age: 20 }));
+    assert_eq!(reg(&s, 1).counter.passed, Some(Passed::Age { age: 20 }));
     ok(&mut s, json!({"type":"dismiss_passed","register":1}));
-    assert_eq!(reg(&s, 1).staff.passed, None);
+    assert_eq!(reg(&s, 1).counter.passed, None);
 
     // 年齢が足りないときは照合OKではなく回収
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BEER);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BEER);
+    scan(&mut s, 1, "counter", BREAD);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     ok(
         &mut s,
-        json!({"type":"choose_age_check","register":1,"side":"staff","id_check":true}),
+        json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}),
     );
     ok(
         &mut s,
         json!({"type":"check_id","register":1,"birth":"20100101","today":"2026-11-14"}),
     );
     let v = reg(&s, 1);
-    assert_eq!(v.staff.passed, None);
-    assert_eq!(v.staff.confiscated.len(), 1);
+    assert_eq!(v.counter.passed, None);
+    assert_eq!(v.counter.confiscated.len(), 1);
 
     // FF：最後の一品が一致したときだけ照合OK
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     ok(
         &mut s,
-        json!({"type":"register_ff","register":1,"side":"staff","code":"FF01","qty":2}),
+        json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":2}),
     );
-    let ff = reg(&s, 1).staff.lines[0].line.id;
+    let ff = reg(&s, 1).counter.lines[0].line.id;
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":ff,"handed":1}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":ff,"handed":1}),
     );
-    assert_eq!(reg(&s, 1).staff.passed, None);
+    assert_eq!(reg(&s, 1).counter.passed, None);
     ok(
         &mut s,
-        json!({"type":"check_ff","register":1,"side":"staff","line_id":ff,"handed":2}),
+        json!({"type":"check_ff","register":1,"side":"counter","line_id":ff,"handed":2}),
     );
-    assert_eq!(reg(&s, 1).staff.passed, Some(Passed::Ff));
+    assert_eq!(reg(&s, 1).counter.passed, Some(Passed::Ff));
 }
 
 /// 仕様 9：店舗の年齢制限は顔写真付きの身分証、法令の年齢制限は公的な身分証
@@ -5129,28 +5129,28 @@ fn store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids() {
     const FIREWORKS: &str = "4910000000076";
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", FIREWORKS);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
-    assert!(!reg(&s, 1).staff.age_official_id, "fireworks is a store rule");
-    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"staff"}));
-    scan(&mut s, 1, "staff", BEER);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"staff"}));
-    assert!(reg(&s, 1).staff.age_official_id, "alcohol is a legal rule");
+    scan(&mut s, 1, "counter", FIREWORKS);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    assert!(!reg(&s, 1).counter.age_official_id, "fireworks is a store rule");
+    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"counter"}));
+    scan(&mut s, 1, "counter", BEER);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    assert!(reg(&s, 1).counter.age_official_id, "alcohol is a legal rule");
 }
 
 /// 仕様 15.3：受け付けなかった操作は理由を返し、続く操作は妨げない（ソフトドリンクの後の荷物の伝票）（B-2）
 #[test]
 fn a_rejected_scan_returns_its_reason_and_the_next_scan_goes_through() {
     let mut s = Store::new(1, 1, 1);
-    scan(&mut s, 1, "customer", TEA);
+    scan(&mut s, 1, "floor", TEA);
     let err = run(
         &mut s,
-        json!({"type":"scan","register":1,"side":"customer","code":PARCEL}),
+        json!({"type":"scan","register":1,"side":"floor","code":PARCEL}),
     )
     .unwrap_err();
     assert!(err.contains("荷物の発送は、ほかの商品と一緒に会計できません"), "{err}");
-    scan(&mut s, 1, "customer", BREAD);
-    assert_eq!(reg(&s, 1).customer.lines.len(), 2);
+    scan(&mut s, 1, "floor", BREAD);
+    assert_eq!(reg(&s, 1).floor.lines.len(), 2);
 }
 
 /// 仕様 6.5：現金の投入中、両画面の帯に出す合計（残りのお支払い額）・お預かり・お釣り／不足の元になる値（B-4）
@@ -5158,24 +5158,24 @@ fn a_rejected_scan_returns_its_reason_and_the_next_scan_goes_through() {
 fn tendered_cash_and_change_are_shown_on_both_sides() {
     let mut s = Store::new(1, 1, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", SANDWICH);
-    scan(&mut s, 1, "staff", SANDWICH);
+    scan(&mut s, 1, "counter", SANDWICH);
+    scan(&mut s, 1, "counter", SANDWICH);
     ok(
         &mut s,
-        json!({"type":"checkout","register":1,"side":"staff"}),
+        json!({"type":"checkout","register":1,"side":"counter"}),
     );
     confirm_point(&mut s, 1);
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
     let v = reg(&s, 1);
-    assert_eq!((v.staff.total - v.prepaid, v.staff.inserted), (640, 500));
-    assert_eq!(v.staff.due, 140, "不足 140 円");
+    assert_eq!((v.counter.total - v.prepaid, v.counter.inserted), (640, 500));
+    assert_eq!(v.counter.due, 140, "不足 140 円");
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
     let v = reg(&s, 1);
-    assert_eq!(v.staff.inserted, 1000);
-    assert_eq!(v.staff.inserted - (v.staff.total - v.prepaid), 360, "お釣り 360 円");
+    assert_eq!(v.counter.inserted, 1000);
+    assert_eq!(v.counter.inserted - (v.counter.total - v.prepaid), 360, "お釣り 360 円");
     ok(
         &mut s,
-        json!({"type":"finish_insert","register":1,"side":"staff"}),
+        json!({"type":"finish_insert","register":1,"side":"counter"}),
     );
     let v = reg(&s, 1);
     let rc = v.last_receipt.unwrap();
@@ -5188,7 +5188,7 @@ fn idle_countdown_pauses_while_a_call_is_open() {
     use janus_pos_core::store::IDLE_REVERT_MS;
     let mut s = Store::new(1, 1, 1);
     login(&mut s, 1);
-    scan(&mut s, 1, "staff", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
     advance(&mut s, 60_000);
     let left = reg(&s, 1).idle_revert_in.unwrap();
     assert_eq!(left, IDLE_REVERT_MS - 60_000);
@@ -5211,7 +5211,7 @@ fn idle_countdown_pauses_while_a_call_is_open() {
 #[test]
 fn idle_countdown_is_frozen_for_a_self_operated_call() {
     let mut s = Store::new(1, 1, 1);
-    scan(&mut s, 1, "customer", BREAD);
+    scan(&mut s, 1, "floor", BREAD);
     advance(&mut s, 10_000);
     ok(
         &mut s,
@@ -5221,5 +5221,5 @@ fn idle_countdown_is_frozen_for_a_self_operated_call() {
     let held = reg(&s, 1).idle_revert_in.unwrap();
     advance(&mut s, 200_000);
     assert_eq!(reg(&s, 1).idle_revert_in.unwrap(), held);
-    assert_eq!(reg(&s, 1).customer.lines.len(), 1, "the transaction is not voided");
+    assert_eq!(reg(&s, 1).floor.lines.len(), 1, "the transaction is not voided");
 }

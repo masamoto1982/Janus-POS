@@ -15,8 +15,8 @@ export function toggleLang(reg: number, side: string): Lang {
 }
 
 export function resetLangs(reg: number): void {
-  langs.delete(`${reg}:staff`);
-  langs.delete(`${reg}:customer`);
+  langs.delete(`${reg}:counter`);
+  langs.delete(`${reg}:floor`);
 }
 
 const JP = /[　-ヿ一-鿿！-～]/;

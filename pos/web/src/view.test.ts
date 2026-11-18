@@ -8,7 +8,7 @@ describe("view helpers", () => {
     expect(signage(0)).toContain("data-i18n-skip");
   });
 
-  it("shows the customer side as closed in the first-wait style while the store menu is open", () => {
+  it("shows the floor side as closed in the first-wait style while the store menu is open", () => {
     const html = menuPaused();
     expect(html).toContain('<b class="mode-big">休止中</b>');
     expect(html).toContain(">Please use another register<");
@@ -22,15 +22,15 @@ describe("view helpers", () => {
   });
 
   it("disables a button with the core's reason", () => {
-    const html = btn("会計", { type: "checkout", register: 1, side: "staff" }, { allowed: false, reason: "明細がありません" });
+    const html = btn("会計", { type: "checkout", register: 1, side: "counter" }, { allowed: false, reason: "明細がありません" });
     expect(html).toContain("disabled");
     expect(html).toContain('title="明細がありません"');
   });
 
   it("routes notices to the side that acted", () => {
-    expect(sideOf({ type: "scan", register: 1, side: "customer", code: "" })).toBe("customer");
-    expect(sideOf({ type: "insert_cash", register: 1, denomination: 1000, count: 1 })).toBe("customer");
-    expect(sideOf({ type: "void_transaction", register: 1 })).toBe("staff");
+    expect(sideOf({ type: "scan", register: 1, side: "floor", code: "" })).toBe("floor");
+    expect(sideOf({ type: "insert_cash", register: 1, denomination: 1000, count: 1 })).toBe("floor");
+    expect(sideOf({ type: "void_transaction", register: 1 })).toBe("counter");
     expect(sideOf({ type: "set_bell_loss", percent: 30 })).toBe("store");
   });
 
@@ -55,7 +55,7 @@ describe("view helpers", () => {
   it("lists every utility bill slip with its payee and amount to tick, and shows the slip count large", () => {
     const html = billVerifyScreen(
       1,
-      "staff",
+      "counter",
       [
         { line_id: 1, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 1234 5678 9012", checked: true, stamp: 200, stamped: false },
         { line_id: 2, code: "2100000000043", name: "水道料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: false, stamp: 0, stamped: false },
@@ -67,8 +67,8 @@ describe("view helpers", () => {
     expect(html).toContain("9100 2222 3333 4444");
     expect(html).not.toContain(">枚数<");
     expect(html.match(/電気料金/g)?.length).toBe(4);
-    expect(html).toContain('type="checkbox" checked data-bill-check="1:staff:1"');
-    expect(html).toContain('type="checkbox"  data-bill-check="1:staff:3"');
+    expect(html).toContain('type="checkbox" checked data-bill-check="1:counter:1"');
+    expect(html).toContain('type="checkbox"  data-bill-check="1:counter:3"');
     expect(html).toContain(`<span class="bill-n">3枚</span>`);
     expect(html).toContain("合計 103,000円");
     const pay = billPayCard(3);
@@ -81,10 +81,10 @@ describe("view helpers", () => {
       { line_id: 1, code: "2100000000021", name: "電気料金", amount: 50000, slip_no: "9100 1234 5678 9012", checked: true, stamp: 200, stamped: false },
       { line_id: 2, code: "2100000000043", name: "水道料金", amount: 3000, slip_no: "9100 2222 3333 4444", checked: true, stamp: 0, stamped: false },
     ];
-    const html = stampVerifyScreen(1, "staff", bills, { allowed: true, reason: null }, true);
+    const html = stampVerifyScreen(1, "counter", bills, { allowed: true, reason: null }, true);
     expect(html).toContain("収入印紙の貼り付け確認");
     expect(html).not.toContain("水道料金");
-    expect(html).toContain('data-stamp-check="1:staff:1"');
+    expect(html).toContain('data-stamp-check="1:counter:1"');
     expect(html).toContain(">200円<");
     expect(html).toContain("data-stampverify-close");
     expect(html).not.toMatch(/。/);
@@ -92,38 +92,38 @@ describe("view helpers", () => {
 
   it("shows the stamp-and-hand-over step after a utility bill payment", () => {
     const st = { action: "hand_over_bills", allowed: true, reason: null };
-    const staff = billHandover(1, "staff", 3, st);
-    expect(staff).toContain("払込票に収納印を押してお渡しください");
-    expect(staff).toContain(`<span class="bill-n">3枚</span>`);
-    expect(staff).toContain("お渡し済");
-    const customer = billHandover(1, "customer", 3, st, 140);
-    expect(customer).toContain("支払いが完了しました");
-    expect(customer).toContain(`<span class="bill-n">3枚</span>`);
-    expect(customer).toContain("払込票とレシート、お釣りをお受け取りください");
+    const counter = billHandover(1, "counter", 3, st);
+    expect(counter).toContain("払込票に収納印を押してお渡しください");
+    expect(counter).toContain(`<span class="bill-n">3枚</span>`);
+    expect(counter).toContain("お渡し済");
+    const floor = billHandover(1, "floor", 3, st, 140);
+    expect(floor).toContain("支払いが完了しました");
+    expect(floor).toContain(`<span class="bill-n">3枚</span>`);
+    expect(floor).toContain("払込票とレシート、お釣りをお受け取りください");
     // 50,000 円ちょうどならお釣りはないので「お釣り」を外す（B-6）
-    expect(billHandover(1, "customer", 1, st, 0)).toContain("払込票とレシートをお受け取りください");
-    expect(customer).not.toContain("お渡し済");
+    expect(billHandover(1, "floor", 1, st, 0)).toContain("払込票とレシートをお受け取りください");
+    expect(floor).not.toContain("お渡し済");
   });
 
-  it("shows the open calls only on the self-operated staff screen", () => {
+  it("shows the open calls only on the self-operated counter-side screen", () => {
     const call = (kind: string, topic: string, created_at: number) => ({ id: 1, register: 1, kind, label: kind, topic, created_at, detail: "" });
     const r = {
-      staff: { calls: [call("tobacco", "たばこ", 2000), call("fast_food", "FF", 1000), call("bill", "お支払い", 3000)], bell_down: [] },
-      customer: { staff_called: true },
+      counter: { calls: [call("tobacco", "たばこ", 2000), call("fast_food", "FF", 1000), call("bill", "お支払い", 3000)], bell_down: [] },
+      floor: { staff_called: true },
     } as unknown as RegisterView;
-    const staff = callScreen(r);
-    expect(staff).toContain(">FF<");
-    expect(staff).not.toContain("たばこ");
-    expect(staff).not.toContain("＆");
-    expect(staff).not.toContain("🔔");
-    expect(staff).not.toContain("経過");
-    expect(staff).toContain("鳴動を止めるにはログインしてください");
+    const counter = callScreen(r);
+    expect(counter).toContain(">FF<");
+    expect(counter).not.toContain("たばこ");
+    expect(counter).not.toContain("＆");
+    expect(counter).not.toContain("🔔");
+    expect(counter).not.toContain("経過");
+    expect(counter).toContain("鳴動を止めるにはログインしてください");
   });
 
   it("puts no bell-down band on the call screen", () => {
     const r = {
-      staff: { calls: [{ id: 1, register: 1, kind: "customer_help", label: "呼び出し", created_at: 1000, detail: "" }], bell_down: ["据え付け端末"] },
-      customer: {},
+      counter: { calls: [{ id: 1, register: 1, kind: "customer_help", label: "呼び出し", created_at: 1000, detail: "" }], bell_down: ["据え付け端末"] },
+      floor: {},
     } as unknown as RegisterView;
     expect(callScreen(r)).not.toContain("不通");
     expect(callScreen(r)).not.toContain("banner");
@@ -131,8 +131,8 @@ describe("view helpers", () => {
 
   it("shows no elapsed time for an age-check call", () => {
     const r = {
-      staff: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", topic: "年確", created_at: 1000, detail: "20歳以上" }], bell_down: [] },
-      customer: { staff_called: true },
+      counter: { calls: [{ id: 1, register: 1, kind: "age_check", label: "年確", topic: "年確", created_at: 1000, detail: "20歳以上" }], bell_down: [] },
+      floor: { staff_called: true },
     } as unknown as RegisterView;
     expect(callScreen(r)).toContain("年確");
     expect(callScreen(r)).not.toContain("経過");
@@ -140,12 +140,12 @@ describe("view helpers", () => {
 
   it("names the goods, not 現金, for a cash-only call", () => {
     const r = {
-      staff: { calls: [{ id: 1, register: 1, kind: "cash_only", label: "現金", topic: "チケット", created_at: 1000, detail: "チケット" }], bell_down: [] },
-      customer: {},
+      counter: { calls: [{ id: 1, register: 1, kind: "cash_only", label: "現金", topic: "チケット", created_at: 1000, detail: "チケット" }], bell_down: [] },
+      floor: {},
     } as unknown as RegisterView;
-    const staff = callScreen(r);
-    expect(staff).toContain(">チケット<");
-    expect(staff).not.toContain("現金");
+    const counter = callScreen(r);
+    expect(counter).toContain(">チケット<");
+    expect(counter).not.toContain("現金");
   });
 
   it("marks the item count when the limit is reached", () => {
@@ -153,7 +153,7 @@ describe("view helpers", () => {
     expect(regTop(100, 10, "", 10)).toContain("上限");
   });
 
-  it("rotates the signage on the attended customer screen's bottom tier", () => {
+  it("rotates the signage on the attended floor-side screen's bottom tier", () => {
     expect(signage(0)).toContain(SIGNAGE[0][0]);
     expect(signage(SIGNAGE_MS)).toContain(SIGNAGE[1][0]);
     expect(signage(SIGNAGE_MS * SIGNAGE.length)).toContain(SIGNAGE[0][0]);

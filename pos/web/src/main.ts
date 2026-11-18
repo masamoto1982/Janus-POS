@@ -155,37 +155,37 @@ function buildSkeleton(): void {
         </label>
       </h2>
       <div class="tabs swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
-        <button type="button" role="tab" class="tab on" aria-selected="true" data-swipe-to="${r.id}:staff">レジカウンター側</button>
-        <button type="button" role="tab" class="tab" aria-selected="false" data-swipe-to="${r.id}:customer">売り場側</button>
+        <button type="button" role="tab" class="tab on" aria-selected="true" data-swipe-to="${r.id}:counter">レジカウンター側</button>
+        <button type="button" role="tab" class="tab" aria-selected="false" data-swipe-to="${r.id}:floor">売り場側</button>
       </div>
       <div class="screens" data-swipe="${r.id}">
-        <div class="screen-wrap" data-wrap="${r.id}:staff">
+        <div class="screen-wrap" data-wrap="${r.id}:counter">
           <div class="screen-cap">レジカウンター側<span class="drop-hint">ここに落とす＝レジカウンター側スキャナーで読む</span></div>
-          <section class="screen staff-screen" data-drop="${r.id}:staff">
-            <div class="screen-head" data-region="head-${r.id}-staff"></div>
-            <div class="screen-body"><div class="screen-main" data-region="staff-${r.id}"></div></div>
-            <div class="screen-items" data-region="items-${r.id}-staff"></div>
-            <div data-region="pop-${r.id}-staff"></div>
+          <section class="screen counter-screen" data-drop="${r.id}:counter">
+            <div class="screen-head" data-region="head-${r.id}-counter"></div>
+            <div class="screen-body"><div class="screen-main" data-region="counter-${r.id}"></div></div>
+            <div class="screen-items" data-region="items-${r.id}-counter"></div>
+            <div data-region="pop-${r.id}-counter"></div>
           </section>
         </div>
-        <div class="screen-wrap" data-wrap="${r.id}:customer">
+        <div class="screen-wrap" data-wrap="${r.id}:floor">
           <div class="screen-cap">売り場側<span class="drop-hint">ここに落とす＝売り場側スキャナーで読む</span></div>
-          <section class="screen customer-screen" data-drop="${r.id}:customer">
-            <div class="screen-head" data-region="head-${r.id}-customer"></div>
-            <div class="screen-body"><div class="screen-main" data-region="cust-${r.id}"></div></div>
-            <div class="screen-items" data-region="items-${r.id}-customer"></div>
-            <div data-region="pop-${r.id}-customer"></div>
+          <section class="screen floor-screen" data-drop="${r.id}:floor">
+            <div class="screen-head" data-region="head-${r.id}-floor"></div>
+            <div class="screen-body"><div class="screen-main" data-region="floor-${r.id}"></div></div>
+            <div class="screen-items" data-region="items-${r.id}-floor"></div>
+            <div data-region="pop-${r.id}-floor"></div>
           </section>
         </div>
       </div>
-      <div class="money-io face-staff">
-        <div class="money-io-staff" aria-label="レジ${r.id}の自動釣銭機（レジカウンター側の画面に付いています）">
+      <div class="money-io face-counter">
+        <div class="money-io-counter" aria-label="レジ${r.id}の自動釣銭機（レジカウンター側の画面に付いています）">
           <div class="money-io-boxes" data-cash-drop="${r.id}">
-            <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:staff:inlet:" aria-label="レジ${r.id}の入金ボックス（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
+            <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:counter:inlet:" aria-label="レジ${r.id}の入金ボックス（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
             <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の出金ボックス（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
           </div>
         </div>
-        <div class="money-io-cust" aria-label="レジ${r.id}の決済端末とスキャナ（売り場側の画面に付いています）">
+        <div class="money-io-floor" aria-label="レジ${r.id}の決済端末とスキャナ（売り場側の画面に付いています）">
           <div class="money-io-boxes">
             <div data-pay-drop="${r.id}" data-device="terminal"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・クレジットカードをかざす）"><span class="placeholder">決済端末</span></button></div>
             <div data-pay-drop="${r.id}" data-device="scanner"><button type="button" class="terminal scanner" data-scanner="${r.id}" aria-label="レジ${r.id}のスキャナ（商品・決済用バーコード・ポイントカードを読む）"><span class="placeholder">スキャナ</span></button></div>
@@ -345,7 +345,7 @@ function trackFlashes(): void {
   const now = performance.now();
   const present = new Set<string>();
   for (const r of snap.registers) {
-    const rows: [number, number][] = [...r.staff.lines.map((l): [number, number] => [l.id, l.qty]), ...r.staff.coupons.map((c): [number, number] => [c.id, 1])];
+    const rows: [number, number][] = [...r.counter.lines.map((l): [number, number] => [l.id, l.qty]), ...r.counter.coupons.map((c): [number, number] => [c.id, 1])];
     for (const [id, qty] of rows) {
       const k = `${r.id}:${id}`;
       present.add(k);
@@ -367,7 +367,7 @@ function trackFlashes(): void {
 const busyRegs = new Set<number>();
 
 function inTransaction(r: RegisterView): boolean {
-  const v = r.staff;
+  const v = r.counter;
   return (
     v.lines.length > 0 ||
     v.coupons.length > 0 ||
@@ -426,10 +426,10 @@ function render(): void {
     else busyRegs.delete(r.id);
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);
     if (sel && document.activeElement !== sel) {
-      const acc = r.staff.state === "absent" ? undefined : snap.accounts.find((a) => a.name === r.staff.name);
+      const acc = r.counter.state === "absent" ? undefined : snap.accounts.find((a) => a.name === r.counter.name);
       sel.value = acc?.barcode ?? "";
     }
-    for (const side of ["staff", "customer"] as const) {
+    for (const side of ["counter", "floor"] as const) {
       const head = app.querySelector<HTMLElement>(`[data-region="head-${r.id}-${side}"]`);
       if (!head) continue;
       head.classList.toggle("sos", r.emergency);
@@ -443,28 +443,28 @@ function render(): void {
       }
     }
     // 第一待ち受け：取引のない待ち受けで、レジ前に人がいない（カーソルが重なっていない）状態が FIRST_WAIT_AFTER_MS 続いたとき
-    let staffMain = sharedScreen(r, snap, "staff");
-    let custMain = sharedScreen(r, snap, "customer");
-    const vacant = isWelcome(staffMain) && isWelcome(custMain) && !busy && !r.staff.point_card && !r.customer.point_card;
+    let counterMain = sharedScreen(r, snap, "counter");
+    let floorMain = sharedScreen(r, snap, "floor");
+    const vacant = isWelcome(counterMain) && isWelcome(floorMain) && !busy && !r.counter.point_card && !r.floor.point_card;
     if (!vacant || present(r.id)) lastBusy.set(r.id, Date.now());
     const first = vacant && Date.now() - (lastBusy.get(r.id) ?? 0) >= FIRST_WAIT_AFTER_MS;
     if (first) {
-      staffMain = firstWelcome(r, "staff");
-      custMain = firstWelcome(r, "customer");
+      counterMain = firstWelcome(r, "counter");
+      floorMain = firstWelcome(r, "floor");
     }
     app.querySelector(`[data-swipe="${r.id}"]`)?.classList.toggle("first-wait", first);
-    for (const side of ["staff", "customer"] as const) {
+    for (const side of ["counter", "floor"] as const) {
       const entry = qtyEntry.get(`${r.id}:${side}`);
-      if (entry && (r.staff.phase !== "registering" || !r.staff.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
+      if (entry && (r.counter.phase !== "registering" || !r.counter.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
       const items = itemsPanel(r, snap, ffUi(r.id), side, Date.now(), first);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
-      const operable = r.active_side !== null ? r.active_side === side : r.mode !== "staff_operated" || side === "staff";
+      const operable = r.active_side !== null ? r.active_side === side : r.mode !== "staff_operated" || side === "counter";
       el?.classList.toggle("operable", operable);
       el?.classList.toggle("mode-staff", r.mode === "staff_operated");
       el?.classList.toggle("mode-self", r.mode === "self_operated");
-      el?.classList.toggle("calling", side === "staff" && r.lamp);
+      el?.classList.toggle("calling", side === "counter" && r.lamp);
       el?.classList.toggle("head-blink", r.lamp || r.emergency);
       el?.classList.toggle("lamp", r.lamp && !r.emergency);
       el?.classList.toggle("sos", r.emergency);
@@ -476,25 +476,25 @@ function render(): void {
       setRegion(`items-${r.id}-${side}`, items, lang);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
-      if (side === "staff" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {
+      if (side === "counter" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {
         padValue.delete(padValueKey(r.id, "mamt"));
         padValue.delete(padValueKey(r.id, "mpw"));
       }
       // 荷物の長さ・重さ・郵便番号は受付中の荷物のものだけ残す。明細の番号は取引ごとに振り直すので、
       // 残しておくと次の取引の荷物に前の荷物の値が入ってしまう
-      if (side === "staff") {
-        const pending = new Set(r.staff.lines.filter((l) => l.parcel && l.kind === "service" && !l.done).map((l) => String(l.id)));
+      if (side === "counter") {
+        const pending = new Set(r.counter.lines.filter((l) => l.parcel && l.kind === "service" && !l.done).map((l) => String(l.id)));
         for (const key of [...padValue.keys()]) {
           const [reg, target, line] = key.split(":");
           if (reg === String(r.id) && ["pcm", "pkg", "post"].includes(target) && !pending.has(line)) padValue.delete(key);
         }
       }
       // ポイントの使い方の画面を離れたら、指定しかけたポイント数を捨てる
-      if (r.customer.method !== "points" || r.prepaid) padValue.delete(padValueKey(r.id, "ppt"));
+      if (r.floor.method !== "points" || r.prepaid) padValue.delete(padValueKey(r.id, "ppt"));
       setRegion(`pop-${r.id}-${side}`, qtyPopup(r, side) || padPopup(r, side), lang);
       el?.classList.toggle("no-items", !items);
     }
-    const face: Side = r.menu ? "staff" : r.mode === "staff_operated" ? "staff" : "customer";
+    const face: Side = r.menu ? "counter" : r.mode === "staff_operated" ? "counter" : "floor";
     if (face !== activeShown.get(r.id)) {
       activeShown.set(r.id, face);
       if (isMobile()) swipeTo(r.id, face);
@@ -510,8 +510,8 @@ function render(): void {
           : ""
       }`,
     );
-    setRegion(`staff-${r.id}`, withRejection(staffMain, rejection(r.id, "staff")), langOf(r.id, "staff"));
-    setRegion(`cust-${r.id}`, withRejection(custMain, rejection(r.id, "customer")), langOf(r.id, "customer"));
+    setRegion(`counter-${r.id}`, withRejection(counterMain, rejection(r.id, "counter")), langOf(r.id, "counter"));
+    setRegion(`floor-${r.id}`, withRejection(floorMain, rejection(r.id, "floor")), langOf(r.id, "floor"));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -519,22 +519,22 @@ function render(): void {
     app.querySelector(`[data-outlet="${r.id}"]`)?.classList.toggle("blink", r.outlet > 0);
     const inlet = app.querySelector<HTMLElement>(`[data-inlet="${r.id}"]`);
     const terminal = app.querySelector<HTMLElement>(`[data-terminal="${r.id}"]`);
-    const paying = !r.menu && r.staff.phase === "paying" && r.staff.method !== null && r.emoney_short === null && r.emoney_partial === null;
+    const paying = !r.menu && r.counter.phase === "paying" && r.counter.method !== null && r.emoney_short === null && r.emoney_partial === null;
     const emoney = r.menu ? null : r.emoney;
     const partial = !r.menu && r.emoney_partial !== null && r.emoney_partial_ok;
-    const cashPay = paying && r.staff.method === "cash";
+    const cashPay = paying && r.counter.method === "cash";
     const charging = !!emoney && emoney.kind === "charge";
     const tapping = !!emoney && emoney.kind !== "menu" && !(charging && !emoney.inserted);
     if (inlet) {
       inlet.classList.toggle("blink", cashPay || (charging && !emoney!.inserted));
       const hint = cashPay || (charging && !emoney!.inserted) ? (charging ? "紙幣を入れる" : "現金を入れる") : "入金";
-      const shown = emoney ? emoney.inserted : !r.menu ? r.staff.inserted : 0;
+      const shown = emoney ? emoney.inserted : !r.menu ? r.counter.inserted : 0;
       setRegion(`inlet-${r.id}`, shown ? `<b>${shown.toLocaleString()}円</b>` : `<span class="placeholder">${esc(hint)}</span>`);
     }
     if (terminal) {
       // 決済端末は、電子マネー・クレジットカードを待っているあいだだけ青白くゆったり明滅する（スキャナは待機中は光らない）。
       // かざした直後に決済が終わっても、光が広がり終わるまでは待ち受けの見た目のまま
-      const reader = (paying && READER_METHODS.has(r.staff.method!)) || partial || tapping || terminal.classList.contains("fx-tap");
+      const reader = (paying && READER_METHODS.has(r.counter.method!)) || partial || tapping || terminal.classList.contains("fx-tap");
       terminal.classList.toggle("reader", reader);
     }
   }
@@ -599,7 +599,7 @@ const SUBMIT: Partial<Record<PadTarget, (register: number, side: Side, digits: s
   birth: (register, side, birth) => ({ type: "check_id", register, side, birth, today: isoDate(new Date()) }),
   pcm: (register, _side, digits, line) => ({ type: "parcel_length", register, line_id: line!, sum_cm: Number(digits) }),
   pkg: (register, _side, digits, line) => {
-    const sum = snap.registers.find((r) => r.id === register)?.staff.lines.find((l) => l.id === line)?.parcel?.sum_cm;
+    const sum = snap.registers.find((r) => r.id === register)?.counter.lines.find((l) => l.id === line)?.parcel?.sum_cm;
     return sum === undefined || sum === null ? null : { type: "parcel_size", register, line_id: line!, sum_cm: sum, weight_g: Math.round(Number(digits) * 1000) };
   },
   post: (register, _side, postal, line) => ({ type: "parcel_postal", register, line_id: line!, postal }),
@@ -627,10 +627,10 @@ function padKey(key: string, k: string): void {
       }
     } else if (e.target === "tkh") {
       if (e.digits === "") return;
-      send({ type: "hand_tickets", register, side: "staff", handed: value });
+      send({ type: "hand_tickets", register, side: "counter", handed: value });
     } else if (e.target === "tkr") {
       if (e.digits === "") return;
-      send({ type: "receive_tickets", register, side: "customer", received: value });
+      send({ type: "receive_tickets", register, side: "floor", received: value });
     } else if (e.target === "ffv") {
       if (e.digits === "") return;
       const ffKey = `${register}:${side}:${e.line}`;
@@ -640,7 +640,7 @@ function padKey(key: string, k: string): void {
       // 取り消す枚数：新しく読んだクーポンから、その枚数だけ取り消す（返却の案内が出る）
       if (e.digits === "") return;
       const r = snap.registers.find((x) => x.id === register);
-      const coupons = (side === "staff" ? r?.staff.coupons : r?.customer.coupons) ?? [];
+      const coupons = (side === "counter" ? r?.counter.coupons : r?.floor.coupons) ?? [];
       const cs = couponCancelTarget(register, side as Side, coupons) ?? [];
       if (value < 1 || value > cs.length) {
         e.error = `1〜${cs.length}枚で入力してください`;
@@ -690,7 +690,7 @@ function qtyKey(key: string, k: string): void {
     // 販売個数の上限を超える数はテンキーでも打てない
     const [register, side] = key.split(":");
     const r = snap.registers.find((x) => x.id === Number(register));
-    const lines = side === "staff" ? r?.staff.lines ?? [] : r?.customer.lines ?? [];
+    const lines = side === "counter" ? r?.counter.lines ?? [] : r?.floor.lines ?? [];
     const l = lines.find((x) => x.id === e.id);
     const max = l ? lineMax(l, lines) : undefined;
     const next = (e.digits + k).replace(/^0+/, "");
@@ -759,8 +759,8 @@ function send(cmd: Command): boolean {
   if (!where && "register" in cmd) {
     const side = sideOf(cmd);
     if (res.ok) {
-      rejected.delete(`${cmd.register}:staff`);
-      rejected.delete(`${cmd.register}:customer`);
+      rejected.delete(`${cmd.register}:counter`);
+      rejected.delete(`${cmd.register}:floor`);
     } else if (side !== "store" && !OWN_ERROR.has(cmd.type) && !res.error?.includes("買い物点数の上限") && !/は1回のお会計で\d+点までです$/.test(res.error ?? "") && !insertShort(cmd, res.error)) {
       rejected.set(`${cmd.register}:${side}`, { text: res.error ?? "操作できません", at: Date.now() });
     }
@@ -923,7 +923,7 @@ app.addEventListener("change", (e) => {
   }
   if (!sel.dataset.login) return;
   const register = Number(sel.dataset.login);
-  if (sel.value) send({ type: "scan", register, side: "staff", code: sel.value });
+  if (sel.value) send({ type: "scan", register, side: "counter", code: sel.value });
   else send({ type: "end_staff_mode", register });
   sel.blur();
 });
@@ -1013,7 +1013,7 @@ app.addEventListener("click", (e) => {
   if (b.dataset.voidAsk) {
     const [reg, side] = b.dataset.voidAsk.split(":");
     const r = Number(reg);
-    voidAsk.set(r, side as "staff" | "customer");
+    voidAsk.set(r, side as "counter" | "floor");
     return frame();
   }
   if (b.dataset.voidCancel) {
@@ -1161,7 +1161,7 @@ function setupDrag(): void {
     }
     if (!t) return;
     const el = t as HTMLElement;
-    const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "staff" : "customer"];
+    const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "counter" : "floor"];
     deliver({ register: Number(reg), side: side as Side, device: el.dataset.device as Device | undefined, cashBox: !!el.dataset.cashDrop }, d.code, d.wallet);
   });
 
@@ -1211,7 +1211,7 @@ function deliver({ register, side, device, cashBox }: Dest, code?: string, walle
   if (code) return void send({ type: "scan", register, side, code });
   const [kind, value] = wallet!.split(":");
   if (kind === "cash") {
-    if (side === "customer") return toast("toast-store", "現金はレジカウンター側の入金ボックスに入れてください（売り場側はキャッシュレス専用です）", false);
+    if (side === "floor") return toast("toast-store", "現金はレジカウンター側の入金ボックスに入れてください（売り場側はキャッシュレス専用です）", false);
     send(cashDrop(register, Number(value)));
   } else {
     if (cashBox) return toast("toast-store", "キャッシュレスは、売り場側の決済端末かスキャナにかざしてください", false);
@@ -1257,20 +1257,20 @@ function cashDrop(register: number, d: number): Command {
 
 function swipeTo(reg: number, side: Side): void {
   const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
-  el?.scrollTo({ left: side === "customer" ? el.scrollWidth : 0, behavior: "smooth" });
+  el?.scrollTo({ left: side === "floor" ? el.scrollWidth : 0, behavior: "smooth" });
 }
 
 function syncSwipeTabs(reg: number): void {
   const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
-  const side: Side = el && el.scrollLeft > el.clientWidth / 2 ? "customer" : "staff";
+  const side: Side = el && el.scrollLeft > el.clientWidth / 2 ? "floor" : "counter";
   app.querySelectorAll<HTMLElement>(`[data-swipe-to^="${reg}:"]`).forEach((b) => {
     const on = b.dataset.swipeTo === `${reg}:${side}`;
     b.classList.toggle("on", on);
     b.setAttribute("aria-selected", String(on));
   });
   const io = app.querySelector(`[data-swipe="${reg}"]`)?.parentElement?.querySelector(".money-io");
-  io?.classList.toggle("face-staff", side === "staff");
-  io?.classList.toggle("face-customer", side === "customer");
+  io?.classList.toggle("face-counter", side === "counter");
+  io?.classList.toggle("face-floor", side === "floor");
 }
 
 function cancelLongPress(): void {
@@ -1309,7 +1309,7 @@ function wireForceRegister(): void {
 function wireMenuSwipe(): void {
   let start: { reg: number; x: number; y: number; id: number } | null = null;
   app.addEventListener("pointerdown", (e) => {
-    const head = (e.target as Element).closest<HTMLElement>(".staff-screen .screen-head");
+    const head = (e.target as Element).closest<HTMLElement>(".counter-screen .screen-head");
     if (!head || e.button !== 0 || (e.target as Element).closest("[data-hold]")) return;
     const reg = Number(head.dataset.region!.split("-")[1]);
     start = { reg, x: e.clientX, y: e.clientY, id: e.pointerId };
@@ -1355,8 +1355,8 @@ function wireSwipe(): void {
         const register = Number(inlet.dataset.inlet ?? inlet.dataset.terminal ?? inlet.dataset.scanner);
         openPicker(
           inlet.dataset.inlet
-            ? { register, side: "staff", cashBox: true }
-            : { register, side: "customer", device: inlet.dataset.terminal ? "terminal" : "scanner" },
+            ? { register, side: "counter", cashBox: true }
+            : { register, side: "floor", device: inlet.dataset.terminal ? "terminal" : "scanner" },
         );
       } else {
         const [reg, side] = screen!.dataset.drop!.split(":");

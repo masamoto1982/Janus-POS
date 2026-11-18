@@ -23,7 +23,7 @@ Janus-POS は、コンビニエンスストア向けのセミセルフ式 POS �
 | スタッフ操作モード | 内部名 `staff_operated`。スタッフがスタッフバーコードでログインしているレジ |
 | セルフ操作モード | 内部名 `self_operated`。ログインしているスタッフがいないレジ。お客様が登録・キャッシュレス決済をする |
 | 店舗処理モード | 店舗メニューを開いている間のヘッダー表示（内部では `menu` が開いている状態） |
-| レジカウンター側／売り場側 | 1 台のレジに付いた 2 つの画面。施設に基づいて呼ぶ：レジカウンターの内に向く画面がレジカウンター側、売り場に向く画面が売り場側（「スタッフ側／お客様側」は使わない。「お客様」はスタッフの視点の呼び方なので）。内部名 `staff` / `customer` |
+| レジカウンター側／売り場側 | 1 台のレジに付いた 2 つの画面。施設に基づいて呼ぶ：レジカウンターの内に向く画面がレジカウンター側、売り場に向く画面が売り場側（「スタッフ側／お客様側」は使わない。「お客様」はスタッフの視点の呼び方なので）。内部名 `counter` / `floor`（型は `CounterView` / `FloorView`）。人を指すスタッフ（`staff_operated`・`call_staff` など）は人の名前のまま |
 | 操作側 | いま操作できる画面（`active_side`）。`null` なら両方 |
 | 入金ボックス・出金ボックス | 自動釣銭機の投入口と排出口。レジカウンター側に付いている（内部名 `inlet` / `outlet`） |
 | 決済端末 | 電子マネー・クレジットカードをかざす端末。売り場側に付いている（内部名 `terminal`） |
@@ -156,7 +156,7 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 | --- | --- |
 | 店舗メニューを開いている | レジカウンター側だけ |
 | ログインしていない | 売り場側だけ |
-| セルフ操作モードで会計に進んだ後、ログインまで（`customer_turn`） | 売り場側だけ |
+| セルフ操作モードで会計に進んだ後、ログインまで（`floor_turn`） | 売り場側だけ |
 | スタッフ操作モードで、どちらかの画面を操作した直後 1 秒（`TOUCH_LOCK_MS`） | 操作した側だけ |
 | それ以外のスタッフ操作モード | 両方 |
 
@@ -268,7 +268,7 @@ FF はすべて軽減税率。在庫は店舗で共有し、お渡し前の FF �
 
 1. まだ確認していない年確年齢のうち最も高いものを、求める年齢にする（なければ明細の最も高い年齢）。まだ確認していない年齢があれば年齢確認をやり直す。
 2. ポイントカードの確認が要るか決める（5.5）。
-3. セルフ操作モードなら、支払いを売り場側に任せる（`customer_turn`）。
+3. セルフ操作モードなら、支払いを売り場側に任せる（`floor_turn`）。
 4. 公共料金があれば支払方法を現金に決める。払込票の確認が済んでいなければ、セルフ操作モードでは公共料金の呼び出しをかける。
 5. セルフ操作モードで現金のみの商品（切手）があれば現金の呼び出しをかける。
 6. セルフ操作モードで年齢確認が要れば年齢確認の呼び出しをかける。
@@ -782,7 +782,7 @@ Item 見出しの歯車から開く。開くときにオーナーの番号とパ
 | `LINK_TIMEOUT_MS` | 5 秒 | `src/bell.rs` | 返事がなければ不通とみなす時間 |
 | `MIN_RING_MS` | 1 秒 | `src/bell.rs` | 押した回数が増えたことを受け取ったときに鳴らす最短の時間 |
 | `TRADING_CARD_LIMIT` | 3 | `src/catalog.rs` | トレカの 1 回のお会計の販売個数の上限（既定値。販売規則の設定で変えられる） |
-| `SCHEMA` | 3 | `src/store/persist.rs` | 保存の形式。既定の販売規則（年齢制限・個数制限）や商品を変えたら上げ、古い保存を捨てて新しい既定値で始める |
+| `SCHEMA` | 4 | `src/store/persist.rs` | 保存の形式。既定の販売規則（年齢制限・個数制限）や商品を変えたら上げ、古い保存を捨てて新しい既定値で始める |
 | `MAX_REGISTERS` | 10 | `src/store.rs` | 作れるレジの台数の上限 |
 | `MAX_BELLS` | 5 | `src/store.rs` | 作れる Bell の台数の上限 |
 | `YEN_PER_POINT` | 200 | `src/store.rs` | ポイントは付与対象の金額（付与対象外の商品・クーポンの値引き・ポイントで払った分を除く）200円につき1ポイント |
@@ -927,8 +927,8 @@ npm run build
   - 公共料金・受付待ちのサービス商品も、取引に残っていればログアウトで立ち直る（B-3）（`bill_and_service_calls_come_back_after_logout`）
 - **4.2 操作側**
   - スタッフ操作モードのレジを売り場側から乗っ取れない（`customer_cannot_take_over_staff_operated_register`）
-  - 売り場側にはスタッフだけの情報を出さない（`customer_view_hides_staff_only_information`）
-  - レジカウンター側と売り場側は同時には操作できない（`staff_and_customer_screens_are_exclusive`）
+  - 売り場側にはスタッフだけの情報を出さない（`floor_view_hides_counter_only_information`）
+  - レジカウンター側と売り場側は同時には操作できない（`counter_and_floor_screens_are_exclusive`）
   - スタッフ操作モードは操作した側だけ 1 秒ロックする（`staff_operated_screens_lock_only_while_touched`）
   - 年齢確認のほかはどちらの画面からも操作できる（`either_screen_can_operate_except_age_confirmation`）
 - **4.3 モードごとの操作の可否**
@@ -962,7 +962,7 @@ npm run build
 - **6 会計**：シナリオなし
 - **6.1 会計ボタン**
   - 会計画面で読むと登録画面に戻って追加する（`scanning_on_payment_screen_returns_to_registering`）
-  - 売り場側から会計し、ポイントカードの確認に進む（`checkout_from_held_customer_screen_then_point_card_check`）
+  - 売り場側から会計し、ポイントカードの確認に進む（`checkout_from_held_floor_screen_then_point_card_check`）
 - **6.2 確認の順序**：シナリオなし
 - **6.3 決済の関門**
   - 販売期限切れの品は取り除くまで会計できない（`expired_onigiri_blocks_checkout_until_removed`）
@@ -1083,12 +1083,12 @@ npm run build
   - 呼び出し中は無操作の残り時間が減らず、片付いたら止まった値から続きを数える（B-5）（`idle_countdown_pauses_while_a_call_is_open`）
   - セルフ操作モードの呼び出しのあいだも残り時間は変わらない（B-5）（`idle_countdown_is_frozen_for_a_self_operated_call`）
 - **12.3 休止・ログアウト**
-  - 売り場側が操作中でもログアウトでセルフ操作モードに戻る（`logout_returns_to_self_operated_even_while_customer_screen_holds`）
+  - 売り場側が操作中でもログアウトでセルフ操作モードに戻る（`logout_returns_to_self_operated_even_while_floor_screen_holds`）
   - 店舗メニューからログアウト・休止する（`logout_and_pause_from_either_store_menu`）
 - **13 店舗メニュー**
   - 出金は店舗メニューの中だけ（`cash_out_only_inside_the_store_menu`）
-  - 店舗メニューはレジカウンター側でだけ開く（`store_menu_opens_only_on_the_staff_side`）
-  - 店舗メニューから入金・出金する（`cash_in_and_out_from_the_customer_side_menu`）
+  - 店舗メニューはレジカウンター側でだけ開く（`store_menu_opens_only_on_the_counter_side`）
+  - 店舗メニューから入金・出金する（`cash_in_and_out_from_the_floor_side_menu`）
   - 店舗メニューも入金・出金ボックスを使う（`store_menu_uses_inlet_and_outlet`）
   - 取引中は店舗メニューを開けない（`store_menu_cannot_open_during_a_transaction`）
 - **14 販売規則の設定**：シナリオなし

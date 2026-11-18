@@ -70,7 +70,17 @@ points?: number, } | { "type": "release_call", register: number, } | { "type": "
 
 export type Confiscated = { name: string, qty: number, };
 
-export type CouponView = { id: number, code: string, name: string, discount: number | null, };
+export type CouponKind = { "kind": "exchange" } | { "kind": "discount", "yen": number };
+
+export type CouponView = { id: number, code: string, name: string, kind: CouponKind, 
+/**
+ * 値引き額（引換券は対象商品 1 個の価格）。適用先がなければ None
+ */
+discount: number | null, 
+/**
+ * 適用先の明細。画面はクーポンの行を出さず、この明細に値引き・お引換えのフラグを立てる
+ */
+line_id: number | null, };
 
 export type CustomerLine = { id: number, touched: number, name: string, qty: number, ff_base: number, amount: number, age: number | null, age_checked: boolean, limit: number | null, 
 /**

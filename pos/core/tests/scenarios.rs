@@ -271,7 +271,7 @@ fn only_owner_changes_age_rules() {
     assert_eq!(s.snapshot().age_rules.history.len(), 1);
 }
 
-/// 仕様 4.2：スタッフ操作モードのレジをお客様側から乗っ取れない
+/// 仕様 4.2：スタッフ操作モードのレジを売り場側から乗っ取れない
 #[test]
 fn customer_cannot_take_over_staff_operated_register() {
     let mut s = Store::new(1, 2, 1);
@@ -929,7 +929,7 @@ fn cash_out_only_inside_the_store_menu() {
     .is_err());
 }
 
-/// 仕様 13：店舗メニューはスタッフ側でだけ開く
+/// 仕様 13：店舗メニューはレジカウンター側でだけ開く
 #[test]
 fn store_menu_opens_only_on_the_staff_side() {
     let mut s = Store::new(1, 2, 1);
@@ -1004,7 +1004,7 @@ fn bell_rings_despite_loss_and_reports_link_down() {
     );
 }
 
-/// 仕様 4.2：お客様側にはスタッフだけの情報を出さない
+/// 仕様 4.2：売り場側にはスタッフだけの情報を出さない
 #[test]
 fn customer_view_hides_staff_only_information() {
     let mut s = Store::new(1, 2, 1);
@@ -1018,7 +1018,7 @@ fn customer_view_hides_staff_only_information() {
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
 }
 
-/// 仕様 4.2：スタッフ側とお客様側は同時には操作できない
+/// 仕様 4.2：レジカウンター側と売り場側は同時には操作できない
 #[test]
 fn staff_and_customer_screens_are_exclusive() {
     let mut s = Store::new(1, 2, 1);
@@ -1462,7 +1462,7 @@ fn shortcut_buttons_call_staff() {
     assert!(kinds(&s, 1).is_empty());
 }
 
-/// 仕様 11.2：スタッフ側のベルは応援を呼ぶだけで呼び出し画面を出さない
+/// 仕様 11.2：レジカウンター側のベルは応援を呼ぶだけで呼び出し画面を出さない
 #[test]
 fn staff_bell_calls_colleagues_without_call_screen() {
     let mut s = Store::new(1, 2, 1);
@@ -1527,7 +1527,7 @@ fn call_button_rings_only_while_held_and_every_press_rings() {
     }
 }
 
-/// 仕様 12.3：お客様側が操作中でもログアウトでセルフ操作モードに戻る
+/// 仕様 12.3：売り場側が操作中でもログアウトでセルフ操作モードに戻る
 #[test]
 fn logout_returns_to_self_operated_even_while_customer_screen_holds() {
     let mut s = Store::new(1, 2, 1);
@@ -1545,7 +1545,7 @@ fn logout_returns_to_self_operated_even_while_customer_screen_holds() {
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
-/// 仕様 6.1：お客様側から会計し、ポイントカードの確認に進む
+/// 仕様 6.1：売り場側から会計し、ポイントカードの確認に進む
 #[test]
 fn checkout_from_held_customer_screen_then_point_card_check() {
     let mut s = Store::new(1, 2, 1);
@@ -1898,7 +1898,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
         json!({"type":"check_bill","register":1,"side":"customer","line_id":ids[0],"checked":true}),
     )
     .unwrap_err();
-    assert!(e.contains("スタッフ側"), "{e}");
+    assert!(e.contains("レジカウンター側"), "{e}");
     check_bill(&mut s, 1, ids[0], true);
     let v = reg(&s, 1);
     assert!(v.staff.bills[0].checked);
@@ -1933,7 +1933,7 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
         json!({"type":"affix_stamp","register":1,"side":"customer","line_id":ids[0],"affixed":true}),
     )
     .unwrap_err();
-    assert!(e.contains("スタッフ側"), "{e}");
+    assert!(e.contains("レジカウンター側"), "{e}");
     assert!(
         run(
             &mut s,
@@ -3998,7 +3998,7 @@ fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matc
     );
     assert!(
         receive_tickets(&mut s, 1, "staff", 2).is_err(),
-        "受け取り枚数はお客様側で入力する"
+        "受け取り枚数は売り場側で入力する"
     );
     let m = receive_tickets(&mut s, 1, "customer", 3).unwrap().unwrap();
     assert!(m.contains("一致しません"), "{m}");
@@ -4007,7 +4007,7 @@ fn tickets_are_issued_after_payment_and_handed_over_when_the_customer_count_matc
     assert_eq!(v.ticket_handover.len(), 1, "枚数が合うまで終わらない");
     assert!(
         hand_tickets(&mut s, 1, "customer", 2).is_err(),
-        "お渡し枚数はスタッフ側で入力する"
+        "お渡し枚数はレジカウンター側で入力する"
     );
     let m = hand_tickets(&mut s, 1, "staff", 1).unwrap().unwrap();
     assert!(m.contains("発券枚数とお渡し枚数が一致しません"), "{m}");
@@ -4243,7 +4243,7 @@ fn self_operated_expired_scan_calls_staff() {
         json!({"type":"checkout","register":1,"side":"customer"}),
     )
     .is_err());
-    // セルフのお客様側には、期限切れの明細を消す手段がない（B-3）
+    // セルフの売り場側には、期限切れの明細を消す手段がない（B-3）
     assert!(run(
         &mut s,
         json!({"type":"remove_line","register":1,"side":"customer","line_id":id}),
@@ -4255,7 +4255,7 @@ fn self_operated_expired_scan_calls_staff() {
     )
     .is_err());
     assert_eq!(reg(&s, 1).customer.lines.len(), 1);
-    // 消せるのはスタッフ側の「回収しました」だけ
+    // 消せるのはレジカウンター側の「回収しました」だけ
     login(&mut s, 1);
     ok(
         &mut s,

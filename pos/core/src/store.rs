@@ -200,7 +200,7 @@ pub enum Command {
         side: Side,
         code: String,
     },
-    /// FF をタブから登録する（スタッフ操作モードのスタッフ側）。`force` は欠品の長押し＝予約注文
+    /// FF をタブから登録する（スタッフ操作モードのレジカウンター側）。`force` は欠品の長押し＝予約注文
     RegisterFf {
         register: u8,
         #[serde(default = "staff_side")]
@@ -432,7 +432,7 @@ pub enum Command {
         side: Side,
         choice: ShortChoice,
     },
-    /// 呼び出しボタンを押す（ベル・金券・その他・たばこ・電子マネー、スタッフ側の応援）
+    /// 呼び出しボタンを押す（ベル・金券・その他・たばこ・電子マネー、レジカウンター側の応援）
     CallStaff {
         register: u8,
         #[serde(default)]
@@ -458,7 +458,7 @@ pub enum Command {
     ReleaseCall {
         register: u8,
     },
-    /// 非常事態モードを解除する（スタッフ側の解除ボタンで。ログインは要らない）
+    /// 非常事態モードを解除する（レジカウンター側の解除ボタンで。ログインは要らない）
     EndEmergency {
         register: u8,
     },
@@ -883,7 +883,7 @@ impl Line {
 struct Txn {
     parcel_ask: bool,
     tobacco_asked: bool,
-    /// スタッフのログインで応答した、お客様の呼び出しの用件（取引が終わるまでスタッフ側に出す）。
+    /// スタッフのログインで応答した、お客様の呼び出しの用件（取引が終わるまでレジカウンター側に出す）。
     /// 最初の一件だけ。残りはスタッフがお客様との対話で聞ける（user 2026-11-14）
     answered: Option<String>,
     lines: Vec<Line>,
@@ -903,7 +903,7 @@ struct Txn {
     confiscated: Vec<(&'static str, u32)>,
     ff_collect: Vec<(&'static str, u32)>,
     /// 照合イベント（年確・FFのお渡し）が済んだ。スタッフが「次へ」で閉じるまで、
-    /// スタッフ側にお墨付き、お客様側に完了とお礼を出す
+    /// レジカウンター側にお墨付き、売り場側に完了とお礼を出す
     passed: Option<Passed>,
     method: Option<PaymentMethod>,
     point_checked: bool,
@@ -1376,11 +1376,11 @@ struct Register {
     press_log: Vec<u64>,
     /// 呼び鈴を押し始めた時刻（押している間だけ）。鳴らしっぱなしの判定用
     press_since: Option<u64>,
-    /// 非常事態モード（旧 エマージェンシーモード）に入った時刻。一度入ったら、スタッフ側の「解除」が押されるまで続く。
+    /// 非常事態モード（旧 エマージェンシーモード）に入った時刻。一度入ったら、レジカウンター側の「解除」が押されるまで続く。
     /// 押すのは誰でもよい（駆け付けた警察官・救急隊も）。ログインだけでは解除しない
     emergency: Option<u64>,
     /// 直前に解除した非常事態モードの（発動時刻, 解除時刻）。解除と同時にこの二つを印字したレシートを出し、
-    /// スタッフ側に EMERGENCY_LOG_MS のあいだ案内する
+    /// レジカウンター側に EMERGENCY_LOG_MS のあいだ案内する
     emergency_log: Option<(u64, u64)>,
 }
 
@@ -1688,10 +1688,10 @@ pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
 pub const EMERGENCY_WINDOW_MS: u64 = 3 * 60 * 1000;
 /// 非常事態モード：EMERGENCY_WINDOW_MS 以内にこの回数以上、呼び鈴が鳴らされると発動する
 pub const EMERGENCY_PRESSES: usize = 30;
-/// 非常事態モードの解除のあと、スタッフ側に「レシートを出力しました」と発動・解除時刻を出しておく時間
+/// 非常事態モードの解除のあと、レジカウンター側に「レシートを出力しました」と発動・解除時刻を出しておく時間
 pub const EMERGENCY_LOG_MS: u64 = 10_000;
 
-/// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはスタッフ側に残す（取引が終わるまで）。
+/// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはレジカウンター側に残す（取引が終わるまで）。
 /// 呼び鈴（用件なし）と釣銭忘れ（ログインでは片付かない）以外のすべての呼び出し（user 2026-11-14：あらゆる呼び出しで挙動を揃える）
 pub const ANSWERED_CALLS: [CallKind; 10] = [
     CallKind::AgeCheck,
@@ -1711,7 +1711,7 @@ pub const BELL_REMIND_MS: u64 = 30 * 1000;
 /// 鳴り続けるとレジ台数が増えたときの騒音になり、繰り返される音に人は鈍くなって、かえって呼び出しに気づきにくくなるため
 pub const BELL_REMINDS: u8 = 3;
 
-/// セルフ操作モードで出金ボックスにお金が残ったまま、お客様側に「釣り銭が残っています」を出すまで
+/// セルフ操作モードで出金ボックスにお金が残ったまま、売り場側に「釣り銭が残っています」を出すまで
 pub const CHANGE_REMIND_MS: u64 = 60 * 1000;
 /// セルフ操作モードで出金ボックスにお金が残ったまま、釣銭忘れの呼び出しをかけるまで
 pub const CHANGE_CALL_MS: u64 = 2 * 60 * 1000;
@@ -2409,7 +2409,7 @@ impl Store {
                 if r.txn.lines[i].is_pickup() {
                     return Err(PICKUP_NO_REMOVE.into());
                 }
-                // 販売期限切れの明細を消せるのは、スタッフ側の「回収しました」だけ（B-3）
+                // 販売期限切れの明細を消せるのは、レジカウンター側の「回収しました」だけ（B-3）
                 if r.txn.lines[i].is_expired()
                     && (side != Side::Staff || r.staff_state() != StaffState::Ready)
                 {
@@ -3347,7 +3347,7 @@ impl Store {
         }
     }
 
-    /// まだ応答のない呼び出しの種類（どの呼び出しも同じく、お客様側の最下段に呼び出し中の案内を出す。user 2026-11-14）
+    /// まだ応答のない呼び出しの種類（どの呼び出しも同じく、売り場側の最下段に呼び出し中の案内を出す。user 2026-11-14）
     fn waiting_calls(&self, register: u8) -> Vec<CallKind> {
         let mut kinds: Vec<CallKind> = vec![];
         for c in self.calls.open.iter().filter(|c| c.register == register) {
@@ -3768,7 +3768,7 @@ impl Store {
         let r = self.reg_mut(register)?;
         if r.staff_state() != StaffState::Ready || side != Side::Staff {
             return Err(
-                "宅配便の取り消しは、スタッフがスタッフ側で伝票を読み取って行います".into(),
+                "宅配便の取り消しは、スタッフがレジカウンター側で伝票を読み取って行います".into(),
             );
         }
         if r.txn.paying {
@@ -3799,7 +3799,7 @@ impl Store {
     fn match_pickup(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         if r.staff_state() != StaffState::Ready || side != Side::Staff {
-            return Err("お預かりの荷物のバーコードは、スタッフがスタッフ側で読み取ります".into());
+            return Err("お預かりの荷物のバーコードは、スタッフがレジカウンター側で読み取ります".into());
         }
         let pk = r
             .txn
@@ -3994,7 +3994,7 @@ impl Store {
                 return done("公共料金のお支払いのためスタッフをお呼びしました");
             }
             return done(format!(
-                "公共料金 {slips}枚：スタッフ側の画面で払込票の内容を確認してください"
+                "公共料金 {slips}枚：レジカウンター側の画面で払込票の内容を確認してください"
             ));
         }
         if mode != Mode::StaffOperated && !ready && r.txn.cash_only() > 0 {
@@ -4019,7 +4019,7 @@ impl Store {
         }
         if pending {
             done(format!(
-                "{}歳以上の年齢確認があります\nスタッフ側の画面で年齢確認をするか選んでください",
+                "{}歳以上の年齢確認があります\nレジカウンター側の画面で年齢確認をするか選んでください",
                 age.unwrap_or(0)
             ))
         } else {
@@ -4396,7 +4396,7 @@ impl Store {
         if r.menu.is_some() {
             Ok(())
         } else {
-            Err("お金の出し入れは、スタッフ側の画面の店舗メニューで行います".into())
+            Err("お金の出し入れは、レジカウンター側の画面の店舗メニューで行います".into())
         }
     }
 
@@ -5024,7 +5024,7 @@ pub struct RegisterView {
     pub call_waiting_ms: Option<u64>,
     pub ring_volume: f32,
     pub tobacco_asked: bool,
-    /// スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのスタッフ側に出す）
+    /// スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのレジカウンター側に出す）
     pub answered: Option<String>,
     /// まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
     pub waiting_calls: Vec<CallKind>,

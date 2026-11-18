@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import css from "./styles.css?raw";
 
 /// 呼び出し中の黄の点滅を、色や段の塗り分けを組み直しても落とさないための見張り。
-/// 2026-11-15 の色の組み直しで、セルフ操作モードのスタッフ側の段（グレー）の規則が呼び出し中の黄の規則より強くなり、
+/// 2026-11-15 の色の組み直しで、セルフ操作モードのレジカウンター側の段（グレー）の規則が呼び出し中の黄の規則より強くなり、
 /// ヘッダーが黄とグレーの点滅に化けた（以前に一度直したもの）。
 
 const rules = [...css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ selector: m[1].trim(), body: m[2] }));
@@ -43,10 +43,10 @@ describe("呼び出し中の黄の点滅", () => {
     expect(rules.some(r => r.selector === ".bell-unit" && decl(r.body, "background"))).toBe(false);
   });
 
-  it("呼び出し中のスタッフ側の黄の段は、ほかの段の色の規則に負けない", () => {
+  it("呼び出し中のレジカウンター側の黄の段は、ほかの段の色の規則に負けない", () => {
     const calling = rules.findIndex(r => r.selector === ":root .staff-screen.calling");
     expect(decl(rules[calling].body, "--cust-bg")).toBe("var(--alert-bg)");
-    // スタッフ側に段の色を塗る規則は、呼び出し中を :not(.calling) で外すか、呼び出し中の規則より前にあって詳細度が同じ以下であること
+    // レジカウンター側に段の色を塗る規則は、呼び出し中を :not(.calling) で外すか、呼び出し中の規則より前にあって詳細度が同じ以下であること
     for (const [i, r] of rules.entries()) {
       if (i === calling || !decl(r.body, "--cust-bg") || !r.selector.includes("staff-screen") || r.selector.includes(".sos")) continue;
       expect(r.selector, `${r.selector} が呼び出し中の黄を上書きする`).toMatch(/:not\([^)]*\.calling/);

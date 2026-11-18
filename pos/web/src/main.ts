@@ -155,12 +155,12 @@ function buildSkeleton(): void {
         </label>
       </h2>
       <div class="tabs swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
-        <button type="button" role="tab" class="tab on" aria-selected="true" data-swipe-to="${r.id}:staff">スタッフ側</button>
-        <button type="button" role="tab" class="tab" aria-selected="false" data-swipe-to="${r.id}:customer">お客様側</button>
+        <button type="button" role="tab" class="tab on" aria-selected="true" data-swipe-to="${r.id}:staff">レジカウンター側</button>
+        <button type="button" role="tab" class="tab" aria-selected="false" data-swipe-to="${r.id}:customer">売り場側</button>
       </div>
       <div class="screens" data-swipe="${r.id}">
         <div class="screen-wrap" data-wrap="${r.id}:staff">
-          <div class="screen-cap">スタッフ側<span class="drop-hint">ここに落とす＝スタッフ側スキャナーで読む</span></div>
+          <div class="screen-cap">レジカウンター側<span class="drop-hint">ここに落とす＝レジカウンター側スキャナーで読む</span></div>
           <section class="screen staff-screen" data-drop="${r.id}:staff">
             <div class="screen-head" data-region="head-${r.id}-staff"></div>
             <div class="screen-body"><div class="screen-main" data-region="staff-${r.id}"></div></div>
@@ -169,7 +169,7 @@ function buildSkeleton(): void {
           </section>
         </div>
         <div class="screen-wrap" data-wrap="${r.id}:customer">
-          <div class="screen-cap">お客様側<span class="drop-hint">ここに落とす＝お客様側スキャナーで読む</span></div>
+          <div class="screen-cap">売り場側<span class="drop-hint">ここに落とす＝売り場側スキャナーで読む</span></div>
           <section class="screen customer-screen" data-drop="${r.id}:customer">
             <div class="screen-head" data-region="head-${r.id}-customer"></div>
             <div class="screen-body"><div class="screen-main" data-region="cust-${r.id}"></div></div>
@@ -179,13 +179,13 @@ function buildSkeleton(): void {
         </div>
       </div>
       <div class="money-io face-staff">
-        <div class="money-io-staff" aria-label="レジ${r.id}の自動釣銭機（スタッフ側の画面に付いています）">
+        <div class="money-io-staff" aria-label="レジ${r.id}の自動釣銭機（レジカウンター側の画面に付いています）">
           <div class="money-io-boxes" data-cash-drop="${r.id}">
             <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:staff:inlet:" aria-label="レジ${r.id}の入金ボックス（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
             <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の出金ボックス（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
           </div>
         </div>
-        <div class="money-io-cust" aria-label="レジ${r.id}の決済端末とスキャナ（お客様側の画面に付いています）">
+        <div class="money-io-cust" aria-label="レジ${r.id}の決済端末とスキャナ（売り場側の画面に付いています）">
           <div class="money-io-boxes">
             <div data-pay-drop="${r.id}" data-device="terminal"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・クレジットカードをかざす）"><span class="placeholder">決済端末</span></button></div>
             <div data-pay-drop="${r.id}" data-device="scanner"><button type="button" class="terminal scanner" data-scanner="${r.id}" aria-label="レジ${r.id}のスキャナ（商品・決済用バーコード・ポイントカードを読む）"><span class="placeholder">スキャナ</span></button></div>
@@ -1142,8 +1142,8 @@ function setupDrag(): void {
       ghost.textContent = drag.label;
       ghost.hidden = false;
       document.body.classList.add("dragging");
-      // ドラッグ中は、それを受け取る機器の枠だけを強調する：現金＝スタッフ側の入金ボックス、
-      // 電子マネー・クレジットカード＝お客様側の決済端末（バーコード決済はスキャナで、赤い枠のまま）
+      // ドラッグ中は、それを受け取る機器の枠だけを強調する：現金＝レジカウンター側の入金ボックス、
+      // 電子マネー・クレジットカード＝売り場側の決済端末（バーコード決済はスキャナで、赤い枠のまま）
       document.body.classList.toggle("dragging-cash", !!drag.wallet?.startsWith("cash:"));
       document.body.classList.toggle("dragging-tap", drag.wallet === "pay:emoney" || drag.wallet === "pay:credit");
     }
@@ -1156,7 +1156,7 @@ function setupDrag(): void {
     const t = target(e.clientX, e.clientY);
     end();
     if (!d.moved) {
-      toast("toast-store", "ドラッグして、レジのスタッフ側の画面・お客様画面（現金は入金ボックス、キャッシュレスは決済端末にも）に落としてください", false);
+      toast("toast-store", "ドラッグして、レジのレジカウンター側の画面・売り場側の画面（現金は入金ボックス、キャッシュレスは決済端末にも）に落としてください", false);
       return;
     }
     if (!t) return;
@@ -1211,10 +1211,10 @@ function deliver({ register, side, device, cashBox }: Dest, code?: string, walle
   if (code) return void send({ type: "scan", register, side, code });
   const [kind, value] = wallet!.split(":");
   if (kind === "cash") {
-    if (side === "customer") return toast("toast-store", "現金はスタッフ側の入金ボックスに入れてください（お客様側はキャッシュレス専用です）", false);
+    if (side === "customer") return toast("toast-store", "現金はレジカウンター側の入金ボックスに入れてください（売り場側はキャッシュレス専用です）", false);
     send(cashDrop(register, Number(value)));
   } else {
-    if (cashBox) return toast("toast-store", "キャッシュレスは、お客様側の決済端末かスキャナにかざしてください", false);
+    if (cashBox) return toast("toast-store", "キャッシュレスは、売り場側の決済端末かスキャナにかざしてください", false);
     send({ type: "tap_emoney", register, method: value as PaymentMethod });
   }
 }

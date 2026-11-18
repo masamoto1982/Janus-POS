@@ -312,7 +312,7 @@ function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate |
 
 /** 回収イベント（年確で販売できない商品・お渡し済みFFの取り消し・販売期限切れ）の共通の画面。
  *  縦横中央に、大きなテキスト＝なぜ回収するか／回収する品の一覧（点数、販売期限切れは販売期限）／小さなテキスト＝スタッフへの指示またはお客様へのお詫び、
- *  スタッフ側だけ「回収しました」 */
+ *  レジカウンター側だけ「回収しました」 */
 function collectScreen(head: string, items: { name: string; qty?: number; note?: string }[], sub: string, action = ""): string {
   const list = items.length
     ? `<ul class="collect-list">${items.map((c) => `<li><b>${esc(c.name)}</b><span>${esc(c.note ?? `${c.qty}点`)}</span></li>`).join("")}</ul>`
@@ -320,8 +320,8 @@ function collectScreen(head: string, items: { name: string; qty?: number; note?:
   return `<div class="point-screen collect">${msg(esc(head), esc(sub))}${list}${action ? `<div class="point-choices">${action}</div>` : ""}</div>`;
 }
 
-/** 照合イベント（年確・FFのお渡し）が済んだ。スタッフ側にはシステムのお墨付き（緑の照合OK）と「次へ」、
- *  お客様側には完了とご協力へのお礼。年確は責任の重い作業なので、手ごたえなしに次の画面へ進めない */
+/** 照合イベント（年確・FFのお渡し）が済んだ。レジカウンター側にはシステムのお墨付き（緑の照合OK）と「次へ」、
+ *  売り場側には完了とご協力へのお礼。年確は責任の重い作業なので、手ごたえなしに次の画面へ進めない */
 function passedCard(reg: number, side: Side, v: StaffView): string {
   const p = v.passed;
   if (!p) return "";
@@ -331,7 +331,7 @@ function passedCard(reg: number, side: Side, v: StaffView): string {
     return side === "staff"
       ? `<div class="point-screen passed">${mark}${msg(`${p.age}歳以上であることを確認しました`, "身分証をお返しください")}${next}</div>`
       : `<div class="point-screen passed">${mark}${msg("年齢確認が完了しました", "ご協力ありがとうございました")}</div>`;
-  // FF はスタッフが取り仕切るので、スタッフ操作モードのお客様側には出さない
+  // FF はスタッフが取り仕切るので、スタッフ操作モードの売り場側には出さない
   return side === "staff" ? `<div class="point-screen passed">${mark}${msg("FFのお渡しを確認しました", "お渡し数がすべて注文数と一致しています")}${next}</div>` : "";
 }
 
@@ -436,7 +436,7 @@ function ffCollectCard(reg: number, v: StaffView): string {
   return collectScreen("お渡し済みのFFが取り消されました", v.ff_collect, "お客様からFFを回収してください", btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { allowed: true, reason: null }, "primary"));
 }
 
-/** お客様側には回収の案内を出さない（FF はスタッフがリードする、user 2026-11-09） */
+/** 売り場側には回収の案内を出さない（FF はスタッフがリードする、user 2026-11-09） */
 function ffReturnCard(v: StaffView): string {
   if (!v.ff_collect.length) return "";
   return collectScreen(v.ff_collect.map((c) => `${c.name}の数量を変更しました`).join("、"), [], "");
@@ -593,12 +593,12 @@ const splitNote = (method: string, cashlessDue: number, due: number): string =>
   `${METHOD_LABEL[method]}で <b>${yen(cashlessDue)}</b>、切手・チケット・お支払いの <b>${yen(due - cashlessDue)}</b> はそのあと現金で`;
 
 /** 支払方法を選んだときの案内。選んだ側には青文字（p.guide）で出す。
- *  inert＝その画面からは操作できない（セルフ操作モードのスタッフ側）。青文字にせず、操作できない部品と同じグレー */
+ *  inert＝その画面からは操作できない（セルフ操作モードのレジカウンター側）。青文字にせず、操作できない部品と同じグレー */
 function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false, inert = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   const guide = inert ? `<p class="guide off">` : `<p class="guide">`;
   if (method && method !== "cash") {
-    // スタッフ操作モードのスタッフ側は、キャッシュレスでスタッフのなすべき作業を出す（かざすのはお客様、バーコード決済はスタッフがスキャン）
+    // スタッフ操作モードのレジカウンター側は、キャッシュレスでスタッフのなすべき作業を出す（かざすのはお客様、バーコード決済はスタッフがスキャン）
     const op = staff ? (method === "qr" ? "決済用バーコードをスキャンしてください" : `お客様に${TAP_DEVICE(method)}の位置を案内してください`) : `${TAP_THING[method]}を${TAP_DEVICE(method)}にかざしてください`;
     const split = cashlessDue < due ? `<br>${splitNote(method, cashlessDue, due)}` : "";
     return `${guide}${op}${split}</p>`;
@@ -612,7 +612,7 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
 }
 
-/** スタッフ操作モードのお客様側：スタッフが支払方法を選んだら、その決済の操作を案内する。
+/** スタッフ操作モードの売り場側：スタッフが支払方法を選んだら、その決済の操作を案内する。
  *  お客様が押したボタンの案内ではないので青文字にせず、大きなテキスト／小さなテキストで出す */
 function customerPayGuide(method: string, cashlessDue: number, due: number): string {
   if (method === "cash") return msg("スタッフが現金をお預かりします");
@@ -773,7 +773,7 @@ export function padPopup(r: RegisterView, side: Side): string {
   // 最下段は左から バック・削除（←）・決定、どれも数字のキーと同じ大きさ（user 2026-11-17）
   const last = `${PAD_GAP}${k("0")}${d.decimal ? k(".", ".") : PAD_GAP}${k("cancel", "バック", "pad-key ghost back-btn")}${k("back", "←", "pad-key neg")}<button type="button" class="pad-key primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button>`;
   const shown = padShow(e.target, e.digits);
-  // チケットの枚数はお客様側・スタッフ側それぞれ専用の入力。その側では操作可能部品として青で描く
+  // チケットの枚数は売り場側・レジカウンター側それぞれ専用の入力。その側では操作可能部品として青で描く
   const only = e.target === "tkr" ? " customer-only" : e.target === "tkh" ? " staff-only" : "";
   return `<div class="qty-pop${only}" data-pad-backdrop="${reg}:${side}">
       <div class="qty-pop-box" role="dialog" aria-label="${esc(title)}">
@@ -786,7 +786,7 @@ export function padPopup(r: RegisterView, side: Side): string {
 }
 
 /** 二千円札は取り扱わないので、自動釣銭機がそのまま出金ボックスに返す。なぜ戻ってきたかを両画面に出し、出金ボックスから取り出すと消える。
- *  現金は自動釣銭機のあるスタッフ側で扱うので、お客様にはスタッフが返す */
+ *  現金は自動釣銭機のあるレジカウンター側で扱うので、お客様にはスタッフが返す */
 function returned2000(side: Side): string {
   return confirm(
     side === "staff"
@@ -814,7 +814,7 @@ function simClock(snap: Snapshot, t: number): string {
 
 /** 非常事態モード（旧 エマージェンシーモード）：セルフ操作モードでスタッフがログインしないまま、呼び鈴を3分以上押しっ放し、
  *  または3分以内に30回以上鳴らした（core emergency_due）。両画面を警告（赤の大きなテキスト・オレンジの小さなテキスト・やわらかい黄色）に置き換える。
- *  スタッフ側は帯（二段目）を出さず、「非常事態モードを解除します」の案内と解除ボタンだけ。オーナーと担当スーパーバイザーの連絡先は最下段
+ *  レジカウンター側は帯（二段目）を出さず、「非常事態モードを解除します」の案内と解除ボタンだけ。オーナーと担当スーパーバイザーの連絡先は最下段
  *  （emergencyContactsRow）。解除はログインなしで誰でも押せる（駆け付けた警察官・救急隊が解除する、user 2026-11-14）。ログインだけでは解除しない */
 function emergencyScreen(r: RegisterView, side: Side): string {
   const body = `${msg(
@@ -827,12 +827,12 @@ function emergencyScreen(r: RegisterView, side: Side): string {
   return `<div class="confirm change-alert emergency">${msg("非常事態モードを解除します")}${end}</div>`;
 }
 
-/** 非常事態モード中のスタッフ側の最下段：オーナーと担当スーパーバイザーの連絡先（ヘッダーと同じ赤で点滅） */
+/** 非常事態モード中のレジカウンター側の最下段：オーナーと担当スーパーバイザーの連絡先（ヘッダーと同じ赤で点滅） */
 function emergencyContactsRow(): string {
   return `<div class="call-row calling"><p class="sos-store">${STORE_CONTACTS.map(([who, tel]) => `<span>${who}<b>${tel}</b></span>`).join("")}</p></div>`;
 }
 
-/** 非常事態モードを解除した直後のスタッフ側：発動時刻と解除時刻を印字したレシートを出した案内（次の操作か10秒で閉じる） */
+/** 非常事態モードを解除した直後のレジカウンター側：発動時刻と解除時刻を印字したレシートを出した案内（次の操作か10秒で閉じる） */
 function emergencyEnded(snap: Snapshot, log: { started_at: number; ended_at: number }): string {
   return confirm(`${msg("非常事態モードを解除しました", "発動時刻と解除時刻を記載したレシートを出力しました")}<p class="sos-log"><span>発動：${simClock(snap, log.started_at)}</span><span>解除：${simClock(snap, log.ended_at)}</span></p>`);
 }
@@ -875,7 +875,7 @@ function ageWait(age: number): string {
  *  店舗が任意で決めた年確（花火など）には添えない：日本語を介さない外国人の小中高生が買うのはまれ */
 const FOREIGN_IDS = `<span lang="en" data-i18n-skip>Also OK: Residence Card, Special Permanent Resident Certificate, Passport</span>`;
 
-/** 年確のあいだのお客様側。スタッフが「する」を選んだら身分証の提示をお願いし、
+/** 年確のあいだの売り場側。スタッフが「する」を選んだら身分証の提示をお願いし、
  *  スタッフが生年月日を打ち始めたら（テンキーを開いたら）判定中であることと、個人情報を残さないことを伝える */
 function ageNote(reg: number, v: StaffView): string {
   if (!v.id_pending) return pairNote("年齢確認が必要な商品が含まれています");
@@ -1028,8 +1028,8 @@ const GUIDES: [GuideKind, string, string][] = [
 const modeTitle = (staffOperated: boolean): string => `<span class="mode-title ${staffOperated ? "staff-operated" : "self-operated"}">${staffOperated ? "スタッフ操作モード" : "セルフ操作モード"}</span>`;
 
 /** 待ち受けの帯：会計ボタンを含む帯（.reg-top）と同じ縦幅。呼び鈴（大きめ）を中央に、左に言語切り替え、右に電子マネー（チャージ・残高照会）を寄せる
- *  言語切り替えは押した側の画面だけを切り替える（日本語・英語、標準は英語）。セルフ操作モードのスタッフ側は操作不可。
- *  電子マネーはスタッフ操作モードのお客様側では表示のみ。その側は呼び鈴がないので、言語と電子マネーを中央に詰める。商品登録が始まると呼び鈴はヘッダーに戻る */
+ *  言語切り替えは押した側の画面だけを切り替える（日本語・英語、標準は英語）。セルフ操作モードのレジカウンター側は操作不可。
+ *  電子マネーはスタッフ操作モードの売り場側では表示のみ。その側は呼び鈴がないので、言語と電子マネーを中央に詰める。商品登録が始まると呼び鈴はヘッダーに戻る */
 function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolean): string {
   const mirror = ' tabindex="-1" aria-disabled="true"';
   const big = (cls: string, main: string, sub: string, ro: boolean, attrs: string) =>
@@ -1038,7 +1038,7 @@ function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolea
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
   const lang = big("lang-btn", "Language", "言語", langRo, ` data-lang="${r.id}:${side}" title="この画面の言語を切り替える／Switch this screen's language"`);
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
-  // 呼び鈴のない側（スタッフ操作モードのお客様側）は空きを作らず、両ボタンを中央に詰める
+  // 呼び鈴のない側（スタッフ操作モードの売り場側）は空きを作らず、両ボタンを中央に詰める
   const bell = bellBtn(r, side);
   return `<div class="reg-top welcome-band"><div class="band-row" data-law>${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>${BAND_END}`;
 }
@@ -1245,7 +1245,7 @@ const POINT_SERVICES: [string, string][] = [
   ["📱", "ポイントアプリ"],
 ];
 
-/** スタッフ操作モードのポイントの確認中のお客様側。スタッフが「付与する」を選ぶまではカードの有無を尋ね、
+/** スタッフ操作モードのポイントの確認中の売り場側。スタッフが「付与する」を選ぶまではカードの有無を尋ね、
  *  選んだ後に「ポイントをお付けします」とカードの絵を出す（スキップした取引では一度も出さない、B-6） */
 function customerPointAsk(reading: boolean): string {
   if (!reading) return `<div class="point-screen">${msg("ポイントカード・アプリはお持ちですか")}</div>`;
@@ -1401,7 +1401,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
 }
 
 /** 一部を払ったあとの残り。現金が選ばれている（電子マネーの残高不足で「不足額を現金で払う」を選んだときなど）か、
- *  残りが現金でしか払えないときは「現金で」、まだ選べるときは支払方法を選んでもらう。スタッフ側で選んだ支払方法とお客様側の案内を揃える */
+ *  残りが現金でしか払えないときは「現金で」、まだ選べるときは支払方法を選んでもらう。レジカウンター側で選んだ支払方法と売り場側の案内を揃える */
 function prepaidNote(r: RegisterView, due: number, method: PaymentMethod | null): string {
   const rest = r.cashless_due && method !== "cash" ? "のお支払い方法をお選びください" : "を現金でお支払いいただきます";
   // ポイントは「ポイントで 80P」と、ポイント数で出す（1ポイント＝1円）
@@ -1414,7 +1414,7 @@ function cashBackNote(side: Side, amount: number): string {
 }
 
 /** ポイントの使い方：使える分を全部・お支払いの端数（100円未満）・ポイント数を指定。
- *  head が null の側（スタッフ操作モードのお客様側）は操作せず、案内だけを出す */
+ *  head が null の側（スタッフ操作モードの売り場側）は操作せず、案内だけを出す */
 function pointsUse(r: RegisterView, side: Side, st: Gate, head: string | null): string {
   const p = r.points;
   const reg = r.id;
@@ -1462,13 +1462,13 @@ export function clockHtml(d: Date): string {
 /** 呼び鈴の絵（色は CSS の currentColor：押せるときは青、押せないときはグレー） */
 const BELL_SVG = `<svg class="bell-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.5a1.5 1.5 0 0 0-1.5 1.5v.6A6.5 6.5 0 0 0 5.5 11v4.2L3.8 17.4a.9.9 0 0 0 .7 1.5h15a.9.9 0 0 0 .7-1.5l-1.7-2.2V11a6.5 6.5 0 0 0-5-6.4V4A1.5 1.5 0 0 0 12 2.5Zm-2.6 17.6a2.6 2.6 0 0 0 5.2 0Z"/></svg>`;
 
-/** 呼び鈴。スタッフ側は応援を呼ぶ（SOS）、お客様側はスタッフを呼ぶ。スタッフ操作モードのお客様側には出さない */
+/** 呼び鈴。レジカウンター側は応援を呼ぶ（SOS）、売り場側はスタッフを呼ぶ。スタッフ操作モードの売り場側には出さない */
 function bellBtn(r: RegisterView, side: Side): string {
   const call = find(r.customer.actions, "call_staff");
   const sos = side === "staff";
   const tip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
   const cmd = sos ? { type: "call_staff", register: r.id, topic: "sos" } : { type: "call_staff", register: r.id };
-  // 呼び鈴が不通ならグレーアウト。セルフ操作モードのお客様側だけは押せるままにし、押すと店員へ直接声をかける案内を出す
+  // 呼び鈴が不通ならグレーアウト。セルフ操作モードの売り場側だけは押せるままにし、押すと店員へ直接声をかける案内を出す
   const dead = r.bell_dead && (sos || r.mode === "staff_operated");
   const ok = call.allowed && !dead;
   const title = dead ? "呼び出し端末が動作していません" : call.allowed ? tip : (call.reason ?? "");
@@ -1496,7 +1496,7 @@ export const FF_TABS = [
 export const FF_PER_PAGE = 4;
 export type FfUi = { tab: string; page: number };
 
-/** スタッフ操作モードのお客様側の最下段（セルフ操作モードの FF・金券・たばこ・その他の段と同じ位置・高さ）に流すサイネージ。
+/** スタッフ操作モードの売り場側の最下段（セルフ操作モードの FF・金券・たばこ・その他の段と同じ位置・高さ）に流すサイネージ。
  *  セール情報や詐欺防止の呼びかけを順番に表示する（シミュレーターの見本）。最下段を両モードで揃え、モード切り替え時の画面の変化を抑える。
  *  現物では広告を画像で流す想定なので、どのモードでも言語切り替えの対象外（data-i18n-skip） */
 export const SIGNAGE: readonly (readonly [string, string])[] = [
@@ -1522,7 +1522,7 @@ export function firstWelcome(r: RegisterView, side: Side): string {
   return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
 }
 
-/** スタッフ側で店舗メニューを開いている間のお客様側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
+/** レジカウンター側で店舗メニューを開いている間の売り場側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
  *  帯には部品を置かず英語の「Please use another register」、「休止中」の下に添え字「空いているレジをお使いください」。言語切り替えの影響を受けない（data-i18n-skip）。最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
 export function menuPaused(): string {
   return `<div class="reg-top welcome-band" data-i18n-skip><div class="band-row">${msg("Please use another register")}</div></div><div class="first-welcome" data-i18n-skip><b class="mode-big">休止中</b><small class="mode-sub">空いているレジをお使いください</small></div>`;
@@ -1532,15 +1532,15 @@ export function menuPaused(): string {
 export const isWelcome = (main: string): boolean => main.includes("welcome-band");
 
 
-/** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。お客様側は「スタッフを呼び出しています」（添え字なし）、
- *  スタッフ側は呼び出しからの経過秒数（取り消しボタンは置かない、user 2026-11-14） */
+/** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。売り場側は「スタッフを呼び出しています」（添え字なし）、
+ *  レジカウンター側は呼び出しからの経過秒数（取り消しボタンは置かない、user 2026-11-14） */
 function callingRow(r: RegisterView, side: Side, now: number): string {
   if (side === "customer") return `<div class="call-row calling">${msg("スタッフを呼び出しています")}</div>`;
   const at = r.staff.calls.filter((c) => r.waiting_calls.includes(c.kind)).map((c) => c.created_at);
   return `<div class="call-row calling">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
 }
 
-/** スタッフがログインして応答した呼び出しの用件（最初の一件）。取引が終わるまでスタッフ側の担当スタッフ名の右に出す */
+/** スタッフがログインして応答した呼び出しの用件（最初の一件）。取引が終わるまでレジカウンター側の担当スタッフ名の右に出す */
 export function answeredTopic(r: RegisterView, side: Side): string {
   const topics = side === "staff" ? (r.answered ?? "") : "";
   return topics ? `<span class="answered-topic" title="お客様の呼び出しの用件">用件：${esc(topics)}</span>` : "";
@@ -1549,7 +1549,7 @@ export function answeredTopic(r: RegisterView, side: Side): string {
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
   if (r.menu && side === "customer" && !r.paused) return signage(now);
-  // 非常事態モード中のお客様側の最下段：英語で「警戒してください」「通報をお願いします」（ヘッダーと同じ赤で点滅）
+  // 非常事態モード中の売り場側の最下段：英語で「警戒してください」「通報をお願いします」（ヘッダーと同じ赤で点滅）
   if (r.emergency && side === "customer") return `<div class="call-row calling" data-i18n-skip>${msg("Stay alert", "Please call emergency services")}</div>`;
   if (r.emergency) return emergencyContactsRow();
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
@@ -1723,7 +1723,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : c.stamp_pending ? billNote(slips, "スタッフが領収証に収入印紙を貼り付けます") : billPayCard(slips, true));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   if (c.phase === "paying" && r.cash_only) return screen(cashOnlyWait([...new Set(c.lines.filter((l) => l.cash_only).map((l) => l.name))]));
-  // セルフ操作モードで「現金」を選ぶと店員呼び出し、お客様側は支払方法の選択から案内画面に切り替わる
+  // セルフ操作モードで「現金」を選ぶと店員呼び出し、売り場側は支払方法の選択から案内画面に切り替わる
   if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   if (c.phase === "registering" && r.limit_alert)
@@ -1778,7 +1778,7 @@ export function bellSettings(s: Snapshot): string {
   const off = s.bells.every((m) => m.offline);
   const test = `<label class="bell-setting"><span>呼び鈴を不通にする</span><input type="checkbox" data-bells-offline${off ? " checked" : ""} aria-label="呼び鈴を不通にする" /><span>${off ? "不通" : "通常"}</span></label>`;
   return `${rows}
-    <h3 class="bell-sub">非常事態モードの確認</h3><p class="muted">セルフ操作モードで、スタッフを呼び出したまま1分応答がないと（実機は5分）、両画面に通報をお願いする案内を出します<br>スタッフ側の「解除」で通常運転に戻ります（ログインは不要）<br>呼び鈴を不通にして、スタッフに届かない状況で試せます</p>${test}`;
+    <h3 class="bell-sub">非常事態モードの確認</h3><p class="muted">セルフ操作モードで、スタッフを呼び出したまま1分応答がないと（実機は5分）、両画面に通報をお願いする案内を出します<br>レジカウンター側の「解除」で通常運転に戻ります（ログインは不要）<br>呼び鈴を不通にして、スタッフに届かない状況で試せます</p>${test}`;
 }
 
 const AGE_CHOICES = [15, 18, 20];
@@ -2011,7 +2011,7 @@ function slipShelf(s: Snapshot): string {
   const slips = s.registers.flatMap((r) =>
     r.staff.lines
       .filter((l) => l.parcel?.slip && l.kind === "service" && l.done)
-      .map((l) => item(`PS${l.parcel!.slip.replace(/-/g, "")}`, `伝票 レジ${r.id}`, esc(l.parcel!.slip), "", "スタッフ側に読むと、この荷物の受付を取り消します")),
+      .map((l) => item(`PS${l.parcel!.slip.replace(/-/g, "")}`, `伝票 レジ${r.id}`, esc(l.parcel!.slip), "", "レジカウンター側に読むと、この荷物の受付を取り消します")),
   );
   return slips.length ? `<div class="shelf"><h3>荷物の伝票（取り消し用）</h3><div class="items uniform">${slips.join("")}</div></div>` : "";
 }

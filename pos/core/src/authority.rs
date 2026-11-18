@@ -285,7 +285,7 @@ pub fn is_staff_only(action: Action) -> bool {
     )
 }
 
-/// お客様側の画面でだけ行う操作（チケットの受け取り枚数の入力）
+/// 売り場側の画面でだけ行う操作（チケットの受け取り枚数の入力）
 pub fn is_customer_only(action: Action) -> bool {
     action == Action::ReceiveTickets
 }
@@ -357,19 +357,19 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
         return if side == fixed {
             Ok(())
         } else if matches!(action, Action::CheckBill | Action::HandOverBills) {
-            Err("払込票の確認・お渡しはスタッフ側の画面で行います")
+            Err("払込票の確認・お渡しはレジカウンター側の画面で行います")
         } else if matches!(action, Action::AffixStamp | Action::AffixReceiptStamp) {
-            Err("収入印紙の貼り付け確認はスタッフ側の画面で行います")
+            Err("収入印紙の貼り付け確認はレジカウンター側の画面で行います")
         } else if action == Action::CheckFf {
-            Err("FF のお渡し確認はスタッフ側の画面で行います")
+            Err("FF のお渡し確認はレジカウンター側の画面で行います")
         } else if action == Action::HandTickets {
-            Err("チケットのお渡し枚数はスタッフ側の画面で入力します")
+            Err("チケットのお渡し枚数はレジカウンター側の画面で入力します")
         } else if action == Action::ReceiveTickets {
-            Err("チケットの受け取り枚数はお客様側の画面で入力していただきます")
+            Err("チケットの受け取り枚数は売り場側の画面で入力していただきます")
         } else if is_staff_only(action) {
-            Err("年齢確認はスタッフ側の画面で行います")
+            Err("年齢確認はレジカウンター側の画面で行います")
         } else {
-            Err("お客様側の画面で押していただきます")
+            Err("売り場側の画面で押していただきます")
         };
     }
     if !is_device_action(action) && active_side(c).is_some_and(|s| s != side) {

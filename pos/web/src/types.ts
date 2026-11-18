@@ -217,7 +217,7 @@ emergency_since: number | null,
  */
 emergency_log: EmergencyLog | null, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, 
 /**
- * スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのスタッフ側に出す）
+ * スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのレジカウンター側に出す）
  */
 answered: string | null, 
 /**

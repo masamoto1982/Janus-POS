@@ -506,6 +506,7 @@ fn pickup_can_be_decided_by_found_or_missing() {
     );
     ok(&mut s, json!({"type":"pickup_handover","register":2}));
     assert!(reg(&s, 2).counter.lines.is_empty());
+    login_as(&mut s, 2, "ST001");
     scan(&mut s, 2, "counter", RECEIVE);
     ok(
         &mut s,
@@ -1095,6 +1096,97 @@ fn mode_follows_staff_badge() {
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
 }
 
+/// 仕様 4.1：取引中は担当スタッフを切り替えられない（ログアウトしたあとも担当のまま）
+#[test]
+fn staff_cannot_be_switched_during_a_transaction() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    login_as(&mut s, 1, "ST002");
+    assert_eq!(reg(&s, 1).counter.name, Some("スタッフ002"), "取引の前なら切り替えられる");
+    scan(&mut s, 1, "counter", BREAD);
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"counter","code":"ST001"}),
+    )
+    .unwrap_err();
+    assert!(e.contains("担当スタッフを切り替えられません"), "{e}");
+    assert_eq!(reg(&s, 1).counter.name, Some("スタッフ002"));
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"counter","code":"ST001"})
+    )
+    .is_err());
+    login_as(&mut s, 1, "ST002");
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+}
+
+/// 仕様 4.1：セルフ操作モードの取引に応答したスタッフが担当になる
+#[test]
+fn staff_who_answers_a_self_transaction_becomes_its_owner() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "floor", BREAD);
+    ok(&mut s, json!({"type":"ff_button","register":1}));
+    login_as(&mut s, 1, "ST002");
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"counter","code":"ST001"})
+    )
+    .is_err());
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    login(&mut s, 1);
+    assert_eq!(reg(&s, 1).counter.name, Some("スタッフ001"), "取引が終われば誰でもログインできる");
+}
+
+/// 仕様 4.1：取引を終えると、後始末が済んだところで担当がログアウトしてセルフ操作モードに戻る
+#[test]
+fn owner_logs_out_after_each_transaction() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    confirm_point(&mut s, 1);
+    pay_cash(&mut s, 1);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::StaffOperated, "お釣りを返すまでは担当がログインしたまま");
+    assert!(v.outlet > 0);
+    assert!(run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"counter","code":"ST002"})
+    )
+    .is_ok(), "後始末だけなら次の取引のスタッフがログインできる");
+    login(&mut s, 1);
+    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+    advance(&mut s, 3_100);
+    let v = reg(&s, 1);
+    assert!(v.last_receipt.is_none());
+    assert_eq!(v.mode, Mode::StaffOperated, "後始末の途中にログインし直したので、次の取引の担当になる");
+
+    scan(&mut s, 1, "counter", BREAD);
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated, "取引中止も取引の終わり");
+    assert_eq!(v.counter.state, StaffState::Absent);
+
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    confirm_point(&mut s, 1);
+    pay_cash(&mut s, 1);
+    scan(&mut s, 1, "floor", TEA);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated, "後始末の途中で次の取引が始まると担当はログアウトする");
+    assert_eq!(v.floor.lines.len(), 1);
+}
+
 /// 仕様 4.3：セルフ操作モードではお客様が FF を登録できない
 #[test]
 fn customer_cannot_register_ff_in_self_operated() {
@@ -1115,6 +1207,8 @@ fn idle_register_returns_to_self_operated() {
     advance(&mut s, 4 * 60_000);
     scan(&mut s, 2, "counter", BREAD);
     ok(&mut s, json!({"type":"void_transaction","register":2}));
+    assert_eq!(reg(&s, 2).mode, Mode::SelfOperated, "取引を終えると担当はログアウトする");
+    login(&mut s, 2);
     advance(&mut s, 4 * 60_000);
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
     advance(&mut s, 61_000);
@@ -1585,6 +1679,8 @@ fn checkout_from_held_floor_screen_then_point_card_check() {
     ok(&mut s, json!({"type":"finish_insert","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 220);
 
+    login(&mut s, 1);
+    advance(&mut s, 1_000);
     scan(&mut s, 1, "floor", "PC12345678");
     ok(
         &mut s,
@@ -2038,6 +2134,7 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
         &mut s,
         json!({"type":"void_transaction","register":1,"side":"counter"}),
     );
+    login(&mut s, 1);
     scan(&mut s, 1, "counter", BILL);
     for cmd in [
         json!({"type":"scan","register":1,"side":"counter","code":BREAD}),
@@ -2340,6 +2437,7 @@ fn store_menu_cannot_open_during_a_transaction() {
     assert!(run(&mut s, top.clone()).is_err(), "会計中も開けない");
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     assert!(reg(&s, 1).menu.is_none());
+    login(&mut s, 1);
     ok(&mut s, top);
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
@@ -2760,11 +2858,9 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
         reg(&s, 1).last_receipt.is_none(),
         "back to the initial screen"
     );
-    advance(&mut s, 10_000);
-    assert!(
-        reg(&s, 1).idle_revert_in.unwrap() < frozen,
-        "countdown resumes"
-    );
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated, "取引の後始末が済むと担当はログアウトする");
+    assert_eq!(v.counter.state, StaffState::Absent);
 }
 
 /// 仕様 14.2：オーナーが 1 回のお会計の販売個数の上限を決める
@@ -3015,7 +3111,9 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
     );
     assert_eq!(emoney_balance(&s), 16_000);
     assert!(reg(&s, 1).emoney.is_none());
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated, "チャージを終えると担当はログアウトする");
 
+    login(&mut s, 1);
     ok(
         &mut s,
         json!({"type":"start_emoney","register":1,"side":"counter","kind":"charge"}),
@@ -3210,6 +3308,7 @@ fn logout_and_pause_from_either_store_menu() {
     scan(&mut s, 1, "counter", BREAD);
     assert!(run(&mut s, json!({"type":"pause","register":1})).is_err());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
+    login(&mut s, 1);
     open_staff_menu(&mut s, 1);
     ok(&mut s, json!({"type":"pause","register":1}));
     let v = reg(&s, 1);
@@ -4565,6 +4664,7 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
         &mut s,
         json!({"type":"void_transaction","register":1,"side":"counter"}),
     );
+    login(&mut s, 1);
     scan(&mut s, 1, "counter", BREAD);
     scan(&mut s, 1, "counter", "PC87654321");
     assert_eq!(reg(&s, 1).points.balance, Some(1));
@@ -4584,6 +4684,7 @@ fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
         reg(&s, 1).last_receipt.and_then(|r| r.point_balance),
         Some(0)
     );
+    login(&mut s, 1);
     scan(&mut s, 1, "counter", BREAD);
     scan(&mut s, 1, "counter", "PC87654321");
     ok(

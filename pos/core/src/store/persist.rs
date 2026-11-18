@@ -129,6 +129,10 @@ struct SavedAudit {
 struct SavedRegister {
     id: u8,
     staff: Option<String>,
+    #[serde(default)]
+    owner: Option<String>,
+    #[serde(default)]
+    closing: bool,
     txn: SavedTxn,
     drawer: Cash,
     last_receipt: Option<SavedReceipt>,
@@ -424,6 +428,8 @@ impl SavedRegister {
         SavedRegister {
             id: r.id,
             staff: r.staff.map(|s| s.account.id.to_string()),
+            owner: r.owner.map(|a| a.id.to_string()),
+            closing: r.closing,
             txn: SavedTxn::from(&r.txn),
             drawer: r.drawer.cash.clone(),
             last_receipt: r.last_receipt.as_ref().map(|rc| SavedReceipt {
@@ -471,10 +477,18 @@ impl SavedRegister {
             }),
             None => None,
         };
+        let owner = match self.owner {
+            Some(id) => {
+                Some(auth::account(&id).ok_or_else(|| format!("スタッフ {id} がいません"))?)
+            }
+            None => None,
+        };
         let mut r = Register {
             id: self.id,
             mode: Mode::SelfOperated,
             staff,
+            owner,
+            closing: self.closing,
             txn: self.txn.restore()?,
             drawer: Drawer { cash: self.drawer },
             last_receipt: self.last_receipt.map(|rc| Receipt {

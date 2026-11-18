@@ -203,7 +203,7 @@ pub enum Command {
     /// FF をタブから登録する（スタッフ操作モードのレジカウンター側）。`force` は欠品の長押し＝予約注文
     RegisterFf {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         code: String,
@@ -310,7 +310,7 @@ pub enum Command {
     /// 年齢確認を「する」（生年月日の入力）か「スキップ」か選ぶ
     ChooseAgeCheck {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         id_check: bool,
@@ -318,7 +318,7 @@ pub enum Command {
     /// 登録中に年確フラグから年齢確認を始める・やめる
     EarlyAgeCheck {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         start: bool,
@@ -326,7 +326,7 @@ pub enum Command {
     /// 身分証の生年月日で年齢を判定する
     CheckId {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         birth: String,
@@ -347,7 +347,7 @@ pub enum Command {
     /// 払込票の内容の確認のチェックを付ける・外す
     CheckBill {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         line_id: u32,
@@ -356,14 +356,14 @@ pub enum Command {
     /// レシートへの収入印紙の貼り付けを確認する
     AffixReceiptStamp {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
     },
     /// 払込票（領収証）への収入印紙の貼り付けを確認する
     AffixStamp {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         line_id: u32,
@@ -372,14 +372,14 @@ pub enum Command {
     /// 払込票・荷物の控えのお渡しを済ませる
     HandOverBills {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
     },
     /// スタッフがお渡ししたチケットの枚数を入力する（発券枚数と照合）
     HandTickets {
         register: u8,
-        #[serde(default = "staff_side")]
+        #[serde(default = "counter_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         handed: u32,
@@ -388,7 +388,7 @@ pub enum Command {
     /// 両方が発券枚数と一致したらお渡し完了
     ReceiveTickets {
         register: u8,
-        #[serde(default = "customer_side")]
+        #[serde(default = "floor_side")]
         #[cfg_attr(feature = "ts", ts(as = "Option<Side>", optional))]
         side: Side,
         received: u32,
@@ -679,9 +679,9 @@ impl Command {
                 topic: Some(CallTopic::Sos),
                 ..
             } => None,
-            C::FfButton { .. } | C::CallStaff { .. } => Some(Side::Customer),
-            C::CashOut { .. } | C::CashIn { .. } => Some(Side::Staff),
-            C::OpenMenu { .. } => Some(Side::Staff),
+            C::FfButton { .. } | C::CallStaff { .. } => Some(Side::Floor),
+            C::CashOut { .. } | C::CashIn { .. } => Some(Side::Counter),
+            C::OpenMenu { .. } => Some(Side::Counter),
             C::CompleteService { .. }
             | C::ParcelLength { .. }
             | C::ParcelSize { .. }
@@ -690,7 +690,7 @@ impl Command {
             | C::ParcelNext { .. }
             | C::PickupHandover { .. }
             | C::PickupFound { .. }
-            | C::VoidTransaction { .. } => Some(Side::Staff),
+            | C::VoidTransaction { .. } => Some(Side::Counter),
             _ => None,
         }
     }
@@ -912,7 +912,7 @@ struct Txn {
     point_declined: bool,
     inserted: Cash,
     inserted_at: u64,
-    customer_turn: bool,
+    floor_turn: bool,
     prepaid: u32,
     prepaid_method: Option<PaymentMethod>,
     emoney_short: bool,
@@ -1531,7 +1531,7 @@ impl Register {
             has_point_card: t.point_card.is_some(),
             coupon_unmatched: t.paying && t.coupon_unmatched(),
             method: t.method,
-            customer_turn: t.customer_turn,
+            floor_turn: t.floor_turn,
             menu_open: self.menu.is_some(),
             touching: self.touch.map(|(side, _)| side),
             items_full: t.item_count() >= MAX_ITEMS,
@@ -1667,12 +1667,12 @@ pub fn age_on(birth: &str, today: &str) -> Result<u8, String> {
     Ok(age.min(150) as u8)
 }
 
-fn staff_side() -> Side {
-    Side::Staff
+fn counter_side() -> Side {
+    Side::Counter
 }
 
-fn customer_side() -> Side {
-    Side::Customer
+fn floor_side() -> Side {
+    Side::Floor
 }
 
 /// 決済後の「ありがとうございました」の画面
@@ -2042,7 +2042,7 @@ impl Store {
             .reg(register)
             .ok_or_else(|| format!("レジ{register}はありません"))?;
         let c = r.context(&self.age_rules);
-        permitted(active_side(&c).unwrap_or(Side::Customer), action, &c).map_err(String::from)
+        permitted(active_side(&c).unwrap_or(Side::Floor), action, &c).map_err(String::from)
     }
 
     fn check(&self, register: u8, side: Side, action: Action) -> Result<(), String> {
@@ -2172,7 +2172,7 @@ impl Store {
                         }
                     )
                 });
-                if matched && all && side == Side::Staff {
+                if matched && all && side == Side::Counter {
                     r.txn.passed = Some(Passed::Ff);
                     return done(format!("{name}：照合 OK\nすべてのFFのお渡しを確認しました"));
                 }
@@ -2411,7 +2411,7 @@ impl Store {
                 }
                 // 販売期限切れの明細を消せるのは、レジカウンター側の「回収しました」だけ（B-3）
                 if r.txn.lines[i].is_expired()
-                    && (side != Side::Staff || r.staff_state() != StaffState::Ready)
+                    && (side != Side::Counter || r.staff_state() != StaffState::Ready)
                 {
                     return Err(EXPIRED_STAFF_ONLY.into());
                 }
@@ -2472,7 +2472,7 @@ impl Store {
                     && r.txn.cash_only() == 0;
                 r.txn.paying = false;
                 r.txn.method = None;
-                r.txn.customer_turn = false;
+                r.txn.floor_turn = false;
                 if undo_cash_call {
                     self.calls.resolve(register, CallKind::CashOnly, self.now);
                 }
@@ -2797,7 +2797,7 @@ impl Store {
                         "電子マネーで {drawn}円 お支払いしました\n残り {due}円を現金でお支払いください"
                     ));
                 }
-                self.check(register, Side::Customer, Action::TapEmoney)?;
+                self.check(register, Side::Floor, Action::TapEmoney)?;
                 let balance = self.emoney_balance;
                 let r = self.reg_mut(register)?;
                 let chosen = r.txn.method.unwrap_or(PaymentMethod::Emoney);
@@ -3515,11 +3515,11 @@ impl Store {
             let r = self.reg_mut(register)?;
             let was = r.staff_state();
             let resumed = std::mem::take(&mut r.paused);
-            let took_over = r.txn.customer_turn;
+            let took_over = r.txn.floor_turn;
             r.staff = Some(StaffSession { account: acc });
             r.press_log.clear();
             r.touch = None;
-            r.txn.customer_turn = false;
+            r.txn.floor_turn = false;
             r.pressing = false;
             r.press_since = None;
             let service_pending = r.txn.service_pending();
@@ -3630,7 +3630,7 @@ impl Store {
         let back = if r.txn.paying {
             r.txn.paying = false;
             r.txn.method = None;
-            r.txn.customer_turn = false;
+            r.txn.floor_turn = false;
             "（登録画面に戻りました）"
         } else {
             ""
@@ -3766,7 +3766,7 @@ impl Store {
     fn cancel_parcel(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
         let now = self.now;
         let r = self.reg_mut(register)?;
-        if r.staff_state() != StaffState::Ready || side != Side::Staff {
+        if r.staff_state() != StaffState::Ready || side != Side::Counter {
             return Err(
                 "宅配便の取り消しは、スタッフがレジカウンター側で伝票を読み取って行います".into(),
             );
@@ -3798,7 +3798,7 @@ impl Store {
 
     fn match_pickup(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
-        if r.staff_state() != StaffState::Ready || side != Side::Staff {
+        if r.staff_state() != StaffState::Ready || side != Side::Counter {
             return Err("お預かりの荷物のバーコードは、スタッフがレジカウンター側で読み取ります".into());
         }
         let pk = r
@@ -3887,7 +3887,7 @@ impl Store {
         if r.txn.paying {
             r.txn.paying = false;
             r.txn.method = None;
-            r.txn.customer_turn = false;
+            r.txn.floor_turn = false;
         }
         r.txn.push(
             p,
@@ -3935,7 +3935,7 @@ impl Store {
         if r.txn.lines.is_empty() {
             r.txn.paying = false;
             r.txn.method = None;
-            r.txn.customer_turn = false;
+            r.txn.floor_turn = false;
         }
         if removed.is_empty() {
             r.txn.passed = need.map(|a| Passed::Age { age: a });
@@ -3973,7 +3973,7 @@ impl Store {
             || r.txn.bill_slips() > 0
             || r.txn.free()
             || !r.txn.lines.iter().any(Line::earns_points);
-        r.txn.customer_turn = r.mode == Mode::SelfOperated;
+        r.txn.floor_turn = r.mode == Mode::SelfOperated;
         let ready = r.staff_state() == StaffState::Ready;
         let pending = r.txn.age_choice_pending();
         let mode = r.mode;
@@ -4042,7 +4042,7 @@ impl Store {
         if self.reg(register).is_some_and(|r| r.emoney.is_some()) {
             return self.charge_cash(register, c);
         }
-        self.check(register, Side::Customer, Action::InsertCash)?;
+        self.check(register, Side::Floor, Action::InsertCash)?;
         self.pay_cash(register, c)
     }
 
@@ -4112,7 +4112,7 @@ impl Store {
                 "もう一方の画面で店舗メニューを操作中です"
             } else if c.staff != StaffState::Ready {
                 "スタッフバーコードでログインしてください"
-            } else if c.customer_turn {
+            } else if c.floor_turn {
                 "お客様がお支払い中です"
             } else {
                 "もう一方の画面で操作中です"
@@ -4135,7 +4135,7 @@ impl Store {
                 self.charge_cash(register, Cash::from_amount(amount))
             }
             None => {
-                self.check(register, Side::Customer, Action::InsertCash)?;
+                self.check(register, Side::Floor, Action::InsertCash)?;
                 self.pay_cash(register, Cash::from_amount(amount))
             }
         }
@@ -4184,7 +4184,7 @@ impl Store {
     }
 
     fn finish_insert(&mut self, register: u8) -> Result<Outcome, String> {
-        self.check(register, Side::Customer, Action::InsertCash)?;
+        self.check(register, Side::Floor, Action::InsertCash)?;
         self.finish_insert_auto(register)
     }
 
@@ -4588,7 +4588,7 @@ impl Store {
         let c = r.context(&self.age_rules);
         let t = &r.txn;
         let taxes = t.taxes(&self.tax.display_rates(), self.tax.rounding);
-        let c_side = active_side(&c).unwrap_or(Side::Customer);
+        let c_side = active_side(&c).unwrap_or(Side::Floor);
         let actions = |side: Side, list: &[Action]| {
             list.iter()
                 .map(|&a| {
@@ -4642,10 +4642,10 @@ impl Store {
             .map(|m| m.id.clone())
             .collect();
 
-        let lines: Vec<StaffLine> = t
+        let lines: Vec<CounterLine> = t
             .lines
             .iter()
-            .map(|l| StaffLine {
+            .map(|l| CounterLine {
                 line: l.clone(),
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
@@ -4659,10 +4659,10 @@ impl Store {
             })
             .collect();
 
-        let customer_lines = t
+        let floor_lines = t
             .lines
             .iter()
-            .map(|l| CustomerLine {
+            .map(|l| FloorLine {
                 id: l.id,
                 touched: l.touched,
                 name: l.name,
@@ -4719,7 +4719,7 @@ impl Store {
             change_left: r
                 .outlet_since
                 .is_some_and(|t| self.now.saturating_sub(t) >= r.change_timers().0),
-            staff: StaffView {
+            counter: CounterView {
                 state: c.staff,
                 name: staff.map(|a| a.name),
                 role: staff.map(|a| a.role),
@@ -4763,9 +4763,9 @@ impl Store {
                 drawer: r.drawer.cash.0.clone(),
                 bell_down,
             },
-            customer: CustomerView {
+            floor: FloorView {
                 phase: c.phase,
-                lines: customer_lines,
+                lines: floor_lines,
                 coupons,
                 coupon_unmatched: c.coupon_unmatched,
                 returned,
@@ -4878,7 +4878,7 @@ pub struct ActionState {
 
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct StaffLine {
+pub struct CounterLine {
     #[serde(flatten)]
     pub line: Line,
     pub amount: u32,
@@ -4899,7 +4899,7 @@ pub struct StaffLine {
 
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct CustomerLine {
+pub struct FloorLine {
     pub id: u32,
     pub touched: u32,
     pub name: &'static str,
@@ -4924,12 +4924,12 @@ pub struct CustomerLine {
 
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct StaffView {
+pub struct CounterView {
     pub state: StaffState,
     pub name: Option<&'static str>,
     pub role: Option<Role>,
     pub phase: Phase,
-    pub lines: Vec<StaffLine>,
+    pub lines: Vec<CounterLine>,
     pub total: u32,
     pub taxes: Vec<TaxTotal>,
     pub coupons: Vec<CouponView>,
@@ -4964,9 +4964,9 @@ pub struct StaffView {
 
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct CustomerView {
+pub struct FloorView {
     pub phase: Phase,
-    pub lines: Vec<CustomerLine>,
+    pub lines: Vec<FloorLine>,
     pub coupons: Vec<CouponView>,
     pub coupon_unmatched: bool,
     pub returned: Vec<ReturnedCoupon>,
@@ -5037,8 +5037,8 @@ pub struct RegisterView {
     pub idle_revert_in: Option<u64>,
     pub idle_voids: bool,
     pub change_left: bool,
-    pub staff: StaffView,
-    pub customer: CustomerView,
+    pub counter: CounterView,
+    pub floor: FloorView,
     pub emoney: Option<EmoneyView>,
     pub emoney_short: Option<u32>,
     pub emoney_partial: Option<u32>,

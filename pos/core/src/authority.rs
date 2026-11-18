@@ -21,8 +21,8 @@ impl Mode {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum Side {
-    Staff,
-    Customer,
+    Counter,
+    Floor,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -166,7 +166,7 @@ pub struct Context {
     pub has_point_card: bool,
     pub coupon_unmatched: bool,
     pub method: Option<PaymentMethod>,
-    pub customer_turn: bool,
+    pub floor_turn: bool,
     pub menu_open: bool,
     pub touching: Option<Side>,
     pub items_full: bool,
@@ -270,7 +270,7 @@ fn check_tickets(c: &Context) -> Result<(), Denial> {
     require(c.ticket_handover, "お渡しするチケットはありません")
 }
 
-pub fn is_staff_only(action: Action) -> bool {
+pub fn is_counter_only(action: Action) -> bool {
     matches!(
         action,
         Action::ChooseAgeCheck
@@ -286,15 +286,15 @@ pub fn is_staff_only(action: Action) -> bool {
 }
 
 /// 売り場側の画面でだけ行う操作（チケットの受け取り枚数の入力）
-pub fn is_customer_only(action: Action) -> bool {
+pub fn is_floor_only(action: Action) -> bool {
     action == Action::ReceiveTickets
 }
 
 pub fn fixed_side(action: Action) -> Option<Side> {
-    if is_staff_only(action) {
-        Some(Side::Staff)
-    } else if is_customer_only(action) {
-        Some(Side::Customer)
+    if is_counter_only(action) {
+        Some(Side::Counter)
+    } else if is_floor_only(action) {
+        Some(Side::Floor)
     } else {
         None
     }
@@ -333,13 +333,13 @@ fn confirm_point(c: &Context) -> Result<(), Denial> {
 
 pub fn active_side(c: &Context) -> Option<Side> {
     if c.menu_open {
-        return Some(Side::Staff);
+        return Some(Side::Counter);
     }
     if c.staff != StaffState::Ready {
-        return Some(Side::Customer);
+        return Some(Side::Floor);
     }
-    if c.customer_turn {
-        return Some(Side::Customer);
+    if c.floor_turn {
+        return Some(Side::Floor);
     }
     c.touching
 }
@@ -366,7 +366,7 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Err("チケットのお渡し枚数はレジカウンター側の画面で入力します")
         } else if action == Action::ReceiveTickets {
             Err("チケットの受け取り枚数は売り場側の画面で入力していただきます")
-        } else if is_staff_only(action) {
+        } else if is_counter_only(action) {
             Err("年齢確認はレジカウンター側の画面で行います")
         } else {
             Err("売り場側の画面で押していただきます")
@@ -571,7 +571,7 @@ mod tests {
                                 for method in
                                     [None, Some(PaymentMethod::Cash), Some(PaymentMethod::Emoney)]
                                 {
-                                    for customer_turn in b {
+                                    for floor_turn in b {
                                         v.push(Context {
                                             menu_open: false,
                                             point_pending: false,
@@ -583,7 +583,7 @@ mod tests {
                                             emoney_short: false,
                                             cash_only_goods: false,
                                             expired: false,
-                                            customer_turn,
+                                            floor_turn,
                                             mode,
                                             phase,
                                             staff: StaffState::Ready,
@@ -618,7 +618,7 @@ mod tests {
     }
 
     fn touch_states(base: Context) -> impl Iterator<Item = Context> {
-        [None, Some(Side::Staff), Some(Side::Customer)]
+        [None, Some(Side::Counter), Some(Side::Floor)]
             .into_iter()
             .map(move |touching| Context { touching, ..base })
     }
@@ -634,18 +634,18 @@ mod tests {
                             && permitted(side, a, &c).is_ok()
                     })
                 };
-                assert!(!(any(Side::Staff) && any(Side::Customer)), "{c:?}");
+                assert!(!(any(Side::Counter) && any(Side::Floor)), "{c:?}");
             }
         }
     }
 
     #[test]
-    fn both_screens_can_do_the_same_except_customer_only_buttons() {
+    fn both_screens_can_do_the_same_except_floor_only_buttons() {
         for base in contexts() {
             for c in touch_states(base) {
                 let active = active_side(&c);
                 for &a in ACTIONS {
-                    for side in [Side::Staff, Side::Customer] {
+                    for side in [Side::Counter, Side::Floor] {
                         let expect = rules(a, &c).is_ok()
                             && if let Some(fixed) = fixed_side(a) {
                                 side == fixed
@@ -666,10 +666,10 @@ mod tests {
     #[test]
     fn staff_operated_ff_from_either_screen_when_nobody_touches() {
         for c in contexts().into_iter().filter(|c| {
-            c.mode == Mode::StaffOperated && !c.customer_turn && c.phase == Phase::Registering
+            c.mode == Mode::StaffOperated && !c.floor_turn && c.phase == Phase::Registering
         }) {
             assert_eq!(active_side(&c), None);
-            for side in [Side::Staff, Side::Customer] {
+            for side in [Side::Counter, Side::Floor] {
                 assert!(permitted(side, Action::RegisterFf, &c).is_ok());
             }
         }
@@ -682,30 +682,30 @@ mod tests {
                 c.age_choice_pending || c.bill_unchecked || c.ff_waiting || c.service_pending;
             for a in [Action::InsertCash, Action::TapEmoney] {
                 if blocked {
-                    assert!(permitted(Side::Customer, a, &c).is_err());
+                    assert!(permitted(Side::Floor, a, &c).is_err());
                 }
             }
         }
     }
 
     #[test]
-    fn bill_check_is_done_by_staff_on_the_staff_side() {
+    fn bill_check_is_done_by_staff_on_the_counter_side() {
         let unchecked: Vec<_> = contexts()
             .into_iter()
             .filter(|c| c.bill_unchecked && c.phase == Phase::Paying)
             .collect();
         assert!(!unchecked.is_empty());
         for c in unchecked {
-            assert!(permitted(Side::Customer, Action::CheckBill, &c).is_err());
+            assert!(permitted(Side::Floor, Action::CheckBill, &c).is_err());
             assert_eq!(
-                permitted(Side::Staff, Action::CheckBill, &c).is_ok(),
+                permitted(Side::Counter, Action::CheckBill, &c).is_ok(),
                 c.mode == Mode::StaffOperated,
                 "{c:?}"
             );
             assert!(c.payment_blocker().is_some());
         }
         for c in contexts().into_iter().filter(|c| !c.has_bills) {
-            assert!(permitted(Side::Staff, Action::CheckBill, &c).is_err());
+            assert!(permitted(Side::Counter, Action::CheckBill, &c).is_err());
         }
     }
 }

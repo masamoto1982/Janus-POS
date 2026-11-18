@@ -70,6 +70,34 @@ points?: number, } | { "type": "release_call", register: number, } | { "type": "
 
 export type Confiscated = { name: string, qty: number, };
 
+export type CounterLine = { amount: number, age: number | null, age_checked: boolean, limit: number | null, 
+/**
+ * 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
+ */
+limit_hit: boolean, 
+/**
+ * 日配食品（数量を増やせない）
+ */
+fresh: boolean, 
+/**
+ * 販売期限切れ（回収（取り消す）までお会計に進めない）
+ */
+expired: boolean, 
+/**
+ * 販売期限・賞味期限（いまからの分）
+ */
+dates: Dates | null, 
+/**
+ * チケットの発券枚数（チケットでなければ 0）
+ */
+tickets: number, id: number, touched: number, code: string, name: string, unit_price: number, qty: number, ff_base: number, tax: string, rate_bp: number, category: Category, cash_only: boolean, parcel?: Parcel, pickup?: Pickup, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, });
+
+export type CounterView = { state: StaffState, name: string | null, role: Role | null, phase: Phase, lines: Array<CounterLine>, total: number, taxes: Array<TaxTotal>, coupons: Array<CouponView>, point_card: string | null, required_age: number | null, 
+/**
+ * 年確に免許証・マイナンバーカードが要る（法令の年齢制限）。false なら顔写真付きの身分証も可
+ */
+age_official_id: boolean, age_choice_pending: boolean, age_early: boolean, confiscated: Array<Confiscated>, ff_collect: Array<Confiscated>, passed: Passed | null, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, id_pending: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, point_pending: boolean, parcel_ask: boolean, method: PaymentMethod | null, inserted: number, settle_in_ms: number | null, due: number, payment_blocker: string | null, calls: Array<Call>, actions: Array<ActionState>, drawer_total: number, drawer: Array<[number, number]>, bell_down: Array<string>, };
+
 export type CouponKind = { "kind": "exchange" } | { "kind": "discount", "yen": number };
 
 export type CouponView = { id: number, code: string, name: string, 
@@ -85,14 +113,6 @@ discount: number | null,
  * 適用先の明細。画面はクーポンの行を出さず、この明細に値引き・お引換えのフラグを立てる
  */
 line_id: number | null, };
-
-export type CustomerLine = { id: number, touched: number, name: string, qty: number, ff_base: number, amount: number, age: number | null, age_checked: boolean, limit: number | null, 
-/**
- * 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
- */
-limit_hit: boolean, cash_only: boolean, pickup: boolean, parcel: boolean, fresh: boolean, expired: boolean, dates: Dates | null, tickets: number, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, });
-
-export type CustomerView = { phase: Phase, lines: Array<CustomerLine>, coupons: Array<CouponView>, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, total: number, taxes: Array<TaxTotal>, inserted: number, settle_in_ms: number | null, due: number, point_card: boolean, point_pending: boolean, parcel_ask: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, staff_called: boolean, age_wait: number | null, staff_present: boolean, method: PaymentMethod | null, payment_blocker: string | null, actions: Array<ActionState>, };
 
 /**
  * 販売期限と賞味期限。シミュレーターをいつ開いても同じ状態になるよう、いまからの分で持つ
@@ -114,6 +134,14 @@ export type FfMenuItem = { code: string, name: string, price: number, level: Sto
 export type FfState = "waiting" | "received";
 
 export type FfTab = "fried" | "drink" | "cold" | "bun" | "oden";
+
+export type FloorLine = { id: number, touched: number, name: string, qty: number, ff_base: number, amount: number, age: number | null, age_checked: boolean, limit: number | null, 
+/**
+ * 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
+ */
+limit_hit: boolean, cash_only: boolean, pickup: boolean, parcel: boolean, fresh: boolean, expired: boolean, dates: Dates | null, tickets: number, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, });
+
+export type FloorView = { phase: Phase, lines: Array<FloorLine>, coupons: Array<CouponView>, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, total: number, taxes: Array<TaxTotal>, inserted: number, settle_in_ms: number | null, due: number, point_card: boolean, point_pending: boolean, parcel_ask: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, staff_called: boolean, age_wait: number | null, staff_present: boolean, method: PaymentMethod | null, payment_blocker: string | null, actions: Array<ActionState>, };
 
 export type LimitAlert = { name: string, limit: number, };
 
@@ -223,7 +251,7 @@ answered: string | null,
 /**
  * まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
  */
-waiting_calls: Array<CallKind>, mode: Mode, mode_label: string, outlet: number, outlet_detail: Array<[number, number]>, menu: Menu | null, paused: boolean, idle_revert_in: number | null, idle_voids: boolean, change_left: boolean, staff: StaffView, customer: CustomerView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 
+waiting_calls: Array<CallKind>, mode: Mode, mode_label: string, outlet: number, outlet_detail: Array<[number, number]>, menu: Menu | null, paused: boolean, idle_revert_in: number | null, idle_voids: boolean, change_left: boolean, counter: CounterView, floor: FloorView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 
 /**
  * ポイント：付与対象の商品があるか・カードの残高・いま充てられる分・このお会計で付与する分
  */
@@ -267,39 +295,11 @@ export type RuleTarget = { "kind": "category", category: Category, } | { "kind":
 
 export type ShortChoice = "cancel" | "cash" | "cash_confirmed" | "charge" | "staff";
 
-export type Side = "staff" | "customer";
+export type Side = "counter" | "floor";
 
 export type Snapshot = { now: number, registers: Array<RegisterView>, bells: Array<BellView>, bell_links: Array<BellLink>, signal: BellSignal, calls: Array<Call>, call_history: Array<ResolvedCall>, age_rules: AgeRulesView, audit: Array<AuditEntry>, ff_stock: Array<FfMenuItem>, bell_loss: number, accounts: Array<AccountView>, catalog: Array<CatalogItem>, tax: TaxView, categories: Array<[Category, string]>, emoney_balance: number, };
 
-export type StaffLine = { amount: number, age: number | null, age_checked: boolean, limit: number | null, 
-/**
- * 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
- */
-limit_hit: boolean, 
-/**
- * 日配食品（数量を増やせない）
- */
-fresh: boolean, 
-/**
- * 販売期限切れ（回収（取り消す）までお会計に進めない）
- */
-expired: boolean, 
-/**
- * 販売期限・賞味期限（いまからの分）
- */
-dates: Dates | null, 
-/**
- * チケットの発券枚数（チケットでなければ 0）
- */
-tickets: number, id: number, touched: number, code: string, name: string, unit_price: number, qty: number, ff_base: number, tax: string, rate_bp: number, category: Category, cash_only: boolean, parcel?: Parcel, pickup?: Pickup, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, });
-
 export type StaffState = "absent" | "ready";
-
-export type StaffView = { state: StaffState, name: string | null, role: Role | null, phase: Phase, lines: Array<StaffLine>, total: number, taxes: Array<TaxTotal>, coupons: Array<CouponView>, point_card: string | null, required_age: number | null, 
-/**
- * 年確に免許証・マイナンバーカードが要る（法令の年齢制限）。false なら顔写真付きの身分証も可
- */
-age_official_id: boolean, age_choice_pending: boolean, age_early: boolean, confiscated: Array<Confiscated>, ff_collect: Array<Confiscated>, passed: Passed | null, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, id_pending: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, point_pending: boolean, parcel_ask: boolean, method: PaymentMethod | null, inserted: number, settle_in_ms: number | null, due: number, payment_blocker: string | null, calls: Array<Call>, actions: Array<ActionState>, drawer_total: number, drawer: Array<[number, number]>, bell_down: Array<string>, };
 
 export type StockLevel = "made_to_order" | "plenty" | "low" | "out";
 

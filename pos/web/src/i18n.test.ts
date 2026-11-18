@@ -4,14 +4,14 @@ import { DEFAULT_LANG, langOf, resetLangs, toggleLang, trCore, trText } from "./
 describe("screen language", () => {
   it("defaults to Japanese, switches only the pressed side, and resets per register", () => {
     expect(DEFAULT_LANG).toBe("ja");
-    expect(toggleLang(1, "customer")).toBe("en");
-    expect(langOf(1, "customer")).toBe("en");
-    expect(langOf(1, "staff")).toBe("ja");
-    expect(langOf(2, "customer")).toBe("ja");
-    toggleLang(2, "staff");
+    expect(toggleLang(1, "floor")).toBe("en");
+    expect(langOf(1, "floor")).toBe("en");
+    expect(langOf(1, "counter")).toBe("ja");
+    expect(langOf(2, "floor")).toBe("ja");
+    toggleLang(2, "counter");
     resetLangs(1);
-    expect(langOf(1, "customer")).toBe("ja");
-    expect(langOf(2, "staff")).toBe("en");
+    expect(langOf(1, "floor")).toBe("ja");
+    expect(langOf(2, "counter")).toBe("en");
     resetLangs(2);
   });
 

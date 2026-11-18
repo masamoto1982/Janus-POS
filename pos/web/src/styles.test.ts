@@ -44,11 +44,11 @@ describe("呼び出し中の黄の点滅", () => {
   });
 
   it("呼び出し中のレジカウンター側の黄の段は、ほかの段の色の規則に負けない", () => {
-    const calling = rules.findIndex(r => r.selector === ":root .staff-screen.calling");
-    expect(decl(rules[calling].body, "--cust-bg")).toBe("var(--alert-bg)");
+    const calling = rules.findIndex(r => r.selector === ":root .counter-screen.calling");
+    expect(decl(rules[calling].body, "--screen-bg")).toBe("var(--alert-bg)");
     // レジカウンター側に段の色を塗る規則は、呼び出し中を :not(.calling) で外すか、呼び出し中の規則より前にあって詳細度が同じ以下であること
     for (const [i, r] of rules.entries()) {
-      if (i === calling || !decl(r.body, "--cust-bg") || !r.selector.includes("staff-screen") || r.selector.includes(".sos")) continue;
+      if (i === calling || !decl(r.body, "--screen-bg") || !r.selector.includes("counter-screen") || r.selector.includes(".sos")) continue;
       expect(r.selector, `${r.selector} が呼び出し中の黄を上書きする`).toMatch(/:not\([^)]*\.calling/);
     }
   });

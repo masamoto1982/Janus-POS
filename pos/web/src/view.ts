@@ -15,14 +15,14 @@ import type {
   ReturnedCoupon as Returned,
   Command,
   PaymentMethod,
-  CustomerView,
+  FloorView,
   FfState,
   MenuScreen,
   RegisterView,
   Snapshot,
   Rounding,
-  StaffLine,
-  StaffView,
+  CounterLine,
+  CounterView,
   TaxKind,
   TaxTotal,
   TicketRow,
@@ -133,7 +133,7 @@ function ffVerifyOpen<L extends { id: number; kind: string; state?: FfState }>(r
   return rows.length > 0 && !rows.every((l) => l.state === "received");
 }
 
-function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number; ff_base?: number }[], customer: boolean): string {
+function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number; ff_base?: number }[], floor: boolean): string {
   const ff = ffVerifyRows(reg, side, lines).sort((a, b) => b.touched - a.touched);
   const rows = ff
     .map((l) => {
@@ -145,14 +145,14 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
       const judge = value === "" ? "" : l.state === "received" ? `<span class="ffv-ok">OK</span>` : `<span class="ffv-ng">NG</span>`;
       if (need === 1) {
         const done = l.state === "received";
-        return `<tr><td>${esc(name)}</td><td class="num">1</td><td class="num"><input type="checkbox" class="ffv-check" data-ffcheck="${l.id}" data-ffreg="${reg}:${side}" ${done ? "checked disabled" : ""} aria-label="${esc(l.name)}の${customer ? "お受け取り" : "お渡し"}を確認した" /></td><td class="ffv-judge">${done ? `<span class="ffv-ok">OK</span>` : ""}</td></tr>`;
+        return `<tr><td>${esc(name)}</td><td class="num">1</td><td class="num"><input type="checkbox" class="ffv-check" data-ffcheck="${l.id}" data-ffreg="${reg}:${side}" ${done ? "checked disabled" : ""} aria-label="${esc(l.name)}の${floor ? "お受け取り" : "お渡し"}を確認した" /></td><td class="ffv-judge">${done ? `<span class="ffv-ok">OK</span>` : ""}</td></tr>`;
       }
-      return `<tr><td>${esc(name)}</td><td class="num">${need}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${customer ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
+      return `<tr><td>${esc(name)}</td><td class="num">${need}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${floor ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
   return `<div class="ffv-screen">
-      <div class="big">${customer ? "お受け取りした数を入力してください" : "お渡しした数を入力してください"}</div>
-      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${customer ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="big">${floor ? "お受け取りした数を入力してください" : "お渡しした数を入力してください"}</div>
+      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${floor ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-ffverify-close="${reg}:${side}" >バック</button></div>
     </div>`;
 }
@@ -160,7 +160,7 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
 const METHOD_LABEL: Record<string, string> = { cash: "現金", emoney: "電子マネー", qr: "バーコード決済", credit: "クレジットカード", points: "ポイント利用" };
 const METHODS = ["cash", "emoney", "qr", "credit", "points"] as const;
 
-type Side = "staff" | "customer";
+type Side = "counter" | "floor";
 
 function thanks(rc: Receipt | null = null): string {
   return `<div class="thanks">${msg("ありがとうございました", "お忘れ物にご注意ください")}${pointResult(rc)}</div>`;
@@ -180,7 +180,7 @@ function changeLeft(): string {
 }
 
 function changeDue(side: Side, amount: number, tendered: number): string {
-  const msg = side === "staff" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
+  const msg = side === "counter" ? `お釣り ${yen(amount)} をお返ししてください` : `お釣り ${yen(amount)} と<br>レシートをお受け取りください`;
   // お預かりを併記する（B-4）
   return `<div class="thanks"><div class="big">${msg}</div>${tendered ? `<p class="small">お預かり ${yen(tendered)}</p>` : ""}</div>`;
 }
@@ -189,14 +189,14 @@ export function isoDate(t: Date): string {
   return `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 }
 
-function idCard(reg: number, age: number, v: StaffView, a: (n: Action) => Gate): string {
+function idCard(reg: number, age: number, v: CounterView, a: (n: Action) => Gate): string {
   const choose = (idCheck: boolean, label: string, cls = "") =>
-    btn(label, { type: "choose_age_check", register: reg, side: "staff", id_check: idCheck }, a("choose_age_check"), cls);
+    btn(label, { type: "choose_age_check", register: reg, side: "counter", id_check: idCheck }, a("choose_age_check"), cls);
   if (v.age_choice_pending) {
     return `<div class="point-screen">
         <div class="big">${age}歳以上の年齢確認をしますか？</div>
         <div class="point-choices">${choose(true, "する", "primary")}</div>
-      </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
+      </div>${skipCorner({ type: "choose_age_check", register: reg, side: "counter", id_check: false }, a("choose_age_check"))}`;
   }
   const st = a("check_id");
   // 法令の年齢制限（酒・たばこ）は免許証・マイナンバーカード、店舗が任意で決めた年齢制限だけなら学生証など顔写真付きの身分証も可。
@@ -205,8 +205,8 @@ function idCard(reg: number, age: number, v: StaffView, a: (n: Action) => Gate):
   const ids = v.age_official_id ? "運転免許証またはマイナンバーカードで確認してください<br>在留カード・特別永住者証明書・パスポートも可" : "学生証など顔写真付きの身分証で確認できます<br>デジタル身分証は不可";
   return `<div class="point-screen id-entry">
       ${msg("身分証の生年月日を入力してください", ids)}
-      ${padField(reg, "staff", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field", st)}
-    </div>${skipCorner({ type: "choose_age_check", register: reg, side: "staff", id_check: false }, a("choose_age_check"))}`;
+      ${padField(reg, "counter", "birth", padValue.get(padValueKey(reg, "birth")) ?? "", "例 19821002", "身分証の生年月日（西暦8桁）", undefined, "birth-field", st)}
+    </div>${skipCorner({ type: "choose_age_check", register: reg, side: "counter", id_check: false }, a("choose_age_check"))}`;
 }
 
 function pickupStep(reg: number, p: Pickup, st: Gate): string {
@@ -227,7 +227,7 @@ function pickupStep(reg: number, p: Pickup, st: Gate): string {
 }
 
 function pickupHandover(reg: number, side: Side, no: string, change = 0): string {
-  if (side === "customer")
+  if (side === "floor")
     return `<div class="point-screen pickup-step">
       ${msg("受け取りのサインをお願いします", change ? "レシートとお釣りをお受け取りください" : "レシートをお受け取りください")}
     </div>`;
@@ -295,16 +295,16 @@ function expiredFlag(reg: number, side: Side, l: { expired: boolean }, operable:
 
 /** 販売期限切れの案内（回収イベント）。期限切れの品はレジを通るたびに一点ずつ出てくるので、直近の一点だけを出す。
  *  操作できる側には「回収しました」と左下のバック（明細のフラグで開き直せる）、お客様が見るだけの側は案内だけ */
-function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate | null, staff: boolean): string {
+function expiredScreen(reg: number, side: Side, lines: ExpiredLine[], st: Gate | null, counter: boolean): string {
   const l = lines.filter((x) => x.expired).sort((a, b) => b.touched - a.touched)[0];
   if (!l) return "";
   const back = st ? `<div class="back-foot"><button type="button" class="md ghost back-btn" data-expired-close="${reg}:${side}" data-expired-sig="${expiredSig(lines)}">バック</button></div>` : "";
   return (
     collectScreen(
-      staff ? "販売期限が切れています" : "この商品は販売期限が切れているためお売りできません",
+      counter ? "販売期限が切れています" : "この商品は販売期限が切れているためお売りできません",
       // 期限切れの品はスキャンした瞬間に一点ずつ止まるので、回収は常に一点。点数は出さず、販売期限を出す
       [{ name: l.name, note: l.dates ? `販売期限 ${expiryLabel(l.dates.sell_by_min, l.fresh)}` : "" }],
-      staff ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "店員が対応いたします",
+      counter ? "お客様にお詫びし、販売期限切れ商品を回収してください" : "店員が対応いたします",
       st ? btn("回収しました", { type: "remove_line", register: reg, side, line_id: l.id }, st, "primary") : "",
     ) + back
   );
@@ -322,30 +322,30 @@ function collectScreen(head: string, items: { name: string; qty?: number; note?:
 
 /** 照合イベント（年確・FFのお渡し）が済んだ。レジカウンター側にはシステムのお墨付き（緑の照合OK）と「次へ」、
  *  売り場側には完了とご協力へのお礼。年確は責任の重い作業なので、手ごたえなしに次の画面へ進めない */
-function passedCard(reg: number, side: Side, v: StaffView): string {
+function passedCard(reg: number, side: Side, v: CounterView): string {
   const p = v.passed;
   if (!p) return "";
   const mark = `<div class="pass-mark" aria-hidden="true">✓</div>`;
   const next = `<div class="point-choices">${btn("次へ", { type: "dismiss_passed", register: reg }, { allowed: true, reason: null }, "primary")}</div>`;
   if (p.kind === "age")
-    return side === "staff"
+    return side === "counter"
       ? `<div class="point-screen passed">${mark}${msg(`${p.age}歳以上であることを確認しました`, "身分証をお返しください")}${next}</div>`
       : `<div class="point-screen passed">${mark}${msg("年齢確認が完了しました", "ご協力ありがとうございました")}</div>`;
   // FF はスタッフが取り仕切るので、スタッフ操作モードの売り場側には出さない
-  return side === "staff" ? `<div class="point-screen passed">${mark}${msg("FFのお渡しを確認しました", "お渡し数がすべて注文数と一致しています")}${next}</div>` : "";
+  return side === "counter" ? `<div class="point-screen passed">${mark}${msg("FFのお渡しを確認しました", "お渡し数がすべて注文数と一致しています")}${next}</div>` : "";
 }
 
 /** 販売個数の上限を超えて登録を断ったときの案内（年齢確認と同じくレジの機能）。
  *  ほかの案内画面と同じ縦横中央の二行、操作できる側には左下のバック。次の登録でも閉じる */
-function limitScreen(reg: number, side: Side, alert: LimitAlert, st: Gate | null, staff: boolean): string {
-  const sub = staff
+function limitScreen(reg: number, side: Side, alert: LimitAlert, st: Gate | null, counter: boolean): string {
+  const sub = counter
     ? `${alert.limit}点を超える分はお売りできないことをお客様にお伝えください`
     : `申し訳ございません、${alert.limit}点を超える分はお売りできません`;
   const back = st ? backCorner({ type: "close_limit_alert", register: reg, side }, st) : "";
   return `<div class="point-screen pair-note limit-screen">${msg(esc(`${alert.name}は1回のお会計で${alert.limit}点までです`), esc(sub))}</div>${back}`;
 }
 
-export function pendingParcel(lines: StaffLine[]): StaffLine | undefined {
+export function pendingParcel(lines: CounterLine[]): CounterLine | undefined {
   return lines.find((l) => l.kind === "service" && !l.done && l.parcel);
 }
 
@@ -356,7 +356,7 @@ const parcelErr = (reg: number): string => {
   return e ? `<span class="parcel-error" role="alert">${esc(e)}</span>` : "";
 };
 
-function parcelNote(reg: number, l: StaffLine): string {
+function parcelNote(reg: number, l: CounterLine): string {
   const p = l.parcel as Parcel;
   const [head, sub] = p.size
     ? ["お届け先を入力しています", `${p.size}サイズでお取り扱いします`]
@@ -372,12 +372,12 @@ function parcelWait(): string {
     </div>`;
 }
 
-function parcelStep(reg: number, l: StaffLine, st: Gate, count: number): string {
+function parcelStep(reg: number, l: CounterLine, st: Gate, count: number): string {
   const p = l.parcel as Parcel;
   const no = count > 1 ? `<span class="parcel-no">${count}個目</span>` : "";
   const back = () => backCorner({ type: "parcel_back", register: reg, line_id: l.id }, st);
   const field = (target: PadTarget, placeholder: string, aria: string) =>
-    padField(reg, "staff", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`, st);
+    padField(reg, "counter", target, padValue.get(padValueKey(reg, target, l.id)) ?? "", placeholder, aria, l.id, `parcel-${target}`, st);
   if (!p.size && !p.sum_cm) {
     return `<div class="point-screen parcel-entry">
         ${msg(`${no}取り扱いサイズを決定してください`, parcelErr(reg) || "三辺の長さの合計を入力してください")}
@@ -397,7 +397,7 @@ function parcelStep(reg: number, l: StaffLine, st: Gate, count: number): string 
 }
 
 /** 複数口の伝票で、この荷物が何個口目か。同じお届け先へ続けて受け付けた複数口だけを数え、ほかの伝票は混ぜない */
-function multiPiece(lines: StaffLine[], l: StaffLine): number {
+function multiPiece(lines: CounterLine[], l: CounterLine): number {
   if (!l.parcel?.multi) return 0;
   const parcels = lines.filter((x) => x.parcel).sort((a, b) => a.id - b.id);
   let n = 1;
@@ -409,9 +409,9 @@ function multiPiece(lines: StaffLine[], l: StaffLine): number {
   return n;
 }
 
-function parcelAsk(reg: number, lines: StaffLine[], st: Gate): string {
+function parcelAsk(reg: number, lines: CounterLine[], st: Gate): string {
   const done = lines.filter((l) => l.parcel && l.kind === "service" && l.done);
-  const last = done.reduce<StaffLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
+  const last = done.reduce<CounterLine | undefined>((a, l) => (!a || l.touched > a.touched ? l : a), undefined);
   const p = last?.parcel;
   const pieces = last ? multiPiece(lines, last) : 0;
   return `<div class="point-screen parcel-ask">
@@ -424,20 +424,20 @@ function parcelAsk(reg: number, lines: StaffLine[], st: Gate): string {
     </div>`;
 }
 
-function confiscatedCard(reg: number, side: Side, v: StaffView): string {
+function confiscatedCard(reg: number, side: Side, v: CounterView): string {
   if (!v.confiscated.length) return "";
-  return side === "staff"
+  return side === "counter"
     ? collectScreen("年齢制限により販売できない商品があります", v.confiscated, "お客様にお詫びし、商品を回収してください", btn("回収しました", { type: "dismiss_confiscated", register: reg }, { allowed: true, reason: null }, "primary"))
     : collectScreen("年齢制限によりお売りできない商品があります", v.confiscated, "申し訳ございません、こちらの商品はお会計から外させていただきます");
 }
 
-function ffCollectCard(reg: number, v: StaffView): string {
+function ffCollectCard(reg: number, v: CounterView): string {
   if (!v.ff_collect.length) return "";
   return collectScreen("お渡し済みのFFが取り消されました", v.ff_collect, "お客様からFFを回収してください", btn("回収しました", { type: "dismiss_ff_collect", register: reg }, { allowed: true, reason: null }, "primary"));
 }
 
 /** 売り場側には回収の案内を出さない（FF はスタッフがリードする、user 2026-11-09） */
-function ffReturnCard(v: StaffView): string {
+function ffReturnCard(v: CounterView): string {
   if (!v.ff_collect.length) return "";
   return collectScreen(v.ff_collect.map((c) => `${c.name}の数量を変更しました`).join("、"), [], "");
 }
@@ -497,7 +497,7 @@ export function stampVerifyScreen(reg: number, side: Side, bills: BillRow[], st:
 // 通常のお買い物：税抜 5 万円以上をクレジットカード以外で受け取ると、レシートに収入印紙が要る。
 // レシートは決済のあとに出るので、確認も決済のあと（お釣り・お礼の案内の前）
 export function receiptStampScreen(reg: number, side: Side, rs: { stamp: number; base: number }, receiptNo: number | undefined, st: Gate, staffPresent = true): string {
-  if (side === "customer")
+  if (side === "floor")
     return `<div class="point-screen pair-note">${staffPresent ? msg("レシートに収入印紙を貼り付けています", "少々お待ちください") : msg("レシートに収入印紙を貼り付けます", "スタッフが向かっています")}</div>`;
   const off = st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`;
   return `<div class="ffv-screen bill-verify stamp-verify">
@@ -515,7 +515,7 @@ export function billPayCard(count: number, selfOperated = false): string {
 
 export function billHandover(reg: number, side: Side, count: number, st: Gate, change = 0): string {
   // お釣りがないときは「お釣り」を外す（B-6）
-  if (side === "customer")
+  if (side === "floor")
     return `<div class="point-screen bill-done">
       ${msg(`公共料金${billN(count)}　支払いが完了しました`, change ? "払込票とレシート、お釣りをお受け取りください" : "払込票とレシートをお受け取りください")}
     </div>`;
@@ -527,7 +527,7 @@ export function billHandover(reg: number, side: Side, count: number, st: Gate, c
 
 /** 宅配便の決済のあと：お客様控えの伝票のお渡し。伝票ごとに1枚、複数口は何個口でも1枚。枚数は両画面に出す */
 export function parcelHandover(reg: number, side: Side, count: number, st: Gate): string {
-  if (side === "customer")
+  if (side === "floor")
     return `<div class="point-screen bill-done">
       ${msg(`控え伝票${billN(count)}`, "控え伝票をお受け取りください")}
     </div>`;
@@ -545,18 +545,18 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], issue
   // 発券はお店全体で先入れ先出し。先に支払ったレジのお渡しが済むまで、このレジは発券を待つ
   if (!issued)
     return `<div class="point-screen ticket-wait">
-      ${side === "customer" ? msg(`チケット${billN(total)}`, "発券の順番をお待ちください") : msg("チケットの発券待ち", "ほかのレジのチケットのお渡しが済むと発券します")}
+      ${side === "floor" ? msg(`チケット${billN(total)}`, "発券の順番をお待ちください") : msg("チケットの発券待ち", "ほかのレジのチケットのお渡しが済むと発券します")}
     </div>`;
-  const staff = side === "staff";
-  const value = staff ? handed : received;
+  const counter = side === "counter";
+  const value = counter ? handed : received;
   const field = st?.allowed === false
     ? `<button type="button" class="pad-field" disabled>${value ?? ""}</button>`
-    : padField(reg, side, staff ? "tkh" : "tkr", value === null ? "" : String(value), "", staff ? "お渡し枚数" : "受け取り枚数");
+    : padField(reg, side, counter ? "tkh" : "tkr", value === null ? "" : String(value), "", counter ? "お渡し枚数" : "受け取り枚数");
   const note = value === null || value === total
     ? ""
-    : `<p class="ticket-alert">${staff ? "発券枚数とお渡し枚数が一致しません" : "申込数と受け取り数が一致しません"}<br>再度ご確認ください</p>`;
-  return `<div class="point-screen ticket-done ${staff ? "staff-only" : "customer-only"}">
-      ${msg(staff ? "お渡し枚数を入力してください" : "受け取り枚数をご入力ください")}
+    : `<p class="ticket-alert">${counter ? "発券枚数とお渡し枚数が一致しません" : "申込数と受け取り数が一致しません"}<br>再度ご確認ください</p>`;
+  return `<div class="point-screen ticket-done ${counter ? "counter-only" : "floor-only"}">
+      ${msg(counter ? "お渡し枚数を入力してください" : "受け取り枚数をご入力ください")}
       <div class="parcel-fields"><label>${field}<span>枚</span></label></div>
       ${note}
     </div>`;
@@ -594,27 +594,27 @@ const splitNote = (method: string, cashlessDue: number, due: number): string =>
 
 /** 支払方法を選んだときの案内。選んだ側には青文字（p.guide）で出す。
  *  inert＝その画面からは操作できない（セルフ操作モードのレジカウンター側）。青文字にせず、操作できない部品と同じグレー */
-function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, staff = false, settleIn: number | null = null, selfOperated = false, inert = false): string {
+function payHint(method: string | null, blocker: string | null, inserted: number, due: number, cashlessDue = due, counter = false, settleIn: number | null = null, selfOperated = false, inert = false): string {
   if (blocker) return `<p class="muted">${esc(blocker)}</p>`;
   const guide = inert ? `<p class="guide off">` : `<p class="guide">`;
   if (method && method !== "cash") {
     // スタッフ操作モードのレジカウンター側は、キャッシュレスでスタッフのなすべき作業を出す（かざすのはお客様、バーコード決済はスタッフがスキャン）
-    const op = staff ? (method === "qr" ? "決済用バーコードをスキャンしてください" : `お客様に${TAP_DEVICE(method)}の位置を案内してください`) : `${TAP_THING[method]}を${TAP_DEVICE(method)}にかざしてください`;
+    const op = counter ? (method === "qr" ? "決済用バーコードをスキャンしてください" : `お客様に${TAP_DEVICE(method)}の位置を案内してください`) : `${TAP_THING[method]}を${TAP_DEVICE(method)}にかざしてください`;
     const split = cashlessDue < due ? `<br>${splitNote(method, cashlessDue, due)}` : "";
     return `${guide}${op}${split}</p>`;
   }
   if (selfOperated) return "";
   if (inserted && due > 0) return `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
-  if (inserted) return staff ? `<div class="big">${sec}秒の無操作で、お支払いを確定します</div>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
-  if (method === "cash" && staff) return `${guide}お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
+  if (inserted) return counter ? `<div class="big">${sec}秒の無操作で、お支払いを確定します</div>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
+  if (method === "cash" && counter) return `${guide}お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
   if (method === "cash") return `${guide}スタッフが現金をお預かりします</p>`;
-  return staff ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
+  return counter ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
 }
 
 /** スタッフ操作モードの売り場側：スタッフが支払方法を選んだら、その決済の操作を案内する。
  *  お客様が押したボタンの案内ではないので青文字にせず、大きなテキスト／小さなテキストで出す */
-function customerPayGuide(method: string, cashlessDue: number, due: number): string {
+function floorPayGuide(method: string, cashlessDue: number, due: number): string {
   if (method === "cash") return msg("スタッフが現金をお預かりします");
   const split = cashlessDue < due ? splitNote(method, cashlessDue, due) : "";
   // バーコード決済はスタッフがスキャンするので、お客様には提示をお願いする
@@ -646,14 +646,14 @@ function taxNote(v: { taxes: TaxTotal[] }): string {
   return `<span class="muted tax-note">内税 ${v.taxes.map((t) => `${esc(t.rate)} ${yen(t.tax)}`).join(" / ")}</span>`;
 }
 
-function staffLine(reg: number, l: StaffLine, v: StaffView, side: Side): string {
-  const ro = side === "customer";
+function counterLine(reg: number, l: CounterLine, v: CounterView, side: Side): string {
+  const ro = side === "floor";
   const tags = [
     expiredFlag(reg, side, l, !ro),
     ffFlag(reg, side, l, find(v.actions, "check_ff"), ro),
     stampFlag(reg, side, v.bills.find((b) => b.line_id === l.id), find(v.actions, "affix_stamp"), ro),
     serviceFlag(l),
-    ro ? ageFlag(l) : ageFlag(l, { type: "early_age_check", register: reg, side: "staff", start: true }, find(v.actions, "early_age_check")),
+    ro ? ageFlag(l) : ageFlag(l, { type: "early_age_check", register: reg, side: "counter", start: true }, find(v.actions, "early_age_check")),
     limitFlag(l),
   ].filter(Boolean);
   const coupon = couponFlags(reg, side, v.coupons, l.id, l.qty, find(v.actions, "remove_coupon"), ro);
@@ -711,7 +711,7 @@ const PAD_GAP = `<span class="pad-gap"></span>`;
 export function qtyPopup(r: RegisterView, side: Side): string {
   const reg = r.id;
   const e = qtyEntry.get(`${reg}:${side}`);
-  const l = e && r.staff.lines.find((x) => x.id === e.id);
+  const l = e && r.counter.lines.find((x) => x.id === e.id);
   if (!e || !l) return "";
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-qtypad="${reg}:${side}:${key}">${label}</button>`;
   const ok = e.digits !== "" && Number(e.digits) > 0;
@@ -765,16 +765,16 @@ export function padPopup(r: RegisterView, side: Side): string {
   if (!e) return "";
   const d = PAD[e.target];
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-pad="${reg}:${side}:${key}">${label}</button>`;
-  const inserted = e.target === "inlet" ? (r.emoney && !r.menu ? r.emoney.inserted : !r.menu ? r.staff.inserted : 0) : 0;
+  const inserted = e.target === "inlet" ? (r.emoney && !r.menu ? r.emoney.inserted : !r.menu ? r.counter.inserted : 0) : 0;
   const ok = e.digits !== "" ? d.code || Number(e.digits) > 0 : e.target === "inlet" && !r.menu && inserted > 0;
   const now = e.target === "inlet" && inserted ? `<div class="qty-pop-note muted">入金済み ${yen(inserted)}</div>` : "";
-  const name = e.target === "ffv" ? r.staff.lines.find((l) => l.id === e.line)?.name : undefined;
-  const title = name ? `${name}の${side === "customer" ? "お受け取り数" : "お渡し数"}` : d.title;
+  const name = e.target === "ffv" ? r.counter.lines.find((l) => l.id === e.line)?.name : undefined;
+  const title = name ? `${name}の${side === "floor" ? "お受け取り数" : "お渡し数"}` : d.title;
   // 最下段は左から バック・削除（←）・決定、どれも数字のキーと同じ大きさ（user 2026-11-17）
   const last = `${PAD_GAP}${k("0")}${d.decimal ? k(".", ".") : PAD_GAP}${k("cancel", "バック", "pad-key ghost back-btn")}${k("back", "←", "pad-key neg")}<button type="button" class="pad-key primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button>`;
   const shown = padShow(e.target, e.digits);
   // チケットの枚数は売り場側・レジカウンター側それぞれ専用の入力。その側では操作可能部品として青で描く
-  const only = e.target === "tkr" ? " customer-only" : e.target === "tkh" ? " staff-only" : "";
+  const only = e.target === "tkr" ? " floor-only" : e.target === "tkh" ? " counter-only" : "";
   return `<div class="qty-pop${only}" data-pad-backdrop="${reg}:${side}">
       <div class="qty-pop-box" role="dialog" aria-label="${esc(title)}">
         <div class="qty-pop-name">${esc(title)}</div>
@@ -789,7 +789,7 @@ export function padPopup(r: RegisterView, side: Side): string {
  *  現金は自動釣銭機のあるレジカウンター側で扱うので、お客様にはスタッフが返す */
 function returned2000(side: Side): string {
   return confirm(
-    side === "staff"
+    side === "counter"
       ? msg("二千円札を返却しました", "取り扱い対象外の紙幣です<br>出金ボックスからお客様にお返しください")
       : msg("二千円札はご利用いただけません", "スタッフがお返しいたします"),
   );
@@ -821,9 +821,9 @@ function emergencyScreen(r: RegisterView, side: Side): string {
     "スタッフの応答がありません",
     "事件または事故の可能性があります<br>ご自身の安全を確保の上、通報をお願いいたします",
   )}<div class="sos-contact"><p class="sos-tel"><span>警察：<b>110</b></span><span>消防救急：<b>119</b></span></p><p class="small">緊急連絡先と店舗住所を記載したレシートを出力します</p></div>`;
-  if (side === "customer") return `<div class="confirm change-alert emergency">${body}</div>`;
-  // 解除はログインなしで誰でも押せる（駆け付けた警察官・救急隊も、user 2026-11-14）。表示のみの側でも押せるよう staff-only に入れる
-  const end = `<span class="staff-only">${btn("解除", { type: "end_emergency", register: r.id }, undefined, "primary")}</span>`;
+  if (side === "floor") return `<div class="confirm change-alert emergency">${body}</div>`;
+  // 解除はログインなしで誰でも押せる（駆け付けた警察官・救急隊も、user 2026-11-14）。表示のみの側でも押せるよう counter-only に入れる
+  const end = `<span class="counter-only">${btn("解除", { type: "end_emergency", register: r.id }, undefined, "primary")}</span>`;
   return `<div class="confirm change-alert emergency">${msg("非常事態モードを解除します")}${end}</div>`;
 }
 
@@ -838,7 +838,7 @@ function emergencyEnded(snap: Snapshot, log: { started_at: number; ended_at: num
 }
 
 export function callScreen(r: RegisterView): string {
-  const v = r.staff;
+  const v = r.counter;
   // 用件は最初の呼び出しの一件だけ（「＆」で繋がない）。スタッフがレジに着けば、残りはお客様との対話でわかる（user 2026-11-14）。
   // 用件はコアが決める：ボタンの呼び出しはボタンの文言、商品登録・お会計からの呼び出しは「お支払い」「宅配便」など具体的に
   const first = [...v.calls].sort((a, b) => a.created_at - b.created_at || a.id - b.id)[0];
@@ -877,9 +877,9 @@ const FOREIGN_IDS = `<span lang="en" data-i18n-skip>Also OK: Residence Card, Spe
 
 /** 年確のあいだの売り場側。スタッフが「する」を選んだら身分証の提示をお願いし、
  *  スタッフが生年月日を打ち始めたら（テンキーを開いたら）判定中であることと、個人情報を残さないことを伝える */
-function ageNote(reg: number, v: StaffView): string {
+function ageNote(reg: number, v: CounterView): string {
   if (!v.id_pending) return pairNote("年齢確認が必要な商品が含まれています");
-  const typing = padEntry.get(`${reg}:staff`)?.target === "birth" || !!padValue.get(padValueKey(reg, "birth"));
+  const typing = padEntry.get(`${reg}:counter`)?.target === "birth" || !!padValue.get(padValueKey(reg, "birth"));
   return typing
     ? pairNote("生年月日から年齢を判定しています", "端末は個人情報を保存しません")
     : `<div class="point-screen pair-note">${msg(
@@ -890,9 +890,9 @@ function ageNote(reg: number, v: StaffView): string {
       )}</div>`;
 }
 
-function ageStep(reg: number, v: StaffView, side: Side, a: (n: Action) => Gate): string {
+function ageStep(reg: number, v: CounterView, side: Side, a: (n: Action) => Gate): string {
   const age = v.required_age;
-  if (!age || side === "customer") return "";
+  if (!age || side === "floor") return "";
   return v.age_choice_pending || v.id_pending ? idCard(reg, age, v, a) : "";
 }
 
@@ -991,7 +991,7 @@ export function unmatchedCard(reg: number, side: Side, coupons: Coupon[], st: Ga
     .map((c) => `<li><b>${esc(c.name)}</b> ${ro ? "" : removeCoupon(reg, side, c, st)}</li>`)
     .join("");
   const [head, body] =
-    side === "staff"
+    side === "counter"
       ? ["適用先のないクーポンがあります", "対象商品と似た別の商品を通していないか確かめてください<br>対象商品を登録するか、クーポンを取り消すまで決済できません"]
       : ["ご利用になれないクーポンがあります", "クーポンの対象商品とお買い上げの商品が同じか、お確かめください<br>対象商品を追加するか、クーポンを取り消すとお支払いに進めます"];
   return `<div class="point-screen coupon-screen">${msg(head, body)}<ul class="coupon-list">${list}</ul></div>`;
@@ -1001,12 +1001,12 @@ export function returnedCard(reg: number, side: Side, returned: Returned[], done
   if (!returned.length) return "";
   const list = returned.map((c) => `<li><b>${esc(c.name)}</b></li>`).join("");
   const head =
-    side === "staff"
+    side === "counter"
       ? "取り消したクーポンをお客様に返却してください"
       : returned.every((c) => c.unmatched)
         ? "適用先のなかったクーポンをお返しします"
         : "取り消したクーポンをお返しします";
-  const label = side === "staff" ? "返却しました" : "受け取りました";
+  const label = side === "counter" ? "返却しました" : "受け取りました";
   return `<div class="point-screen coupon-screen">${msg(head)}<ul class="coupon-list">${list}</ul>${
     done ? `<div class="point-choices">${btn(label, { type: "dismiss_returned", register: reg }, undefined, "primary")}</div>` : ""
   }</div>`;
@@ -1034,7 +1034,7 @@ function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolea
   const mirror = ' tabindex="-1" aria-disabled="true"';
   const big = (cls: string, main: string, sub: string, ro: boolean, attrs: string) =>
     `<button type="button" class="band-btn neg ${cls}${ro ? " mirror-only" : ""}"${cls === "lang-btn" ? " data-i18n-skip" : ""}${ro ? mirror : attrs}><b>${main}</b><small>${sub}</small></button>`;
-  const langRo = r.mode === "self_operated" && side === "staff";
+  const langRo = r.mode === "self_operated" && side === "counter";
   const cmd = { type: "start_emoney", register: r.id, side, kind: "menu" };
   const lang = big("lang-btn", "Language", "言語", langRo, ` data-lang="${r.id}:${side}" title="この画面の言語を切り替える／Switch this screen's language"`);
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
@@ -1063,8 +1063,8 @@ function voidBtn(reg: number, side: Side, st: Gate): string {
 
 function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }[]; total: number; inserted: number }): string {
   const reg = r.id;
-  if (r.mode === "staff_operated" && side === "customer") return pairNote("取引の中止を確認しています");
-  const st = find(r.mode === "staff_operated" ? r.staff.actions : r.customer.actions, "void_transaction");
+  if (r.mode === "staff_operated" && side === "floor") return pairNote("取引の中止を確認しています");
+  const st = find(r.mode === "staff_operated" ? r.counter.actions : r.floor.actions, "void_transaction");
   const back = [
     view.inserted ? `入れたお金 ${yen(view.inserted)} は出金ボックスに戻ります` : "",
     r.prepaid && r.prepaid_method === "電子マネー" ? `電子マネーで払った ${yen(r.prepaid)} は残高に戻ります` : "",
@@ -1089,51 +1089,51 @@ const STAFF_OP_GUIDES: [GuideKind, string, string][] = [
 
 function staffOperatedWelcome(r: RegisterView, side: Side): string {
   const reg = r.id;
-  const on = scanGuide.get(`${reg}:staff`);
-  const ro = side === "customer";
+  const on = scanGuide.get(`${reg}:counter`);
+  const ro = side === "floor";
   const guide = STAFF_OP_GUIDES.find(([k]) => k === on);
   const guides = STAFF_OP_GUIDES.map(
     ([k, label]) =>
-      `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:staff:${k}"`}>${label}</button>`,
+      `<button type="button" class="guide-btn ${k === on ? "on" : ""}${ro ? " mirror-only" : ""}"${ro ? ' tabindex="-1" aria-disabled="true"' : ` data-guide="${reg}:counter:${k}"`}>${label}</button>`,
   ).join("");
   const [head, sub] = ro ? ["いらっしゃいませ", "ご用件をお申し付けください"] : ["お辞儀とご挨拶をしましょう", "ご用件をお伺いしてください"];
-  return `${welcomeBand(r, side, find(r.staff.actions, "emoney"), ro)}<div class="welcome staff-operated-welcome">${msg(head, sub)}
+  return `${welcomeBand(r, side, find(r.counter.actions, "emoney"), ro)}<div class="welcome staff-operated-welcome">${msg(head, sub)}
       <div class="guide-row" data-law>${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
     </div>`;
 }
 
-export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "staff"): string {
-  if (r.menu) return side === "staff" ? storeMenu(r) : menuPaused();
-  const v = r.staff;
+export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "counter"): string {
+  if (r.menu) return side === "counter" ? storeMenu(r) : menuPaused();
+  const v = r.counter;
   const reg = r.id;
   const a = (n: Action) => find(v.actions, n);
   if (r.bill_handover && !v.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills"), r.last_receipt?.change_total ?? 0));
   if (r.parcel_handover && !v.lines.length) return confirm(parcelHandover(reg, side, r.parcel_handover, a("hand_over_bills")));
-  if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
+  if (r.ticket_handover.length && !v.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "counter" ? find(r.counter.actions, "hand_tickets") : find(r.floor.actions, "receive_tickets")));
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover, r.last_receipt?.change_total ?? 0));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet, r.last_receipt.method.includes("現金") ? r.last_receipt.paid : 0) : thanks(r.last_receipt)));
   if (!v.lines.length && !v.coupons.length && !v.point_card) voidAsk.delete(reg);
   // ポイントカード（アプリ）だけ読んだときも取引は始まっているので、登録画面に進む
   if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
-  const ro = side === "customer";
-  const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, staffLine(reg, l, v, side)])]);
+  const ro = side === "floor";
+  const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, counterLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
 
   const pointPending = paying && v.point_pending;
   const agePending = (paying || v.age_early) && (v.age_choice_pending || v.id_pending);
   const payStage = paying && !pointPending && !agePending;
-  const ask = side === "staff" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
+  const ask = side === "counter" ? "決済手段をお伺いしてください" : "決済手段をお申しつけください";
   // 「ポイント利用」を選んだら、ポイントの使い方（全部・端数・指定）を選ぶ画面に切り替わる
   const pointsUsing = payStage && v.method === "points" && r.points.balance !== null && !r.prepaid;
   const pay = pointsUsing
-    ? pointsUse(r, side, a("select_payment"), side === "staff" ? "ポイントのご利用方法をお伺いしてください" : null)
+    ? pointsUse(r, side, a("select_payment"), side === "counter" ? "ポイントのご利用方法をお伺いしてください" : null)
     : payStage
     ? `<div class="paybox pay-stage">
         ${v.method || v.inserted ? "" : `<div class="big">${ask}</div>`}
-        ${side === "staff" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : v.method ? "" : methodList(v.method, v.inserted, r.unavailable)}
-        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due, v.method) : side === "customer" && v.method && !v.inserted && !v.payment_blocker ? customerPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "staff", v.settle_in_ms) : cashOnlyNote(r)}
+        ${side === "counter" ? methodRow(reg, side, v.method, v.inserted, a("select_payment"), "", r.unavailable) : v.method ? "" : methodList(v.method, v.inserted, r.unavailable)}
+        ${r.outlet && !v.inserted && !v.method ? cashBackNote(side, r.outlet) : r.prepaid && !v.inserted && !v.payment_blocker && (!v.method || v.method === "cash") ? prepaidNote(r, v.due, v.method) : side === "floor" && v.method && !v.inserted && !v.payment_blocker ? floorPayGuide(v.method, r.cashless_due, v.due) : v.method || v.inserted || v.payment_blocker ? payHint(v.method, v.payment_blocker, v.inserted, v.due, r.cashless_due, side === "counter", v.settle_in_ms) : cashOnlyNote(r)}
         ${v.method === "cash" && !ro && v.inserted > 0 ? `<div class="finish-row">${finishInsert(reg, v.inserted, v.due, a("insert_cash"))}</div>` : ""}
       </div>`
     : agePending
@@ -1166,14 +1166,14 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       : paying
       ? backFoot(reg, side, a("back_to_registering"))
       : agePending
-        ? backCorner({ type: "early_age_check", register: reg, side: "staff", start: false }, a("early_age_check"))
+        ? backCorner({ type: "early_age_check", register: reg, side: "counter", start: false }, a("early_age_check"))
         : "";
   const screen = (body: string) => `${top}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
   if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
   if (!paying && pickup && !pickup.matched)
     return screen(
-      side === "staff"
+      side === "counter"
         ? pickupStep(reg, pickup, a("complete_service"))
         : pickup.missing
           ? pairNote("申し訳ございません", "お預かりの荷物が見つかりませんでした")
@@ -1183,31 +1183,31 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (!parcel) parcelError.delete(reg);
   if (!paying && parcel)
     return screen(
-      side === "staff"
+      side === "counter"
         ? parcelStep(reg, parcel, a("complete_service"), multiPiece(v.lines, parcel))
         : parcelNote(reg, parcel),
     );
-  if (!paying && v.parcel_ask) return screen(side === "staff" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("同じお届け先にお送りする荷物はございますか？"));
+  if (!paying && v.parcel_ask) return screen(side === "counter" ? parcelAsk(reg, v.lines, a("parcel_next")) : pairNote("同じお届け先にお送りする荷物はございますか？"));
   const slips = v.bills.length;
   if (paying && slips && v.bill_unchecked)
-    return screen(side === "staff" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "スタッフが払込票を確認しています"));
+    return screen(side === "counter" ? billVerifyScreen(reg, side, v.bills, a("check_bill")) : billNote(slips, "スタッフが払込票を確認しています"));
   if (paying && slips && v.stamp_pending)
-    return screen(side === "staff" ? stampVerifyScreen(reg, side, v.bills, a("affix_stamp"), false) : billNote(slips, "スタッフが領収証に収入印紙を貼り付けています"));
-  if (paying && slips) return screen(side === "customer" ? billPayCard(slips) : billNote(slips, "お客様に受付点数、合計金額をお伝えください"));
-  if (agePending) return screen(side === "staff" ? pay : ageNote(reg, v));
+    return screen(side === "counter" ? stampVerifyScreen(reg, side, v.bills, a("affix_stamp"), false) : billNote(slips, "スタッフが領収証に収入印紙を貼り付けています"));
+  if (paying && slips) return screen(side === "floor" ? billPayCard(slips) : billNote(slips, "お客様に受付点数、合計金額をお伝えください"));
+  if (agePending) return screen(side === "counter" ? pay : ageNote(reg, v));
   // 回収イベント・照合の済んだ案内は、それぞれのボタン（回収しました・次へ）だけで閉じる（バックで登録画面に戻っても同じ案内が残るだけなので出さない）
-  const held = firstOf([confiscatedCard(reg, side, v), passedCard(reg, side, v), side === "staff" ? ffCollectCard(reg, v) : ffReturnCard(v)]);
+  const held = firstOf([confiscatedCard(reg, side, v), passedCard(reg, side, v), side === "counter" ? ffCollectCard(reg, v) : ffReturnCard(v)]);
   if (held) return `${top}${confirm(held)}`;
   const card = firstOf([
     v.coupon_unmatched ? unmatchedCard(reg, side, v.coupons, a("remove_coupon"), ro) : "",
-    returnedCard(reg, side, v.returned, side === "staff"),
+    returnedCard(reg, side, v.returned, side === "counter"),
   ]);
   if (card) return screen(card);
-  if (pointPending) return screen(side === "staff" ? pointCheck(reg, side, a("confirm_point_card")) : customerPointAsk(scanGuide.get(`${reg}:staff`) === "point"));
+  if (pointPending) return screen(side === "counter" ? pointCheck(reg, side, a("confirm_point_card")) : floorPointAsk(scanGuide.get(`${reg}:counter`) === "point"));
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
   if (!paying && r.limit_alert)
-    return screen(limitScreen(reg, side, r.limit_alert, ro || !a("remove_line").allowed ? null : a("remove_line"), side === "staff"));
+    return screen(limitScreen(reg, side, r.limit_alert, ro || !a("remove_line").allowed ? null : a("remove_line"), side === "counter"));
   const cancelling = !ro ? couponCancelTarget(reg, side, v.coupons) : null;
   if (cancelling) return `${top}${confirm(couponCancelScreen(reg, side, v.lines.find((l) => l.id === cancelling[0].line_id)?.name ?? "", cancelling, a("remove_coupon")))}`;
   if (!ro && !paying && a("remove_line").allowed && expiredOpen(reg, side, v.lines))
@@ -1247,7 +1247,7 @@ const POINT_SERVICES: [string, string][] = [
 
 /** スタッフ操作モードのポイントの確認中の売り場側。スタッフが「付与する」を選ぶまではカードの有無を尋ね、
  *  選んだ後に「ポイントをお付けします」とカードの絵を出す（スキップした取引では一度も出さない、B-6） */
-function customerPointAsk(reading: boolean): string {
+function floorPointAsk(reading: boolean): string {
   if (!reading) return `<div class="point-screen">${msg("ポイントカード・アプリはお持ちですか")}</div>`;
   return `<div class="point-screen">
       <div class="big">ポイントをお付けします</div>
@@ -1263,7 +1263,7 @@ function finishInsert(reg: number, inserted: number, due: number, st: Gate): str
       : due > 0
         ? { ...st, allowed: false, reason: `あと ${yen(due)} 入れてください` }
         : st;
-  return `<span class="staff-only">${btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary")}</span>`;
+  return `<span class="counter-only">${btn("投入おわり", { type: "finish_insert", register: reg }, ready, "primary")}</span>`;
 }
 
 /** 合計の下のポイント表示。付与対象の商品がなく、カードも読んでいなければ出さない */
@@ -1327,25 +1327,25 @@ export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): strin
   if (r.paused)
     return confirm(`<div class="point-screen paused-screen">${msg(
       "レジ休止中",
-      side === "customer" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します",
+      side === "floor" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します",
     )}</div>`);
   if (r.emergency) return emergencyScreen(r, side);
-  if (r.emergency_log && side === "staff") return emergencyEnded(snap, r.emergency_log);
+  if (r.emergency_log && side === "counter") return emergencyEnded(snap, r.emergency_log);
   if (!r.menu && r.outlet_detail.some(([d]) => d === 2000)) return returned2000(side);
-  if (r.mode === "self_operated" && side === "staff" && !r.menu && r.staff.calls.length) return callScreen(r);
-  if (r.mode === "self_operated" && side === "customer" && r.bell_dead && r.staff.calls.length) return bellDeadScreen();
+  if (r.mode === "self_operated" && side === "counter" && !r.menu && r.counter.calls.length) return callScreen(r);
+  if (r.mode === "self_operated" && side === "floor" && r.bell_dead && r.counter.calls.length) return bellDeadScreen();
   if (!r.menu && (r.emoney || r.emoney_short !== null || r.emoney_partial !== null)) return confirm(emoneyScreen(r, side));
   return r.mode === "staff_operated" ? staffOperatedScreen(r, side) : selfOperatedScreen(r, side);
 }
 
 function emoneyScreen(r: RegisterView, side: Side): string {
   const reg = r.id;
-  const ro = r.mode === "staff_operated" && side === "customer";
-  const actions = r.mode === "self_operated" ? r.customer.actions : r.staff.actions;
+  const ro = r.mode === "staff_operated" && side === "floor";
+  const actions = r.mode === "self_operated" ? r.floor.actions : r.counter.actions;
   const close = (label: string) =>
     ro ? "" : `<div class="back-foot">${btn(label, { type: "close_emoney", register: reg, side }, find(actions, "emoney"), "md ghost back-btn")}</div>`;
   if (r.emoney_partial !== null) {
-    const rest = Math.max(0, r.staff.due - r.emoney_partial);
+    const rest = Math.max(0, r.counter.due - r.emoney_partial);
     const st = find(actions, "resolve_emoney_short");
     const go = (label: string, c: ShortChoice, cls: string) => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
     const other = ro ? "" : `<div class="back-foot">${go("他の決済を使う", "cancel", "md ghost back-btn wide")}</div>`;
@@ -1362,12 +1362,12 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   if (r.emoney_short !== null) {
     const st = find(actions, "resolve_emoney_short");
     const choice = (label: string, c: ShortChoice, cls = "") => btn(label, { type: "resolve_emoney_short", register: reg, side, choice: c }, st, cls);
-    const short = Math.max(0, r.staff.due - r.emoney_short);
+    const short = Math.max(0, r.counter.due - r.emoney_short);
     const staffOp = r.mode === "staff_operated";
     if (!staffOp) {
       // セルフ操作モード：残高不足の時点ではスタッフを呼ばない（他の決済を使うならスタッフの無駄足になる）。
       // 「チャージまたは現金併用」（左・消極）でスタッフを呼び、「他の決済を使う」（右・積極）で支払方法の選択へ。
-      const called = r.staff.calls.some((c) => c.kind === "emoney");
+      const called = r.counter.calls.some((c) => c.kind === "emoney");
       // スタッフを呼んだあとは「他の決済を使う」も出さない（押されるとスタッフの無駄足になる）
       const buttons = called
         ? ""
@@ -1410,7 +1410,7 @@ function prepaidNote(r: RegisterView, due: number, method: PaymentMethod | null)
 }
 
 function cashBackNote(side: Side, amount: number): string {
-  return side === "staff" ? `<p>現金 <b>${yen(amount)}</b> を出金ボックスからお返しください</p>` : `<p>現金 <b>${yen(amount)}</b> をお返しします</p>`;
+  return side === "counter" ? `<p>現金 <b>${yen(amount)}</b> を出金ボックスからお返しください</p>` : `<p>現金 <b>${yen(amount)}</b> をお返しします</p>`;
 }
 
 /** ポイントの使い方：使える分を全部・お支払いの端数（100円未満）・ポイント数を指定。
@@ -1464,8 +1464,8 @@ const BELL_SVG = `<svg class="bell-svg" viewBox="0 0 24 24" aria-hidden="true" f
 
 /** 呼び鈴。レジカウンター側は応援を呼ぶ（SOS）、売り場側はスタッフを呼ぶ。スタッフ操作モードの売り場側には出さない */
 function bellBtn(r: RegisterView, side: Side): string {
-  const call = find(r.customer.actions, "call_staff");
-  const sos = side === "staff";
+  const call = find(r.floor.actions, "call_staff");
+  const sos = side === "counter";
   const tip = sos ? "仲間のスタッフを呼ぶ（押している間鳴ります）" : "スタッフを呼ぶ（押している間鳴ります）";
   const cmd = sos ? { type: "call_staff", register: r.id, topic: "sos" } : { type: "call_staff", register: r.id };
   // 呼び鈴が不通ならグレーアウト。セルフ操作モードの売り場側だけは押せるままにし、押すと店員へ直接声をかける案内を出す
@@ -1517,8 +1517,8 @@ export function signage(now = Date.now()): string {
 export function firstWelcome(r: RegisterView, side: Side): string {
   const staffOp = r.mode === "staff_operated";
   const band = staffOp
-    ? welcomeBand(r, side, find(r.staff.actions, "emoney"), side === "customer")
-    : welcomeBand(r, side, find(r.customer.actions, "emoney"), false);
+    ? welcomeBand(r, side, find(r.counter.actions, "emoney"), side === "floor")
+    : welcomeBand(r, side, find(r.floor.actions, "emoney"), false);
   return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
 }
 
@@ -1535,22 +1535,22 @@ export const isWelcome = (main: string): boolean => main.includes("welcome-band"
 /** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。売り場側は「スタッフを呼び出しています」（添え字なし）、
  *  レジカウンター側は呼び出しからの経過秒数（取り消しボタンは置かない、user 2026-11-14） */
 function callingRow(r: RegisterView, side: Side, now: number): string {
-  if (side === "customer") return `<div class="call-row calling">${msg("スタッフを呼び出しています")}</div>`;
-  const at = r.staff.calls.filter((c) => r.waiting_calls.includes(c.kind)).map((c) => c.created_at);
+  if (side === "floor") return `<div class="call-row calling">${msg("スタッフを呼び出しています")}</div>`;
+  const at = r.counter.calls.filter((c) => r.waiting_calls.includes(c.kind)).map((c) => c.created_at);
   return `<div class="call-row calling">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
 }
 
 /** スタッフがログインして応答した呼び出しの用件（最初の一件）。取引が終わるまでレジカウンター側の担当スタッフ名の右に出す */
 export function answeredTopic(r: RegisterView, side: Side): string {
-  const topics = side === "staff" ? (r.answered ?? "") : "";
+  const topics = side === "counter" ? (r.answered ?? "") : "";
   return topics ? `<span class="answered-topic" title="お客様の呼び出しの用件">用件：${esc(topics)}</span>` : "";
 }
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
-  if (r.menu && side === "customer" && !r.paused) return signage(now);
+  if (r.menu && side === "floor" && !r.paused) return signage(now);
   // 非常事態モード中の売り場側の最下段：英語で「警戒してください」「通報をお願いします」（ヘッダーと同じ赤で点滅）
-  if (r.emergency && side === "customer") return `<div class="call-row calling" data-i18n-skip>${msg("Stay alert", "Please call emergency services")}</div>`;
+  if (r.emergency && side === "floor") return `<div class="call-row calling" data-i18n-skip>${msg("Stay alert", "Please call emergency services")}</div>`;
   if (r.emergency) return emergencyContactsRow();
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
   // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
@@ -1558,7 +1558,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {
-    const a = (n: Action) => find(r.customer.actions, n);
+    const a = (n: Action) => find(r.floor.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。文は受け取り方に誤りの余地がない一番具体的な表現なので、ボタン群の上に置く（user 2026-11-17）
@@ -1569,12 +1569,12 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
     ].join("")}</div>`;
   }
-  if (r.mode === "staff_operated" && side === "customer") return signage(now);
-  if (r.mode === "staff_operated" && r.staff.phase === "paying") return "";
-  if (r.mode === "staff_operated" && (r.staff.returned.length || r.staff.confiscated.length || r.staff.ff_collect.length)) return "";
-  if (r.mode === "staff_operated" && r.staff.lines.some((l) => l.parcel || l.pickup)) return "";
-  if (r.mode === "staff_operated" && r.pickup_handover && !r.staff.lines.length) return "";
-  const view = r.staff;
+  if (r.mode === "staff_operated" && side === "floor") return signage(now);
+  if (r.mode === "staff_operated" && r.counter.phase === "paying") return "";
+  if (r.mode === "staff_operated" && (r.counter.returned.length || r.counter.confiscated.length || r.counter.ff_collect.length)) return "";
+  if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
+  if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
+  const view = r.counter;
   const can = find(view.actions, "register_ff");
   const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
   const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
@@ -1613,16 +1613,16 @@ const MENU_LABEL: Record<MenuScreen, string> = {
 const MENU_ITEMS: MenuScreen[] = ["refund", "emergency", "deposit", "expense", "changer", "journal", "waste", "ff_fresh"];
 
 export function storeMenuUsable(r: RegisterView): boolean {
-  return r.mode === "staff_operated" && r.staff.state === "ready" && !r.paused && (r.menu !== null || !inTransaction(r));
+  return r.mode === "staff_operated" && r.counter.state === "ready" && !r.paused && (r.menu !== null || !inTransaction(r));
 }
 
 /** 取引中（明細・クーポンがある、または電子マネーの手続き中）は店舗メニューを開けない */
 function inTransaction(r: RegisterView): boolean {
-  return r.staff.lines.length > 0 || r.staff.coupons.length > 0 || r.staff.phase === "paying" || r.emoney !== null;
+  return r.counter.lines.length > 0 || r.counter.coupons.length > 0 || r.counter.phase === "paying" || r.emoney !== null;
 }
 
 export function storeMenu(r: RegisterView): string {
-  const v = r.staff;
+  const v = r.counter;
   const reg = r.id;
   const m = r.menu!;
   const go = (screen: MenuScreen | null, extra: { exchange_to?: number } = {}): Command => ({ type: "open_menu", register: reg, screen, ...extra });
@@ -1654,8 +1654,8 @@ export function storeMenu(r: RegisterView): string {
       return screen(`${head(MENU_LABEL[m.screen])}
         <p class="muted">お金を抜く操作です<br>操作のたびに店舗パスワードが要ります<br>お金は下の「出金」ボックスに出ます<br>記録は担当者名つきで残ります</p>
         <div class="menu-form">
-          ${padField(reg, "staff", "mamt", amt, "金額（円）", "出金する金額")}
-          ${padField(reg, "staff", "mpw", pw, "店舗パスワード", "店舗パスワード")}
+          ${padField(reg, "counter", "mamt", amt, "金額（円）", "出金する金額")}
+          ${padField(reg, "counter", "mpw", pw, "店舗パスワード", "店舗パスワード")}
           <button class="primary" data-form="cashout" data-reg="${reg}" data-kind="${m.screen}" ${ready ? "" : `disabled title="${esc(cout.allowed ? "金額と店舗パスワードを入れてください" : (cout.reason ?? ""))}"`}>出金</button>
         </div>`);
     }
@@ -1677,14 +1677,14 @@ export function storeMenu(r: RegisterView): string {
   }
 }
 
-export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "customer"): string {
-  const c: CustomerView = r.customer;
+export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "floor"): string {
+  const c: FloorView = r.floor;
   const reg = r.id;
   const a = (n: Action) => find(c.actions, n);
   if (r.bill_handover && !c.lines.length) return confirm(billHandover(reg, side, r.bill_handover, a("hand_over_bills"), r.last_receipt?.change_total ?? 0));
   if (r.parcel_handover && !c.lines.length) return confirm(parcelHandover(reg, side, r.parcel_handover, a("hand_over_bills")));
-  if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "staff" ? find(r.staff.actions, "hand_tickets") : find(r.customer.actions, "receive_tickets")));
-  if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "customer", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
+  if (r.ticket_handover.length && !c.lines.length) return confirm(ticketHandover(reg, side, r.ticket_handover, r.tickets_issued, r.tickets_received, r.tickets_handed, side === "counter" ? find(r.counter.actions, "hand_tickets") : find(r.floor.actions, "receive_tickets")));
+  if (r.receipt_stamp && !c.lines.length) return confirm(receiptStampScreen(reg, "floor", r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp"), false));
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks(r.last_receipt)));
 
   const lineRows = c.lines.map((l): Row => {
@@ -1692,7 +1692,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
       const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
       const n = l.tickets || l.qty;
       const qty =
-        c.phase === "registering" && !fixedHere && !(l.expired && side === "customer")
+        c.phase === "registering" && !fixedHere && !(l.expired && side === "floor")
           ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, c.lines))
           : `${n}`;
       const coupon = couponFlags(reg, side, c.coupons, l.id, l.qty, a("remove_coupon"), false);
@@ -1724,14 +1724,14 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
   if (c.phase === "paying" && r.cash_only) return screen(cashOnlyWait([...new Set(c.lines.filter((l) => l.cash_only).map((l) => l.name))]));
   // セルフ操作モードで「現金」を選ぶと店員呼び出し、売り場側は支払方法の選択から案内画面に切り替わる
-  if (c.phase === "paying" && c.method === "cash" && side === "customer") return screen(cashCallWait());
+  if (c.phase === "paying" && c.method === "cash" && side === "floor") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
   if (c.phase === "registering" && r.limit_alert)
-    return screen(limitScreen(reg, side, r.limit_alert, a("remove_line").allowed ? a("remove_line") : null, side === "staff"));
+    return screen(limitScreen(reg, side, r.limit_alert, a("remove_line").allowed ? a("remove_line") : null, side === "counter"));
   const cancelling = couponCancelTarget(reg, side, c.coupons);
   if (cancelling) return `${top}${confirm(couponCancelScreen(reg, side, c.lines.find((l) => l.id === cancelling[0].line_id)?.name ?? "", cancelling, a("remove_coupon")))}`;
   if (c.phase === "registering" && a("remove_line").allowed && expiredOpen(reg, side, c.lines))
-    return screen(expiredScreen(reg, side, c.lines, side === "staff" ? a("remove_line") : null, side === "staff"));
+    return screen(expiredScreen(reg, side, c.lines, side === "counter" ? a("remove_line") : null, side === "counter"));
   const card = firstOf([
     c.coupon_unmatched ? unmatchedCard(reg, side, c.coupons, a("remove_coupon")) : "",
     returnedCard(reg, side, c.returned, true),
@@ -1744,7 +1744,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying")
     return screen(`<div class="paybox pay-stage">
         <div class="big">お支払い方法を選択してください</div>
-        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due, c.method) : !c.method && !c.inserted && !c.payment_blocker && r.cash_only ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true, side === "staff")}
+        ${methodRow(reg, side, c.method, c.inserted, a("select_payment"), "center", r.unavailable, true)}${r.prepaid && !c.inserted && !c.payment_blocker && (!c.method || c.method === "cash") ? prepaidNote(r, c.due, c.method) : !c.method && !c.inserted && !c.payment_blocker && r.cash_only ? cashOnlyNote(r) : payHint(c.method, c.payment_blocker, c.inserted, c.due, r.cashless_due, false, c.settle_in_ms, true, side === "counter")}
       </div>${cashCorner(reg, side, c.method, a("select_payment"))}`);
   if (ffVerifyOpen(reg, side, c.lines))
     return screen(ffVerifyScreen(reg, side, c.lines, true));
@@ -2009,7 +2009,7 @@ function datesSub(p: { fresh: boolean; dates: Dates | null }): string {
 
 function slipShelf(s: Snapshot): string {
   const slips = s.registers.flatMap((r) =>
-    r.staff.lines
+    r.counter.lines
       .filter((l) => l.parcel?.slip && l.kind === "service" && l.done)
       .map((l) => item(`PS${l.parcel!.slip.replace(/-/g, "")}`, `伝票 レジ${r.id}`, esc(l.parcel!.slip), "", "レジカウンター側に読むと、この荷物の受付を取り消します")),
   );
@@ -2059,9 +2059,9 @@ export function walletPanel(emoneyBalance: number): string {
   return `<div class="shelf"><div class="items">${[...bills, ...coins].join("")}</div><div class="items wallet-cards">${cards.join("")}</div></div>`;
 }
 
-export function sideOf(cmd: Command): "staff" | "customer" | "store" {
+export function sideOf(cmd: Command): "counter" | "floor" | "store" {
   if ("side" in cmd && cmd.side) return cmd.side;
-  if (["ff_button", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "customer";
-  if ("register" in cmd) return "staff";
+  if (["ff_button", "insert_cash", "tap_emoney", "call_staff"].includes(cmd.type)) return "floor";
+  if ("register" in cmd) return "counter";
   return "store";
 }

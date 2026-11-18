@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arrange, seats, shells, wrapUnit } from "./law";
+import { alignByLength, arrange, seats, shells, wrapUnit } from "./law";
 
 // W=400 の目安：小ボタン 50×25、大ボタン 100×50、特大 141×71、最小間隔 8.8
 const g = 400 / 45.255;
@@ -83,5 +83,26 @@ describe("レイアウトの法則", () => {
     expect(rows).toHaveLength(1);
     const used = rows[0].reduce((s, w) => s + w, 0) + 3 * g;
     expect(used).toBeCloseTo(L - 2 * g);
+  });
+});
+
+describe("一文字差の幅そろえ", () => {
+  const w = (cs: number[]) => alignByLength(cs.map((c) => ({ chars: c, width: 20 + 18 * c })));
+  it("一文字差は長い方の幅にそろう（はい／いいえ）", () => {
+    expect(w([2, 3])).toEqual([74, 74]);
+    expect(w([1, 2])).toEqual([56, 56]);
+  });
+  it("二文字以上違えば別々の幅", () => {
+    expect(w([1, 3])).toEqual([38, 74]);
+    expect(w([2, 4])).toEqual([56, 92]);
+  });
+  it("一・二・三文字が並べば一文字差でつながって三つとも同じ幅", () => {
+    expect(w([3, 1, 2])).toEqual([74, 74, 74]);
+  });
+  it("つながりが切れたところで組が分かれる", () => {
+    expect(w([1, 2, 4, 5])).toEqual([56, 56, 110, 110]);
+  });
+  it("半角は半文字（Back と Skip、OK と はい）", () => {
+    expect(w([2, 2.5, 4.5])).toEqual([65, 65, 101]);
   });
 });

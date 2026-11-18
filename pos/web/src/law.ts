@@ -240,6 +240,51 @@ export const TEXT_STEP_NAMES = ["特大", "大", "小", "極小"] as const;
  * 並ぶ数が決まっていて幅を変えられないボタン（FF の単品・セルフの最下段・テンキー・明細の − ＋・FF のタブ）は
  * 段の幅のまま。文字も決めた段のまま（入らないときに下げる例外は 2026-11-18 に廃止）
  */
+/**
+ * 一文字差の幅そろえ（user 2026-11-18）：「一文字と二文字」「二文字と三文字」のように文字数が一文字しか違わないボタンは
+ * 同じ幅にする。二文字以上違えば（一文字と三文字など）幅は違ってよい。
+ * 文字通りには推移律で全部が同じ幅になってしまうので、範囲を「同じ並び（行・群）の同じ大きさのボタン」に限り、
+ * その中で文字数を小さい順に並べ、隣との差が一文字以内でつながるものを一組として、組の中でいちばん広い幅にそろえる。
+ * 一・二・三文字が同じ並びにあれば三つとも同じ幅、一文字と三文字だけなら別々の幅。
+ * 文字数は全角換算（半角は半文字）で、0.5 刻みに丸める
+ */
+export function alignByLength(items: { chars: number; width: number }[]): number[] {
+  const order = items.map((_, i) => i).sort((a, b) => items[a].chars - items[b].chars);
+  const out = items.map((x) => x.width);
+  let start = 0;
+  for (let k = 1; k <= order.length; k++) {
+    if (k < order.length && items[order[k]].chars - items[order[k - 1]].chars <= 1 + 1e-6) continue;
+    const run = order.slice(start, k);
+    const w = Math.max(...run.map((i) => items[i].width));
+    for (const i of run) out[i] = w;
+    start = k;
+  }
+  return out;
+}
+
+/** ボタンの文字数（全角換算、0.5 刻み）。二行のボタンは主役の行で数える */
+function charsOf(b: HTMLElement): number {
+  const main = b.querySelector<HTMLElement>(":scope > b") ?? b;
+  const r = document.createRange();
+  r.selectNodeContents(main);
+  const font = parseFloat(getComputedStyle(main).fontSize) || 1;
+  return Math.round((r.getBoundingClientRect().width / font) * 2) / 2;
+}
+
+/** 同じ並びの同じ大きさのボタンの組：並び＝法則の行（[data-law]）か合計の帯、なければ親要素。大きさ＝高さと文字の段 */
+function rowsOf(buttons: HTMLElement[]): HTMLElement[][] {
+  const groups = new Map<string, HTMLElement[]>();
+  const rows = new Map<Element, number>();
+  for (const b of buttons) {
+    const row = b.closest("[data-law], .reg-top") ?? b.parentElement;
+    if (!row) continue;
+    if (!rows.has(row)) rows.set(row, rows.size);
+    const key = `${rows.get(row)}:${Math.round(b.offsetHeight)}:${b.dataset.text}`;
+    groups.set(key, [...(groups.get(key) ?? []), b]);
+  }
+  return [...groups.values()].filter((g) => g.length > 1);
+}
+
 const RIGID = ".ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
 
 export function fitText(root: ParentNode): void {
@@ -272,7 +317,7 @@ export function fitText(root: ParentNode): void {
   /** 決めた文字の段：一行は特大、二行は大＋極小 */
   // 二行のボタンと同じ並びにある一行のボタン（セルフ最下段の「その他」など）は、隣の主役と同じ大にそろえる
   const tierOf = (b: HTMLElement) => (parts(b) || [...(b.parentElement?.children ?? [])].some((x) => x !== b && x instanceof HTMLElement && x.matches("button") && parts(x)) ? 1 : 0);
-  // 1. 幅：文字＋左右の余白 B÷4＋枠（同じ並びでもボタンごと、そろえない）
+  // 1. 幅：文字＋左右の余白 B÷4＋枠（まずボタンごと）
   const flex = buttons.filter((b) => !b.matches(RIGID));
   for (const b of flex) {
     b.style.removeProperty("width");
@@ -286,7 +331,12 @@ export function fitText(root: ParentNode): void {
     b.style.width = b.dataset.fitW = `${w}px`;
     b.style.paddingLeft = b.style.paddingRight = "0";
   }
-  // 2. 幅を変えられないボタン（RIGID）も文字は決めた段のまま。表示エリアに合わせて文字を下げる仕組みは廃止（user 2026-11-18）
+  // 2. 一文字差の幅そろえ（user 2026-11-18）：同じ並びの同じ大きさのボタンで、文字数の差が一文字以内なら長い方の幅にそろえる
+  for (const group of rowsOf(flex)) {
+    const ws = alignByLength(group.map((b) => ({ chars: charsOf(b), width: b.offsetWidth })));
+    group.forEach((b, i) => (b.style.width = b.dataset.fitW = `${ws[i]}px`));
+  }
+  // 3. 幅を変えられないボタン（RIGID）も文字は決めた段のまま。表示エリアに合わせて文字を下げる仕組みは廃止（user 2026-11-18）
   for (const b of buttons) if (b.matches(RIGID)) apply(b, tierOf(b));
 }
 

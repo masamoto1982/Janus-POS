@@ -7,7 +7,7 @@
 3. シミュレーター（`npm run dev`、または GitHub Pages） … 実際の画面と操作
 
 - `pos/core` … Rust で書いた決定的なコア（wasm-bindgen で Web UI に公開）
-- `pos/web` … TypeScript + Vite の Web UI（店員画面・客側画面・呼び鈴）
+- `pos/web` … TypeScript + Vite の Web UI（レジカウンター側・売り場側の画面、呼び鈴）
 
 変更の経緯は [CHANGELOG.md](CHANGELOG.md)。
 

@@ -307,7 +307,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 /* 番号の下に小さなテキスト（オレンジ）でレシートの出力を添える。大小の間は 4px（pos-text-tiers） */
 .screen .sos-contact { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); }
 .screen .sos-contact p.small { margin: 0; }
-/* 非常事態モードのスタッフ側の最下段：オーナー・担当スーパーバイザーの連絡先を二行で。最下段の点滅（赤＋白）に合わせて文字も白に */
+/* 非常事態モードのレジカウンター側の最下段：オーナー・担当スーパーバイザーの連絡先を二行で。最下段の点滅（赤＋白）に合わせて文字も白に */
 .screen .sos-store { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0; margin: 0; font-size: var(--text-sm); font-weight: 700; line-height: 1.3; }
 .screen .sos-store b { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
 .screen.sos .call-row.calling .sos-store { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
@@ -356,9 +356,9 @@ details summary h3 { display: inline; }
 .point-choices button { flex: 0 1 auto; min-width: 0; font-size: var(--text-sm); }
 .confirm button:not(.tag):not(.seg):not(.pad-field):not(.back-btn):not(.skip) { box-sizing: border-box; width: calc(var(--btn-w) * 2); max-width: 100%; height: var(--btn-h); padding: 0 var(--s15, 2px); }
 .method-row { flex-wrap: wrap; justify-content: center; gap: var(--gap); }
-/* 支払方法は文字なりの幅をやめて、いちばん長い「クレジットカード」が入る幅（強い角丸のボタンの大きさは .guide-btn の規則）（user 2026-11-17）。対になるお客様側の一覧も同じ */
+/* 支払方法は文字なりの幅をやめて、いちばん長い「クレジットカード」が入る幅（強い角丸のボタンの大きさは .guide-btn の規則）（user 2026-11-17）。対になる売り場側の一覧も同じ */
 
-/* お客様側の支払方法一覧（スタッフ操作モード、表示のみ）はスタッフ側の支払方法ボタンと同じ大きさ（user 2026-11-12） */
+/* 売り場側の支払方法一覧（スタッフ操作モード、表示のみ）はレジカウンター側の支払方法ボタンと同じ大きさ（user 2026-11-12） */
 .method-list .seg { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
 /* フラグ＝取引の阻害因子。行を警告色に染め、フラグは別画面を呼び出す部品なので小さな消極ボタン
    （操作できる側では青枠・青文字、背景なし）。確認や入力を終えると行の色ごと外れる。
@@ -383,7 +383,7 @@ button.flag { cursor: pointer; }
 button.ffv-input { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s13, 4px); }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
-/* チケットの受け取り枚数（お客様側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
+/* チケットの受け取り枚数（売り場側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
 /* 入力欄は荷物の長さ・重さと同じ形（.parcel-fields） */
 .screen .ticket-alert { margin: 0; color: var(--alert-ink); font-size: var(--text-sm); font-weight: 700; text-align: center; }
 .ffv-foot { align-self: stretch; display: flex; justify-content: flex-start; padding: var(--s11, 8px) 0 0; }
@@ -556,7 +556,7 @@ body.dragging .drop-hint { display: inline; }
 .screen .call-reason, .screen .point-service .icon { filter: grayscale(1); }
 /* ボタン操作で出すガイダンス（案内ボタン・支払方法の選択）は青文字（濃いグレーを青のランプで青にする） */
 .screen p.guide { filter: url(#ramp); }
-/* 操作できない画面（セルフ操作モードのスタッフ側）の案内は青にせず、操作できない部品と同じグレー */
+/* 操作できない画面（セルフ操作モードのレジカウンター側）の案内は青にせず、操作できない部品と同じグレー */
 .screen p.guide.off { filter: grayscale(1); color: var(--off-ink); }
 .screen.inactive [data-region] button, .screen.inactive [data-region] input,
 .screen.inactive [data-region] select, .screen.inactive [data-region] summary {
@@ -644,7 +644,7 @@ body.dragging .drop-hint { display: inline; }
 @keyframes io-frame { 50% { border-color: var(--msg-strong); box-shadow: inset 0 0 0 var(--frame-w) var(--msg-strong); } }
 .money-io .inlet.blink, .money-io .outlet.blink, .money-io .terminal.blink { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); animation: io-frame 1s steps(1) infinite; }
 .money-io .inlet.blink .placeholder { color: var(--ink); font-weight: 700; }
-/* お客様側の下は、左に決済端末・右にスキャナ（スタッフ側の入金・出金ボックスと同じ横並び）。どちらも二重枠、文字は入金・出金と同じ色 */
+/* 売り場側の下は、左に決済端末・右にスキャナ（レジカウンター側の入金・出金ボックスと同じ横並び）。どちらも二重枠、文字は入金・出金と同じ色 */
 .money-io .terminal { width: 100%; outline: var(--frame-w) solid var(--msg-strong); outline-offset: calc(var(--frame-w) * -3); justify-content: center; text-align: center; }
 .money-io .terminal { --scan-red: var(--red-3); --tap-blue: var(--blue-3); position: relative; overflow: hidden; }
 .money-io .terminal > * { position: relative; z-index: 1; }
@@ -675,7 +675,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-staff, .money-io-cust { grid-column: 1; } }
 
-/* スタッフ操作モードのお客様側の最下段＝サイネージ（セール情報・詐欺防止の呼びかけ）。押せる部品は置かない */
+/* スタッフ操作モードの売り場側の最下段＝サイネージ（セール情報・詐欺防止の呼びかけ）。押せる部品は置かない */
 .signage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 /* 第一待ち受け：三段目いっぱいに稼働モードを特大の文字で（有人レジ／セルフレジ） */
 .first-welcome { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 var(--s9, 16px); text-align: center; }
@@ -690,7 +690,7 @@ body.dragging .drop-hint { display: inline; }
 .call-row.calling .msg { flex: 1; min-width: 0; }
 /* 呼び出し中の最下段の背景は、ヘッダーの呼び出しの点滅と同じ拍（--blink-on）で、薄い黄（--alert-bg）と濃い黄（--call-soft）を行き来する（user 2026-11-14） */
 .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--call-soft) calc(var(--blink-on) * 100%), var(--alert-bg)); }
-/* エマージェンシーモード中は、点滅するところをすべてスタッフ側ヘッダーと同じ色・同じ拍に揃える（user 2026-11-14）：
+/* エマージェンシーモード中は、点滅するところをすべてレジカウンター側ヘッダーと同じ色・同じ拍に揃える（user 2026-11-14）：
    点いているあいだは赤 --sos-head＋白文字、消えているあいだはその段のふだんの色 */
 .screen.sos .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--sos-head) calc(var(--blink-on) * 100%), var(--tier-deep)); }
 .screen.sos .call-row.calling :is(.big, p.small) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
@@ -855,7 +855,7 @@ body.dragging .drop-hint { display: inline; }
 /* 第二待ち受けの Language・電子マネーは主役が大・添え字が極小（user 2026-11-17）：二行の文字はボタンの高さ B から 大 B÷2√2・極小 B÷4√2 なので、高さを特大 W/8 にして主役＝大 W/22.6 */
 .welcome-band .band-row:has(> .msg) { height: var(--s6, 48px); }
 .welcome-band .mirror-only { pointer-events: none; cursor: default; }
-/* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードのお客様側）でも押せる＝青 */
+/* 言語切り替えは押した側だけを切り替えるので、表示のみの側（スタッフ操作モードの売り場側）でも押せる＝青 */
 .screen [data-region] .welcome-band .lang-btn:not(.mirror-only) { filter: url(#ramp); }
 .screen.inactive [data-region] .welcome-band .lang-btn:not(.mirror-only) { pointer-events: auto; }
 /* 呼び鈴は待ち受けでは帯の中央に大きめに出し、商品登録が始まるとヘッダーに戻る */
@@ -864,7 +864,7 @@ body.dragging .drop-hint { display: inline; }
 
 /* 稼働モードの背景色：スタッフ操作モード＝ピンク、セルフ操作モード＝ミント（グレー・青・黄と P/D/T 型でも区別できる淡い色）。
    グラデーションは使わず段ごとに塗り分ける：一段目（ヘッダー）と三段目は薄く、二段目（帯）と四段目（FF・サイネージ）は濃いめ。
-   呼び出し中のスタッフ側画面は、エマージェンシーと同じやわらかい黄色を同じ塗り分けで */
+   呼び出し中のレジカウンター側画面は、エマージェンシーと同じやわらかい黄色を同じ塗り分けで */
 :root { --mode-staff-bg: var(--white); --mode-staff-deep: var(--grey-1);
   --mode-self-bg: var(--white); --mode-self-deep: var(--grey-1); --alert-deep: var(--orange-2); }
 :root .screen.mode-staff { --cust-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
@@ -872,9 +872,9 @@ body.dragging .drop-hint { display: inline; }
 /* 操作できる側（アクティブ側）の画面は肯定の緑、操作できない側は否定の赤：一段目・三段目は淡（濃度1）、二段目（帯）と四段目（最下段）は薄（濃度2） */
 :root .screen.operable { --cust-bg: var(--green-1); --tier-deep: var(--green-2); }
 :root .screen:not(.operable) { --cust-bg: var(--red-1); --tier-deep: var(--red-2); }
-/* セルフ操作モードのスタッフ側（操作できない側）は、赤だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
+/* セルフ操作モードのレジカウンター側（操作できない側）は、赤だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
 :root .staff-screen.mode-self:not(.operable, .calling) { --cust-bg: var(--grey-1); --tier-deep: var(--grey-2); }
-/* 呼び出し中のスタッフ側は黄の段が優先。段の色の規則を足すときは :not(.calling) で呼び出し中を外す（styles.test.ts で守る） */
+/* 呼び出し中のレジカウンター側は黄の段が優先。段の色の規則を足すときは :not(.calling) で呼び出し中を外す（styles.test.ts で守る） */
 :root .staff-screen.calling { --cust-bg: var(--alert-bg); --tier-deep: var(--alert-deep); }
 /* 非常事態モード中は両画面ともモードの色（ピンク・ミント）もグレーアウトも出さず、黄の段にする。
    ヘッダー・最下段は消えているあいだもこの黄なので、黄と赤（--sos-head）で点滅する（user 2026-11-14） */

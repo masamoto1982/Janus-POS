@@ -823,29 +823,29 @@ Command の全バリアント（serde の名前）と doc コメントから生�
 | --- | --- | --- |
 | `scan` | `register`・`side`・`code` | バーコードを読む（商品・ポイントカード・クーポン・スタッフバーコード・荷物・伝票）。操作側に関係なく受け付ける機器の操作 |
 | `register_ff` | `register`・`side`・`code`・`qty`・`force` | FF をタブから登録する（スタッフ操作モードのレジカウンター側）。`force` は欠品の長押し＝予約注文 |
-| `ff_button` | `register` | 最下段の「FF」ボタンでスタッフを呼ぶ（セルフ操作モード） |
+| `ff_button { register: u8 }` |  | 最下段の「FF」ボタンでスタッフを呼ぶ（セルフ操作モード） |
 | `check_ff` | `register`・`side`・`line_id`・`handed` | FF のお渡し数を入れて照合する |
 | `complete_service` | `register`・`line_id`・`amount` | サービス商品の受付を済ませる |
 | `parcel_length` | `register`・`line_id`・`sum_cm` | 荷物を送る：三辺の合計を決める |
 | `parcel_size` | `register`・`line_id`・`sum_cm`・`weight_g` | 荷物を送る：重さを入れてサイズを決める |
 | `parcel_postal` | `register`・`line_id`・`postal` | 荷物を送る：届け先の郵便番号を入れて料金を決める |
-| `parcel_back` | `register`・`line_id` | 荷物を送るの入力を一段階戻る（三辺の合計から戻ると受付をやめる） |
-| `parcel_next` | `register`・`more` | 「同じお届け先の荷物はありますか？」に答える |
-| `pickup_handover` | `register` | 荷物を受取る：お渡しを済ませる |
+| `parcel_back { register: u8, line_id: u32 }` |  | 荷物を送るの入力を一段階戻る（三辺の合計から戻ると受付をやめる） |
+| `parcel_next { register: u8, more: bool }` |  | 「同じお届け先の荷物はありますか？」に答える |
+| `pickup_handover { register: u8 }` |  | 荷物を受取る：お渡しを済ませる |
 | `pickup_found` | `register`・`found` | 荷物を受取る：保管場所に荷物があったか（`null` で探し直す） |
 | `remove_line` | `register`・`side`・`line_id` | 明細を取り消す（販売期限切れの「回収しました」も） |
 | `set_qty` | `register`・`side`・`line_id`・`qty` | 明細の数量を変える |
 | `remove_coupon` | `register`・`side`・`coupon_id` | クーポンを取り消す |
-| `dismiss_returned` | `register` | 取り消したクーポンの返却の案内を閉じる |
-| `checkout` | `register`・`side` | 会計に進む |
-| `back_to_registering` | `register`・`side` | 会計から登録画面に戻る |
+| `dismiss_returned { register: u8 }` |  | 取り消したクーポンの返却の案内を閉じる |
+| `checkout { register: u8, side: _side }` |  | 会計に進む |
+| `back_to_registering { register: u8, side: _side }` |  | 会計から登録画面に戻る |
 | `select_payment` | `register`・`side`・`method` | 支払方法を選ぶ（選択中をもう一度押すと外す） |
 | `choose_age_check` | `register`・`side`・`id_check` | 年齢確認を「する」（生年月日の入力）か「スキップ」か選ぶ |
 | `early_age_check` | `register`・`side`・`start` | 登録中に年確フラグから年齢確認を始める・やめる |
 | `check_id` | `register`・`side`・`birth`・`today` | 身分証の生年月日で年齢を判定する |
-| `dismiss_confiscated` | `register` | 年齢に届かない商品の回収の案内を閉じる |
-| `dismiss_ff_collect` | `register` | お渡し済み FF の回収の案内を閉じる |
-| `dismiss_passed` | `register` | 照合が済んだ案内（年確OK・FFのお渡しOK）を閉じて先へ進む |
+| `dismiss_confiscated { register: u8 }` |  | 年齢に届かない商品の回収の案内を閉じる |
+| `dismiss_ff_collect { register: u8 }` |  | お渡し済み FF の回収の案内を閉じる |
+| `dismiss_passed { register: u8 }` |  | 照合が済んだ案内（年確OK・FFのお渡しOK）を閉じて先へ進む |
 | `check_bill` | `register`・`side`・`line_id`・`checked` | 払込票の内容の確認のチェックを付ける・外す |
 | `affix_receipt_stamp` | `register`・`side` | レシートへの収入印紙の貼り付けを確認する |
 | `affix_stamp` | `register`・`side`・`line_id`・`affixed` | 払込票（領収証）への収入印紙の貼り付けを確認する |
@@ -853,37 +853,37 @@ Command の全バリアント（serde の名前）と doc コメントから生�
 | `hand_tickets` | `register`・`side`・`handed` | スタッフがお渡ししたチケットの枚数を入力する（発券枚数と照合） |
 | `receive_tickets` | `register`・`side`・`received` | お客様が受け取ったチケットの枚数を入力する（発券枚数と照合）。両方が発券枚数と一致したらお渡し完了 |
 | `insert_cash` | `register`・`denomination`・`count` | 入金ボックスに金種と枚数で現金を入れる |
-| `finish_insert` | `register` | 現金の投入を終えて決済する（「投入おわり」） |
+| `finish_insert { register: u8 }` |  | 現金の投入を終えて決済する（「投入おわり」） |
 | `tap_emoney` | `register`・`method` | 決済端末にかざす・スキャナで読む（電子マネー・クレジットカード・バーコード決済・ポイント） |
 | `start_emoney` | `register`・`side`・`kind` | 電子マネーのチャージ・残高確認を始める |
-| `close_emoney` | `register`・`side` | 電子マネーの手続きを閉じる |
+| `close_emoney { register: u8, side: _side }` |  | 電子マネーの手続きを閉じる |
 | `resolve_emoney_short` | `register`・`side`・`choice` | 電子マネーの残高不足にどうするか答える |
 | `call_staff` | `register`・`topic` | 呼び出しボタンを押す（ベル・金券・その他・たばこ・電子マネー、レジカウンター側の応援） |
-| `confirm_point_card` | `register`・`side` | ポイントカードなしで進む（「スキップ」） |
+| `confirm_point_card { register: u8, side: _side }` |  | ポイントカードなしで進む（「スキップ」） |
 | `use_points` | `register`・`side`・`how`・`points` | 「ポイント利用」を選んだあと、ポイントの使い方を決めて充てる |
-| `release_call` | `register` | 呼び出しボタンから指を離す |
-| `end_emergency` | `register` | 非常事態モードを解除する（レジカウンター側の解除ボタンで。ログインは要らない） |
-| `void_transaction` | `register` | 取引を中止する |
-| `end_staff_mode` | `register` | ログアウトしてセルフ操作モードに戻る |
-| `pause` | `register` | レジ休止中にする |
+| `release_call { register: u8 }` |  | 呼び出しボタンから指を離す |
+| `end_emergency { register: u8 }` |  | 非常事態モードを解除する（レジカウンター側の解除ボタンで。ログインは要らない） |
+| `void_transaction { register: u8 }` |  | 取引を中止する |
+| `end_staff_mode { register: u8 }` |  | ログアウトしてセルフ操作モードに戻る |
+| `pause { register: u8 }` |  | レジ休止中にする |
 | `cash_out` | `register`・`kind`・`amount`・`password` | 店舗メニュー：お金を抜く（返品返金・緊急出金・経費支出など、店舗パスワードが要る） |
 | `cash_in` | `register`・`kind`・`amount` | 店舗メニュー：取引外入金・両替などでお金を入れる |
 | `open_menu` | `register`・`screen`・`exchange_to` | 店舗メニューを開く・項目を選ぶ・閉じる |
-| `insert` | `register`・`amount` | 入金ボックスに金額で現金を入れる（テンキー） |
-| `take_outlet` | `register` | 出金ボックスのお金を取り出す |
-| `claim` | `register`・`side` | その側の画面が操作できるか確かめる（操作側でなければ理由を返す。状態は変えない） |
+| `insert { register: u8, amount: u32 }` |  | 入金ボックスに金額で現金を入れる（テンキー） |
+| `take_outlet { register: u8 }` |  | 出金ボックスのお金を取り出す |
+| `claim { register: u8, side: _side }` |  | その側の画面が操作できるか確かめる（操作側でなければ理由を返す。状態は変えない） |
 | `add_age_rule` | `owner_id`・`password`・`target`・`min_age` | 販売規則：分類単位の年確ルールを足す（オーナー） |
 | `remove_age_rule` | `owner_id`・`password`・`rule_id` | 販売規則：年確ルールを外す（オーナー） |
 | `set_product_age` | `owner_id`・`password`・`code`・`min_age` | 販売規則：商品ごとの年確の年齢を決める（オーナー） |
 | `set_sale_limit` | `owner_id`・`password`・`code`・`limit` | 販売規則：商品ごとの販売個数の上限を決める（オーナー） |
-| `verify_owner` | `owner_id`・`password` | 販売規則の設定を開くときのオーナー認証 |
+| `verify_owner { owner_id: _string, password: _string }` |  | 販売規則の設定を開くときのオーナー認証 |
 | `set_tax_rate` | `owner_id`・`password`・`class_id`・`rate_bp` | 販売規則：税区分の税率を変える（オーナー） |
 | `add_tax_class` | `owner_id`・`password`・`name`・`kind`・`rate_bp` | 販売規則：税区分を足す（オーナー） |
 | `set_product_tax` | `owner_id`・`password`・`code`・`class_id` | 販売規則：商品の税区分を付け替える（オーナー） |
 | `set_invoice` | `owner_id`・`password`・`invoice_no`・`rounding` | 販売規則：インボイスの登録番号と端数処理（オーナー） |
-| `set_bell_loss` | `percent` | シミュレーター：Bell との通信ロス率 |
-| `set_bell_offline` | `bell`・`offline` | シミュレーター：Bell を不通にする |
-| `set_bell_on` | `bell`・`on` | Bell の呼び鈴機能の ON/OFF |
+| `set_bell_loss { percent: u8 }` |  | シミュレーター：Bell との通信ロス率 |
+| `set_bell_offline { bell: usize, offline: bool }` |  | シミュレーター：Bell を不通にする |
+| `set_bell_on { bell: usize, on: bool }` |  | Bell の呼び鈴機能の ON/OFF |
 <!-- /generated -->
 
 スナップショットは、レジごとのビュー（レジカウンター側・売り場側・操作の可否と理由・使えない支払方法など）、Bell の状態、呼び出しと履歴、年確ルールと変更履歴、監査ログ、FF の在庫、スタッフ、商品、税設定、電子マネーの残高を持つ。売り場側のビューには商品コード・分類を載せない。

@@ -709,7 +709,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
         <div class="qty-pop-name">${esc(l.name)}</div>
         <div class="qty-pop-value">${esc(e.digits) || `<span class="muted">新しい数量</span>`}</div>
         <div class="qty-pop-note muted">いまの数量 ${l.qty}</div>
-        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${PAD_GAP}${k("0")}${PAD_GAP}${k("cancel", "バック", "pad-key ghost back-btn")}${k("back", "←", "pad-key neg")}<button type="button" class="pad-key primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
+        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((d) => k(d)).join("")}${PAD_GAP}${k("0")}${PAD_GAP}${k("cancel", "バック", "pad-key pad-fn ghost back-btn")}${k("back", "←", "pad-key pad-fn neg")}<button type="button" class="pad-key pad-fn primary" data-qtypad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button></div>
       </div>
     </div>`;
 }
@@ -760,7 +760,7 @@ export function padPopup(r: RegisterView, side: Side): string {
   const name = e.target === "ffv" ? r.counter.lines.find((l) => l.id === e.line)?.name : undefined;
   const title = name ? `${name}の${side === "floor" ? "お受け取り数" : "お渡し数"}` : d.title;
   // 最下段は左から バック・削除（←）・決定、どれも数字のキーと同じ大きさ（user 2026-11-17）
-  const last = `${PAD_GAP}${k("0")}${d.decimal ? k(".", ".") : PAD_GAP}${k("cancel", "バック", "pad-key ghost back-btn")}${k("back", "←", "pad-key neg")}<button type="button" class="pad-key primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button>`;
+  const last = `${PAD_GAP}${k("0")}${d.decimal ? k(".", ".") : PAD_GAP}${k("cancel", "バック", "pad-key pad-fn ghost back-btn")}${k("back", "←", "pad-key pad-fn neg")}<button type="button" class="pad-key pad-fn primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button>`;
   const shown = padShow(e.target, e.digits);
   // チケットの枚数は売り場側・レジカウンター側それぞれ専用の入力。その側では操作可能部品として青で描く
   const only = e.target === "tkr" ? " floor-only" : e.target === "tkh" ? " counter-only" : "";

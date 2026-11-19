@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignByLength, arrange, seats, shells, wrapUnit } from "./law";
+import { alignByLength, arrange, fitRatio, seats, shells, wrapUnit } from "./law";
 
 // W=400 の目安：小ボタン 50×25、大ボタン 100×50、特大 141×71、最小間隔 8.8
 const g = 400 / 45.255;
@@ -104,5 +104,13 @@ describe("一文字差の幅そろえ", () => {
   });
   it("半角は半文字（Back と Skip、OK と はい）", () => {
     expect(w([2, 2.5, 4.5])).toEqual([65, 65, 101]);
+  });
+});
+
+describe("モバイルモードの文字の縮め（ボタンの大きさから文字を決める）", () => {
+  it("shrinks text only as much as the button needs", () => {
+    expect(fitRatio({ width: 48, height: 19 }, { width: 36, height: 27 })).toBeCloseTo(0.75);
+    expect(fitRatio({ width: 30, height: 19 }, { width: 36, height: 27 })).toBe(1);
+    expect(fitRatio({ width: 30, height: 40 }, { width: 60, height: 20 })).toBeCloseTo(0.5);
   });
 });

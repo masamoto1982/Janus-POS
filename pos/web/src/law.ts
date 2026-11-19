@@ -316,7 +316,8 @@ export function fitText(root: ParentNode): void {
   };
   /** 決めた文字の段：一行は特大、二行は大＋極小 */
   // 二行のボタンと同じ並びにある一行のボタン（セルフ最下段の「その他」など）は、隣の主役と同じ大にそろえる
-  const tierOf = (b: HTMLElement) => (parts(b) || [...(b.parentElement?.children ?? [])].some((x) => x !== b && x instanceof HTMLElement && x.matches("button") && parts(x)) ? 1 : 0);
+  // テンキーの下段（バック・←・決定）は数字より一段小さい大（user 2026-11-19：「バック」が幅の決まったキーからはみ出していた）
+  const tierOf = (b: HTMLElement) => (b.matches(".pad-fn") || parts(b) || [...(b.parentElement?.children ?? [])].some((x) => x !== b && x instanceof HTMLElement && x.matches("button") && parts(x)) ? 1 : 0);
   // 1. 幅：文字＋左右の余白 B÷4＋枠（まずボタンごと）
   const flex = buttons.filter((b) => !b.matches(RIGID));
   for (const b of flex) {
@@ -338,5 +339,32 @@ export function fitText(root: ParentNode): void {
   }
   // 3. 幅を変えられないボタン（RIGID）も文字は決めた段のまま。表示エリアに合わせて文字を下げる仕組みは廃止（user 2026-11-18）
   for (const b of buttons) if (b.matches(RIGID)) apply(b, tierOf(b));
+  // 4. モバイルモードだけは逆に、ボタンの大きさから文字を決める（user 2026-11-19：表示エリアの制約に応じた便宜的な措置）。
+  //    画面の幅で縮んだボタン（ポイントの使い方・テンキーの「バック」など）に文字が収まらなければ、収まるまで文字を縮める。
+  //    余白は上の手順と同じ（幅を変えられるボタンは左右 B÷4、変えられないボタンは B÷8）
+  if (typeof matchMedia === "function" && matchMedia(MOBILE).matches) for (const b of buttons) shrinkToFit(b, b.matches(RIGID));
+}
+
+/** モバイルモード（幅 760px 以下）。styles.css の @media と同じ境目 */
+export const MOBILE = "(max-width: 760px)";
+
+/** 文字の幅が収まる大きさの比（1 以上なら縮めない） */
+export function fitRatio(text: { width: number; height: number }, room: { width: number; height: number }): number {
+  if (text.width <= 0 || text.height <= 0) return 1;
+  return Math.min(1, room.width / text.width, room.height / text.height);
+}
+
+function shrinkToFit(b: HTMLElement, rigid: boolean): void {
+  const B = Math.min(b.offsetWidth, b.offsetHeight);
+  const r = document.createRange();
+  r.selectNodeContents(b);
+  const t = r.getBoundingClientRect();
+  const k = fitRatio(t, { width: b.clientWidth - (rigid ? B / 4 : B / 2), height: b.clientHeight - B / 8 });
+  if (k >= 1) return;
+  const scale = (el: HTMLElement) => (el.style.fontSize = `${(parseFloat(getComputedStyle(el).fontSize) || 0) * k}px`);
+  const main = b.querySelector<HTMLElement>(":scope > b");
+  const sub = b.querySelector<HTMLElement>(":scope > small");
+  if (main && sub && sub.getClientRects().length) [main, sub].forEach(scale);
+  else scale(b);
 }
 

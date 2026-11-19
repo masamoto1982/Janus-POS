@@ -249,15 +249,7 @@ waiting_calls: Array<CallKind>, mode: Mode, mode_label: string, outlet: number, 
 /**
  * 保留中の取引がある
  */
-held: boolean, 
-/**
- * いま保留できる（登録画面を左へスワイプできる）
- */
-can_hold: boolean, 
-/**
- * いま保留した取引に戻れる（第二待ち受けを右へスワイプできる）
- */
-can_resume: boolean, change_left: boolean, counter: CounterView, floor: FloorView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 
+held: boolean, change_left: boolean, counter: CounterView, floor: FloorView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 
 /**
  * ポイント：付与対象の商品があるか・カードの残高・いま充てられる分・このお会計で付与する分
  */

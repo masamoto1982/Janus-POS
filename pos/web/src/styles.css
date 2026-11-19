@@ -906,17 +906,16 @@ body.dragging .drop-hint { display: inline; }
    文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
 @media (max-width: 760px) { .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); } }
 
-/* スワイプできることの手がかり（user 2026-11-20）：操作できる側の段を操作の青と同じ色相の薄い青にしたので、
-   スワイプで中身が出てくる側の縁を、濃い青（操作の青）から段の薄い青へのグラデーションで示す。部品をかき消さないよう背景に敷く。
-   ヘッダー：右スワイプで店舗メニューを開く（左の縁）・左スワイプで閉じる（右の縁）。
-   登録画面：左スワイプで保留して第二待ち受けが右から出る（右の縁）・第二待ち受けの右スワイプで保留した取引が左から戻る（左の縁） */
+/* スワイプの手がかり（user 2026-11-20）：操作できる側の段を操作の青と同じ色相の薄い青にし、隠れているものがある側の縁を、
+   濃い青（操作の青）から段の薄い青へのグラデーションで示す。部品をかき消さないよう背景に敷く。
+   ヘッダー：左に店舗メニューが隠れている（スタッフ操作モードのあいだ常に左の縁、開いているあいだは右の縁）。
+   登録画面：保留した取引は左へ追いやられている（保留した取引があるあいだだけ左の縁）。保留そのもの（左スワイプ）には手がかりを出さない */
 :root { --swipe-edge: color-mix(in oklch, var(--operable-blue) 65%, var(--blue-2)); --swipe-w: 25%; }
 /* 縁はスワイプの向きへゆっくり伸びては戻る（手で引き出す動き）。幅は --swipe-reach を 0.6〜1 倍で行き来させる */
 @property --swipe-reach { syntax: "<number>"; inherits: true; initial-value: 1; }
 @keyframes swipe-reach { 0%, 100% { --swipe-reach: 0.6; } 50% { --swipe-reach: 1; } }
-.counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-hold, .swipe-resume) { animation: swipe-reach 2.4s ease-in-out infinite; }
+.counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: swipe-reach 2.4s ease-in-out infinite; }
 .counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head { background: linear-gradient(to right, var(--swipe-edge), transparent calc(var(--swipe-w) * var(--swipe-reach))); }
 .counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), transparent calc(var(--swipe-w) * var(--swipe-reach))); }
-.counter-screen.swipe-hold .screen-body { background: linear-gradient(to left, var(--swipe-edge), transparent calc(var(--swipe-w) / 2 * var(--swipe-reach))); }
 .counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), transparent calc(var(--swipe-w) / 2 * var(--swipe-reach))); }
-@media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-hold, .swipe-resume) { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }

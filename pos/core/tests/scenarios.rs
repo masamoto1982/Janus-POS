@@ -1,7 +1,8 @@
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{
-    Command, FfState, LineKind, RegisterView, Store, EMERGENCY_LOG_MS, EMERGENCY_PRESSES, EMERGENCY_WINDOW_MS,
+    Command, FfState, LineKind, RegisterView, Store, EMERGENCY_LOG_MS, EMERGENCY_PRESSES,
+    EMERGENCY_WINDOW_MS,
 };
 use serde_json::{json, Value};
 
@@ -209,11 +210,7 @@ fn self_operated_age_check_calls_staff() {
         .calls
         .iter()
         .any(|c| c.register == 2 && c.kind == CallKind::AgeCheck));
-    assert!(!allowed(
-        &reg(&s, 2),
-        Side::Floor,
-        Action::ChooseAgeCheck
-    ));
+    assert!(!allowed(&reg(&s, 2), Side::Floor, Action::ChooseAgeCheck));
     assert_eq!(reg(&s, 2).floor.age_wait, Some(20));
     scan(&mut s, 2, "counter", "ST002");
     assert_eq!(reg(&s, 2).floor.age_wait, None);
@@ -1102,7 +1099,11 @@ fn staff_cannot_be_switched_during_a_transaction() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     login_as(&mut s, 1, "ST002");
-    assert_eq!(reg(&s, 1).counter.name, Some("スタッフ002"), "取引の前なら切り替えられる");
+    assert_eq!(
+        reg(&s, 1).counter.name,
+        Some("スタッフ002"),
+        "取引の前なら切り替えられる"
+    );
     scan(&mut s, 1, "counter", BREAD);
     let e = run(
         &mut s,
@@ -1136,7 +1137,11 @@ fn staff_who_answers_a_self_transaction_becomes_its_owner() {
     .is_err());
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     login(&mut s, 1);
-    assert_eq!(reg(&s, 1).counter.name, Some("スタッフ001"), "取引が終われば誰でもログインできる");
+    assert_eq!(
+        reg(&s, 1).counter.name,
+        Some("スタッフ001"),
+        "取引が終われば誰でもログインできる"
+    );
 }
 
 /// 仕様 4.1：取引を終えると、後始末が済んだところで担当がログアウトしてセルフ操作モードに戻る
@@ -1152,20 +1157,31 @@ fn owner_logs_out_after_each_transaction() {
     confirm_point(&mut s, 1);
     pay_cash(&mut s, 1);
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::StaffOperated, "お釣りを返すまでは担当がログインしたまま");
+    assert_eq!(
+        v.mode,
+        Mode::StaffOperated,
+        "お釣りを返すまでは担当がログインしたまま"
+    );
     assert!(v.outlet > 0);
-    assert!(run(
-        &mut s,
-        json!({"type":"scan","register":1,"side":"counter","code":"ST002"})
-    )
-    .is_ok(), "後始末だけなら次の取引のスタッフがログインできる");
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"scan","register":1,"side":"counter","code":"ST002"})
+        )
+        .is_ok(),
+        "後始末だけなら次の取引のスタッフがログインできる"
+    );
     login(&mut s, 1);
     ok(&mut s, json!({"type":"take_outlet","register":1}));
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     advance(&mut s, 3_100);
     let v = reg(&s, 1);
     assert!(v.last_receipt.is_none());
-    assert_eq!(v.mode, Mode::StaffOperated, "後始末の途中にログインし直したので、次の取引の担当になる");
+    assert_eq!(
+        v.mode,
+        Mode::StaffOperated,
+        "後始末の途中にログインし直したので、次の取引の担当になる"
+    );
 
     scan(&mut s, 1, "counter", BREAD);
     ok(&mut s, json!({"type":"void_transaction","register":1}));
@@ -1183,7 +1199,11 @@ fn owner_logs_out_after_each_transaction() {
     pay_cash(&mut s, 1);
     scan(&mut s, 1, "floor", TEA);
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SelfOperated, "後始末の途中で次の取引が始まると担当はログアウトする");
+    assert_eq!(
+        v.mode,
+        Mode::SelfOperated,
+        "後始末の途中で次の取引が始まると担当はログアウトする"
+    );
     assert_eq!(v.floor.lines.len(), 1);
 }
 
@@ -1207,7 +1227,11 @@ fn idle_register_returns_to_self_operated() {
     advance(&mut s, 4 * 60_000);
     scan(&mut s, 2, "counter", BREAD);
     ok(&mut s, json!({"type":"void_transaction","register":2}));
-    assert_eq!(reg(&s, 2).mode, Mode::SelfOperated, "取引を終えると担当はログアウトする");
+    assert_eq!(
+        reg(&s, 2).mode,
+        Mode::SelfOperated,
+        "取引を終えると担当はログアウトする"
+    );
     login(&mut s, 2);
     advance(&mut s, 4 * 60_000);
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
@@ -1395,7 +1419,11 @@ fn staff_operated_screens_lock_only_while_touched() {
     );
     assert!(reg(&s, 1).counter.calls.is_empty());
     assert_eq!(reg(&s, 1).active_side, Some(Side::Floor));
-    let e = run(&mut s, json!({"type":"claim","register":1,"side":"counter"})).unwrap_err();
+    let e = run(
+        &mut s,
+        json!({"type":"claim","register":1,"side":"counter"}),
+    )
+    .unwrap_err();
     assert!(e.contains("操作中"), "{e}");
     assert!(run(
         &mut s,
@@ -1706,11 +1734,7 @@ fn either_screen_can_operate_except_age_confirmation() {
     scan(&mut s, 1, "counter", "ST001");
     assert_eq!(reg(&s, 1).active_side, None);
     scan(&mut s, 1, "floor", BEER);
-    assert!(allowed(
-        &reg(&s, 1),
-        Side::Floor,
-        Action::VoidTransaction
-    ));
+    assert!(allowed(&reg(&s, 1), Side::Floor, Action::VoidTransaction));
     ok(
         &mut s,
         json!({"type":"checkout","register":1,"side":"floor"}),
@@ -1987,7 +2011,11 @@ fn utility_bills_are_checked_by_staff_after_checkout_and_paid_in_cash() {
     }
     assert_ne!(nos[0], nos[3]);
     let ids = bill_ids(&s, 1);
-    assert!(v.counter.payment_blocker.unwrap().contains("公共料金の内容"));
+    assert!(v
+        .counter
+        .payment_blocker
+        .unwrap()
+        .contains("公共料金の内容"));
     assert!(run(&mut s, json!({"type":"insert","register":1,"amount":20000})).is_err());
     let e = run(
         &mut s,
@@ -2129,7 +2157,10 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
         json!({"type":"scan","register":1,"side":"counter","code":BILL}),
     )
     .unwrap_err();
-    assert!(e.contains("お支払い同士なら幾つでも一緒に会計できます"), "{e}");
+    assert!(
+        e.contains("お支払い同士なら幾つでも一緒に会計できます"),
+        "{e}"
+    );
     ok(
         &mut s,
         json!({"type":"void_transaction","register":1,"side":"counter"}),
@@ -2141,7 +2172,10 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
         json!({"type":"register_ff","register":1,"code":"FF01","qty":1}),
     ] {
         let e = run(&mut s, cmd).unwrap_err();
-        assert!(e.contains("お支払い同士なら幾つでも一緒に会計できます"), "{e}");
+        assert!(
+            e.contains("お支払い同士なら幾つでも一緒に会計できます"),
+            "{e}"
+        );
     }
     assert_eq!(reg(&s, 1).counter.lines.len(), 1);
 }
@@ -2556,14 +2590,28 @@ fn a_coupon_points_at_the_line_it_applies_to() {
     scan(&mut s, 1, "floor", TEA);
     scan(&mut s, 1, "floor", "CP0002");
     let v = reg(&s, 1);
-    let sandwich = v.counter.lines.iter().find(|l| l.line.code == SANDWICH).unwrap().line.id;
+    let sandwich = v
+        .counter
+        .lines
+        .iter()
+        .find(|l| l.line.code == SANDWICH)
+        .unwrap()
+        .line
+        .id;
     assert_eq!(v.counter.coupons[0].line_id, Some(sandwich));
     assert_eq!(v.floor.coupons[0].line_id, Some(sandwich));
     assert_eq!(v.floor.coupons[0].discount, Some(50));
     scan(&mut s, 1, "floor", "CP0002");
     scan(&mut s, 1, "floor", SANDWICH);
     let v = reg(&s, 1);
-    let second = v.counter.lines.iter().filter(|l| l.line.code == SANDWICH).map(|l| l.line.id).max().unwrap();
+    let second = v
+        .counter
+        .lines
+        .iter()
+        .filter(|l| l.line.code == SANDWICH)
+        .map(|l| l.line.id)
+        .max()
+        .unwrap();
     assert_ne!(second, sandwich);
     assert_eq!(v.counter.coupons[1].line_id, Some(second));
     ok(
@@ -2585,7 +2633,13 @@ fn a_coupon_goes_to_the_nearest_target() {
     }
     scan(&mut s, 1, "floor", "CP0001");
     let v = reg(&s, 1);
-    let teas: Vec<u32> = v.counter.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).collect();
+    let teas: Vec<u32> = v
+        .counter
+        .lines
+        .iter()
+        .filter(|l| l.line.code == TEA)
+        .map(|l| l.line.id)
+        .collect();
     let last = *teas.iter().max().unwrap();
     assert_eq!(v.counter.coupons[0].line_id, Some(last));
     // 先に読んだクーポンは後から登録した一番古い対象商品に付き、さらに後の商品に奪われない
@@ -2596,7 +2650,14 @@ fn a_coupon_goes_to_the_nearest_target() {
     scan(&mut s, 1, "floor", PAN);
     scan(&mut s, 1, "floor", TEA);
     let v = reg(&s, 1);
-    let first = v.counter.lines.iter().filter(|l| l.line.code == TEA).map(|l| l.line.id).min().unwrap();
+    let first = v
+        .counter
+        .lines
+        .iter()
+        .filter(|l| l.line.code == TEA)
+        .map(|l| l.line.id)
+        .min()
+        .unwrap();
     assert_eq!(v.counter.coupons[0].line_id, Some(first));
 }
 
@@ -2859,7 +2920,11 @@ fn change_left_in_the_outlet_reminds_then_calls_staff() {
         "back to the initial screen"
     );
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SelfOperated, "取引の後始末が済むと担当はログアウトする");
+    assert_eq!(
+        v.mode,
+        Mode::SelfOperated,
+        "取引の後始末が済むと担当はログアウトする"
+    );
     assert_eq!(v.counter.state, StaffState::Absent);
 }
 
@@ -3111,7 +3176,11 @@ fn emoney_charge_takes_bills_up_to_the_limit() {
     );
     assert_eq!(emoney_balance(&s), 16_000);
     assert!(reg(&s, 1).emoney.is_none());
-    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated, "チャージを終えると担当はログアウトする");
+    assert_eq!(
+        reg(&s, 1).mode,
+        Mode::SelfOperated,
+        "チャージを終えると担当はログアウトする"
+    );
 
     login(&mut s, 1);
     ok(
@@ -3665,7 +3734,11 @@ fn back_after_inserting_cash_returns_it_and_reopens_methods() {
     assert_eq!(v.outlet, 1000, "unsettled cash goes to the outlet");
     assert_eq!(v.counter.inserted, 0);
     assert_eq!(v.counter.method, None, "back to choosing a method");
-    assert_eq!(v.counter.phase, Phase::Paying, "stays on the payment screen");
+    assert_eq!(
+        v.counter.phase,
+        Phase::Paying,
+        "stays on the payment screen"
+    );
     assert!(v.last_receipt.is_none());
     advance(&mut s, 40_000);
     assert!(reg(&s, 1).last_receipt.is_none(), "nothing settles itself");
@@ -4932,22 +5005,10 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
         .map(|l| l.qty)
         .sum();
     assert_eq!(qty, 3);
-    // ブラウザのアラートではなく、レジの機能として両画面に案内を出す
-    let alert = reg(&s, 1).limit_alert.unwrap();
-    assert_eq!((alert.name, alert.limit), ("トレカ", 3));
-    ok(
-        &mut s,
-        json!({"type":"close_limit_alert","register":1,"side":"floor"}),
-    );
-    assert!(reg(&s, 1).limit_alert.is_none());
-    // 上限内の登録でも案内は閉じる
-    let _ = run(
-        &mut s,
-        json!({"type":"scan","register":1,"side":"floor","code":card}),
-    );
-    assert!(reg(&s, 1).limit_alert.is_some());
+    // ブラウザのアラートではなく、理由（一行目＝上限・二行目＝売れないこと）を返して登録画面の中央に一瞬重ねる
+    assert!(e.ends_with("\n3点を超える分はお売りできません"), "{e}");
     scan(&mut s, 1, "floor", BREAD);
-    assert!(reg(&s, 1).limit_alert.is_none()); // 上限を超えようとした明細にだけ個数制限のフラグ（お会計は止めない）
+    // 上限を超えようとした明細にだけ個数制限のフラグ（お会計は止めない）
     let r = reg(&s, 1);
     assert!(
         r.floor
@@ -5231,12 +5292,27 @@ fn store_set_age_limits_accept_photo_ids_but_legal_ones_need_official_ids() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "counter", FIREWORKS);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
-    assert!(!reg(&s, 1).counter.age_official_id, "fireworks is a store rule");
-    ok(&mut s, json!({"type":"back_to_registering","register":1,"side":"counter"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    assert!(
+        !reg(&s, 1).counter.age_official_id,
+        "fireworks is a store rule"
+    );
+    ok(
+        &mut s,
+        json!({"type":"back_to_registering","register":1,"side":"counter"}),
+    );
     scan(&mut s, 1, "counter", BEER);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
-    assert!(reg(&s, 1).counter.age_official_id, "alcohol is a legal rule");
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    assert!(
+        reg(&s, 1).counter.age_official_id,
+        "alcohol is a legal rule"
+    );
 }
 
 /// 仕様 15.3：受け付けなかった操作は理由を返し、続く操作は妨げない（ソフトドリンクの後の荷物の伝票）（B-2）
@@ -5249,7 +5325,10 @@ fn a_rejected_scan_returns_its_reason_and_the_next_scan_goes_through() {
         json!({"type":"scan","register":1,"side":"floor","code":PARCEL}),
     )
     .unwrap_err();
-    assert!(err.contains("お荷物同士なら、何個でも一緒に会計できます"), "{err}");
+    assert!(
+        err.contains("お荷物同士なら、何個でも一緒に会計できます"),
+        "{err}"
+    );
     scan(&mut s, 1, "floor", BREAD);
     assert_eq!(reg(&s, 1).floor.lines.len(), 2);
 }
@@ -5268,12 +5347,19 @@ fn tendered_cash_and_change_are_shown_on_both_sides() {
     confirm_point(&mut s, 1);
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
     let v = reg(&s, 1);
-    assert_eq!((v.counter.total - v.prepaid, v.counter.inserted), (640, 500));
+    assert_eq!(
+        (v.counter.total - v.prepaid, v.counter.inserted),
+        (640, 500)
+    );
     assert_eq!(v.counter.due, 140, "不足 140 円");
     ok(&mut s, json!({"type":"insert","register":1,"amount":500}));
     let v = reg(&s, 1);
     assert_eq!(v.counter.inserted, 1000);
-    assert_eq!(v.counter.inserted - (v.counter.total - v.prepaid), 360, "お釣り 360 円");
+    assert_eq!(
+        v.counter.inserted - (v.counter.total - v.prepaid),
+        360,
+        "お釣り 360 円"
+    );
     ok(
         &mut s,
         json!({"type":"finish_insert","register":1,"side":"counter"}),
@@ -5300,7 +5386,11 @@ fn idle_countdown_pauses_while_a_call_is_open() {
     advance(&mut s, 200);
     let held = reg(&s, 1).idle_revert_in.unwrap();
     advance(&mut s, 120_000);
-    assert_eq!(reg(&s, 1).idle_revert_in.unwrap(), held, "frozen while calling");
+    assert_eq!(
+        reg(&s, 1).idle_revert_in.unwrap(),
+        held,
+        "frozen while calling"
+    );
     // ログインで片付くと、止まった値から続きを数える（ログインも操作なので満タンに戻る）
     login(&mut s, 1);
     let after = reg(&s, 1).idle_revert_in.unwrap();
@@ -5322,5 +5412,9 @@ fn idle_countdown_is_frozen_for_a_self_operated_call() {
     let held = reg(&s, 1).idle_revert_in.unwrap();
     advance(&mut s, 200_000);
     assert_eq!(reg(&s, 1).idle_revert_in.unwrap(), held);
-    assert_eq!(reg(&s, 1).floor.lines.len(), 1, "the transaction is not voided");
+    assert_eq!(
+        reg(&s, 1).floor.lines.len(),
+        1,
+        "the transaction is not voided"
+    );
 }

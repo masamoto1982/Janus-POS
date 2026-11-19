@@ -41,11 +41,9 @@ import {
   walletPanel,
   sideOf,
   sharedScreen,
-  withRejection,
   REJECT_SHOW_MS,
-  IMPOSSIBLE,
-  IMPOSSIBLE_SHOW_MS,
-  impossibleFlash,
+  rejectFlash,
+  shownOnScreen,
 } from "./view";
 
 declare global {
@@ -513,8 +511,8 @@ function render(): void {
           : ""
       }`,
     );
-    setRegion(`counter-${r.id}`, withRejection(counterMain, rejection(r.id, "counter")), langOf(r.id, "counter"));
-    setRegion(`floor-${r.id}`, withRejection(floorMain, rejection(r.id, "floor")), langOf(r.id, "floor"));
+    setRegion(`counter-${r.id}`, counterMain, langOf(r.id, "counter"));
+    setRegion(`floor-${r.id}`, floorMain, langOf(r.id, "floor"));
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -657,9 +655,8 @@ function padKey(key: string, k: string): void {
       // 入力欄ひとつの画面：テンキーの「決定」でそのまま送る。受け付けられなければ理由を出してテンキーを開いたままにする
       if (e.digits === "") return;
       const cmd = SUBMIT[e.target]!(register, side as Side, e.digits, e.line);
-      if (!cmd || !send(cmd)) {
+      if (!cmd || !send(cmd, true)) {
         e.error = lastError ?? "受け付けられません";
-        rejected.delete(`${register}:${side}`);
         frame();
         return;
       }
@@ -730,39 +727,28 @@ function deviceFx(cmd: Command): (() => void) | null {
 
 /** 直前の send が受け付けられなかった理由 */
 let lastError: string | undefined;
-/** レジが受け付けなかった理由（B-2）。操作した側の画面に、次に操作が受け付けられるか REJECT_SHOW_MS たつまで出す */
-const rejected = new Map<string, { text: string; at: number }>();
-/** 足りないまま「投入おわり」（入金ボックスの決定）を押したときの理由は、画面中央の「不足額〇円」と同じなので帯の下に重ねて出さない（user 2026-11-17） */
-const insertShort = (cmd: Command, error?: string): boolean => cmd.type === "finish_insert" && /^(あと .+ 入れてください|お金を入れてください)$/.test(error ?? "");
-/** 理由をほかの場所で出すコマンド（荷物の入力欄・入力欄ひとつの画面のテンキー）は、帯の下には出さない。
- *  点数の上限（ブラウザの警告）と販売個数の上限（レジ画面の案内）も、それぞれの場所に出す */
+/** 理由をほかの場所で出すコマンド（荷物の入力欄）は、登録画面に重ねない */
 const OWN_ERROR = new Set(["parcel_length", "parcel_size", "parcel_postal", "parcel_back", "parcel_next"]);
 
-function rejection(reg: number, side: Side): string | undefined {
-  const key = `${reg}:${side}`;
-  const r = rejected.get(key);
-  if (r && Date.now() - r.at >= REJECT_SHOW_MS) rejected.delete(key);
-  return rejected.get(key)?.text;
-}
-
-/** 選択の余地のない、完全に不可能な操作の案内を、操作した側の登録画面の中央に一瞬だけ重ねる（user 2026-11-18）。
- *  背後の登録画面はぼかして読めなくする。案内は画面の描き直しの外に置くので、表示中に画面が変わっても最後まで出る。
- *  ポインターは素通しにし、表示中もすべての操作を受け付ける */
-function flashImpossible(reg: number, side: Side, reason: string): void {
+/** レジが受け付けなかった理由を、操作した側の登録画面の中央に一瞬だけ重ねる（user 2026-11-18〜19）。
+ *  登録画面の最上部に赤褐色の一行を出す形（旧 B-2）は全廃した。背後の登録画面はぼかして読めなくする。
+ *  案内は画面の描き直しの外に置くので、表示中に画面が変わっても最後まで出る。ポインターは素通しにし、表示中もすべての操作を受け付ける */
+function flashRejection(reg: number, side: Side, reason: string): void {
   const body = app.querySelector(`[data-region="${side}-${reg}"]`)?.parentElement;
   if (!body) return;
-  body.querySelector(".impossible-flash")?.remove();
+  body.querySelector(".reject-flash")?.remove();
   const el = document.createElement("div");
-  el.className = "impossible-flash";
+  el.className = "reject-flash";
   el.setAttribute("role", "alert");
-  el.style.setProperty("--flash-ms", `${IMPOSSIBLE_SHOW_MS}ms`);
-  el.innerHTML = impossibleFlash(langOf(reg, side) === "ja" ? reason : trText(reason));
+  el.style.setProperty("--flash-ms", `${REJECT_SHOW_MS}ms`);
+  el.innerHTML = rejectFlash(langOf(reg, side) === "ja" ? reason : trText(reason));
   body.append(el);
   el.addEventListener("animationend", () => el.remove());
-  window.setTimeout(() => el.remove(), IMPOSSIBLE_SHOW_MS + 200);
+  window.setTimeout(() => el.remove(), REJECT_SHOW_MS + 200);
 }
 
-function send(cmd: Command): boolean {
+/** quiet：理由をテンキーの中など呼び出し元で出すときは、登録画面に重ねない */
+function send(cmd: Command, quiet = false): boolean {
   const fx = deviceFx(cmd);
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
@@ -773,19 +759,10 @@ function send(cmd: Command): boolean {
       if (res.message) toast(where, res.message, false);
     } else toast(where, res.error ?? "操作できません", true);
   }
-  if (!res.ok) {
-    if (res.error?.includes("買い物点数の上限")) setTimeout(() => alert(res.error), 0);
-  }
-  if (!where && "register" in cmd) {
+  if (!res.ok && !where && !quiet && "register" in cmd) {
     const side = sideOf(cmd);
-    if (res.ok) {
-      rejected.delete(`${cmd.register}:counter`);
-      rejected.delete(`${cmd.register}:floor`);
-    } else if (side !== "store" && IMPOSSIBLE.has(res.error ?? "")) {
-      flashImpossible(cmd.register, side, res.error!);
-    } else if (side !== "store" && !OWN_ERROR.has(cmd.type) && !res.error?.includes("買い物点数の上限") && !/は1回のお会計で\d+点までです$/.test(res.error ?? "") && !insertShort(cmd, res.error)) {
-      rejected.set(`${cmd.register}:${side}`, { text: res.error ?? "操作できません", at: Date.now() });
-    }
+    const reason = res.error ?? "操作できません";
+    if (side !== "store" && !OWN_ERROR.has(cmd.type) && !shownOnScreen(reason)) flashRejection(cmd.register, side, reason);
   }
   if (cmd.type.startsWith("parcel_")) {
     if (res.ok) parcelError.delete("register" in cmd ? cmd.register : 0);

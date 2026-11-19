@@ -317,19 +317,17 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--s11, 8px); align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
-/* 受け付けなかった理由（B-2）：二段目の帯の直下、内税の行の位置に赤文字で一行。何も覆わず、閉じるボタンも置かない */
-.screen .reject-note { flex: none; margin: 0; padding: var(--s13, 4px) 0; color: var(--alert-ink); font-size: var(--text-lg); font-weight: 700; line-height: 1.35; text-align: center; }
-.screen-main > .reject-note + .confirm { flex: 1; }
-/* 選択の余地のない、完全に不可能な操作の案内（user 2026-11-18）：登録画面の上に重ね、中央に赤褐色の案内（一行目＝大・二行目＝小）を一瞬だけ出す。
+/* 受け付けなかった理由（user 2026-11-18〜19）：登録画面の上に重ね、中央に赤褐色の案内（一行目＝大・二行目＝小）を一瞬だけ出す。
+   登録画面の最上部に赤褐色の一行を出す形（旧 B-2）は全廃。いまの画面がすでに示している理由は出さない（view.ts shownOnScreen）。
    背後の登録画面はぼかして読めなくし、注意喚起の薄い黄色（--alert-bg）を重ねる（覆うのはこの案内だけ）。ポインターは素通しで、表示中も操作を妨げない */
-.screen .impossible-flash { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s13, 4px);
+.screen .reject-flash { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s13, 4px);
   padding: var(--s9, 16px); text-align: center; background: color-mix(in oklch, var(--alert-bg) 70%, transparent);
-  -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px)); animation: impossible-flash var(--flash-ms, 1800ms) ease-out forwards; }
-.screen .impossible-flash p { margin: 0; max-width: 100%; color: var(--alert-ink); line-height: 1.35; word-break: auto-phrase; text-wrap: balance; }
-.screen .impossible-flash .big { font-size: var(--text-lg); font-weight: 700; }
-.screen .impossible-flash .sub { font-size: var(--text-sm); }
-@keyframes impossible-flash { 0% { opacity: 0; } 8% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .screen .impossible-flash { animation-timing-function: steps(1, end); } }
+  -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px)); animation: reject-flash var(--flash-ms, 1800ms) ease-out forwards; }
+.screen .reject-flash p { margin: 0; max-width: 100%; color: var(--alert-ink); line-height: 1.35; word-break: auto-phrase; text-wrap: balance; }
+.screen .reject-flash .big { font-size: var(--text-lg); font-weight: 700; }
+.screen .reject-flash .sub { font-size: var(--text-sm); }
+@keyframes reject-flash { 0% { opacity: 0; } 8% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .screen .reject-flash { animation-timing-function: steps(1, end); } }
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }
 .screen-main > .reg-top, .screen-main > .banner { flex: none; }
 /* 確認・案内画面の配置（アプリ全体で共通）

@@ -2,7 +2,6 @@ import type {
   Action,
   ActionState,
   EmoneyKind,
-  LimitAlert,
   ShortChoice,
   BillRow,
   Parcel,
@@ -333,16 +332,6 @@ function passedCard(reg: number, side: Side, v: CounterView): string {
       : `<div class="point-screen passed">${mark}${msg("年齢確認が完了しました", "ご協力ありがとうございました")}</div>`;
   // FF はスタッフが取り仕切るので、スタッフ操作モードの売り場側には出さない
   return side === "counter" ? `<div class="point-screen passed">${mark}${msg("FFのお渡しを確認しました", "お渡し数がすべて注文数と一致しています")}${next}</div>` : "";
-}
-
-/** 販売個数の上限を超えて登録を断ったときの案内（年齢確認と同じくレジの機能）。
- *  ほかの案内画面と同じ縦横中央の二行、操作できる側には左下のバック。次の登録でも閉じる */
-function limitScreen(reg: number, side: Side, alert: LimitAlert, st: Gate | null, counter: boolean): string {
-  const sub = counter
-    ? `${alert.limit}点を超える分はお売りできないことをお客様にお伝えください`
-    : `申し訳ございません、${alert.limit}点を超える分はお売りできません`;
-  const back = st ? backCorner({ type: "close_limit_alert", register: reg, side }, st) : "";
-  return `<div class="point-screen pair-note limit-screen">${msg(esc(`${alert.name}は1回のお会計で${alert.limit}点までです`), esc(sub))}</div>${back}`;
 }
 
 export function pendingParcel(lines: CounterLine[]): CounterLine | undefined {
@@ -1040,7 +1029,7 @@ function welcomeBand(r: RegisterView, side: Side, emoney: Gate, emoneyRo: boolea
   const money = big("emoney-btn", "電子マネー", "チャージ・残高照会", emoneyRo, ` data-cmd="${esc(JSON.stringify(cmd))}"${emoney.allowed ? "" : ` disabled title="${esc(emoney.reason ?? "")}"`}`);
   // 呼び鈴のない側（スタッフ操作モードの売り場側）は空きを作らず、両ボタンを中央に詰める
   const bell = bellBtn(r, side);
-  return `<div class="reg-top welcome-band"><div class="band-row" data-law>${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>${BAND_END}`;
+  return `<div class="reg-top welcome-band"><div class="band-row" data-law>${lang}${bell ? `<span class="bell-slot">${bell}</span>` : ""}${money}</div></div>`;
 }
 
 export function welcome(r: RegisterView, side: Side, emoney?: Gate): string {
@@ -1206,8 +1195,6 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (pointPending) return screen(side === "counter" ? pointCheck(reg, side, a("confirm_point_card")) : floorPointAsk(scanGuide.get(`${reg}:counter`) === "point"));
   scanGuide.delete(`${reg}:${side}`);
   if (payStage) return screen(pay);
-  if (!paying && r.limit_alert)
-    return screen(limitScreen(reg, side, r.limit_alert, ro || !a("remove_line").allowed ? null : a("remove_line"), side === "counter"));
   const cancelling = !ro ? couponCancelTarget(reg, side, v.coupons) : null;
   if (cancelling) return `${top}${confirm(couponCancelScreen(reg, side, v.lines.find((l) => l.id === cancelling[0].line_id)?.name ?? "", cancelling, a("remove_coupon")))}`;
   if (!ro && !paying && a("remove_line").allowed && expiredOpen(reg, side, v.lines))
@@ -1277,44 +1264,46 @@ function pointInfo(p: PointsView | undefined): string {
 const pt = (n: number): string => `${n.toLocaleString("ja-JP")}P`;
 
 
-/** 二段目の帯の終わりの印。受け付けなかった理由（B-2）をこの直後に差し込む */
-const BAND_END = "<!--band-end-->";
+/** 受け付けなかった理由のうち、いまの画面がすでに示しているもの。同じ情報を二か所に出さないので重ねて出さない
+ *  （端末の操作なら異常音だけ）。支払方法の選択・ポイントの使い方・フラグや確認画面で止まっている理由など */
+const ON_SCREEN: RegExp[] = [
+  /^ポイントの使い方を選んでください$/,
+  /^.+が選ばれています（.+は使えません）$/,
+  /^キャッシュレスの支払方法が選ばれていません$/,
+  /^現金以外のお支払いが選ばれています$/,
+  /^(あと .+ 入れてください|お金を入れてください)$/,
+  /^電子マネーの残高が足りません\nどうするか選んでください$/,
+  /^販売期限切れの商品があります\n/,
+  /^スタッフが公共料金の内容を確認していません$/,
+  /^収入印紙の貼り付けが確認できていません$/,
+  /^(現金はスタッフがお預かりいたします\n)?スタッフをお呼びしました$/,
+  /^スタッフが年齢確認をするか選んでいません$/,
+  /^スタッフが身分証の生年月日を入力していません$/,
+  /^ポイントカードの確認が済んでいません$/,
+  /^適用先のないクーポンがあります\n/,
+  /^FF のお渡し確認（お渡し個数の照合）が済んでいません$/,
+  /^サービス商品の受付が済んでいません$/,
+  /^スタッフがサービス商品の受付をするまでお待ちください$/,
+  /^同じお届け先の荷物があるか選んでください$/,
+  /^スタッフが向かっています\nそのままお待ちください$/,
+  /^チャージか残高確認を選んでください$/,
+  /^先にチャージする紙幣を入金ボックスに入れてください$/,
+  /^(案内を確認してから、)?電子マネーをかざしてください$/,
+];
 
-/** レジが受け付けなかった理由を表示する時間（B-2）。そのレジで次に操作が受け付けられたときにも消す */
-export const REJECT_SHOW_MS = 8000;
+/** 受け付けなかった理由をいまの画面が示しているか */
+export const shownOnScreen = (reason: string): boolean => ON_SCREEN.some((re) => re.test(reason));
 
-/** 受け付けなかった理由を、操作した側の画面の二段目の帯の直下（内税の行の位置）に赤文字で一行出す（B-2）。
- *  何も覆わず、閉じるボタンも置かない。表示中もすべての操作を受け付ける。内税の行があればその位置に入れ替え、
- *  帯のない画面（お礼・案内など）では画面の一番上に出す */
-export function withRejection(html: string, reason: string | undefined): string {
-  if (!reason) return html;
-  const note = `<p class="reject-note" role="status">${reason.split("\n").map(esc).join("<br>")}</p>`;
-  const head = /<div class="staff-head">[\s\S]*?<\/div>/;
-  if (head.test(html)) return html.replace(head, note);
-  if (html.includes(BAND_END)) return html.replace(BAND_END, note);
-  return note + html;
-}
+/** 受け付けなかった理由を出している時間。現れて、読めるあいだ留まり、消える */
+export const REJECT_SHOW_MS = 1800;
 
-/** 選択の余地のない、完全に不可能な操作の理由（user 2026-11-18）。帯の下の赤文字ではなく、
- *  登録画面の中央にぼかした登録画面を背にして一瞬だけ出す（IMPOSSIBLE_SHOW_MS）。ほかの理由は今までどおり帯の下 */
-export const IMPOSSIBLE = new Set([
-  "会計を分けてください\nお支払い同士なら幾つでも一緒に会計できます",
-  "会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます",
-  "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです",
-  "会計を分けてください\nチケットは一件ずつのお取り扱いです",
-  "日配食品は数量を増やせません\n一点ずつスキャンしてください",
-  "サービス商品の個数は変えられません",
-]);
-
-/** 不可能な操作の案内を出している時間。現れて、読めるあいだ留まり、消える */
-export const IMPOSSIBLE_SHOW_MS = 1800;
-
-/** 不可能な操作の案内の中身：一行目は大テキスト、改行やかっこ書きの続きは小テキストで添える */
-export function impossibleFlash(reason: string): string {
-  const m = /^([^\n（(]+?)(?:\n| ?[（(])([\s\S]*?)[）)]?$/.exec(reason);
-  const big = m ? m[1]! : reason;
-  const sub = m ? m[2]! : "";
-  return `<p class="big">${esc(big)}</p>${sub ? `<p class="sub">${esc(sub)}</p>` : ""}`;
+/** 受け付けなかった理由の中身：一行目は大テキスト、改行の続き（なければ末尾のかっこ書き）は小テキストで添える */
+export function rejectFlash(reason: string): string {
+  const nl = reason.indexOf("\n");
+  const m = nl < 0 ? /^(.+?) ?[（(](.+)[）)]$/.exec(reason) : null;
+  const big = nl >= 0 ? reason.slice(0, nl) : m ? m[1]! : reason;
+  const sub = nl >= 0 ? reason.slice(nl + 1) : m ? m[2]! : "";
+  return `<p class="big">${esc(big)}</p>${sub ? `<p class="sub">${sub.split("\n").map(esc).join("<br>")}</p>` : ""}`;
 }
 
 /** 現金の投入が始まったら、帯の合計の下（ポイントの行の位置）に「お預かり」「お釣り」（足りなければ赤の「不足」）を出す（B-4）。
@@ -1338,7 +1327,7 @@ export function regTop(total: number, count: number, action: string, max = Infin
   const point = tender || pointInfo(points);
   const info = point ? `<small class="info">${point}</small>` : "";
   const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
-  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>${BAND_END}`;
+  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>`;
 }
 
 export function itemCount(lines: { qty: number }[]): number {
@@ -1748,8 +1737,6 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   // セルフ操作モードで「現金」を選ぶと店員呼び出し、売り場側は支払方法の選択から案内画面に切り替わる
   if (c.phase === "paying" && c.method === "cash" && side === "floor") return screen(cashCallWait());
   if (c.lines.some((l) => l.parcel && l.kind === "service" && !l.done)) return screen(parcelWait());
-  if (c.phase === "registering" && r.limit_alert)
-    return screen(limitScreen(reg, side, r.limit_alert, a("remove_line").allowed ? a("remove_line") : null, side === "counter"));
   const cancelling = couponCancelTarget(reg, side, c.coupons);
   if (cancelling) return `${top}${confirm(couponCancelScreen(reg, side, c.lines.find((l) => l.id === cancelling[0].line_id)?.name ?? "", cancelling, a("remove_coupon")))}`;
   if (c.phase === "registering" && a("remove_line").allowed && expiredOpen(reg, side, c.lines))

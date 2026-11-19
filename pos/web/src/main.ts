@@ -468,10 +468,11 @@ function render(): void {
       el?.classList.toggle("mode-staff", r.mode === "staff_operated");
       el?.classList.toggle("hold-swipe", side === "counter" && r.mode === "staff_operated" && !r.menu);
       // 隠れているものがある側の縁を、操作の青の濃い青→段の薄い青のグラデーションで示す（user 2026-11-20）：
-      // ヘッダーの左＝店舗メニュー（スタッフ操作モードのあいだ常に）、開いているあいだは右＝もとの画面。登録画面の左＝保留した取引（あるときだけ）
+      // ヘッダーの左＝店舗メニュー（開けるときだけ。取引中は開けないので出さない）、開いているあいだは右＝もとの画面。登録画面の左＝保留した取引（あるときだけ）
       const staffCounter = side === "counter" && r.mode === "staff_operated" && !r.paused;
-      el?.classList.toggle("swipe-menu-open", staffCounter && !r.menu);
-      el?.classList.toggle("swipe-menu-close", staffCounter && !!r.menu);
+      const menuSwipe = side === "counter" && storeMenuUsable(r);
+      el?.classList.toggle("swipe-menu-open", menuSwipe && !r.menu);
+      el?.classList.toggle("swipe-menu-close", menuSwipe && !!r.menu);
       el?.classList.toggle("swipe-resume", staffCounter && !r.menu && r.held);
       el?.classList.toggle("mode-self", r.mode === "self_operated");
       el?.classList.toggle("calling", side === "counter" && r.lamp);

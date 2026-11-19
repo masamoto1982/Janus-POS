@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, withRejection, impossibleFlash } from "./view";
+import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, rejectFlash, shownOnScreen } from "./view";
 import { trCore } from "./i18n";
 
 describe("view helpers", () => {
@@ -160,29 +160,26 @@ describe("view helpers", () => {
     expect(signage(0)).not.toContain("<button");
   });
 
-  it("splits an impossible-operation reason into a large first line and a small rest", () => {
-    expect(impossibleFlash("会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます")).toBe(
+  it("splits a rejected reason into a large first line and a small rest", () => {
+    expect(rejectFlash("会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます")).toBe(
       '<p class="big">会計を分けてください</p><p class="sub">お荷物同士なら、何個でも一緒に会計できます</p>',
     );
-    expect(impossibleFlash("サービス商品の個数は変えられません")).toBe('<p class="big">サービス商品の個数は変えられません</p>');
-    expect(impossibleFlash("Please pay separately\nAny number of parcels can be paid together")).toContain('<p class="sub">Any number of parcels can be paid together</p>');
+    expect(rejectFlash("サービス商品の個数は変えられません")).toBe('<p class="big">サービス商品の個数は変えられません</p>');
+    expect(rejectFlash("Please pay separately\nAny number of parcels can be paid together")).toContain('<p class="sub">Any number of parcels can be paid together</p>');
+    // 一行の理由は末尾のかっこ書きを小テキストに、改行のある理由はかっこをそのまま残す
+    expect(rejectFlash("お会計中です（登録に戻ってから伝票を読み取ってください）")).toBe('<p class="big">お会計中です</p><p class="sub">登録に戻ってから伝票を読み取ってください</p>');
+    expect(rejectFlash("番号が違います\nこの荷物はお渡しできません（お受け取りの荷物は 123）")).toContain('<p class="sub">この荷物はお渡しできません（お受け取りの荷物は 123）</p>');
+    expect(rejectFlash("取引中は担当スタッフを切り替えられません\nスタッフ001さんの取引です")).toContain('<p class="sub">スタッフ001さんの取引です</p>');
   });
 
-  it("puts a rejected reason in red under the band, in place of the tax row (B-2)", () => {
-    const reason = "お会計中です（登録に戻ってから伝票を読み取ってください）";
-    const band = regTop(150, 1, "");
-    const screen = `${band}<div class="staff-head"><span class="muted tax-note">内税 8% 11円</span></div><table></table>`;
-    const html = withRejection(screen, reason);
-    expect(html).toContain(`<p class="reject-note" role="status">${reason}</p>`);
-    expect(html).not.toContain("tax-note");
-    expect(html.indexOf("reject-note")).toBeGreaterThan(html.indexOf("reg-top"));
-    expect(html).toContain("<table>");
-    // 帯だけの画面では帯の直下、帯のない画面では一番上
-    expect(withRejection(`${band}<div class="confirm"></div>`, reason).indexOf("reject-note")).toBeGreaterThan(0);
-    expect(withRejection(`<div class="confirm"></div>`, reason).startsWith('<p class="reject-note"')).toBe(true);
-    expect(withRejection(screen, undefined)).toBe(screen);
-    // 英語の画面では英語で出る
-    expect(trCore(reason)).toBe("Checking out (go back to registration, then scan the slip)");
+  it("does not repeat a reason the screen already shows", () => {
+    expect(shownOnScreen("ポイントの使い方を選んでください")).toBe(true);
+    expect(shownOnScreen("電子マネーが選ばれています（クレジットカードは使えません）")).toBe(true);
+    expect(shownOnScreen("あと 120円 入れてください")).toBe(true);
+    expect(shownOnScreen("トレカは1回のお会計で3点までです\n3点を超える分はお売りできません")).toBe(false);
+    expect(shownOnScreen("お会計中です（登録に戻ってから伝票を読み取ってください）")).toBe(false);
+    expect(trCore("トレカは1回のお会計で3点までです\n3点を超える分はお売りできません")).toBe("Trading cards: up to 3 per purchase\nWe cannot sell more than 3");
+    expect(trCore("取引中は担当スタッフを切り替えられません\nスタッフ001さんの取引です")).toBe("Staff can't be switched during a transaction\nThis is Staff 001's transaction");
   });
 
   it("shows total, tendered and change (or a red shortage) while cash goes in (B-4)", () => {

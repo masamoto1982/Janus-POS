@@ -527,6 +527,7 @@ const DICT: Record<string, string> = {
   生年月日の入力は不要です: "No date of birth needed",
   先に年齢確認をしてください: "Check age first",
   "買い物点数の上限（100点）に達しています": "The item limit (100) has been reached",
+  取引中は担当スタッフを切り替えられません: "Staff can't be switched during a transaction",
   公共料金の払込票はありません: "No utility bill slips",
   会計ボタンを押してから確認します: "Checked after pressing Pay",
   お渡しする払込票はありません: "No slips to hand over",
@@ -618,7 +619,7 @@ const DICT: Record<string, string> = {
 };
 
 
-/** レジが受け付けなかった理由（コアの拒否の文言、B-2）。DICT にないものだけ */
+/** レジが受け付けなかった理由（コアの拒否の文言）。DICT にないものだけ */
 const REJECT_EN: Record<string, string> = {
   "FF の商品が見つかりません": "FF item not found",
   "FF の回収の確認はスタッフが行います": "Staff confirm taking back FF",
@@ -745,8 +746,8 @@ const RULES: Rule[] = [
   [/^(.+)cm を超える荷物は受け付けられません$/, (m) => `Parcels over ${m[1]} cm can't be accepted`],
   [/^(.+)kg を超える荷物は受け付けられません$/, (m) => `Parcels over ${m[1]} kg can't be accepted`],
   [/^(.+)は1回のお会計で(\d+)点までです$/, (m) => `${t(m[1])}: up to ${m[2]} per purchase`],
-  [/^(\d+)点を超える分はお売りできないことをお客様にお伝えください$/, (m) => `Tell the customer we cannot sell more than ${m[1]}`],
-  [/^申し訳ございません、(\d+)点を超える分はお売りできません$/, (m) => `Sorry, we cannot sell more than ${m[1]}`],
+  [/^スタッフ(\d+)さんの取引です$/, (m) => `This is Staff ${m[1]}'s transaction`],
+  [/^(\d+)点を超える分はお売りできません$/, (m) => `We cannot sell more than ${m[1]}`],
   [/^(.+)は欠品です（FF ボタンの長押しで予約注文として登録できます）$/, (m) => `${t(m[1])} is sold out (long-press to pre-order)`],
   [/^電子マネーの残高が足りません（残高 (.+)円・お支払い (.+)円）$/, (m) => `Not enough e-money (balance ¥${m[1]}, due ¥${m[2]})`],
   [/^内税 (.*)$/, (m) => `Tax incl. ${yenify(m[1])}`],

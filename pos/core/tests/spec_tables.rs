@@ -24,7 +24,11 @@ fn read(p: &Path) -> String {
 
 fn rust_sources() -> Vec<PathBuf> {
     fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-        let mut entries: Vec<_> = std::fs::read_dir(dir).unwrap().flatten().map(|e| e.path()).collect();
+        let mut entries: Vec<_> = std::fs::read_dir(dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .collect();
         entries.sort();
         for p in entries {
             if p.is_dir() {
@@ -89,9 +93,15 @@ fn constants() -> String {
         let file = path.strip_prefix(root()).unwrap().display().to_string();
         for (i, l) in lines.iter().enumerate() {
             let t = l.trim_start();
-            let Some(rest) = t.strip_prefix("pub const ") else { continue };
-            let Some((name, rest)) = rest.split_once(':') else { continue };
-            let Some((ty, expr)) = rest.split_once('=') else { continue };
+            let Some(rest) = t.strip_prefix("pub const ") else {
+                continue;
+            };
+            let Some((name, rest)) = rest.split_once(':') else {
+                continue;
+            };
+            let Some((ty, expr)) = rest.split_once('=') else {
+                continue;
+            };
             let ty = ty.trim();
             if !["u8", "u32", "u64", "usize", "f32", "i32"].contains(&ty) {
                 continue;
@@ -129,7 +139,9 @@ fn snake(s: &str) -> String {
 
 fn commands() -> String {
     let src = read(&root().join("src/store.rs"));
-    let start = src.find("pub enum Command {").expect("Command がありません");
+    let start = src
+        .find("pub enum Command {")
+        .expect("Command がありません");
     let body = &src[start..];
     let end = body.find("\n}\n").unwrap();
     let lines: Vec<&str> = body[..end].lines().collect();
@@ -155,7 +167,13 @@ fn commands() -> String {
                     i += 1;
                 }
             }
-            let _ = writeln!(out, "| `{}` | {} | {} |", snake(&name), fields.join("・"), cell(&doc));
+            let _ = writeln!(
+                out,
+                "| `{}` | {} | {} |",
+                snake(&name),
+                fields.join("・"),
+                cell(&doc)
+            );
         }
         i += 1;
     }
@@ -176,7 +194,11 @@ fn shelf(p: &Product) -> &'static str {
 
 fn span(min: i32, fresh: bool) -> String {
     let (h, d) = (60, 24 * 60);
-    let (n, unit) = if fresh && min.abs() < d { (min / h, "時間") } else { (min / d, "日") };
+    let (n, unit) = if fresh && min.abs() < d {
+        (min / h, "時間")
+    } else {
+        (min / d, "日")
+    };
     if n < 0 {
         format!("**{} {unit}前（期限切れ）**", -n)
     } else {
@@ -187,7 +209,14 @@ fn span(min: i32, fresh: bool) -> String {
 fn notes(p: &Product) -> String {
     let mut n = vec![];
     if p.utility_bill {
-        n.push(if p.stamp_exempt { "払込票（税金、収入印紙は要らない）" } else { "払込票" }.to_string());
+        n.push(
+            if p.stamp_exempt {
+                "払込票（税金、収入印紙は要らない）"
+            } else {
+                "払込票"
+            }
+            .to_string(),
+        );
     }
     if p.cash_only {
         n.push("現金のみ".into());
@@ -196,7 +225,16 @@ fn notes(p: &Product) -> String {
         n.push(format!("申込券 1 枚でチケット {} 枚を発券", p.tickets));
     }
     if p.parcel_send {
-        n.push(if p.parcel_collect { "荷物を送る（着払い、レジでは 0 円）" } else if p.parcel_multi { "荷物を送る（複数口）" } else { "荷物を送る（料金は受付で決まる）" }.into());
+        n.push(
+            if p.parcel_collect {
+                "荷物を送る（着払い、レジでは 0 円）"
+            } else if p.parcel_multi {
+                "荷物を送る（複数口）"
+            } else {
+                "荷物を送る（料金は受付で決まる）"
+            }
+            .into(),
+        );
     }
     if p.parcel_pickup {
         n.push("荷物を受取る（代金引換額）".into());
@@ -214,10 +252,22 @@ fn products() -> String {
     for p in CATALOG.iter().filter(|p| p.category != Category::FastFood) {
         let dates = p
             .dates
-            .map(|d| format!("{} / {}", span(d.sell_by_min, p.fresh), span(d.best_before_min, p.fresh)))
+            .map(|d| {
+                format!(
+                    "{} / {}",
+                    span(d.sell_by_min, p.fresh),
+                    span(d.best_before_min, p.fresh)
+                )
+            })
             .unwrap_or_default();
-        let age = ages.age_for(p.code, p.category).map(|a| format!("{a}")).unwrap_or_default();
-        let limit = ages.limit_for(p.code).map(|n| format!("{n} 点")).unwrap_or_default();
+        let age = ages
+            .age_for(p.code, p.category)
+            .map(|a| format!("{a}"))
+            .unwrap_or_default();
+        let limit = ages
+            .limit_for(p.code)
+            .map(|n| format!("{n} 点"))
+            .unwrap_or_default();
         let _ = writeln!(
             out,
             "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |",
@@ -293,7 +343,12 @@ fn parcel_sizes() -> String {
     for (size, cm, g) in SIZES {
         let base = parcel::fee(size, kanto);
         let step = (parcel::fee(size, kyushu) - base) / 4;
-        let _ = writeln!(out, "| {size} | {cm}cm | {}kg | {} | {step} |", g / 1000, fmt_yen(base));
+        let _ = writeln!(
+            out,
+            "| {size} | {cm}cm | {}kg | {} | {step} |",
+            g / 1000,
+            fmt_yen(base)
+        );
     }
     out
 }
@@ -301,7 +356,9 @@ fn parcel_sizes() -> String {
 fn parcel_regions() -> String {
     let mut tiers: BTreeMap<u32, Vec<(String, Vec<u32>)>> = BTreeMap::new();
     for n in 0..100u32 {
-        let Ok(r) = parcel::region(&format!("{n:02}00000")) else { continue };
+        let Ok(r) = parcel::region(&format!("{n:02}00000")) else {
+            continue;
+        };
         let tier = (parcel::fee(60, r) - parcel::fee(60, parcel::region("1000000").unwrap())) / 110;
         let list = tiers.entry(tier).or_default();
         match list.iter_mut().find(|(l, _)| l == r.label()) {
@@ -317,14 +374,21 @@ fn parcel_regions() -> String {
             while j + 1 < v.len() && v[j + 1] == v[j] + 1 {
                 j += 1;
             }
-            parts.push(if j > i { format!("{:02}〜{:02}", v[i], v[j]) } else { format!("{:02}", v[i]) });
+            parts.push(if j > i {
+                format!("{:02}〜{:02}", v[i], v[j])
+            } else {
+                format!("{:02}", v[i])
+            });
             i = j + 1;
         }
         parts.join("・")
     };
     let mut out = String::from("| 段階 | 地域（郵便番号の上 2 桁） |\n| --- | --- |\n");
     for (tier, list) in tiers {
-        let s: Vec<String> = list.iter().map(|(l, v)| format!("{l}（{}）", ranges(v))).collect();
+        let s: Vec<String> = list
+            .iter()
+            .map(|(l, v)| format!("{l}（{}）", ranges(v)))
+            .collect();
         let _ = writeln!(out, "| {tier} | {} |", s.join("、"));
     }
     out
@@ -338,14 +402,19 @@ fn scenarios(spec: &str) -> String {
     let mut by_section: BTreeMap<String, Vec<(String, String)>> = BTreeMap::new();
     let mut unassigned: Vec<String> = vec![];
     for (i, l) in lines.iter().enumerate() {
-        let Some(rest) = l.strip_prefix("fn ") else { continue };
+        let Some(rest) = l.strip_prefix("fn ") else {
+            continue;
+        };
         if i == 0 || lines[i - 1].trim() != "#[test]" {
             continue;
         }
         let name = rest.split('(').next().unwrap().to_string();
         let doc = doc_above(&lines, i);
         match doc.strip_prefix("仕様 ").and_then(|d| d.split_once('：')) {
-            Some((sec, what)) => by_section.entry(sec.trim().to_string()).or_default().push((name, what.to_string())),
+            Some((sec, what)) => by_section
+                .entry(sec.trim().to_string())
+                .or_default()
+                .push((name, what.to_string())),
             None => unassigned.push(name),
         }
     }
@@ -354,21 +423,43 @@ fn scenarios(spec: &str) -> String {
     for l in spec.lines() {
         let head = l.strip_prefix("### ").or_else(|| l.strip_prefix("## "));
         let Some(head) = head else { continue };
-        let Some((no, title)) = head.split_once(' ') else { continue };
+        let Some((no, title)) = head.split_once(' ') else {
+            continue;
+        };
         let no = no.trim_end_matches('.');
         if !no.chars().next().is_some_and(|c| c.is_ascii_digit()) {
             continue;
         }
         let list = by_section.get(no);
-        let _ = writeln!(out, "- **{no} {title}**{}", if list.is_none() { "：シナリオなし" } else { "" });
+        let _ = writeln!(
+            out,
+            "- **{no} {title}**{}",
+            if list.is_none() {
+                "：シナリオなし"
+            } else {
+                ""
+            }
+        );
         for (name, what) in list.into_iter().flatten() {
             let _ = writeln!(out, "  - {what}（`{name}`）");
         }
         seen.push(no.to_string());
     }
     let unknown: Vec<_> = by_section.keys().filter(|k| !seen.contains(k)).collect();
-    assert!(unknown.is_empty(), "仕様書にない節を指すシナリオがあります: {unknown:?}");
-    let _ = writeln!(out, "\n節をまだ書いていないシナリオ（{} 件）：{}", unassigned.len(), unassigned.iter().map(|n| format!("`{n}`")).collect::<Vec<_>>().join("・"));
+    assert!(
+        unknown.is_empty(),
+        "仕様書にない節を指すシナリオがあります: {unknown:?}"
+    );
+    let _ = writeln!(
+        out,
+        "\n節をまだ書いていないシナリオ（{} 件）：{}",
+        unassigned.len(),
+        unassigned
+            .iter()
+            .map(|n| format!("`{n}`"))
+            .collect::<Vec<_>>()
+            .join("・")
+    );
     out
 }
 
@@ -377,10 +468,21 @@ fn scenarios(spec: &str) -> String {
 fn replace_block(doc: &str, name: &str, body: &str) -> String {
     let open = format!("<!-- generated:{name} -->");
     let close = "<!-- /generated -->";
-    let a = doc.find(&open).unwrap_or_else(|| panic!("仕様書に {open} がありません"));
+    let a = doc
+        .find(&open)
+        .unwrap_or_else(|| panic!("仕様書に {open} がありません"));
     let after = a + open.len();
-    let b = after + doc[after..].find(close).unwrap_or_else(|| panic!("{open} が閉じていません"));
-    format!("{}{open}\n{}{}{}", &doc[..a], body.trim_end_matches('\n').to_string() + "\n", close, &doc[b + close.len()..])
+    let b = after
+        + doc[after..]
+            .find(close)
+            .unwrap_or_else(|| panic!("{open} が閉じていません"));
+    format!(
+        "{}{open}\n{}{}{}",
+        &doc[..a],
+        body.trim_end_matches('\n').to_string() + "\n",
+        close,
+        &doc[b + close.len()..]
+    )
 }
 
 #[test]

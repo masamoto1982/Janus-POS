@@ -417,7 +417,6 @@ impl SavedTxn {
             emoney_short: self.emoney_short,
             emoney_partial: self.emoney_partial,
             emoney_partial_ok: self.emoney_partial_ok,
-            limit_alert: None,
             limit_hit: vec![],
         })
     }

@@ -33,15 +33,12 @@ pub const FRESH_ONE_BY_ONE: &str = "日配食品は数量を増やせません\n
 const CASH_ONLY: &str = "現金のみ取り扱いいたします";
 const NO_CASH_MIX: &str = "クレジットカード・バーコード決済は現金と併用できません";
 const TICKETS_FIRST: &str = "チケットのお渡しが済むまで、次の取引は始められません";
-const TICKET_ALONE: &str =
-    "会計を分けてください\nチケットは一件ずつのお取り扱いです";
+const TICKET_ALONE: &str = "会計を分けてください\nチケットは一件ずつのお取り扱いです";
 const BILL_ALONE: &str = "会計を分けてください\nお支払い同士なら幾つでも一緒に会計できます";
 const PARCEL_CODE: &str = "2100000000014";
-const PARCEL_ALONE: &str =
-    "会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます";
+const PARCEL_ALONE: &str = "会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます";
 const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、スタッフがログインしてから行います";
-const PICKUP_ALONE: &str =
-    "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです";
+const PICKUP_ALONE: &str = "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです";
 const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引中止にしてください";
 const PARCEL_SLIP_TO_REMOVE: &str =
     "宅配便を取り消すときは、取り消す荷物の伝票のバーコードを読み取ってください";
@@ -213,9 +210,7 @@ pub enum Command {
         force: bool,
     },
     /// 最下段の「FF」ボタンでスタッフを呼ぶ（セルフ操作モード）
-    FfButton {
-        register: u8,
-    },
+    FfButton { register: u8 },
     /// FF のお渡し数を入れて照合する
     CheckFf {
         register: u8,
@@ -249,19 +244,11 @@ pub enum Command {
         postal: String,
     },
     /// 荷物を送るの入力を一段階戻る（三辺の合計から戻ると受付をやめる）
-    ParcelBack {
-        register: u8,
-        line_id: u32,
-    },
+    ParcelBack { register: u8, line_id: u32 },
     /// 「同じお届け先の荷物はありますか？」に答える
-    ParcelNext {
-        register: u8,
-        more: bool,
-    },
+    ParcelNext { register: u8, more: bool },
     /// 荷物を受取る：お渡しを済ませる
-    PickupHandover {
-        register: u8,
-    },
+    PickupHandover { register: u8 },
     /// 荷物を受取る：保管場所に荷物があったか（`null` で探し直す）
     PickupFound {
         register: u8,
@@ -288,19 +275,11 @@ pub enum Command {
         coupon_id: u32,
     },
     /// 取り消したクーポンの返却の案内を閉じる
-    DismissReturned {
-        register: u8,
-    },
+    DismissReturned { register: u8 },
     /// 会計に進む
-    Checkout {
-        register: u8,
-        side: Side,
-    },
+    Checkout { register: u8, side: Side },
     /// 会計から登録画面に戻る
-    BackToRegistering {
-        register: u8,
-        side: Side,
-    },
+    BackToRegistering { register: u8, side: Side },
     /// 支払方法を選ぶ（選択中をもう一度押すと外す）
     SelectPayment {
         register: u8,
@@ -333,17 +312,11 @@ pub enum Command {
         today: String,
     },
     /// 年齢に届かない商品の回収の案内を閉じる
-    DismissConfiscated {
-        register: u8,
-    },
+    DismissConfiscated { register: u8 },
     /// お渡し済み FF の回収の案内を閉じる
-    DismissFfCollect {
-        register: u8,
-    },
+    DismissFfCollect { register: u8 },
     /// 照合が済んだ案内（年確OK・FFのお渡しOK）を閉じて先へ進む
-    DismissPassed {
-        register: u8,
-    },
+    DismissPassed { register: u8 },
     /// 払込票の内容の確認のチェックを付ける・外す
     CheckBill {
         register: u8,
@@ -400,9 +373,7 @@ pub enum Command {
         count: u32,
     },
     /// 現金の投入を終えて決済する（「投入おわり」）
-    FinishInsert {
-        register: u8,
-    },
+    FinishInsert { register: u8 },
     /// 決済端末にかざす・スキャナで読む（電子マネー・クレジットカード・バーコード決済・ポイント）
     TapEmoney {
         register: u8,
@@ -417,15 +388,7 @@ pub enum Command {
         kind: EmoneyKind,
     },
     /// 電子マネーの手続きを閉じる
-    CloseEmoney {
-        register: u8,
-        side: Side,
-    },
-    /// 販売個数の上限の案内を閉じる
-    CloseLimitAlert {
-        register: u8,
-        side: Side,
-    },
+    CloseEmoney { register: u8, side: Side },
     /// 電子マネーの残高不足にどうするか答える
     ResolveEmoneyShort {
         register: u8,
@@ -440,10 +403,7 @@ pub enum Command {
         topic: Option<CallTopic>,
     },
     /// ポイントカードなしで進む（「スキップ」）
-    ConfirmPointCard {
-        register: u8,
-        side: Side,
-    },
+    ConfirmPointCard { register: u8, side: Side },
     /// 「ポイント利用」を選んだあと、ポイントの使い方を決めて充てる
     UsePoints {
         register: u8,
@@ -455,25 +415,15 @@ pub enum Command {
         points: Option<u32>,
     },
     /// 呼び出しボタンから指を離す
-    ReleaseCall {
-        register: u8,
-    },
+    ReleaseCall { register: u8 },
     /// 非常事態モードを解除する（レジカウンター側の解除ボタンで。ログインは要らない）
-    EndEmergency {
-        register: u8,
-    },
+    EndEmergency { register: u8 },
     /// 取引を中止する
-    VoidTransaction {
-        register: u8,
-    },
+    VoidTransaction { register: u8 },
     /// ログアウトしてセルフ操作モードに戻る
-    EndStaffMode {
-        register: u8,
-    },
+    EndStaffMode { register: u8 },
     /// レジ休止中にする
-    Pause {
-        register: u8,
-    },
+    Pause { register: u8 },
     /// 店舗メニュー：お金を抜く（返品返金・緊急出金・経費支出など、店舗パスワードが要る）
     CashOut {
         register: u8,
@@ -499,19 +449,11 @@ pub enum Command {
         exchange_to: Option<u32>,
     },
     /// 入金ボックスに金額で現金を入れる（テンキー）
-    Insert {
-        register: u8,
-        amount: u32,
-    },
+    Insert { register: u8, amount: u32 },
     /// 出金ボックスのお金を取り出す
-    TakeOutlet {
-        register: u8,
-    },
+    TakeOutlet { register: u8 },
     /// その側の画面が操作できるか確かめる（操作側でなければ理由を返す。状態は変えない）
-    Claim {
-        register: u8,
-        side: Side,
-    },
+    Claim { register: u8, side: Side },
     /// 販売規則：分類単位の年確ルールを足す（オーナー）
     AddAgeRule {
         owner_id: String,
@@ -542,10 +484,7 @@ pub enum Command {
         limit: Option<u32>,
     },
     /// 販売規則の設定を開くときのオーナー認証
-    VerifyOwner {
-        owner_id: String,
-        password: String,
-    },
+    VerifyOwner { owner_id: String, password: String },
     /// 販売規則：税区分の税率を変える（オーナー）
     SetTaxRate {
         owner_id: String,
@@ -576,19 +515,11 @@ pub enum Command {
         rounding: Rounding,
     },
     /// シミュレーター：Bell との通信ロス率
-    SetBellLoss {
-        percent: u8,
-    },
+    SetBellLoss { percent: u8 },
     /// シミュレーター：Bell を不通にする
-    SetBellOffline {
-        bell: usize,
-        offline: bool,
-    },
+    SetBellOffline { bell: usize, offline: bool },
     /// Bell の呼び鈴機能の ON/OFF
-    SetBellOn {
-        bell: usize,
-        on: bool,
-    },
+    SetBellOn { bell: usize, on: bool },
 }
 
 impl Command {
@@ -631,7 +562,6 @@ impl Command {
             | C::TapEmoney { register, .. }
             | C::StartEmoney { register, .. }
             | C::CloseEmoney { register, .. }
-            | C::CloseLimitAlert { register, .. }
             | C::ResolveEmoneyShort { register, .. }
             | C::CallStaff { register, .. }
             | C::ReleaseCall { register }
@@ -672,7 +602,6 @@ impl Command {
             | C::HandTickets { side, .. }
             | C::StartEmoney { side, .. }
             | C::CloseEmoney { side, .. }
-            | C::CloseLimitAlert { side, .. }
             | C::ResolveEmoneyShort { side, .. }
             | C::Claim { side, .. } => Some(*side),
             C::CallStaff {
@@ -918,9 +847,6 @@ struct Txn {
     emoney_short: bool,
     emoney_partial: bool,
     emoney_partial_ok: bool,
-    /// 販売個数の上限を超えて登録を断った商品と上限。両画面の登録の代わりに案内を出し、
-    /// バックか次の登録で閉じる（年齢確認と同じくレジの機能）
-    limit_alert: Option<(&'static str, u32)>,
     /// 販売個数の上限を超えて登録しようとした商品（明細に個数制限のフラグを出す。お会計は止めない）
     limit_hit: Vec<&'static str>,
 }
@@ -939,8 +865,19 @@ impl Txn {
                         && l.kind == LineKind::Item
                         && used.iter().find(|(i, _)| *i == l.id).map_or(0, |e| e.1) < l.qty
                 };
-                let before = self.lines.iter().filter(free).filter(|l| l.id < id).max_by_key(|l| l.id);
-                let line = before.or_else(|| self.lines.iter().filter(free).filter(|l| l.id > id).min_by_key(|l| l.id));
+                let before = self
+                    .lines
+                    .iter()
+                    .filter(free)
+                    .filter(|l| l.id < id)
+                    .max_by_key(|l| l.id);
+                let line = before.or_else(|| {
+                    self.lines
+                        .iter()
+                        .filter(free)
+                        .filter(|l| l.id > id)
+                        .min_by_key(|l| l.id)
+                });
                 let Some(l) = line else {
                     return (id, c, None);
                 };
@@ -1512,7 +1449,9 @@ impl Register {
     fn in_txn(&self) -> bool {
         self.busy()
             || (self.closing
-                && (self.handover_pending() || self.last_receipt.is_some() || self.outlet.total() > 0))
+                && (self.handover_pending()
+                    || self.last_receipt.is_some()
+                    || self.outlet.total() > 0))
     }
 
     /// 取引中にログインしているスタッフを担当にする。担当のいる取引を終えたら、後始末が済んだところで担当をログアウトさせ、
@@ -1921,7 +1860,9 @@ impl Store {
             if r.emergency.is_none() && r.emergency_due(now) {
                 r.emergency = Some(now);
             }
-            if r.emergency_log.is_some_and(|(_, end)| end + EMERGENCY_LOG_MS <= now) {
+            if r.emergency_log
+                .is_some_and(|(_, end)| end + EMERGENCY_LOG_MS <= now)
+            {
                 r.emergency_log = None;
             }
             if r.outlet.total() > 0 {
@@ -2126,7 +2067,10 @@ impl Store {
         if let Some(id) = cmd.register() {
             let now = self.now;
             // 解除のレシートの案内は、そのレジで次の操作があれば閉じる（待たせない）
-            let keep_log = matches!(cmd, Command::EndEmergency { .. } | Command::ReleaseCall { .. });
+            let keep_log = matches!(
+                cmd,
+                Command::EndEmergency { .. } | Command::ReleaseCall { .. }
+            );
             if let Ok(r) = self.reg_mut(id) {
                 r.last_op = now;
                 if !keep_log {
@@ -2946,11 +2890,6 @@ impl Store {
                     }
                 })
             }
-            C::CloseLimitAlert { register, side } => {
-                self.check(register, side, Action::RemoveLine)?;
-                self.reg_mut(register)?.txn.limit_alert = None;
-                Ok(Outcome::default())
-            }
             C::CloseEmoney { register, side } => {
                 self.check(register, side, Action::Emoney)?;
                 let r = self.reg_mut(register)?;
@@ -3373,23 +3312,22 @@ impl Store {
             .ok_or_else(|| "受付中の荷物が見つかりません".to_string())
     }
 
-    /// 販売個数の上限。超える分は登録せず、レジ画面に案内を出す（ブラウザのアラートではない）。
-    /// 上限内の登録は出ている案内を閉じる
+    /// 販売個数の上限。超える分は登録しない（ブラウザのアラートではなく、操作した側の登録画面の中央に一瞬だけ理由を重ねる）
     fn check_limit(&mut self, register: u8, code: &str, add: u32) -> Result<(), String> {
         let limit = self.age_rules.limit_for(code);
         let have = self.reg(register).map_or(0, |r| r.txn.qty_of(code));
         let r = self.reg_mut(register)?;
         let Some(limit) = limit.filter(|&n| have + add > n) else {
-            r.txn.limit_alert = None;
             return Ok(());
         };
         let p = catalog::find(code);
         let name = p.map_or("この商品", |p| p.name);
-        r.txn.limit_alert = Some((name, limit));
         if let Some(p) = p.filter(|p| !r.txn.limit_hit.contains(&p.code)) {
             r.txn.limit_hit.push(p.code);
         }
-        Err(format!("{name}は1回のお会計で{limit}点までです"))
+        Err(format!(
+            "{name}は1回のお会計で{limit}点までです\n{limit}点を超える分はお売りできません"
+        ))
     }
 
     /// セルフ操作モードで電子マネーの残高が足りず、お客様が「チャージまたは現金併用」を選んだとき：
@@ -3870,7 +3808,9 @@ impl Store {
     fn match_pickup(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
         let r = self.reg_mut(register)?;
         if r.staff_state() != StaffState::Ready || side != Side::Counter {
-            return Err("お預かりの荷物のバーコードは、スタッフがレジカウンター側で読み取ります".into());
+            return Err(
+                "お預かりの荷物のバーコードは、スタッフがレジカウンター側で読み取ります".into(),
+            );
         }
         let pk = r
             .txn
@@ -4765,7 +4705,10 @@ impl Store {
             bell_dead,
             emergency: r.emergency.is_some(),
             emergency_since: r.emergency,
-            emergency_log: r.emergency_log.map(|(started_at, ended_at)| EmergencyLog { started_at, ended_at }),
+            emergency_log: r.emergency_log.map(|(started_at, ended_at)| EmergencyLog {
+                started_at,
+                ended_at,
+            }),
             active_side: active_side(&c),
             max_items: MAX_ITEMS,
             lamp: waiting.is_some(),
@@ -4935,10 +4878,6 @@ impl Store {
                 .unwrap_or(0),
             pickup_handover: r.pickup_handover.clone(),
             receipt_stamp: r.receipt_stamp,
-            limit_alert: r
-                .txn
-                .limit_alert
-                .map(|(name, limit)| LimitAlert { name, limit }),
         }
     }
 }
@@ -5140,15 +5079,6 @@ pub struct RegisterView {
     pub tickets_ahead: usize,
     pub pickup_handover: Option<String>,
     pub receipt_stamp: Option<ReceiptStamp>,
-    /// 販売個数の上限を超えて登録を断った（案内を閉じるまで）
-    pub limit_alert: Option<LimitAlert>,
-}
-
-#[derive(Clone, Copy, Debug, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct LimitAlert {
-    pub name: &'static str,
-    pub limit: u32,
 }
 
 #[derive(Clone, Debug, Serialize)]

@@ -919,8 +919,11 @@ body.dragging .drop-hint { display: inline; }
 .counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 .counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 @media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }
-/* グラデーションの上の文字が沈まないよう、縁が出ているあいだは文字のまわりを段の薄い青でふちどる（輪郭を文字の下に敷く）（user 2026-11-20）。
-   積極ボタン（白文字）など地を自分で持つ部品は対象外 */
-.counter-screen:is(.swipe-menu-open, .swipe-menu-close) .screen-head,
-.counter-screen.swipe-resume .screen-body :is(th, td, .staff-head, .staff-head *, .muted, .welcome, .welcome *) { -webkit-text-stroke: 0.2em var(--screen-bg); paint-order: stroke fill; }
-.counter-screen.swipe-resume .screen-body :is(button, input, select) { -webkit-text-stroke: 0; }
+/* グラデーションの上の文字が沈まないよう、縁が出ているあいだは文字の載る部品（ヘッダーの稼働モード・スタッフ名の行・明細の行）の
+   左に段の薄い青のグラデーションを敷き、縁の濃さを打ち消す（user 2026-11-20）。部品の外の縁は濃いまま見える */
+.counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head .head-l { background: linear-gradient(to right, color-mix(in oklch, var(--screen-bg) 0%, transparent), var(--screen-bg) 16px, color-mix(in oklch, var(--screen-bg) 0%, transparent)); }
+.counter-screen.swipe-resume .screen-body :is(.staff-head, table) { background: linear-gradient(to right, color-mix(in oklch, var(--screen-bg) 0%, transparent), var(--screen-bg) 16px, color-mix(in oklch, var(--screen-bg) 0%, transparent)); }
+.counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head .head-r { background: linear-gradient(to left, color-mix(in oklch, var(--screen-bg) 0%, transparent), var(--screen-bg) 16px, color-mix(in oklch, var(--screen-bg) 0%, transparent)); }
+/* スタッフ名の行と明細のあいだに縁の濃い筋が出ないよう、明細の上の余白をスタッフ名の行の内側へ移す */
+.counter-screen.swipe-resume .screen-body .staff-head + table { margin-top: 0; }
+.counter-screen.swipe-resume .screen-body .staff-head:has(+ table) { padding-bottom: var(--s13, 4px); }

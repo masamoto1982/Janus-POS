@@ -467,12 +467,12 @@ function render(): void {
       el?.classList.toggle("operable", operable);
       el?.classList.toggle("mode-staff", r.mode === "staff_operated");
       el?.classList.toggle("hold-swipe", side === "counter" && r.mode === "staff_operated" && !r.menu);
-      // スワイプできる縁を、操作の青の濃い青→段の薄い青のグラデーションで示す（user 2026-11-20）
-      el?.classList.toggle("swipe-hold", side === "counter" && r.can_hold);
-      el?.classList.toggle("swipe-resume", side === "counter" && r.can_resume);
-      const menuSwipe = side === "counter" && storeMenuUsable(r);
-      el?.classList.toggle("swipe-menu-open", menuSwipe && !r.menu);
-      el?.classList.toggle("swipe-menu-close", menuSwipe && !!r.menu);
+      // 隠れているものがある側の縁を、操作の青の濃い青→段の薄い青のグラデーションで示す（user 2026-11-20）：
+      // ヘッダーの左＝店舗メニュー（スタッフ操作モードのあいだ常に）、開いているあいだは右＝もとの画面。登録画面の左＝保留した取引（あるときだけ）
+      const staffCounter = side === "counter" && r.mode === "staff_operated" && !r.paused;
+      el?.classList.toggle("swipe-menu-open", staffCounter && !r.menu);
+      el?.classList.toggle("swipe-menu-close", staffCounter && !!r.menu);
+      el?.classList.toggle("swipe-resume", staffCounter && !r.menu && r.held);
       el?.classList.toggle("mode-self", r.mode === "self_operated");
       el?.classList.toggle("calling", side === "counter" && r.lamp);
       el?.classList.toggle("head-blink", r.lamp || r.emergency);
@@ -763,6 +763,8 @@ function send(cmd: Command, quiet = false): boolean {
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   lastError = res.ok ? undefined : res.error;
+  // 取引中止で保留した取引に戻ったときも、中止の確認は閉じる（戻った取引に確認を持ち越さない）
+  if (res.ok && cmd.type === "void_transaction") voidAsk.delete(cmd.register);
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {
@@ -1362,7 +1364,7 @@ function wireHoldSwipe(): void {
     if (!r || r.mode !== "staff_operated" || r.menu) return;
     swallowClick = true;
     if (dx < 0 && r.counter.lines.length > 0) send({ type: "hold_transaction", register: reg });
-    else if (dx > 0 && r.held && !r.counter.lines.length) send({ type: "resume_held", register: reg });
+    else if (dx > 0 && r.held) send({ type: "resume_held", register: reg });
   });
   window.addEventListener("pointercancel", () => (start = null));
 }

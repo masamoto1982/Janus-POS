@@ -687,14 +687,11 @@ const REJECT_EN: Record<string, string> = {
   "非常事態モードではありません": "Not in emergency mode",
 };
 
-const TOPIC_EN: Record<string, string> = { FF: "FF", サービス: "service", 金券: "vouchers", たばこ: "tobacco", 電子マネー: "e-money", お支払い: "bill payment", 宅配便: "parcel" };
-const topicsEn = (s: string): string => s.split("・").map((x) => TOPIC_EN[x] ?? x).join(", ");
 type Rule = [RegExp, (m: RegExpExecArray) => string];
 
 const RULES: Rule[] = [
   [/^(\d{4})年(\d{1,2})月(\d{1,2})日 (.)曜日 (\d{2}:\d{2})$/, (m) => `${WEEKDAY[m[4]] ?? m[4]}, ${MONTH[Number(m[2]) - 1]} ${m[3]}, ${m[1]} ${m[5]}`],
   [/^(\d{4})年(\d{1,2})月(\d{1,2})日 (.)曜日$/, (m) => `${WEEKDAY[m[4]] ?? m[4]}, ${MONTH[Number(m[2]) - 1]} ${m[3]}, ${m[1]}`],
-  [/^用件：(.+)$/, (m) => `Called for: ${topicsEn(m[1])}`],
   [/^(\d+)歳以上の年齢確認をしますか？$/, (m) => `Check age (${m[1]}+)?`],
   [/^(\d+)歳前後のお客様は身分証をご準備ください$/, (m) => `If you are around ${m[1]}, please have your ID ready`],
   [/^(\d+)歳以上$/, (m) => `Age ${m[1]}+`],

@@ -1208,7 +1208,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   stampVerifying.delete(`${reg}:${side}`);
   return `${top}
     <div class="staff-head">
-      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}${answeredTopic(r, side)}</span>
+      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
     </div>
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th>${qtyHead(v.lines)}</th><th class="num">小計</th></tr></thead>
@@ -1549,12 +1549,6 @@ function callingRow(r: RegisterView, side: Side, now: number): string {
   if (side === "floor") return `<div class="call-row calling">${msg("スタッフを呼び出しています")}</div>`;
   const at = r.counter.calls.filter((c) => r.waiting_calls.includes(c.kind)).map((c) => c.created_at);
   return `<div class="call-row calling">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
-}
-
-/** スタッフがログインして応答した呼び出しの用件（最初の一件）。取引が終わるまでレジカウンター側の担当スタッフ名の右に出す */
-export function answeredTopic(r: RegisterView, side: Side): string {
-  const topics = side === "counter" ? (r.answered ?? "") : "";
-  return topics ? `<span class="answered-topic" title="お客様の呼び出しの用件">用件：${esc(topics)}</span>` : "";
 }
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {

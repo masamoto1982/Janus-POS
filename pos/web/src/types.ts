@@ -243,10 +243,6 @@ emergency_since: number | null,
  */
 emergency_log: EmergencyLog | null, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, 
 /**
- * スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのレジカウンター側に出す）
- */
-answered: string | null, 
-/**
  * まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
  */
 waiting_calls: Array<CallKind>, mode: Mode, mode_label: string, outlet: number, outlet_detail: Array<[number, number]>, menu: Menu | null, paused: boolean, idle_revert_in: number | null, idle_voids: boolean, change_left: boolean, counter: CounterView, floor: FloorView, emoney: EmoneyView | null, emoney_short: number | null, emoney_partial: number | null, emoney_partial_ok: boolean, prepaid: number, prepaid_method: string | null, 

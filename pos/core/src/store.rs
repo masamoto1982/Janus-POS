@@ -812,9 +812,6 @@ impl Line {
 struct Txn {
     parcel_ask: bool,
     tobacco_asked: bool,
-    /// スタッフのログインで応答した、お客様の呼び出しの用件（取引が終わるまでレジカウンター側に出す）。
-    /// 最初の一件だけ。残りはスタッフがお客様との対話で聞ける（user 2026-11-14）
-    answered: Option<String>,
     lines: Vec<Line>,
     next_line: u32,
     paying: bool,
@@ -1682,20 +1679,6 @@ pub const EMERGENCY_PRESSES: usize = 30;
 /// 非常事態モードの解除のあと、レジカウンター側に「レシートを出力しました」と発動・解除時刻を出しておく時間
 pub const EMERGENCY_LOG_MS: u64 = 10_000;
 
-/// スタッフがログインすると呼び出しは消えるが、何の用件で呼ばれたかはレジカウンター側に残す（取引が終わるまで）。
-/// 呼び鈴（用件なし）と釣銭忘れ（ログインでは片付かない）以外のすべての呼び出し（user 2026-11-14：あらゆる呼び出しで挙動を揃える）
-pub const ANSWERED_CALLS: [CallKind; 10] = [
-    CallKind::AgeCheck,
-    CallKind::FastFood,
-    CallKind::Service,
-    CallKind::Tobacco,
-    CallKind::Voucher,
-    CallKind::Bill,
-    CallKind::Emoney,
-    CallKind::CashOnly,
-    CallKind::ReceiptStamp,
-    CallKind::Expired,
-];
 /// 応答のない呼び出しがあるあいだ、最後に鳴ってからこの間隔で呼び鈴を鳴らし直す
 pub const BELL_REMIND_MS: u64 = 30 * 1000;
 /// 鳴らし直しは、呼び出し（押されたとき・新しい呼び出し）ごとに最大この回数まで。
@@ -3532,17 +3515,6 @@ impl Store {
             r.pressing = false;
             r.press_since = None;
             let service_pending = r.txn.service_pending();
-            let first = self
-                .calls
-                .for_register(register)
-                .into_iter()
-                .filter(|c| ANSWERED_CALLS.contains(&c.kind))
-                .min_by_key(|c| (c.created_at, c.id))
-                .map(|c| c.topic);
-            let t = &mut self.reg_mut(register)?.txn;
-            if t.answered.is_none() {
-                t.answered = first;
-            }
             self.calls.resolve(register, CallKind::CustomerHelp, now);
             if self.calls.is_open(register, CallKind::Tobacco) {
                 self.reg_mut(register)?.txn.tobacco_asked = true;
@@ -4715,11 +4687,6 @@ impl Store {
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
             tobacco_asked: r.mode == Mode::StaffOperated && t.tobacco_asked,
-            answered: if r.mode == Mode::StaffOperated {
-                t.answered.clone()
-            } else {
-                None
-            },
             waiting_calls: if r.mode == Mode::SelfOperated {
                 self.waiting_calls(r.id)
             } else {
@@ -5038,8 +5005,6 @@ pub struct RegisterView {
     pub call_waiting_ms: Option<u64>,
     pub ring_volume: f32,
     pub tobacco_asked: bool,
-    /// スタッフのログインで応答した呼び出しの用件、最初の一件（スタッフ操作モードのレジカウンター側に出す）
-    pub answered: Option<String>,
     /// まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
     pub waiting_calls: Vec<CallKind>,
     pub mode: Mode,

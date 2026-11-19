@@ -919,3 +919,8 @@ body.dragging .drop-hint { display: inline; }
 .counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 .counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 @media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }
+/* グラデーションの上の文字が沈まないよう、縁が出ているあいだは文字のまわりを段の薄い青でふちどる（輪郭を文字の下に敷く）（user 2026-11-20）。
+   積極ボタン（白文字）など地を自分で持つ部品は対象外 */
+.counter-screen:is(.swipe-menu-open, .swipe-menu-close) .screen-head,
+.counter-screen.swipe-resume .screen-body :is(th, td, .staff-head, .staff-head *, .muted, .welcome, .welcome *) { -webkit-text-stroke: 0.2em var(--screen-bg); paint-order: stroke fill; }
+.counter-screen.swipe-resume .screen-body :is(button, input, select) { -webkit-text-stroke: 0; }

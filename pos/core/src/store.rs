@@ -4847,6 +4847,8 @@ impl Store {
             paused: r.paused,
             idle_voids: !r.idle() || r.on_hold.is_some(),
             held: r.on_hold.is_some(),
+            can_hold: r.hold_refusal().is_none(),
+            can_resume: r.on_hold.is_some() && !r.in_txn(),
             idle_revert_in: (r.mode != Mode::SelfOperated || !r.idle())
                 .then(|| r.idle_revert_in(self.now)),
             change_left: r
@@ -5165,6 +5167,10 @@ pub struct RegisterView {
     pub idle_voids: bool,
     /// 保留中の取引がある
     pub held: bool,
+    /// いま保留できる（登録画面を左へスワイプできる）
+    pub can_hold: bool,
+    /// いま保留した取引に戻れる（第二待ち受けを右へスワイプできる）
+    pub can_resume: bool,
     pub change_left: bool,
     pub counter: CounterView,
     pub floor: FloorView,

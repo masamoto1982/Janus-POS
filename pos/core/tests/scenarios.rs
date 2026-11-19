@@ -5102,9 +5102,9 @@ fn unanswered_call_rings_again_up_to_three_times() {
     assert_eq!(s.snapshot().bells[0].rings, r, "stops once staff logs in");
 }
 
-/// 仕様 11.1：呼び出しはログインまで出し、スタッフは用件を見る
+/// 仕様 11.1：呼び出しはログインまで出す
 #[test]
-fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
+fn customer_call_shows_until_login() {
     let mut s = Store::new(3, 2, 1);
     ok(
         &mut s,
@@ -5122,11 +5122,6 @@ fn customer_call_shows_until_login_and_staff_sees_answered_topic() {
     login_as(&mut s, 1, "ST001");
     let v = reg(&s, 1);
     assert!(v.waiting_calls.is_empty());
-    assert_eq!(
-        v.answered.as_deref(),
-        Some("たばこ"),
-        "staff still sees why they were called"
-    );
 }
 
 /// 仕様 11.1：セルフ操作モードのチャージの呼び出しもほかと同じく待つ
@@ -5142,12 +5137,11 @@ fn self_emoney_charge_call_waits_like_other_waiting_calls() {
     login_as(&mut s, 1, "ST001");
     let v = reg(&s, 1);
     assert!(v.waiting_calls.is_empty());
-    assert_eq!(v.answered.as_deref(), Some("電子マネー"));
 }
 
-/// 仕様 11.1：セルフ操作モードの呼び出しは最下段で待ち、ログイン後に用件を出す
+/// 仕様 11.1：セルフ操作モードの呼び出しは最下段で待ち、ログインで解ける
 #[test]
-fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
+fn every_self_call_waits_on_the_bottom_row_until_login() {
     // 年確
     let mut s = Store::new(3, 2, 1);
     ok(
@@ -5162,7 +5156,6 @@ fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
     login_as(&mut s, 1, "ST001");
     let v = reg(&s, 1);
     assert!(v.waiting_calls.is_empty());
-    assert_eq!(v.answered.as_deref(), Some("年確"));
     // 宅配便（受付中のサービス商品が呼ぶサービス）。用件は「サービス」ではなく「宅配便」
     let mut s = Store::new(3, 2, 1);
     ok(
@@ -5172,12 +5165,12 @@ fn every_self_call_waits_on_the_bottom_row_and_is_named_after_login() {
     assert_eq!(reg(&s, 1).waiting_calls, vec![CallKind::Service]);
     assert_eq!(reg(&s, 1).counter.calls[0].topic, "宅配便");
     login_as(&mut s, 1, "ST001");
-    assert_eq!(reg(&s, 1).answered.as_deref(), Some("宅配便"));
+    assert!(reg(&s, 1).waiting_calls.is_empty());
 }
 
-/// 仕様 11.1：用件は具体的で、最初の一件だけを出す
+/// 仕様 11.1：用件は具体的
 #[test]
-fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
+fn call_topic_is_concrete() {
     // 公共料金の払込票は「お支払い」
     let mut s = Store::new(3, 2, 1);
     ok(
@@ -5203,21 +5196,6 @@ fn call_topic_is_concrete_and_only_the_first_one_is_kept() {
         ok(&mut s, json!({"type":"release_call","register":1}));
         assert_eq!(reg(&s, 1).counter.calls[0].topic, want);
     }
-    // 二つ呼んでも、ログイン後の用件は最初の一件だけ
-    let mut s = Store::new(3, 2, 1);
-    ok(
-        &mut s,
-        json!({"type":"call_staff","register":1,"topic":"voucher"}),
-    );
-    ok(&mut s, json!({"type":"release_call","register":1}));
-    advance(&mut s, 1_000);
-    ok(
-        &mut s,
-        json!({"type":"call_staff","register":1,"topic":"tobacco"}),
-    );
-    ok(&mut s, json!({"type":"release_call","register":1}));
-    login_as(&mut s, 1, "ST001");
-    assert_eq!(reg(&s, 1).answered.as_deref(), Some("金券"));
 }
 
 /// 仕様 9.1：年確・FF の照合が済んだ案内はスタッフが次へ進むまで出す

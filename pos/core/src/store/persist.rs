@@ -188,7 +188,6 @@ struct SavedTxn {
     parcel_ask: bool,
     tobacco_asked: bool,
     #[serde(default)]
-    answered: Option<String>,
     lines: Vec<SavedLine>,
     next_line: u32,
     paying: bool,
@@ -331,7 +330,6 @@ impl SavedTxn {
         SavedTxn {
             parcel_ask: t.parcel_ask,
             tobacco_asked: t.tobacco_asked,
-            answered: t.answered.clone(),
             lines: t.lines.iter().map(SavedLine::from).collect(),
             next_line: t.next_line,
             paying: t.paying,
@@ -383,7 +381,6 @@ impl SavedTxn {
         Ok(Txn {
             parcel_ask: self.parcel_ask,
             tobacco_asked: self.tobacco_asked,
-            answered: self.answered,
             lines: self
                 .lines
                 .into_iter()

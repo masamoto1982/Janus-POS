@@ -910,12 +910,12 @@ body.dragging .drop-hint { display: inline; }
    濃い青（操作の青）から段の薄い青へのグラデーションで示す。部品をかき消さないよう背景に敷く。
    ヘッダー：左に店舗メニューが隠れている（スタッフ操作モードのあいだ常に左の縁、開いているあいだは右の縁）。
    登録画面：保留した取引は左へ追いやられている（保留した取引があるあいだだけ左の縁）。保留そのもの（左スワイプ）には手がかりを出さない */
-:root { --swipe-edge: color-mix(in oklch, var(--operable-blue) 65%, var(--blue-2)); --swipe-w: 25%; }
-/* 縁はスワイプの向きへゆっくり伸びては戻る（手で引き出す動き）。幅は --swipe-reach を 0.6〜1 倍で行き来させる */
+:root { --swipe-edge: color-mix(in oklch, var(--operable-blue) 75%, var(--blue-2)); --swipe-soft: color-mix(in oklch, var(--operable-blue) 25%, var(--blue-2)); --swipe-w: 50%; }
+/* 縁はスワイプの向きへゆっくり伸びては戻る（手で引き出す動き）。グラデーションは反対の縁まで緩やかに続き、濃さが半分になる位置（色の中間点）がヘッダーも登録画面も同じく引き潮＝横幅の 1/3・満ち潮＝横幅の 1/2（user 2026-11-20） */
 @property --swipe-reach { syntax: "<number>"; inherits: true; initial-value: 1; }
-@keyframes swipe-reach { 0%, 100% { --swipe-reach: 0.6; } 50% { --swipe-reach: 1; } }
+@keyframes swipe-reach { 0%, 100% { --swipe-reach: 0.6667; } 50% { --swipe-reach: 1; } }
 .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: swipe-reach 2.4s ease-in-out infinite; }
-.counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head { background: linear-gradient(to right, var(--swipe-edge), transparent calc(var(--swipe-w) * var(--swipe-reach))); }
-.counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), transparent calc(var(--swipe-w) * var(--swipe-reach))); }
-.counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), transparent calc(var(--swipe-w) / 2 * var(--swipe-reach))); }
+.counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
+.counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
+.counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 @media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }

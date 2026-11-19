@@ -919,11 +919,14 @@ body.dragging .drop-hint { display: inline; }
 .counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 .counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 @media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }
-/* グラデーションの上の文字が沈まないよう、縁が出ているあいだは文字の載る部品（ヘッダーの稼働モード・スタッフ名の行・明細の行）の
-   左に段の薄い青のグラデーションを敷き、縁の濃さを打ち消す（user 2026-11-20）。部品の外の縁は濃いまま見える */
-.counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head .head-l { background: linear-gradient(to right, color-mix(in oklch, var(--screen-bg) 0%, transparent), var(--screen-bg) 16px, color-mix(in oklch, var(--screen-bg) 0%, transparent)); }
-.counter-screen.swipe-resume .screen-body :is(.staff-head, table) { background: linear-gradient(to right, color-mix(in oklch, var(--screen-bg) 0%, transparent), var(--screen-bg) 16px, color-mix(in oklch, var(--screen-bg) 0%, transparent)); }
-.counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head .head-r { background: linear-gradient(to left, color-mix(in oklch, var(--screen-bg) 0%, transparent), var(--screen-bg) 16px, color-mix(in oklch, var(--screen-bg) 0%, transparent)); }
-/* スタッフ名の行と明細のあいだに縁の濃い筋が出ないよう、明細の上の余白をスタッフ名の行の内側へ移す */
-.counter-screen.swipe-resume .screen-body .staff-head + table { margin-top: 0; }
-.counter-screen.swipe-resume .screen-body .staff-head:has(+ table) { padding-bottom: var(--s13, 4px); }
+/* グラデーションの上の文字が沈まないよう、縁が出ているあいだは縁に近い文字（ヘッダーの稼働モード、スタッフ名の行、明細の一列目）の
+   色そのものを、縁に近い端ほど濃く（黒）し、離れるにつれて元の文字色へ戻す（user 2026-11-20。文字は縁の中間の濃さの上に載るので、白く明るくするより黒へ寄せる方が読める） */
+.counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head .mode-title,
+.counter-screen.swipe-resume .screen-body :is(.staff-head > :first-child, .lines tr > :first-child) {
+  background: linear-gradient(to right, var(--ink), var(--swipe-ink, currentColor) 70%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.counter-screen.swipe-resume .screen-body :is(.staff-head > :first-child, .lines tr > :first-child) * { color: transparent; }
+.counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head .head-r .clock {
+  background: linear-gradient(to left, var(--ink), var(--swipe-ink, currentColor) 70%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.counter-screen .screen-head .mode-title { --swipe-ink: var(--msg-strong); }
+.counter-screen .screen-head .clock, .counter-screen .staff-head > :first-child, .counter-screen .lines td { --swipe-ink: var(--ink); }
+.counter-screen .lines th { --swipe-ink: var(--msg-weak); }

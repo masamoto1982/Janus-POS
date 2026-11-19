@@ -884,8 +884,8 @@ body.dragging .drop-hint { display: inline; }
   --mode-self-bg: var(--white); --mode-self-deep: var(--grey-1); --alert-deep: var(--orange-2); }
 :root .screen.mode-staff { --screen-bg: var(--mode-staff-bg); --tier-deep: var(--mode-staff-deep); }
 :root .screen.mode-self { --screen-bg: var(--mode-self-bg); --tier-deep: var(--mode-self-deep); }
-/* 操作できる側（アクティブ側）の画面は肯定の緑、操作できない側は否定の赤：一段目・三段目は淡（濃度1）、二段目（帯）と四段目（最下段）は薄（濃度2） */
-:root .screen.operable { --screen-bg: var(--green-1); --tier-deep: var(--green-2); }
+/* 操作できる側（アクティブ側）の画面は操作の青の延長の薄い青（user 2026-11-20、旧 肯定の緑）、操作できない側は否定の赤：一段目・三段目は淡（濃度1）、二段目（帯）と四段目（最下段）は薄（濃度2） */
+:root .screen.operable { --screen-bg: var(--blue-1); --tier-deep: var(--blue-2); }
 :root .screen:not(.operable) { --screen-bg: var(--red-1); --tier-deep: var(--red-2); }
 /* セルフ操作モードのレジカウンター側（操作できない側）は、赤だと呼び鈴が目立たないのでグレーアウトの段（グレーの淡・薄）にする */
 :root .counter-screen.mode-self:not(.operable, .calling) { --screen-bg: var(--grey-1); --tier-deep: var(--grey-2); }
@@ -905,3 +905,18 @@ body.dragging .drop-hint { display: inline; }
 /* モバイルモードでは W の下限 384px をなくし、画面の内幅そのものにする（user 2026-11-18：表示エリアの制約による便宜的措置。
    文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
 @media (max-width: 760px) { .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); } }
+
+/* スワイプできることの手がかり（user 2026-11-20）：操作できる側の段を操作の青と同じ色相の薄い青にしたので、
+   スワイプで中身が出てくる側の縁を、濃い青（操作の青）から段の薄い青へのグラデーションで示す。部品をかき消さないよう背景に敷く。
+   ヘッダー：右スワイプで店舗メニューを開く（左の縁）・左スワイプで閉じる（右の縁）。
+   登録画面：左スワイプで保留して第二待ち受けが右から出る（右の縁）・第二待ち受けの右スワイプで保留した取引が左から戻る（左の縁） */
+:root { --swipe-edge: color-mix(in oklch, var(--operable-blue) 65%, var(--blue-2)); --swipe-w: 25%; }
+/* 縁はスワイプの向きへゆっくり伸びては戻る（手で引き出す動き）。幅は --swipe-reach を 0.6〜1 倍で行き来させる */
+@property --swipe-reach { syntax: "<number>"; inherits: true; initial-value: 1; }
+@keyframes swipe-reach { 0%, 100% { --swipe-reach: 0.6; } 50% { --swipe-reach: 1; } }
+.counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-hold, .swipe-resume) { animation: swipe-reach 2.4s ease-in-out infinite; }
+.counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head { background: linear-gradient(to right, var(--swipe-edge), transparent calc(var(--swipe-w) * var(--swipe-reach))); }
+.counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), transparent calc(var(--swipe-w) * var(--swipe-reach))); }
+.counter-screen.swipe-hold .screen-body { background: linear-gradient(to left, var(--swipe-edge), transparent calc(var(--swipe-w) / 2 * var(--swipe-reach))); }
+.counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), transparent calc(var(--swipe-w) / 2 * var(--swipe-reach))); }
+@media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-hold, .swipe-resume) { animation: none; } }

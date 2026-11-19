@@ -467,6 +467,12 @@ function render(): void {
       el?.classList.toggle("operable", operable);
       el?.classList.toggle("mode-staff", r.mode === "staff_operated");
       el?.classList.toggle("hold-swipe", side === "counter" && r.mode === "staff_operated" && !r.menu);
+      // スワイプできる縁を、操作の青の濃い青→段の薄い青のグラデーションで示す（user 2026-11-20）
+      el?.classList.toggle("swipe-hold", side === "counter" && r.can_hold);
+      el?.classList.toggle("swipe-resume", side === "counter" && r.can_resume);
+      const menuSwipe = side === "counter" && storeMenuUsable(r);
+      el?.classList.toggle("swipe-menu-open", menuSwipe && !r.menu);
+      el?.classList.toggle("swipe-menu-close", menuSwipe && !!r.menu);
       el?.classList.toggle("mode-self", r.mode === "self_operated");
       el?.classList.toggle("calling", side === "counter" && r.lamp);
       el?.classList.toggle("head-blink", r.lamp || r.emergency);

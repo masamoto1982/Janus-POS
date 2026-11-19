@@ -1530,7 +1530,9 @@ export function firstWelcome(r: RegisterView, side: Side): string {
   const band = staffOp
     ? welcomeBand(r, side, find(r.counter.actions, "emoney"), side === "floor")
     : welcomeBand(r, side, find(r.floor.actions, "emoney"), false);
-  return `${band}<div class="first-welcome"><b class="mode-big">${staffOp ? "有人レジ" : "セルフレジ"}</b></div>`;
+  // 英語の添え字を小テキストで添える（user 2026-11-19）。日本語と英語を並べて出すので、休止中と同じく言語切り替えでは訳さない
+  const [ja, en] = staffOp ? ["有人レジ", "Staffed Checkout"] : ["セルフレジ", "Self Checkout"];
+  return `${band}<div class="first-welcome" data-i18n-skip><b class="mode-big">${ja}</b><small class="mode-sub">${en}</small></div>`;
 }
 
 /** レジカウンター側で店舗メニューを開いている間の売り場側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。

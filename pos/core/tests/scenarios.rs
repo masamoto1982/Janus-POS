@@ -5396,3 +5396,129 @@ fn idle_countdown_is_frozen_for_a_self_operated_call() {
         "the transaction is not voided"
     );
 }
+
+/// 仕様 9：学生証など（店舗の年齢制限だけの年確）で確かめた年齢は、同じ年齢の法令の商品（酒・たばこ）には使わない
+#[test]
+fn an_age_confirmed_with_a_student_id_does_not_cover_alcohol_or_tobacco() {
+    const FIREWORKS: &str = "4910000000076";
+    // 登録の途中で年確を始め、身分証の生年月日（2000年生まれ＝26歳）で確かめる
+    let id_check = |s: &mut Store| {
+        ok(
+            s,
+            json!({"type":"early_age_check","register":1,"side":"counter","start":true}),
+        );
+        ok(
+            s,
+            json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}),
+        );
+        ok(
+            s,
+            json!({"type":"check_id","register":1,"birth":"20000101","today":"2026-11-19"}),
+        );
+        ok(s, json!({"type":"dismiss_passed","register":1}));
+    };
+    let line = |s: &Store, name: &str| {
+        reg(s, 1)
+            .counter
+            .lines
+            .iter()
+            .find(|l| l.line.name == name)
+            .map(|l| l.age_checked)
+            .unwrap()
+    };
+
+    // ライター（店舗の 20 歳）を学生証で確かめたあとに、たばこ（法令の 20 歳）が加わる：公的な身分証でやり直す
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", LIGHTER);
+    assert!(!reg(&s, 1).counter.age_official_id);
+    id_check(&mut s);
+    assert!(line(&s, "ライター"));
+    scan(&mut s, 1, "counter", TOBACCO);
+    let v = reg(&s, 1);
+    assert!(v.counter.age_official_id, "tobacco needs an official ID");
+    let tobacco = v
+        .counter
+        .lines
+        .iter()
+        .find(|l| l.age.is_some() && !l.age_checked);
+    assert!(
+        tobacco.is_some(),
+        "tobacco is not covered by the student ID"
+    );
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    assert_eq!(reg(&s, 1).counter.required_age, Some(20));
+    assert!(reg(&s, 1).counter.age_official_id);
+
+    // 公的な身分証で 20 歳を確かめたあとなら、ライターが加わってもやり直さない
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BEER);
+    assert!(reg(&s, 1).counter.age_official_id);
+    id_check(&mut s);
+    scan(&mut s, 1, "counter", LIGHTER);
+    assert!(line(&s, "ライター"), "an official ID covers the store rule");
+
+    // たばこ（20・法令）と花火（18・店舗）を一緒に：厳しい方の 20 歳を公的な身分証で確かめれば両方済む
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", TOBACCO);
+    scan(&mut s, 1, "counter", FIREWORKS);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    assert_eq!(reg(&s, 1).counter.required_age, Some(20));
+    assert!(reg(&s, 1).counter.age_official_id);
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"check_id","register":1,"birth":"20000101","today":"2026-11-19"}),
+    );
+    let v = reg(&s, 1);
+    assert!(v.counter.lines.iter().all(|l| l.age_checked));
+
+    // 花火（18・店舗）を学生証で確かめたあとに酒（20・法令）：20 歳を公的な身分証でやり直す
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", FIREWORKS);
+    id_check(&mut s);
+    scan(&mut s, 1, "counter", BEER);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    assert_eq!(reg(&s, 1).counter.required_age, Some(20));
+    assert!(reg(&s, 1).counter.age_official_id);
+
+    // 19 歳とわかったら、たばこだけを取り除き花火は残す
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", TOBACCO);
+    scan(&mut s, 1, "counter", FIREWORKS);
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"check_id","register":1,"birth":"20070101","today":"2026-11-19"}),
+    );
+    let names: Vec<_> = reg(&s, 1)
+        .counter
+        .lines
+        .iter()
+        .map(|l| l.line.name)
+        .collect();
+    assert_eq!(names, vec!["花火"]);
+}

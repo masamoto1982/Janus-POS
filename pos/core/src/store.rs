@@ -821,9 +821,10 @@ struct Txn {
     returned: Vec<(&'static str, bool)>,
     age_method: Option<AgeMethod>,
     verified_age: Option<u8>,
-    /// 確認を済ませた年確の年齢（20・18 など）。同じ年齢の年確商品があとから加わっても
-    /// やり直さず、まだ確認していない年齢の年確商品が加わったときだけやり直す
-    age_done: Vec<u8>,
+    /// 確認を済ませた年確の年齢（20・18 など）と、公的な身分証（免許証・マイナンバーカードなど）で確かめたか。
+    /// 同じ年齢の年確商品があとから加わってもやり直さず、まだ確認していない年齢の年確商品が加わったときだけやり直す。
+    /// ただし学生証など（店舗が任意で決めた年齢制限だけの年確）で確かめた年齢は、法令の年齢制限（酒・たばこ）の商品には使わない
+    age_done: Vec<(u8, bool)>,
     /// スタッフが登録の途中で年齢確認を始めた
     age_early: bool,
     confiscated: Vec<(&'static str, u32)>,
@@ -1117,31 +1118,51 @@ impl Txn {
             && self.age_method == Some(AgeMethod::Id)
     }
 
-    fn line_ages(&self, rules: &AgeRules) -> Vec<u8> {
-        let mut ages: Vec<u8> = self
+    /// 明細の年確：求める年齢と、法令の年齢制限（公的な身分証が要る）か
+    fn line_needs(&self, rules: &AgeRules) -> Vec<(u8, bool)> {
+        let mut needs: Vec<(u8, bool)> = self
             .lines
             .iter()
-            .filter_map(|l| rules.age_for(l.code, l.category))
+            .filter_map(|l| {
+                rules
+                    .age_for(l.code, l.category)
+                    .map(|a| (a, rules.legal_age_for(l.code, l.category).is_some()))
+            })
             .collect();
-        ages.sort_unstable();
-        ages.dedup();
-        ages
+        needs.sort_unstable();
+        needs.dedup();
+        needs
     }
 
-    /// 確認を済ませた年齢に、いま明細にある年確の年齢を加える
-    fn mark_ages_done(&mut self, rules: &AgeRules) {
-        for a in self.line_ages(rules) {
-            if !self.age_done.contains(&a) {
-                self.age_done.push(a);
+    /// その年齢を確認済みか。法令の年齢制限には公的な身分証での確認（またはスタッフの判断での省略）が要る
+    fn age_is_done(&self, age: u8, legal: bool) -> bool {
+        self.age_done
+            .iter()
+            .any(|&(a, official)| a == age && (official || !legal))
+    }
+
+    /// 確認を済ませた年齢に、いま明細にある年確の年齢を加える。official＝公的な身分証で確かめた（または省略した）
+    fn mark_ages_done(&mut self, rules: &AgeRules, official: bool) {
+        for (a, _) in self.line_needs(rules) {
+            match self.age_done.iter_mut().find(|(d, _)| *d == a) {
+                Some(e) => e.1 |= official,
+                None => self.age_done.push((a, official)),
             }
         }
     }
 
+    fn unmet_ages(&self, rules: &AgeRules) -> Vec<(u8, bool)> {
+        self.line_needs(rules)
+            .into_iter()
+            .filter(|&(a, legal)| !self.age_is_done(a, legal))
+            .collect()
+    }
+
     /// 求める年齢：まだ確認していない年齢があればそのうち最も高いもの、なければ明細の最も高いもの
     fn age_to_check(&self, rules: &AgeRules) -> Option<u8> {
-        self.line_ages(rules)
+        self.unmet_ages(rules)
             .into_iter()
-            .filter(|a| !self.age_done.contains(a))
+            .map(|(a, _)| a)
             .max()
             .or_else(|| self.max_age(rules))
     }
@@ -1154,23 +1175,18 @@ impl Txn {
     }
 
     fn age_unchecked(&self, rules: &AgeRules) -> bool {
-        self.line_ages(rules)
-            .iter()
-            .any(|a| !self.age_done.contains(a))
+        !self.unmet_ages(rules).is_empty()
     }
 
     /// まだ確認していない年確商品に法令の年齢制限（酒・たばこ）があるか。あれば免許証・マイナンバーカード、
-    /// 店舗が任意で決めた年齢制限だけなら学生証など顔写真付きの身分証も認める（デジタル身分証は不可）
+    /// 店舗が任意で決めた年齢制限だけなら学生証など顔写真付きの身分証も認める（デジタル身分証は不可）。
+    /// 学生証で確かめた年齢と同じ年齢の法令の商品（ライターのあとのたばこ）が加わっても、公的な身分証でやり直す
     fn age_official_id(&self, rules: &AgeRules) -> bool {
-        self.lines.iter().any(|l| {
-            rules
-                .legal_age_for(l.code, l.category)
-                .is_some_and(|a| !self.age_done.contains(&a))
-        })
+        self.unmet_ages(rules).iter().any(|&(_, legal)| legal)
     }
 
-    fn line_age_checked(&self, age: Option<u8>) -> bool {
-        age.is_some_and(|a| self.age_done.contains(&a))
+    fn line_age_checked(&self, age: Option<u8>, legal: bool) -> bool {
+        age.is_some_and(|a| self.age_is_done(a, legal))
     }
 
     fn coupon_unmatched(&self) -> bool {
@@ -2543,7 +2559,7 @@ impl Store {
                     let age = r.txn.required_age.unwrap_or(0);
                     r.txn.age_method = Some(AgeMethod::Skip);
                     r.txn.verified_age = r.txn.required_age;
-                    r.txn.mark_ages_done(rules);
+                    r.txn.mark_ages_done(rules, true);
                     r.txn.age_early = false;
                     done(format!("{age}歳以上の年齢確認を省略しました"))
                 }
@@ -3900,6 +3916,7 @@ impl Store {
             .find(|r| r.id == register)
             .ok_or("レジがありません")?;
         let need = r.txn.required_age;
+        let official = r.txn.age_official_id(rules);
         let mut removed: Vec<(&'static str, u32)> = vec![];
         r.txn.lines.retain(|l| {
             let keep = rules.age_for(l.code, l.category).is_none_or(|a| a <= age);
@@ -3912,7 +3929,7 @@ impl Store {
             keep
         });
         r.txn.verified_age = Some(age);
-        r.txn.mark_ages_done(rules);
+        r.txn.mark_ages_done(rules, official);
         r.txn.required_age = r.txn.age_to_check(rules);
         r.txn.age_early = false;
         if r.txn.lines.is_empty() {
@@ -4636,7 +4653,10 @@ impl Store {
                 line: l.clone(),
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
-                age_checked: t.line_age_checked(self.age_rules.age_for(l.code, l.category)),
+                age_checked: t.line_age_checked(
+                    self.age_rules.age_for(l.code, l.category),
+                    self.age_rules.legal_age_for(l.code, l.category).is_some(),
+                ),
                 limit: self.age_rules.limit_for(l.code),
                 limit_hit: t.limit_hit.contains(&l.code),
                 fresh: l.is_fresh(),
@@ -4657,7 +4677,10 @@ impl Store {
                 ff_base: l.ff_base,
                 amount: l.amount(),
                 age: self.age_rules.age_for(l.code, l.category),
-                age_checked: t.line_age_checked(self.age_rules.age_for(l.code, l.category)),
+                age_checked: t.line_age_checked(
+                    self.age_rules.age_for(l.code, l.category),
+                    self.age_rules.legal_age_for(l.code, l.category).is_some(),
+                ),
                 limit: self.age_rules.limit_for(l.code),
                 limit_hit: t.limit_hit.contains(&l.code),
                 cash_only: l.cash_only,

@@ -18,7 +18,7 @@ use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
 
 /// 保存の形式。既定の販売規則（年齢制限・個数制限）や商品を変えたら上げ、古い保存を捨てて新しい既定値で始める
-pub const SCHEMA: u32 = 4;
+pub const SCHEMA: u32 = 5;
 
 fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
@@ -198,7 +198,7 @@ struct SavedTxn {
     age_method: Option<AgeMethod>,
     verified_age: Option<u8>,
     #[serde(default)]
-    age_done: Vec<u8>,
+    age_done: Vec<(u8, bool)>,
     #[serde(default)]
     age_early: bool,
     confiscated: Vec<(String, u32)>,

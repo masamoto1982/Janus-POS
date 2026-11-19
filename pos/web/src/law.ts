@@ -316,7 +316,8 @@ export function fitText(root: ParentNode): void {
   };
   /** 決めた文字の段：一行は特大、二行は大＋極小 */
   // 二行のボタンと同じ並びにある一行のボタン（セルフ最下段の「その他」など）は、隣の主役と同じ大にそろえる
-  const tierOf = (b: HTMLElement) => (parts(b) || [...(b.parentElement?.children ?? [])].some((x) => x !== b && x instanceof HTMLElement && x.matches("button") && parts(x)) ? 1 : 0);
+  // テンキーの下段（バック・←・決定）は数字より一段小さい大（user 2026-11-19：「バック」が幅の決まったキーからはみ出していた）
+  const tierOf = (b: HTMLElement) => (b.matches(".pad-fn") || parts(b) || [...(b.parentElement?.children ?? [])].some((x) => x !== b && x instanceof HTMLElement && x.matches("button") && parts(x)) ? 1 : 0);
   // 1. 幅：文字＋左右の余白 B÷4＋枠（まずボタンごと）
   const flex = buttons.filter((b) => !b.matches(RIGID));
   for (const b of flex) {

@@ -5522,3 +5522,134 @@ fn an_age_confirmed_with_a_student_id_does_not_cover_alcohol_or_tobacco() {
         .collect();
     assert_eq!(names, vec!["花火"]);
 }
+
+fn hold(s: &mut Store, r: u8) -> Result<Option<String>, String> {
+    run(s, json!({"type":"hold_transaction","register":r}))
+}
+
+fn line_codes(v: &RegisterView) -> Vec<&'static str> {
+    v.counter.lines.iter().map(|l| l.line.code).collect()
+}
+
+/// 仕様 5.7：保留した取引は脇に置かれ、割り込みの取引が後始末まで済むと担当ごと戻る
+#[test]
+fn held_transaction_comes_back_after_the_interrupting_one() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    hold(&mut s, 1).unwrap();
+    let v = reg(&s, 1);
+    assert!(v.held);
+    assert!(v.counter.lines.is_empty(), "第二待ち受けから新しい取引を始められる");
+    assert_eq!(v.mode, Mode::StaffOperated);
+
+    scan(&mut s, 1, "counter", TEA);
+    assert_eq!(line_codes(&reg(&s, 1)), vec![TEA]);
+    assert!(hold(&mut s, 1).unwrap_err().contains("一件だけ"));
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    confirm_point(&mut s, 1);
+    pay_cash(&mut s, 1);
+    assert!(reg(&s, 1).held, "お釣りを返すまでは割り込みの取引の後始末");
+    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    advance(&mut s, 3_100);
+    let v = reg(&s, 1);
+    assert!(!v.held);
+    assert_eq!(line_codes(&v), vec![BREAD]);
+    assert_eq!(v.mode, Mode::StaffOperated, "担当はログインしたまま保留した取引に戻る");
+    assert_eq!(v.counter.name, Some("スタッフ001"));
+
+    hold(&mut s, 1).unwrap();
+    assert!(reg(&s, 1).held, "戻った取引は再び保留できる");
+}
+
+/// 仕様 5.7：割り込みの後始末の途中で次の商品を読むと、保留した取引に戻してから登録する
+#[test]
+fn scanning_during_the_interrupt_aftercare_goes_to_the_held_transaction() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    hold(&mut s, 1).unwrap();
+    scan(&mut s, 1, "counter", TEA);
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+    let v = reg(&s, 1);
+    assert!(!v.held, "取引中止も割り込みの取引の終わり");
+    assert_eq!(line_codes(&v), vec![BREAD]);
+
+    hold(&mut s, 1).unwrap();
+    scan(&mut s, 1, "counter", TEA);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    confirm_point(&mut s, 1);
+    pay_cash(&mut s, 1);
+    ok(&mut s, json!({"type":"take_outlet","register":1}));
+    scan(&mut s, 1, "counter", SNACK);
+    let v = reg(&s, 1);
+    assert!(!v.held);
+    assert_eq!(line_codes(&v), vec![BREAD, SNACK]);
+    assert_eq!(v.mode, Mode::StaffOperated);
+}
+
+/// 仕様 5.7：保留はスタッフ操作モードの商品登録の画面だけ。お支払い・宅配便・チケットは保留できない
+#[test]
+fn only_plain_registering_transactions_can_be_held() {
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "floor", BREAD);
+    assert!(hold(&mut s, 1).unwrap_err().contains("スタッフ操作モード"));
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+
+    login(&mut s, 1);
+    assert!(hold(&mut s, 1).unwrap_err().contains("ありません"));
+    scan(&mut s, 1, "counter", BREAD);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    assert!(hold(&mut s, 1).unwrap_err().contains("商品登録の画面"));
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+
+    for (code, why) in [(BILL, "お支払い"), (PARCEL, "宅配便"), (RECEIVE, "宅配便"), (TICKET, "チケット")] {
+        login(&mut s, 1);
+        scan(&mut s, 1, "counter", code);
+        let e = hold(&mut s, 1).unwrap_err();
+        assert!(e.contains(why), "{code}: {e}");
+        assert!(!reg(&s, 1).held);
+        ok(&mut s, json!({"type":"void_transaction","register":1}));
+    }
+}
+
+/// 仕様 5.7：割り込みの取引を始める前なら保留した取引に戻れる。ログアウトしても戻る。ほかのスタッフには切り替えられない
+#[test]
+fn held_transaction_can_be_resumed_before_an_interrupt() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    hold(&mut s, 1).unwrap();
+    let e = run(&mut s, json!({"type":"scan","register":1,"side":"counter","code":"ST002"})).unwrap_err();
+    assert!(e.contains("保留中の取引"), "{e}");
+    ok(&mut s, json!({"type":"resume_held","register":1}));
+    assert_eq!(line_codes(&reg(&s, 1)), vec![BREAD]);
+
+    hold(&mut s, 1).unwrap();
+    scan(&mut s, 1, "counter", TEA);
+    assert!(run(&mut s, json!({"type":"resume_held","register":1})).is_err(), "割り込みの取引の途中では戻れない");
+    ok(&mut s, json!({"type":"void_transaction","register":1}));
+
+    hold(&mut s, 1).unwrap();
+    ok(&mut s, json!({"type":"end_staff_mode","register":1}));
+    let v = reg(&s, 1);
+    assert!(!v.held, "割り込む前にログアウトしたら保留した取引に戻る");
+    assert_eq!(line_codes(&v), vec![BREAD]);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert!(run(&mut s, json!({"type":"scan","register":1,"side":"counter","code":"ST002"})).is_err(), "担当は保留したときのスタッフのまま");
+}
+
+/// 仕様 5.7：無操作が続けば、保留した取引も中止する
+#[test]
+fn idle_revert_voids_the_held_transaction_too() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    hold(&mut s, 1).unwrap();
+    scan(&mut s, 1, "counter", TEA);
+    advance(&mut s, 5 * 60 * 1000 + 100);
+    let v = reg(&s, 1);
+    assert!(!v.held);
+    assert!(v.counter.lines.is_empty());
+    assert_eq!(v.mode, Mode::SelfOperated);
+}

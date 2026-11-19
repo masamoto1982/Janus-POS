@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    bell_name, AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, Passed, Receipt,
+    bell_name, AgeMethod, OnHold, AuditEntry, EmoneyTask, Line, LineKind, Menu, Passed, Receipt,
     ReceiptStamp, Register, StaffSession, Store, TicketRow, Txn,
 };
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
@@ -134,6 +134,8 @@ struct SavedRegister {
     #[serde(default)]
     closing: bool,
     txn: SavedTxn,
+    #[serde(default)]
+    on_hold: Option<SavedOnHold>,
     drawer: Cash,
     last_receipt: Option<SavedReceipt>,
     bill_handover: Option<u32>,
@@ -181,6 +183,13 @@ struct SavedReceipt {
     points_used: u32,
     #[serde(default)]
     point_balance: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SavedOnHold {
+    txn: SavedTxn,
+    owner: Option<String>,
+    interrupted: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -427,6 +436,11 @@ impl SavedRegister {
             owner: r.owner.map(|a| a.id.to_string()),
             closing: r.closing,
             txn: SavedTxn::from(&r.txn),
+            on_hold: r.on_hold.as_ref().map(|h| SavedOnHold {
+                txn: SavedTxn::from(&h.txn),
+                owner: h.owner.map(|a| a.id.to_string()),
+                interrupted: h.interrupted,
+            }),
             drawer: r.drawer.cash.clone(),
             last_receipt: r.last_receipt.as_ref().map(|rc| SavedReceipt {
                 no: rc.no,
@@ -486,6 +500,19 @@ impl SavedRegister {
             owner,
             closing: self.closing,
             txn: self.txn.restore()?,
+            on_hold: match self.on_hold {
+                Some(h) => Some(OnHold {
+                    txn: h.txn.restore()?,
+                    owner: match h.owner {
+                        Some(id) => Some(
+                            auth::account(&id).ok_or_else(|| format!("スタッフ {id} がいません"))?,
+                        ),
+                        None => None,
+                    },
+                    interrupted: h.interrupted,
+                }),
+                None => None,
+            },
             drawer: Drawer { cash: self.drawer },
             last_receipt: self.last_receipt.map(|rc| Receipt {
                 no: rc.no,

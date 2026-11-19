@@ -37,6 +37,13 @@ const TICKET_ALONE: &str = "会計を分けてください\nチケットは一�
 const BILL_ALONE: &str = "会計を分けてください\nお支払い同士なら幾つでも一緒に会計できます";
 const PARCEL_CODE: &str = "2100000000014";
 const PARCEL_ALONE: &str = "会計を分けてください\nお荷物同士なら、何個でも一緒に会計できます";
+const HOLD_STAFF_ONLY: &str = "保留はスタッフ操作モードだけで使えます";
+const HOLD_ONE: &str = "保留できる取引は一件だけです";
+const HOLD_NOTHING: &str = "保留する取引がありません";
+const HOLD_REGISTERING: &str = "商品登録の画面で保留してください";
+const HOLD_BILL: &str = "お支払いのある取引は保留できません";
+const HOLD_PARCEL: &str = "宅配便のある取引は保留できません";
+const HOLD_TICKET: &str = "チケットのある取引は保留できません";
 const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、スタッフがログインしてから行います";
 const PICKUP_ALONE: &str = "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです";
 const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引中止にしてください";
@@ -420,6 +427,10 @@ pub enum Command {
     EndEmergency { register: u8 },
     /// 取引を中止する
     VoidTransaction { register: u8 },
+    /// 商品登録中の取引を保留して、次の取引を受け付ける（スタッフ操作モードのレジカウンター側、登録画面の左スワイプ）
+    HoldTransaction { register: u8 },
+    /// 割り込みの取引を始める前に、保留した取引に戻る（第二待ち受けの右スワイプ）
+    ResumeHeld { register: u8 },
     /// ログアウトしてセルフ操作モードに戻る
     EndStaffMode { register: u8 },
     /// レジ休止中にする
@@ -569,6 +580,8 @@ impl Command {
             | C::ConfirmPointCard { register, .. }
             | C::UsePoints { register, .. }
             | C::VoidTransaction { register, .. }
+            | C::HoldTransaction { register }
+            | C::ResumeHeld { register }
             | C::EndStaffMode { register, .. }
             | C::Pause { register }
             | C::CashOut { register, .. }
@@ -619,7 +632,9 @@ impl Command {
             | C::ParcelNext { .. }
             | C::PickupHandover { .. }
             | C::PickupFound { .. }
-            | C::VoidTransaction { .. } => Some(Side::Counter),
+            | C::VoidTransaction { .. }
+            | C::HoldTransaction { .. }
+            | C::ResumeHeld { .. } => Some(Side::Counter),
             _ => None,
         }
     }
@@ -1283,6 +1298,15 @@ pub struct ReceiptStamp {
     pub base: u32,
 }
 
+/// 保留した取引。保留できるのは一件だけで、担当スタッフも取引と一緒に脇に置く
+#[derive(Clone, Debug)]
+struct OnHold {
+    txn: Txn,
+    owner: Option<&'static auth::StaffAccount>,
+    /// 保留のあと、割り込みの取引が始まった。それが終わると保留した取引に戻る
+    interrupted: bool,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct StaffSession {
     account: &'static auth::StaffAccount,
@@ -1300,6 +1324,8 @@ struct Register {
     /// 担当のいる取引を終えて、後始末を待っている
     closing: bool,
     txn: Txn,
+    /// 保留した取引（スタッフ操作モードだけ、一件まで）
+    on_hold: Option<OnHold>,
     drawer: Drawer,
     last_receipt: Option<Receipt>,
     bill_handover: Option<u32>,
@@ -1470,6 +1496,16 @@ impl Register {
     /// 取引中にログインしているスタッフを担当にする。担当のいる取引を終えたら、後始末が済んだところで担当をログアウトさせ、
     /// セルフ操作モードに戻す。後始末の途中で次の取引が始まったときも、そこでログアウトさせる（次の取引は改めてログインする）
     fn sync_owner(&mut self) {
+        let busy = self.busy();
+        let in_txn = self.in_txn();
+        let staff = self.staff.map(|s| s.account.id);
+        if let Some(h) = &mut self.on_hold {
+            h.interrupted |= busy;
+            // 割り込みの取引が後始末まで済んだ、または割り込む前に担当がログアウトした（休止も）ら、保留した取引に戻る
+            if !in_txn && (h.interrupted || staff != h.owner.map(|o| o.id)) {
+                self.resume_held();
+            }
+        }
         if self.closing && (self.busy() || !self.in_txn()) {
             self.closing = false;
             if self.owner.take().is_some() {
@@ -1484,6 +1520,42 @@ impl Register {
             self.owner = None;
         }
         self.sync_mode();
+    }
+
+    /// 保留した取引に戻る。担当も保留したときのスタッフに戻す（ログインしているスタッフはそのまま）
+    fn resume_held(&mut self) {
+        if let Some(h) = self.on_hold.take() {
+            self.closing = false;
+            self.txn = h.txn;
+            self.owner = h.owner;
+        }
+    }
+
+    /// 保留できるか：スタッフ操作モードの商品登録の画面で、お支払い（公共料金など）・宅配便・チケットを含まない取引を一件だけ
+    fn hold_refusal(&self) -> Option<&'static str> {
+        let t = &self.txn;
+        if self.staff.is_none() || self.mode != Mode::StaffOperated {
+            return Some(HOLD_STAFF_ONLY);
+        }
+        if self.on_hold.is_some() {
+            return Some(HOLD_ONE);
+        }
+        if t.lines.is_empty() {
+            return Some(HOLD_NOTHING);
+        }
+        if t.paying || self.emoney.is_some() || self.menu.is_some() || t.passed.is_some() {
+            return Some(HOLD_REGISTERING);
+        }
+        if t.lines.iter().any(Line::is_bill) {
+            return Some(HOLD_BILL);
+        }
+        if t.lines.iter().any(|l| l.is_parcel() || l.is_pickup()) {
+            return Some(HOLD_PARCEL);
+        }
+        if t.lines.iter().any(|l| l.tickets() > 0) {
+            return Some(HOLD_TICKET);
+        }
+        None
     }
 
     /// 取引を終えた（決済・取引中止・荷物が見つからないお受け取り・電子マネーのチャージ）
@@ -1730,6 +1802,7 @@ impl Store {
                 staff: None,
                 owner: None,
                 closing: false,
+                on_hold: None,
                 txn: Txn::default(),
                 drawer: Drawer::default(),
                 last_receipt: None,
@@ -1893,6 +1966,13 @@ impl Store {
             .collect();
         for id in due {
             if !self.reg(id).is_some_and(|r| r.idle()) {
+                self.void_txn(id, now);
+            }
+            // 保留した取引も、無操作が続けば中止する
+            if self.reg(id).is_some_and(|r| r.on_hold.is_some()) {
+                if let Ok(r) = self.reg_mut(id) {
+                    r.resume_held();
+                }
                 self.void_txn(id, now);
             }
             if let Ok(r) = self.reg_mut(id) {
@@ -2074,6 +2154,19 @@ impl Store {
                 r.last_op = now;
                 if !keep_log {
                     r.emergency_log = None;
+                }
+            }
+        }
+        // 割り込みの取引の後始末の途中で次の商品を読んだら、それは保留していたお客様の商品：保留した取引に戻してから受け付ける
+        let starts_txn = match &cmd {
+            Command::Scan { code, .. } => !matches!(catalog::classify(code), Scanned::Staff(_)),
+            Command::RegisterFf { .. } => true,
+            _ => false,
+        };
+        if let (true, Some(id)) = (starts_txn, cmd.register()) {
+            if let Ok(r) = self.reg_mut(id) {
+                if r.closing && !r.busy() && r.on_hold.as_ref().is_some_and(|h| h.interrupted) {
+                    r.resume_held();
                 }
             }
         }
@@ -3090,6 +3183,31 @@ impl Store {
                     done("取引を中止しました")
                 }
             }
+            C::HoldTransaction { register } => {
+                let r = self.reg_mut(register)?;
+                if let Some(why) = r.hold_refusal() {
+                    return Err(why.into());
+                }
+                let txn = std::mem::take(&mut r.txn);
+                let owner = r.owner.take();
+                r.on_hold = Some(OnHold {
+                    txn,
+                    owner,
+                    interrupted: false,
+                });
+                done("")
+            }
+            C::ResumeHeld { register } => {
+                let r = self.reg_mut(register)?;
+                if r.on_hold.is_none() {
+                    return Err("保留中の取引はありません".into());
+                }
+                if r.in_txn() {
+                    return Err("この取引が終わると、保留した取引に戻ります".into());
+                }
+                r.resume_held();
+                done("")
+            }
             C::Pause { register } => {
                 self.check_active(register, Action::Pause)?;
                 let r = self.reg_mut(register)?;
@@ -3516,6 +3634,12 @@ impl Store {
                         o.name
                     ));
                 }
+            }
+            if let Some(o) = r.on_hold.as_ref().and_then(|h| h.owner).filter(|o| o.id != acc.id) {
+                return Err(format!(
+                    "保留中の取引があるため、担当スタッフを切り替えられません\n{}さんの取引です",
+                    o.name
+                ));
             }
             if r.closing && !r.handover_pending() {
                 r.closing = false;
@@ -4721,7 +4845,8 @@ impl Store {
             outlet_detail: r.outlet.0.clone(),
             menu: r.menu,
             paused: r.paused,
-            idle_voids: !r.idle(),
+            idle_voids: !r.idle() || r.on_hold.is_some(),
+            held: r.on_hold.is_some(),
             idle_revert_in: (r.mode != Mode::SelfOperated || !r.idle())
                 .then(|| r.idle_revert_in(self.now)),
             change_left: r
@@ -5038,6 +5163,8 @@ pub struct RegisterView {
     pub paused: bool,
     pub idle_revert_in: Option<u64>,
     pub idle_voids: bool,
+    /// 保留中の取引がある
+    pub held: bool,
     pub change_left: bool,
     pub counter: CounterView,
     pub floor: FloorView,

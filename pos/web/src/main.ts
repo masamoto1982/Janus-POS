@@ -125,6 +125,7 @@ function start(): void {
   });
   wireSwipe();
   wireMenuSwipe();
+  wireHoldSwipe();
   wireForceRegister();
   rulesDlg().addEventListener("close", lockRules);
   rulesDlg()
@@ -370,6 +371,7 @@ const busyRegs = new Set<number>();
 function inTransaction(r: RegisterView): boolean {
   const v = r.counter;
   return (
+    r.held ||
     v.lines.length > 0 ||
     v.coupons.length > 0 ||
     v.point_card !== null ||
@@ -464,6 +466,7 @@ function render(): void {
       const operable = r.active_side !== null ? r.active_side === side : r.mode !== "staff_operated" || side === "counter";
       el?.classList.toggle("operable", operable);
       el?.classList.toggle("mode-staff", r.mode === "staff_operated");
+      el?.classList.toggle("hold-swipe", side === "counter" && r.mode === "staff_operated" && !r.menu);
       el?.classList.toggle("mode-self", r.mode === "self_operated");
       el?.classList.toggle("calling", side === "counter" && r.lamp);
       el?.classList.toggle("head-blink", r.lamp || r.emergency);
@@ -513,6 +516,7 @@ function render(): void {
     );
     setRegion(`counter-${r.id}`, counterMain, langOf(r.id, "counter"));
     setRegion(`floor-${r.id}`, floorMain, langOf(r.id, "floor"));
+    slideOnHold(r);
     setRegion(
       `outlet-${r.id}`,
       r.outlet ? `<b title="${r.outlet_detail.map(([d, n]) => `${d.toLocaleString()}円×${n}`).join(" ")}">${r.outlet.toLocaleString()}円</b>` : `<span class="placeholder">出金</span>`,
@@ -1327,6 +1331,50 @@ function wireMenuSwipe(): void {
   };
   window.addEventListener("pointerup", end);
   window.addEventListener("pointercancel", () => (start = null));
+}
+
+/** 保留：スタッフ操作モードのレジカウンター側の登録画面を左へスワイプすると取引を保留し、右から第二待ち受けが出る。
+ *  割り込みの取引を始める前の第二待ち受けを右へスワイプすると、保留した取引に戻る。スワイプできることを示す手がかりは置かない。
+ *  ヘッダーのスワイプ（店舗メニュー）とは場所で分ける：保留は画面の本体（.screen-body）だけ */
+function wireHoldSwipe(): void {
+  let start: { reg: number; x: number; y: number; id: number } | null = null;
+  app.addEventListener("pointerdown", (e) => {
+    const t = e.target as Element;
+    const body = t.closest<HTMLElement>(".counter-screen.hold-swipe .screen-body");
+    if (!body || e.button !== 0 || t.closest("input, select, textarea, [data-hold], [data-ffforce]")) return;
+    const reg = Number(body.closest<HTMLElement>("[data-drop]")!.dataset.drop!.split(":")[0]);
+    start = { reg, x: e.clientX, y: e.clientY, id: e.pointerId };
+  });
+  window.addEventListener("pointerup", (e) => {
+    if (!start || e.pointerId !== start.id) return;
+    const { reg, x, y } = start;
+    start = null;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    if (Math.abs(dx) < MENU_SWIPE_PX || Math.abs(dy) > Math.abs(dx) / 2) return;
+    const r = snap.registers.find((v) => v.id === reg);
+    if (!r || r.mode !== "staff_operated" || r.menu) return;
+    swallowClick = true;
+    if (dx < 0 && r.counter.lines.length > 0) send({ type: "hold_transaction", register: reg });
+    else if (dx > 0 && r.held && !r.counter.lines.length) send({ type: "resume_held", register: reg });
+  });
+  window.addEventListener("pointercancel", () => (start = null));
+}
+
+/** 保留したら第二待ち受けを右から、保留した取引に戻ったらそれを左から滑り込ませる（両画面とも） */
+const heldShown = new Map<number, boolean>();
+function slideOnHold(r: RegisterView): void {
+  const was = heldShown.get(r.id);
+  heldShown.set(r.id, r.held);
+  if (was === undefined || was === r.held) return;
+  for (const side of ["counter", "floor"] as const) {
+    const el = app.querySelector<HTMLElement>(`[data-region="${side}-${r.id}"]`);
+    if (!el) continue;
+    el.classList.remove("slide-from-right", "slide-from-left");
+    void el.offsetWidth;
+    el.classList.add(r.held ? "slide-from-right" : "slide-from-left");
+    el.addEventListener("animationend", () => el.classList.remove("slide-from-right", "slide-from-left"), { once: true });
+  }
 }
 
 function wireSwipe(): void {

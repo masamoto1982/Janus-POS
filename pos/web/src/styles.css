@@ -120,6 +120,13 @@ button { touch-action: manipulation; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: var(--s11, 8px); }
 .screen-head .clock { font-size: var(--text-sm); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.screen-body:has(> .slide-from-right, > .slide-from-left) { overflow: hidden; }
+/* 保留の左スワイプ・戻る右スワイプを、モバイルの画面切り替え（横スクロール）に取られないように */
+.counter-screen.hold-swipe :is(.screen-body, .screen-main) { touch-action: pan-y; }
+.screen-main.slide-from-right { animation: slide-from-right 0.28s ease-out; }
+.screen-main.slide-from-left { animation: slide-from-left 0.28s ease-out; }
+@keyframes slide-from-right { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes slide-from-left { from { transform: translateX(-100%); } to { transform: none; } }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: var(--s11, 8px) var(--s10, 12px); }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }

@@ -1510,10 +1510,23 @@ function bellBtn(r: RegisterView, side: Side): string {
   return bell;
 }
 
+/** スタッフ操作モードのレジカウンター側のヘッダー右の操作（user 2026-11-20：スワイプをやめ、とりあえずボタンを置く）：
+ *  店舗メニュー（開けるときだけ。閉じるのはメニューのバック）・保留（明細があるとき）・保留した取引に戻る（割り込む前だけ）。
+ *  保留できない取引（お会計中・公共料金など）では押すと理由を出す */
+function headActions(r: RegisterView, side: Side): string {
+  if (side !== "counter" || r.mode !== "staff_operated" || r.paused || r.emergency || r.menu) return "";
+  const b = (label: string, cmd: Command) => `<button type="button" class="head-btn neg" data-cmd="${esc(JSON.stringify(cmd))}">${label}</button>`;
+  const out: string[] = [];
+  if (r.held && !inTransaction(r)) out.push(b("保留に戻る", { type: "resume_held", register: r.id }));
+  if (!r.held && r.counter.lines.length > 0) out.push(b("保留", { type: "hold_transaction", register: r.id }));
+  if (storeMenuUsable(r)) out.push(b("店舗メニュー", { type: "open_menu", register: r.id, screen: "top" }));
+  return out.join("");
+}
+
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bell = bellBtn(r, side);
   const mode = r.emergency ? `<span class="mode-title emergency">非常事態モード</span>` : r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
-  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock">${clockHtml(now)}</time></span>`;
+  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r">${headActions(r, side)}<time class="clock">${clockHtml(now)}</time></span>`;
 }
 
 export const FF_TABS = [
@@ -1707,14 +1720,15 @@ export function storeMenu(r: RegisterView): string {
   const screen = (body: string) => `<div class="menu-screen"><div class="menu-body">${body}</div>${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
+      return `<div class="menu-screen"><div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
         <div class="menu-list" data-law>${MENU_ITEMS
           .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>
         <div class="menu-list" data-law>
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
           ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
-        </div>`;
+        </div>
+        ${backFootRow(go(null))}</div>`;
     case "journal":
     case "waste":
     case "ff_fresh":

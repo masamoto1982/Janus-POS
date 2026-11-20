@@ -206,7 +206,7 @@ button { touch-action: manipulation; }
 .num { text-align: right; white-space: nowrap; }
 
 .reg-top { --sum-h: var(--s7); --row: calc(var(--s6) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: flex; justify-content: center; align-items: center; gap: 0 var(--gap); min-height: var(--s6); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
-/* 取引中止・合計・お会計は、第二待ち受けの帯（Language・呼び鈴・電子マネー）と同じく最小間隔で寄り添い、群ごと中央に置く（user 2026-11-18）。
+/* 取消し・合計・お会計は、第二待ち受けの帯（Language・呼び鈴・電子マネー）と同じく最小間隔で寄り添い、群ごと中央に置く（user 2026-11-18）。
    中央（合計・お預かり・お釣り）は文字を縮めない。消えたボタンの席は残すので、合計の位置はどの段階でも動かない */
 .reg-top .mid { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .reg-top .total { font-size: var(--text-num); }
@@ -218,7 +218,7 @@ button { touch-action: manipulation; }
 .reg-top .yen { font-size: inherit; font-weight: 400; }
 .reg-top .void { display: flex; flex: none; }
 .reg-top .action { display: flex; flex: none; gap: var(--gap); }
-/* 取引中止・会計（投入おわり）は最下段の FF ボタンと同じ大ボタン（user 2026-11-12）。幅は白銀比の 2 倍（user 2026-11-17） */
+/* 取消し・会計（投入おわり）は最下段の FF ボタンと同じ大ボタン（user 2026-11-12）。幅は白銀比の 2 倍（user 2026-11-17） */
 .reg-top .void > button, .reg-top .action > button, .reg-top .action > .counter-only > button { box-sizing: border-box; flex: none; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 /* 消えたボタンの席（見えない・押せない）。幅は本物と同じく law.ts fitText が文字から決める */
 .reg-top .band-slot { visibility: hidden; }
@@ -362,6 +362,9 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .screen .reject-flash p { margin: 0; max-width: 100%; color: var(--alert-ink); line-height: 1.35; word-break: auto-phrase; text-wrap: balance; }
 .screen .reject-flash .big { font-size: var(--text-lg); font-weight: 700; }
 .screen .reject-flash .sub { font-size: var(--text-sm); }
+/* 商品取消しが成立した知らせ：受け付けなかった理由と同じ一瞬の表示を、意味色のグリーン（安全・肯定）で */
+.screen .reject-flash.done { background: color-mix(in oklch, var(--green-1) 70%, transparent); }
+.screen .reject-flash.done p { color: var(--ok); }
 @keyframes reject-flash { 0% { opacity: 0; } 8% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .screen .reject-flash { animation-timing-function: steps(1, end); } }
 .screen-main:has(> .confirm) { display: flex; flex-direction: column; }

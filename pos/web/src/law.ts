@@ -157,7 +157,7 @@ function weightOf(el: HTMLElement): number {
   return w;
 }
 
-/** 向き：バック・取引中止は戻る、積極とスキップは進む */
+/** 向き：バック・取消しは戻る、積極とスキップは進む */
 function dirOf(el: HTMLElement): Unit["dir"] {
   const has = (sel: string) => el.matches(sel) || !!el.querySelector(sel);
   return has(".back-btn, .void-btn") ? "back" : has(".primary, .skip") ? "go" : undefined;

@@ -2181,7 +2181,7 @@ fn utility_bills_cannot_share_a_transaction_with_other_goods() {
     assert_eq!(reg(&s, 1).counter.lines.len(), 1);
 }
 
-/// 仕様 5.3：払込票は明細ごとに取り消せず、取引中止だけ
+/// 仕様 5.3：払込票は明細ごとに取り消せず、取引の取り消しだけ
 #[test]
 fn registered_bill_slips_cannot_be_removed_only_voided() {
     let mut s = Store::new(1, 2, 1);
@@ -2194,7 +2194,7 @@ fn registered_bill_slips_cannot_be_removed_only_voided() {
             json!({"type":"remove_line","register":1,"side":side,"line_id":id}),
         )
         .unwrap_err();
-        assert!(e.contains("取引中止"), "{e}");
+        assert!(e.contains("取引を取り消して"), "{e}");
     };
     try_remove(&mut s, "floor");
     login(&mut s, 1);
@@ -3343,7 +3343,7 @@ fn emoney_short_offers_three_choices() {
     assert_eq!(emoney_balance(&s), 880);
 }
 
-/// 仕様 12.1：お客様が取引中止するとお金が戻る
+/// 仕様 12.1：お客様が取引を取り消すとお金が戻る
 #[test]
 fn customer_voids_and_money_comes_back() {
     let mut s = Store::new(1, 2, 1);
@@ -3362,6 +3362,35 @@ fn customer_voids_and_money_comes_back() {
     let v = reg(&s, 1);
     assert!(v.floor.lines.is_empty());
     assert_eq!(v.outlet, 0);
+}
+
+/// 仕様 12.1：商品取消し＝読んだ商品を一点取り消す。登録していない商品は登録せずに知らせる
+#[test]
+fn cancel_scan_removes_one_and_tells_when_the_item_was_not_registered() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", TEA);
+    scan(&mut s, 1, "counter", TEA);
+    scan(&mut s, 1, "counter", BREAD);
+    let cancel = |code: &str| json!({"type":"cancel_item","register":1,"side":"counter","code":code});
+    let msg = run(&mut s, cancel(TEA)).unwrap().unwrap();
+    assert!(msg.ends_with("を1点取り消しました"), "{msg}");
+    let v = reg(&s, 1);
+    assert_eq!(v.counter.lines.iter().find(|l| l.line.code == TEA).unwrap().line.qty, 1);
+    ok(&mut s, cancel(TEA));
+    assert!(reg(&s, 1).counter.lines.iter().all(|l| l.line.code != TEA), "一点なら明細ごと");
+    let e = run(&mut s, cancel(TEA)).unwrap_err();
+    assert!(e.contains("登録されていません"), "{e}");
+    let v = reg(&s, 1);
+    assert_eq!(v.counter.lines.len(), 1, "登録もしない");
+    assert!(run(&mut s, cancel("PC0000000001")).unwrap_err().contains("商品のバーコードではありません"));
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    assert!(run(&mut s, cancel(BREAD)).is_err(), "お会計中は取り消せない");
+    // セルフ操作モードのお客様も取り消せる
+    let mut s = Store::new(1, 2, 1);
+    scan(&mut s, 1, "floor", BREAD);
+    ok(&mut s, json!({"type":"cancel_item","register":1,"side":"floor","code":BREAD}));
+    assert!(reg(&s, 1).floor.lines.is_empty());
 }
 
 /// 仕様 12.3：店舗メニューからログアウト・休止する
@@ -4717,7 +4746,7 @@ fn a_short_point_balance_pays_part_and_the_rest_goes_to_another_method() {
     assert_eq!((r.points, r.points_used, r.point_balance), (1, 1, Some(1)));
 }
 
-/// 仕様 6.4：取引中止で使ったポイントを戻し、残高 0 では払えない
+/// 仕様 6.4：取引の取り消しで使ったポイントを戻し、残高 0 では払えない
 #[test]
 fn voiding_returns_used_points_and_an_empty_card_cannot_pay() {
     let mut s = Store::new(1, 2, 1);
@@ -4957,7 +4986,7 @@ fn customer_copies_are_one_per_slip_and_a_multi_piece_slip_is_one() {
     assert_eq!(reg(&s, 2).parcel_handover, None);
 }
 
-/// 仕様 5.5：ポイントカードだけでも取引が始まり、取引中止できる
+/// 仕様 5.5：ポイントカードだけでも取引が始まり、取引を取り消せる
 #[test]
 fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
     let mut s = Store::new(1, 2, 1);

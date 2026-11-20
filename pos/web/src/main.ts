@@ -1,7 +1,7 @@
 import { applyLaw, fitForms, fitText } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
-import type { GuideKind, RulesTab } from "./view";
+import type { CancelStage, GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
 import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
@@ -38,7 +38,7 @@ import {
   storeMenuUsable,
   isoDate,
   scanGuide,
-  voidAsk,
+  cancelAsk,
   ffFloorOpen,
   ffOpenFoot,
   parcelError,
@@ -763,12 +763,12 @@ const OWN_ERROR = new Set(["parcel_length", "parcel_size", "parcel_postal", "par
 /** レジが受け付けなかった理由を、操作した側の登録画面の中央に一瞬だけ重ねる（user 2026-11-18〜19）。
  *  登録画面の最上部に赤褐色の一行を出す形（旧 B-2）は全廃した。背後の登録画面はぼかして読めなくする。
  *  案内は画面の描き直しの外に置くので、表示中に画面が変わっても最後まで出る。ポインターは素通しにし、表示中もすべての操作を受け付ける */
-function flashRejection(reg: number, side: Side, reason: string): void {
+function flashRejection(reg: number, side: Side, reason: string, done = false): void {
   const body = app.querySelector(`[data-region="${side}-${reg}"]`)?.parentElement;
   if (!body) return;
   body.querySelector(".reject-flash")?.remove();
   const el = document.createElement("div");
-  el.className = "reject-flash";
+  el.className = done ? "reject-flash done" : "reject-flash";
   el.setAttribute("role", "alert");
   el.style.setProperty("--flash-ms", `${REJECT_SHOW_MS}ms`);
   el.innerHTML = rejectFlash(langOf(reg, side) === "ja" ? reason : trText(reason));
@@ -780,11 +780,19 @@ function flashRejection(reg: number, side: Side, reason: string): void {
 /** quiet：理由をテンキーの中など呼び出し元で出すときは、登録画面に重ねない */
 function send(cmd: Command, quiet = false): boolean {
   const fx = deviceFx(cmd);
+  // 「商品を取り消す」を選んだあとに読んだ商品は登録せず、その商品を1点取り消す（一度きり。スタッフバーコードはふだんどおり）
+  const asked = cmd.type === "scan" && !cmd.code.startsWith(STAFF_BARCODE_PREFIX) ? cancelAsk.get(cmd.register) : undefined;
+  if (cmd.type === "scan" && asked?.stage === "item") {
+    cancelAsk.delete(cmd.register);
+    cmd = { type: "cancel_item", register: cmd.register, side: asked.side, code: cmd.code };
+  }
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   lastError = res.ok ? undefined : res.error;
-  // 取引中止で保留した取引に戻ったときも、中止の確認は閉じる（戻った取引に確認を持ち越さない）
-  if (res.ok && cmd.type === "void_transaction") voidAsk.delete(cmd.register);
+  // 取引を取り消して保留した取引に戻ったときも、取消しの画面は閉じる（戻った取引に持ち越さない）
+  if (res.ok && cmd.type === "void_transaction") cancelAsk.delete(cmd.register);
+  // 取り消せたら、登録済みだったことを操作した側の登録画面の中央に一瞬だけ知らせる
+  if (res.ok && cmd.type === "cancel_item" && res.message) flashRejection(cmd.register, cmd.side, res.message, true);
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {
@@ -806,7 +814,7 @@ function send(cmd: Command, quiet = false): boolean {
   const paidAtTerminal = cmd.type === "tap_emoney" && cmd.method !== "qr" && cmd.method !== "points";
   // 電子マネーの残高不足は払えていないので決済音を鳴らさず異常音（ブブッ）：同じ音だと支払いが済んだと勘違いして退店してしまう
   const emoneyShort = cmd.type === "tap_emoney" && !!res.message?.startsWith("電子マネーの残高が足りません");
-  if (["scan", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired && !emoneyShort ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
+  if (["scan", "cancel_item", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired && !emoneyShort ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
   // 照合イベント（年確・FFのお渡し）が済んだら「ピンポン」
   if (res.ok && ((cmd.type === "check_id" && !!res.message?.includes("年齢確認が済みました")) || (cmd.type === "check_ff" && !!res.message?.includes("すべてのFFのお渡しを確認しました")))) chimeOk();
   frame();
@@ -1110,14 +1118,10 @@ app.addEventListener("click", (e) => {
     send({ type: "take_outlet", register: Number(b.dataset.outlet) });
     return;
   }
-  if (b.dataset.voidAsk) {
-    const [reg, side] = b.dataset.voidAsk.split(":");
-    const r = Number(reg);
-    voidAsk.set(r, side as "counter" | "floor");
-    return frame();
-  }
-  if (b.dataset.voidCancel) {
-    voidAsk.delete(Number(b.dataset.voidCancel));
+  if (b.dataset.cancelAsk) {
+    const [reg, side, stage] = b.dataset.cancelAsk.split(":");
+    if (stage) cancelAsk.set(Number(reg), { side: side as Side, stage: stage as CancelStage });
+    else cancelAsk.delete(Number(reg));
     return frame();
   }
   if (b.dataset.lang) {

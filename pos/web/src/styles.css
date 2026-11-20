@@ -239,9 +239,10 @@ button {
    入力フォーム（数字を打つ欄）はボタンではないので除く */
 :where(.screen) button:where(:not(.pad-field, .birth-field, .ffv-input)) { box-sizing: border-box; width: calc(var(--btn-sm-w) * 2); height: var(--btn-sm-h); padding: 0 var(--s15, 2px); line-height: 1; }
 :where(.screen) button:where(.pad-field, .birth-field, .ffv-input) { line-height: 1; }
-/* 入力欄も白銀比（user 2026-11-17）：大きさを指定していなければ小の高さで幅は 2 倍。数量・FF の照合数は小の白銀比ちょうど、
-   長さ・郵便番号・枚数・ポイント数は大の 2 倍、生年月日は特大の 3 倍、店舗メニューの金額・パスワードは小の 3 倍 */
-:where(.screen) button.pad-field { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s13, 4px); white-space: nowrap; overflow: hidden; }
+/* 入力フォーム・セレクタの大きさはボタンと同じ理屈（user 2026-11-20、law.ts fitForms）：高さはボタンの四段から選び、
+   文字＝高さ÷2、幅＝文字（いちばん長く打ったときの見本 data-fit か入力例）＋左右の余白 高さ÷4＋枠、一文字差は同じ幅。
+   ここで決めるのは高さの段だけ。指定がなければ小（W/16） */
+:where(.screen) button.pad-field { box-sizing: border-box; height: var(--btn-md-h); white-space: nowrap; overflow: hidden; }
 /* 二行のボタン（主役＋添え字）は縦に積む。文字の大きさは law.ts の fitText がボタンの短い辺から決める */
 .screen button:has(> b + small) { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; }
 .screen button > :is(b, small) { display: block; line-height: 1; }
@@ -283,13 +284,23 @@ button.seg { padding: var(--s13, 4px) var(--s11, 10px); }
 /* 入力フォーム：角丸なし・背景なし。枠線は消極ボタンと同じ濃いグレー（--msg-strong）で、操作できるときは青のランプで
    操作可能部品と同じ青になる。押せない入力欄の枠線はグレー（--border） */
 input, select, button.pad-field {
-  padding: var(--s12, 6px) var(--s11, 8px); border-radius: 0; border: var(--s16, 1.5px) solid var(--msg-strong); background: transparent; color: var(--ink); min-width: 0;
+  box-sizing: border-box; padding: 0 var(--s11, 8px); line-height: 1; border-radius: 0; border: var(--s16, 1.5px) solid var(--msg-strong); background: transparent; color: var(--ink); min-width: 0;
 }
 input:disabled, select:disabled { border-color: var(--border); }
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
-input::placeholder { color: var(--line); opacity: 1; }
-/* 入力例は小テキスト・青の濃度2（user 2026-11-18：一番薄い青1は白・緑1の段で読めない） */
-button.pad-field .placeholder { color: var(--input-hint); font-size: var(--text-sm); font-weight: 400; }
+input::placeholder { color: var(--input-hint); opacity: 1; font-size: min(1em, var(--text-sm)); font-weight: 400; text-align: center; }
+/* 入力例は打ち込む文字より小さいので、欄の文字の行に載せると下にずれる（user 2026-11-20：区分名の入力例が縦にずれていた）。
+   空のあいだは欄の文字そのものを入力例の大きさにして、上下の中央に置く。fitForms が inline で決めた大きさ（--form-fs）を上書きする */
+input:placeholder-shown { font-size: min(var(--form-fs, 1em), var(--text-sm)) !important; }
+/* 入力例は小テキスト（打ち込む文字より大きくはしない）・青の濃度2（user 2026-11-18：一番薄い青1は白・緑1の段で読めない） */
+button.pad-field .placeholder { color: var(--input-hint); font-size: min(1em, var(--text-sm)); font-weight: 400; }
+/* 入力例は欄の中央（user 2026-11-20）。打ち込んだ数字は右寄せのまま */
+button.pad-field:has(> .placeholder) { justify-content: center; }
+/* セレクタ：開く印（▼）は濃いグレーで、操作できるところでは青のランプ（#ramp）で操作の青になる。文字のあとに 高さ÷4 の間・高さ÷4 の印・高さ÷4 の余白（em＝高さ÷2） */
+select {
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23535353'/%3E%3C/svg%3E") no-repeat right 0.5em center / 0.5em auto;
+}
 button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-offset: var(--s17, 1px); }
 
 .tag {
@@ -359,7 +370,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .paybox { border: var(--s17, 1px) dashed var(--border); border-radius: var(--s11, 8px); padding: var(--s11, 8px); margin: var(--s11, 8px) 0; }
 .svc { display: flex; gap: var(--gap); margin-top: var(--s13, 4px); }
 /* 金額の入力欄は大の高さで幅は白銀比の 2 倍（user 2026-11-17） */
-.svc input { box-sizing: border-box; width: calc(var(--btn-w) * 2); height: var(--btn-h); }
+.svc input { height: var(--btn-h); }
 details summary { cursor: pointer; margin-top: var(--s12, 6px); }
 details summary h3 { display: inline; }
 
@@ -407,7 +418,7 @@ button.flag { cursor: pointer; }
 .ffv-screen .lines.ffv td { vertical-align: middle; text-align: left; }
 .ffv-screen .lines.ffv td.num, .ffv-screen .lines.ffv th.num { text-align: right; }
 .ffv-screen .lines.ffv .ffv-judge { text-align: center; width: var(--s6, 48px); }
-button.ffv-input { box-sizing: border-box; width: var(--btn-md-w); height: var(--btn-md-h); padding: 0 var(--s13, 4px); }
+button.ffv-input { height: var(--btn-md-h); }
 .ffv-ok { font-weight: 700; color: var(--ok); }
 .ffv-ng { font-weight: 700; color: var(--danger); }
 /* チケットの受け取り枚数（売り場側）：入力欄＋「枚」、合わないときは警告の赤で再確認を促す */
@@ -611,10 +622,9 @@ body.dragging .drop-hint { display: inline; }
 .parcel-fields { display: flex; flex-wrap: wrap; gap: var(--s11, 8px) var(--s9, 16px); justify-content: center; }
 .parcel-fields label { display: flex; align-items: center; gap: var(--s11, 8px); font-size: var(--text-sm); }
 .points-amount { align-items: center; }
-/* 入力フォームの共通の大きさ（user 2026-11-18）：入力例を小テキストで考え、それが収まる枠。高さ＝小（W/16）、幅＝W/4
-   （「例 19821002」「例 100-0001」が小テキストで左右に余白を残して入り、打ち込んだ数字＝大の 8 桁も入る）。
-   宅配便の長さ・重さ・郵便番号、年確の生年月日、チケット枚数・ポイント数の欄はすべてこの一つの大きさ */
-.screen :is(.parcel-fields, .parcel-entry, .id-entry) button.pad-field { box-sizing: border-box; width: var(--s4, 100px); height: var(--btn-md-h, 26px); font-size: var(--text-lg); padding: 0 var(--s13, 4px); }
+/* 案内画面の入力フォーム（宅配便の長さ・重さ・郵便番号、年確の生年月日、チケット枚数・ポイント数・取り消す枚数）は
+   打ち込む数字が大テキストなので高さは大（W/11.3＝大テキストの 2 倍、user 2026-11-20）。幅は law.ts fitForms */
+.screen :is(.parcel-fields, .parcel-entry, .id-entry) button.pad-field { height: var(--btn-h); }
 .parcel-entry p, .parcel-ask p, .parcel-wait p { margin: 0; }
 .parcel-no { margin-right: var(--s11, 8px); }
 .parcel-fee { margin-left: var(--s11, 8px); }
@@ -626,7 +636,8 @@ body.dragging .drop-hint { display: inline; }
 .mirror { background: var(--screen-bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; }
 .mirror .muted { color: var(--muted); }
 .login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: var(--text-sm); font-weight: 500; color: var(--muted); }
-.login-sel select { font-size: var(--text-sm); padding: 4px 8px; }
+/* シミュレーターまわりのセレクタは一行のボタンと同じ高さ（--chrome-b）。文字・幅は law.ts fitForms */
+.login-sel select { height: var(--chrome-b); filter: url(#ramp); }
 
 .rules-open { margin-left: auto; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
@@ -636,23 +647,17 @@ body.dragging .drop-hint { display: inline; }
 .rules-dlg .toast { position: sticky; top: 0; z-index: 1; margin: 6px 0; }
 .rules-dlg .toast:not(.show) { display: none; }
 .lines.rules tr.grp th { text-align: left; padding-top: 10px; color: var(--muted); font-size: var(--text-sm); }
-.lines.rules select { font-size: var(--text-sm); padding: 3px 6px; }
 .idle { margin-left: 6px; font-size: var(--text-sm); font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
 .icon-btn { width: var(--s8, 26px); height: var(--s8, 26px); padding: 0; border-radius: var(--shape-round); font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .icon-btn:hover { color: var(--ink); }
 .rules-dlg :is(h3, h4) { font-size: var(--text-lg); margin: 14px 0 6px; }
 .rules-dlg .rules-tabs { margin-top: 12px; }
-/* 販売規則の設定の入力フォームはレジ画面の中と同じ（user 2026-11-20）：角丸なし・背景なし・操作の青の枠、高さ小 W/16×幅 W/4、
-   打ち込んだ文字は大テキスト・入力例は小テキストの青2。数を打つ欄は押すとレジ画面と同じテンキーが開く。
-   青はレジ画面と同じく濃いグレーを青のランプ（#ramp）に通して出す。セレクタ（プルダウン）は入力フォームではないので対象外 */
-#rules-dlg :is(button.pad-field, input:not([type="checkbox"])) {
-  box-sizing: border-box; width: var(--s4); height: var(--btn-md-h); padding: 0 var(--s13); font-size: var(--text-lg); line-height: 1; vertical-align: middle; filter: url(#ramp);
-}
+/* 販売規則の設定の入力フォーム・セレクタはレジ画面の中と同じ仕組み（user 2026-11-20）：角丸なし・背景なし・操作の青の枠、
+   高さはダイアログの一行のボタンと同じ小（W/16）、文字・幅は law.ts fitForms。数を打つ欄は押すとレジ画面と同じテンキーが開く。
+   青はレジ画面と同じく濃いグレーを青のランプ（#ramp）に通して出す */
+#rules-dlg :is(button.pad-field, select, input:not([type="checkbox"])) { height: var(--btn-md-h); vertical-align: middle; filter: url(#ramp); }
 #rules-dlg button.pad-field { white-space: nowrap; overflow: hidden; color: var(--ink); }
-#rules-dlg input::placeholder { color: var(--input-hint); font-size: var(--text-sm); font-weight: 400; }
-/* インボイスの登録番号（T＋13 桁）だけは大テキストの 14 文字が W/4 に収まらないので幅を 2 倍にする */
-#rules-dlg button.pad-field.wide { width: calc(var(--s4) * 2); }
 #rules-dlg .field-label { display: inline-flex; align-items: center; gap: var(--s12); margin-right: var(--s11); }
 #rules-dlg .field-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s11); margin: var(--s11) 0; }
 /* テンキーはダイアログの上に重ねる（レジ画面では画面の中に重ねる） */
@@ -672,8 +677,7 @@ body.dragging .drop-hint { display: inline; }
 /* 店舗メニューの項目は大ボタン（白銀比の 2 倍）を三列に並べる。長い名前は二行に折り返す（user 2026-11-17） */
 .menu-item { box-sizing: border-box; width: calc(var(--btn-w) * 2); height: var(--btn-h); text-align: center; padding: 0 var(--s15, 2px); line-height: 1.1; }
 .menu-form { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); }
-.menu-form input { flex: 0 1 8em; min-width: 0; }
-.screen .menu-form button.pad-field { width: calc(var(--btn-md-w) * 3); height: var(--btn-md-h); }
+.screen .menu-form button.pad-field { height: var(--btn-md-h); }
 .screen .menu-form button:not(.pad-field) { width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); }
 .money-io { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-top: 8px; }
 .money-io-counter { grid-column: 1; min-width: 0; }
@@ -786,7 +790,7 @@ body.dragging .drop-hint { display: inline; }
 .qty-step { display: flex; align-items: center; justify-content: center; gap: var(--gap); white-space: nowrap; }
 /* 明細の削除・数量・＋は中の白銀比（user 2026-11-17） */
 .screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-md-w); width: var(--btn-md-w); height: var(--btn-md-h); min-width: 0; padding: 0 var(--s15, 2px); font-size: var(--text-sm); }
-.screen-main .qty-step .qty-key { justify-content: center; font-weight: 600; font-size: var(--text-sm); }
+.screen-main .qty-step .qty-key { flex: none; padding: 0; justify-content: center; font-weight: 600; }
 .qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-md-w); width: var(--btn-md-w); min-width: 0; text-align: center; }
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, var(--black) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--s11, 10px); padding: var(--s11, 8px); width: max-content; max-width: calc(100% - var(--s9, 16px)); max-height: calc(100% - var(--s10, 12px)); display: flex; flex-direction: column; gap: var(--s11, 8px); box-shadow: 0 var(--s12, 6px) var(--s9, 18px) color-mix(in oklch, var(--black) 25%, transparent); }

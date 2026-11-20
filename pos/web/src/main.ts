@@ -1,4 +1,4 @@
-import { applyLaw, fitText } from "./law";
+import { applyLaw, fitForms, fitText } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { GuideKind, RulesTab } from "./view";
@@ -82,9 +82,9 @@ async function boot(): Promise<void> {
   window.addEventListener("pagehide", save);
   window.setInterval(frame, 100);
   // レイアウトの法則は部品の大きさで決まるので、段の大きさが変わったときとフォントが届いたときにも当て直す
-  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), applyLaw(e.target), fitNotes(e.target))));
+  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), fitForms(e.target), applyLaw(e.target), fitNotes(e.target))));
   app.querySelectorAll(".screen-main, .screen-items").forEach((el) => relaid.observe(el));
-  void document.fonts?.ready.then(() => (fitText(app), applyLaw(app), fitNotes(app)));
+  void document.fonts?.ready.then(() => (fitText(app), fitForms(document), applyLaw(app), fitNotes(app)));
 }
 
 /** 最下段の添え書きが一行に入りきらないときは、文字を縮めずに電光掲示板のように流す（user 2026-11-20）。
@@ -138,6 +138,7 @@ function start(): void {
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
+  fitForms(app);
   app.querySelector("[data-reset]")?.addEventListener("click", () => {
     if (!confirm("保存されている状態を消して、最初からやり直しますか")) return;
     discarding = true;
@@ -330,6 +331,7 @@ function setRegion(name: string, raw: string, lang: Lang = "ja"): void {
 
   el.innerHTML = html;
   fitText(el);
+  fitForms(el);
   applyLaw(el);
   fitNotes(el);
 
@@ -1047,7 +1049,8 @@ app.addEventListener("click", (e) => {
       pickerDlg().close();
       pickFor = null;
     }
-    return rulesDlg().showModal();
+    rulesDlg().showModal();
+    return fitForms(rulesDlg());
   }
   if (b.hasAttribute("data-owner-submit")) return verifyOwner();
   if (b.dataset.rpadopen !== undefined) {

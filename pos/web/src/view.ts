@@ -540,7 +540,7 @@ export function ticketHandover(reg: number, side: Side, rows: TicketRow[], issue
   const counter = side === "counter";
   const value = counter ? handed : received;
   const field = st?.allowed === false
-    ? `<button type="button" class="pad-field" disabled>${value ?? ""}</button>`
+    ? `<button type="button" class="pad-field" data-fit="000" disabled>${value ?? ""}</button>`
     : padField(reg, side, counter ? "tkh" : "tkr", value === null ? "" : String(value), "", counter ? "お渡し枚数" : "受け取り枚数");
   const note = value === null || value === total
     ? ""
@@ -652,7 +652,7 @@ function counterLine(reg: number, l: CounterLine, v: CounterView, side: Side): s
   if (l.kind === "service" && !l.done && !ro && !l.parcel && !l.pickup) {
     const a = find(v.actions, "complete_service");
     svc = `<div class="svc">
-      <input type="number" inputmode="numeric" min="0" placeholder="金額" data-key="svc-${reg}-${l.id}" ${a.allowed ? "" : "disabled"} />
+      <input type="number" inputmode="numeric" min="0" placeholder="金額" data-fit="000000" data-key="svc-${reg}-${l.id}" ${a.allowed ? "" : "disabled"} />
       <button data-form="service" data-reg="${reg}" data-line="${l.id}" ${a.allowed ? "" : "disabled"}>受付</button>
     </div>`;
   }
@@ -690,7 +690,7 @@ function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Ga
   const e = qtyEntry.get(`${reg}:${side}`);
   const typing = e?.id === l.id;
   const shown = typing ? e.digits || "　" : String(l.qty);
-  const key = `<button type="button" class="pad-field qty-key${typing ? " typing" : ""}" data-qtyentry="${reg}:${side}:${l.id}" aria-label="数量 ${l.qty}、押すとテンキーで数量を入力">${esc(shown)}</button>`;
+  const key = `<button type="button" class="pad-field qty-key${typing ? " typing" : ""}" data-fit="00" data-qtyentry="${reg}:${side}:${l.id}" aria-label="数量 ${l.qty}、押すとテンキーで数量を入力">${esc(shown)}</button>`;
   const plus = max !== undefined && l.qty >= max ? `<i class="qty-plus-gone" aria-hidden="true"></i>` : btn("＋", step(1), st, "small neg");
   return `<span class="qty-step">${minus}${key}${plus}</span>`;
 }
@@ -735,6 +735,8 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   ppt: { title: "使うポイント数", unit: "P", max: 5 },
   cpn: { title: "取り消す枚数", unit: "枚", max: 3 },
 };
+/** 入力フォームの幅の見本：いちばん長く打ち込んだときの表示（law.ts fitForms が幅を決める） */
+const padFit = (target: PadTarget): string => padShow(target, "0".repeat(PAD[target].max)) + (PAD[target].decimal ? "." : "");
 export const padShow = (target: PadTarget, digits: string): string =>
   target === "mpw" ? "●".repeat(digits.length) : target === "post" && digits.length > 3 ? `${digits.slice(0, 3)}-${digits.slice(3)}` : digits;
 
@@ -744,7 +746,7 @@ function padField(reg: number, side: Side, target: PadTarget, value: string, pla
   const on = typing?.target === target && typing.line === line;
   const shown = padShow(target, value);
   const off = st && !st.allowed ? ` disabled title="${esc(st.reason ?? "")}"` : "";
-  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-padopen="${reg}:${side}:${target}:${line ?? ""}" aria-label="${esc(aria)}（押すとテンキーで入力）"${off}>${
+  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-fit="${esc(padFit(target))}" data-padopen="${reg}:${side}:${target}:${line ?? ""}" aria-label="${esc(aria)}（押すとテンキーで入力）"${off}>${
     shown ? esc(shown) : `<span class="placeholder">${esc(placeholder)}</span>`
   }</button>`;
 }
@@ -1873,7 +1875,9 @@ export function rulesPadField(target: RulesPadTarget, value: string, placeholder
   const e = rulesPad.entry;
   const on = e?.target === target && e.id === id;
   const shown = rulesShow(target, value);
-  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-rpadopen="${target}:${esc(id ?? "")}" aria-label="${esc(aria)}（押すとテンキーで入力）">${
+  const d = RULES_PAD[target];
+  const fit = rulesShow(target, "0".repeat(d.max));
+  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-fit="${esc(fit)}" data-rpadopen="${target}:${esc(id ?? "")}" aria-label="${esc(aria)}（押すとテンキーで入力）">${
     shown ? esc(shown) : `<span class="placeholder">${esc(placeholder)}</span>`
   }</button>`;
 }
@@ -2006,14 +2010,14 @@ function taxPanel(s: Snapshot): string {
   return `<h4>税区分</h4>
     <table class="lines rules"><thead><tr><th>区分</th><th>種類</th><th class="num">税率</th></tr></thead><tbody>${classes}</tbody></table>
     <div class="field-row tax-add">
-      <label class="field-label">区分名<input data-key="new-tax-name" data-new-tax="name" placeholder="例 新税率" aria-label="追加する税区分の名前" /></label>
+      <label class="field-label">区分名<input data-key="new-tax-name" data-new-tax="name" data-fit="〇〇〇〇〇〇" placeholder="例 新税率" aria-label="追加する税区分の名前" /></label>
       <select data-key="new-tax-kind" data-new-tax="kind" aria-label="追加する税区分の種類">${TAX_KINDS.map((k) => `<option value="${k.id}">${k.label}</option>`).join("")}</select>
       <span class="field-label">税率${rulesPadField("newrate", rulesValue.get("newrate") ?? "", "例 10", "追加する税区分の税率（%）")}%</span>
       <button class="small" data-add-tax>区分を追加</button>
     </div>
     <h4>インボイス</h4>
     <div class="field-row">
-      <span class="field-label">登録番号${rulesPadField("inv", rulesValue.get("inv") ?? t.invoice_no.replace(/^T/, ""), "例 T1234567890123", "適格請求書発行事業者の登録番号（T＋13桁）", undefined, "wide")}</span>
+      <span class="field-label">登録番号${rulesPadField("inv", rulesValue.get("inv") ?? t.invoice_no.replace(/^T/, ""), "例 T1234567890123", "適格請求書発行事業者の登録番号（T＋13桁）")}</span>
       <label>端数処理 <select data-key="invoice-rounding" data-invoice="rounding" aria-label="消費税の端数処理">${ROUNDINGS.map((r) => `<option value="${r.id}" ${r.id === t.rounding ? "selected" : ""}>${r.label}</option>`).join("")}</select></label>
       <button class="small" data-save-invoice>保存</button>
     </div>

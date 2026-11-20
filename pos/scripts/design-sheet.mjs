@@ -51,7 +51,9 @@ for (const [n, varName, v] of SHAPES) {
   const m = css.match(new RegExp(`${varName}:\\s*([^;]+);`));
   if (!m || m[1].trim() !== v) throw new Error(`${varName}（${n}）が ${v} ではない（${m?.[1]}）。SHAPES を直す`);
 }
-const screenRule = css.match(/\n\.screen \{([^}]*)\}/)?.[1] ?? "";
+// .screen の段の定義は販売規則の設定のダイアログと共有している（.screen, #rules-dlg { … }）
+const screenRule = css.match(/\n\.screen(?:, #rules-dlg)? \{([^}]*)\}/)?.[1] ?? "";
+if (!screenRule) throw new Error("styles.css に .screen の段の定義が見つからない。screenRule の正規表現を直す");
 const checkDiv = (varName, div) => {
   if (!screenRule.includes(`${varName}: calc(var(--W) / ${div})`)) throw new Error(`.screen の ${varName} が W / ${div} ではない。SIZES・BUTTONS を直す`);
 };

@@ -288,9 +288,11 @@ input, select, button.pad-field {
 }
 input:disabled, select:disabled { border-color: var(--border); }
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
-input::placeholder { color: var(--input-hint); opacity: 1; font-size: min(1em, var(--text-sm)); font-weight: 400; }
+input::placeholder { color: var(--input-hint); opacity: 1; font-size: min(1em, var(--text-sm)); font-weight: 400; text-align: center; }
 /* 入力例は小テキスト（打ち込む文字より大きくはしない）・青の濃度2（user 2026-11-18：一番薄い青1は白・緑1の段で読めない） */
 button.pad-field .placeholder { color: var(--input-hint); font-size: min(1em, var(--text-sm)); font-weight: 400; }
+/* 入力例は欄の中央（user 2026-11-20）。打ち込んだ数字は右寄せのまま */
+button.pad-field:has(> .placeholder) { justify-content: center; }
 /* セレクタ：開く印（▼）は濃いグレーで、操作できるところでは青のランプ（#ramp）で操作の青になる。文字のあとに 高さ÷4 の間・高さ÷4 の印・高さ÷4 の余白（em＝高さ÷2） */
 select {
   appearance: none; -webkit-appearance: none; cursor: pointer;

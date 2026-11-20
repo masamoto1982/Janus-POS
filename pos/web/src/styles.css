@@ -79,7 +79,7 @@ button { touch-action: manipulation; }
 .screen-wrap.inactive .screen-cap::after { content: "　表示のみ"; font-weight: 700; }
 /* レジ画面の寸法は絶対値でなく、画面の内幅 W を白銀比（1:√2）で割った階段から選ぶ（user 2026-11-16）。
    W÷√2ⁿ：n＝1 三段目／3 特大ボタンの幅／4 大ボタンの幅・特大テキスト…と、偶数の段は W の 1/4・1/8・1/16・1/32 になる。
-   実機の POS は画面の大きさが決まっているので W がそのまま基準になる。シミュレーターでは小テキストが 12〜16px に収まるよう W を 384〜512px で止める（モバイルモードは下限なし）。
+   実機の POS は画面の大きさが決まっているので W がそのまま基準になる。シミュレーターでは W の上限を 512px とし、下限は設けない（レジを横一列に等分して並べるため、user 2026-11-21）。
    W は @property で長さとして登録し、.screen で一度だけ解決する（中の container（.reg-top）で cqi が測り直されないように）
    縦幅：画面全体を縦長の白銀長方形（縦＝W×√2、A判の紙と同じ形）にし、ヘッダー（W÷√2⁷）16個分を四段に分ける（user 2026-11-16）
    一段目＝ヘッダー 1（W÷√2⁷）
@@ -92,7 +92,7 @@ button { touch-action: manipulation; }
 @property --gap { syntax: "<length>"; inherits: true; initial-value: 6px; }
 /* 販売規則の設定のダイアログも同じ段を持つ：入力フォームとテンキーをレジ画面の中と同じ形・大きさにする（user 2026-11-20）。W は 400px に固定 */
 .screen, #rules-dlg {
-  --W: clamp(384px, 100cqi - 2 * var(--frame-w), 512px);
+  --W: min(100cqi - 2 * var(--frame-w), 512px, var(--W-max, 512px));
   /* 白銀比の階段 --sN＝W÷√2ⁿ（W=400 で s11≒8.8・s13≒4.4・s15≒2.2・s17≒1.1）。レジ画面の中の大きさはすべてこの段から選ぶ。
      段を使う規則は var(--sN, 元の px) と書き、レジ画面の外（.screen の外）では元の px のまま */
   --s0: calc(var(--W) / 1); --s1: calc(var(--W) / 1.414); --s2: calc(var(--W) / 2); --s3: calc(var(--W) / 2.828); --s4: calc(var(--W) / 4); --s5: calc(var(--W) / 5.657);
@@ -507,18 +507,23 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .floor { display: grid; gap: 16px; padding-block: 16px; align-items: start; }
-/* レジは 1〜5 台を横に並べる（user 2026-11-20：Item・Wallet をピッカーにして空いた幅を使う）。
-   デスクトップは常に二つの面を並べるので、一台の幅は「横幅を台数で割った幅」、ただし二つの面が入る 812px を下回るなら折り返す
-   （モバイルは一列）。台数が少なくて広すぎるときは 1240px で止めて中央に */
-.registers {
-  --n: 2; display: grid; gap: 16px; align-items: start;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(812px, (100% - (var(--n) - 1) * 16px) / var(--n))), 1fr));
-}
-.register { width: 100%; max-width: 1240px; justify-self: center; }
+/* デスクトップはすべてのレジを横一列に並べ、画面の横幅を台数で等分する（user 2026-11-21：折り返すとレジ一台すら画面に収まらず、デモにならない）。
+   どのレジも常に二つの面を並べる。画面の W は等分した幅に合わせて縮み（下限なし）、さらにレジ全体が画面の高さに収まるよう
+   --W-max（main.ts fitRegisters）で止める。止まったときはレジの幅も二つの面の分だけにして中央に置く */
+.registers { --n: 2; display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+.register { container: reg / inline-size; width: 100%; max-width: calc(2 * (var(--W-max, 512px) + 2 * var(--frame-w)) + 12px + 26px); justify-self: center; }
 .register, .bell-area {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
 .register h2, .bell-area h2 { margin: 0 0 8px; font-size: var(--text-num); display: flex; gap: 8px; align-items: center; }
+.register h2 { flex-wrap: wrap; row-gap: 4px; }
+/* 無操作の残り時間は見出しの下の一行に回す（レジ番号・スタッフのセレクタの行を崩さない） */
+.register h2 > [data-region^="mode-"] { order: 1; flex-basis: 100%; font-size: var(--text-sm); line-height: 1.4; }
+.register h2 > [data-region^="mode-"]:empty { display: none; }
+.register h2 .idle { margin-left: 0; }
+/* 台数が多くてレジが細いときも、画面の上の見出しと入出金ボックス・決済端末・スキャナの文字は一行に収める（レジの幅に合わせて縮む） */
+.screen-cap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: min(var(--text-sm), 5cqi); }
+.register .money-io :is(.inlet, .outlet, .terminal) { white-space: nowrap; overflow: hidden; padding-inline: 4px; height: clamp(24px, 6cqi, 40px); font-size: min(var(--text-lg), 3.2cqi); }
 .hw { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 10px; }
 .hw .row { margin: 0; }
 
@@ -844,7 +849,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .top { flex-wrap: wrap; row-gap: 4px; }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
-  .registers { gap: 8px; }
+  /* モバイルは縦に並べ、2 台まで（複数台運用の最低台数。3 台以上のデモは現実的でない、user 2026-11-21） */
+  .registers { gap: 8px; grid-template-columns: minmax(0, 1fr); }
+  .register { max-width: none; }
+  .register:nth-child(n + 3) { display: none; }
   /* 最下段の添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す。帯の言語・電子マネーは余裕があるので出す */
   .call-btn small { display: none; }
   /* ヘッダー右の日時は時刻だけ（年月日・曜日は表示エリアが狭いので出さない。便宜的措置で、デスクトップでは出す） */
@@ -880,7 +888,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .money-io { grid-template-columns: 1fr; margin-top: 6px; }
   .money-io-counter, .money-io-floor { grid-column: 1; }
   .money-io.face-counter .money-io-floor, .money-io.face-floor .money-io-counter { display: none; }
-  /* 面が一つなら W の下限 384px をなくし、画面の内幅そのものにする（文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
+  /* モバイルは画面の高さでは止めない（縦にスクロールする） */
   .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); }
 }
 /* 画面が W の下限より狭いとき（モバイル）は、ヘッダー右の日時は時刻だけ・最下段の呼び出しボタンの添え字は出さない
@@ -978,8 +986,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
    次の行の余地がなければ縮む。当てはめる前（初回の描画）は各行の flex の仮の並び */
 [data-law].law-on { position: relative; display: block; flex: none; }
 [data-law].law-on > * { position: absolute; margin: 0; box-sizing: border-box; max-width: none; }
-/* モバイルモードでは W の下限 384px をなくし、画面の内幅そのものにする（user 2026-11-18：表示エリアの制約による便宜的措置。
-   文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
 
 /* スワイプの手がかり（user 2026-11-20）：隠れているものがある側の縁に白いグラデーションを敷き、隠し領域をにおわせる。
    青のグラデーションは上の文字が沈むのでやめ、操作できる側の段もミントに戻した（青のドット模様も文字が読みにくく見送り）。

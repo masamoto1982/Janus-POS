@@ -34,6 +34,7 @@ import {
   scanGuide,
   voidAsk,
   ffFloorOpen,
+  ffOpenFoot,
   parcelError,
   bellPanel,
   bellSettings,
@@ -166,7 +167,7 @@ function buildSkeleton(): void {
           <div class="screen-cap">レジカウンター側<span class="drop-hint">ここに落とす＝レジカウンター側スキャナーで読む</span></div>
           <section class="screen counter-screen" data-drop="${r.id}:counter">
             <div class="screen-head" data-region="head-${r.id}-counter"></div>
-            <div class="screen-body"><div class="screen-main" data-region="counter-${r.id}"></div></div>
+            <div class="screen-body"><div class="screen-main" data-region="counter-${r.id}"></div><div data-region="foot-${r.id}-counter"></div></div>
             <div class="screen-items" data-region="items-${r.id}-counter"></div>
             <div data-region="pop-${r.id}-counter"></div>
           </section>
@@ -175,7 +176,7 @@ function buildSkeleton(): void {
           <div class="screen-cap">売り場側<span class="drop-hint">ここに落とす＝売り場側スキャナーで読む</span></div>
           <section class="screen floor-screen" data-drop="${r.id}:floor">
             <div class="screen-head" data-region="head-${r.id}-floor"></div>
-            <div class="screen-body"><div class="screen-main" data-region="floor-${r.id}"></div></div>
+            <div class="screen-body"><div class="screen-main" data-region="floor-${r.id}"></div><div data-region="foot-${r.id}-floor"></div></div>
             <div class="screen-items" data-region="items-${r.id}-floor"></div>
             <div data-region="pop-${r.id}-floor"></div>
           </section>
@@ -460,8 +461,8 @@ function render(): void {
     for (const side of ["counter", "floor"] as const) {
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.counter.phase !== "registering" || !r.counter.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
-      // 「FF」から開いた FF タブは、セルフ操作モードを抜けたとき・呼び出しが立ったときに閉じる
-      if (r.mode !== "self_operated" || r.waiting_calls.length) ffFloorOpen.delete(r.id);
+      // 「FF」から開いた FF タブは、セルフ操作モードを抜けたとき・呼び出しが立ったとき・取引が終わったときに閉じる（四つのボタンに戻る）
+      if (r.mode !== "self_operated" || r.waiting_calls.length || r.last_receipt) ffFloorOpen.delete(r.id);
       const items = itemsPanel(r, snap, ffUi(r.id), side, Date.now(), first);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
@@ -488,6 +489,7 @@ function render(): void {
       const lang = langOf(r.id, side);
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side), lang);
       setRegion(`items-${r.id}-${side}`, items, lang);
+      setRegion(`foot-${r.id}-${side}`, items.includes("ff-open") ? ffOpenFoot(r) : "", lang);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       if (side === "counter" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {
@@ -1020,10 +1022,6 @@ app.addEventListener("click", (e) => {
     const first = FF_TABS.find(([k]) => snap.ff_tabs.some((t) => t.tab === k && t.display === "both"));
     ffFloorOpen.add(reg);
     if (first) ffTabs.set(reg, { tab: first[0], page: 0 });
-    return frame();
-  }
-  if (b.dataset.ffclose) {
-    ffFloorOpen.delete(Number(b.dataset.ffclose));
     return frame();
   }
   if (b.dataset.fftab) {

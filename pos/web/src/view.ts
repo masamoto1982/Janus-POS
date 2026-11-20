@@ -1571,7 +1571,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
     // 販売規則の FF タブ表示で「両側」にしたタブがあるときは、「FF」を押すと最下段にレジカウンター側と同じすべての FF タブを開く（user 2026-11-20）。
-    // 「両側」のタブはお客様が登録でき、それ以外のタブに触れるとスタッフの呼び出し（「FF」の呼び出しと同じ）。「バック」で四つのボタンに戻る
+    // 「両側」のタブはお客様が登録でき、それ以外のタブに触れるとスタッフの呼び出し（「FF」の呼び出しと同じ）。
+    // 開いているあいだ、「金券」「たばこ」「その他」は最下段の上の段（ffOpenFoot）。取引が終わると四つのボタンに戻る
     const floorTabs = new Set(snap.ff_tabs.filter((t) => t.display === "both").map((t) => t.tab as string));
     if (floorTabs.size && ffFloorOpen.has(reg)) {
       const tab = floorTabs.has(ui.tab) ? ui.tab : FF_TABS.find(([k]) => floorTabs.has(k))![0];
@@ -1580,8 +1581,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
         floorTabs.has(k)
           ? `<button type="button" role="tab" class="tab ff-tab ${k === tab ? "on" : ""}" data-fftab="${reg}:${k}" aria-selected="${k === tab}">${label}</button>`
           : `<button type="button" role="tab" class="tab ff-tab call-tab" aria-selected="false" data-hold="${esc(JSON.stringify({ type: "ff_button", register: reg }))}"${ffCall.allowed ? "" : ` disabled title="${esc(ffCall.reason ?? "")}"`} title="スタッフを呼び出します">${label}</button>`;
-      const back = `<button type="button" class="md ghost back-btn ff-back" data-ffclose="${reg}">バック</button>`;
-      return `<div class="tabs ff-tabs with-back" role="tablist" aria-label="FF">${back}${FF_TABS.map(tabBtn).join("")}</div>${ffPage(reg, side, snap, tab, ui.page, a("register_ff"))}`;
+      return `<div class="tabs ff-tabs ff-open" role="tablist" aria-label="FF">${FF_TABS.map(tabBtn).join("")}</div>${ffPage(reg, side, snap, tab, ui.page, a("register_ff"))}`;
     }
     const ffBtn = floorTabs.size
       ? `<button type="button" class="call-btn ff" data-ffopen="${reg}"${a("ff_button").allowed ? "" : " disabled"}><b>FF</b><small>揚げ物など</small></button>`
@@ -1606,6 +1606,17 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
 
 /** セルフ操作モードで「FF」を押して FF タブを開いているレジ */
 export const ffFloorOpen = new Set<number>();
+
+/** FF タブを開いているあいだ、最下段の上に設ける段（四段目）：「金券」「たばこ」「その他」を中央に（user 2026-11-20）。
+ *  存在感は控えめに、すべて小ボタン・添え字なし。この段には明細を出さない。
+ *  将来、金券やたばこも売り場側に出すなら FF タブの仕組みを流用し、最下段のタブにしたものはこの段から外れる（「FF」がこの段に来る） */
+export function ffOpenFoot(r: RegisterView): string {
+  const reg = r.id;
+  const can = find(r.floor.actions, "call_staff");
+  const callBtn = (label: string, topic: "voucher" | "tobacco" | "other") =>
+    `<button type="button" class="ghost" data-hold="${esc(JSON.stringify({ type: "call_staff", register: reg, topic }))}"${can.allowed ? "" : ` disabled title="${esc(can.reason ?? "")}"`}>${label}</button>`;
+  return `<div class="ff-open-foot">${callBtn("金券", "voucher")}${callBtn("たばこ", "tobacco")}${callBtn("その他", "other")}</div>`;
+}
 
 function ffTabRow(reg: number, tabs: readonly (readonly [string, string])[], cur: string): string {
   const row = tabs

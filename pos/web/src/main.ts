@@ -126,15 +126,19 @@ function save(): void {
 
 /** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
  *  モバイルは 2 台まで（複数台運用の最低台数。3 台以上のデモは現実的でない、user 2026-11-21）。
+ *  デスクトップは 2 台から（user 2026-11-21：1 台では、呼び出しの通知が発生したレジにだけ出ることや、
+ *  チケットの取引が僅差で重なるケースのデモができない）
  *  台数を変えると店の状態を作り直す（コアは作るときに台数を決める） */
 const REG_COUNT_KEY = "janus-pos-registers";
 const DEFAULT_REGISTERS = 2;
-const maxRegisters = (): number => (window.matchMedia(MOBILE_MQ).matches ? 2 : 5);
+const isMobileMode = (): boolean => window.matchMedia(MOBILE_MQ).matches;
+const minRegisters = (): number => (isMobileMode() ? 1 : 2);
+const maxRegisters = (): number => (isMobileMode() ? 2 : 5);
 
 function savedRegCount(): number {
   try {
     const n = Number(localStorage.getItem(REG_COUNT_KEY));
-    return Number.isInteger(n) && n >= 1 ? Math.min(n, maxRegisters()) : DEFAULT_REGISTERS;
+    return Number.isInteger(n) && n >= 1 ? Math.min(Math.max(n, minRegisters()), maxRegisters()) : DEFAULT_REGISTERS;
   } catch {
     return DEFAULT_REGISTERS;
   }
@@ -277,6 +281,7 @@ function buildSkeleton(): void {
       <span class="tip how-to" tabindex="0" data-tip="${esc(HOW_TO)}" aria-label="使い方：${esc(HOW_TO)}"><span class="how-to-label">使い方</span> <span class="info-icon" aria-hidden="true">i</span></span>
       <label class="reg-count">レジ
         <select data-reg-count aria-label="レジの台数（変えると最初からやり直します）">${Array.from({ length: Math.max(maxRegisters(), snap.registers.length) }, (_, i) => i + 1)
+          .filter((n) => n >= minRegisters() || n === snap.registers.length)
           .map((n) => `<option value="${n}"${n === snap.registers.length ? " selected" : ""}>${n}台</option>`)
           .join("")}</select>
       </label>

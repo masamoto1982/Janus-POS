@@ -121,6 +121,9 @@ button { touch-action: manipulation; }
 .counter-screen .screen-head { touch-action: pan-y; user-select: none; -webkit-user-select: none; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: var(--s11, 8px); }
+/* 無操作の残り時間（レジカウンター側だけ）。時刻の左に同じ小テキストで、強い色にはしない */
+.screen-head .head-r:has(.idle-left) { flex-direction: column; align-items: flex-end; justify-content: center; gap: 0; }
+.screen-head .idle-left { font-size: var(--text-sm); line-height: 1.2; color: var(--msg-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .screen-head .clock { font-size: var(--text-sm); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-body:has(> .slide-from-right, > .slide-from-left) { overflow: hidden; }
@@ -517,10 +520,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 }
 .register h2, .bell-area h2 { margin: 0 0 8px; font-size: var(--text-num); display: flex; gap: 8px; align-items: center; }
 .register h2 { flex-wrap: wrap; row-gap: 4px; }
-/* 無操作の残り時間は見出しの下の一行に回す（レジ番号・スタッフのセレクタの行を崩さない） */
-.register h2 > [data-region^="mode-"] { order: 1; flex-basis: 100%; font-size: var(--text-sm); line-height: 1.4; }
-.register h2 > [data-region^="mode-"]:empty { display: none; }
-.register h2 .idle { margin-left: 0; }
 /* 台数が多くてレジが細いときも、画面の上の見出しと入出金ボックス・決済端末・スキャナの文字は一行に収める（レジの幅に合わせて縮む） */
 .screen-cap { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: min(var(--text-sm), 5cqi); }
 .register .money-io :is(.inlet, .outlet, .terminal) { white-space: nowrap; overflow: hidden; padding-inline: 4px; height: clamp(24px, 6cqi, 40px); font-size: min(var(--text-lg), 3.2cqi); }
@@ -659,7 +658,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .rules-dlg .toast { position: sticky; top: 0; z-index: 1; margin: 6px 0; }
 .rules-dlg .toast:not(.show) { display: none; }
 .lines.rules tr.grp th { text-align: left; padding-top: 10px; color: var(--muted); font-size: var(--text-sm); }
-.idle { margin-left: 6px; font-size: var(--text-sm); font-weight: 400; color: var(--muted); }
 .ffmenu.center { justify-content: center; }
 .icon-btn { width: var(--s8, 26px); height: var(--s8, 26px); padding: 0; border-radius: var(--shape-round); font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .icon-btn:hover { color: var(--ink); }
@@ -870,10 +868,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 /* モバイルモードでは一つの面だけを出してタブで切り替える。デスクトップは常に二つの面を並べる（user 2026-11-20） */
 @media (max-width: 760px) {
   .register h2 { flex-wrap: wrap; row-gap: 4px; margin-bottom: 4px; }
-  .register h2 .idle { font-size: var(--text-sm); }
   /* 無操作の残り時間は見出しの下の一行に回す（レジ番号・スタッフのセレクタの行を崩さない） */
   .register h2 > [data-region^="mode-"] { order: 1; flex-basis: 100%; font-size: var(--text-sm); line-height: 1.4; }
-  .register h2 .idle { margin-left: 0; }
   .swipe-tabs { display: flex; border-bottom: none; }
   /* 画面切り替えのタブは横いっぱいのまま、白銀比のボタンを上下に二分割した形（FF のタブと同じ、縦横比 1:2√2）を
      見ている側に 3 つ分・見ていない側に 2 つ分（user 2026-11-17）。高さは幅から逆算（以前の半分） */

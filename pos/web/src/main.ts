@@ -221,7 +221,7 @@ function buildSkeleton(): void {
   const regs = snap.registers
     .map(
       (r) => `<section class="register" data-register="${r.id}" aria-label="レジ${r.id}">
-      <h2>レジ${r.id} <span data-region="mode-${r.id}"></span>
+      <h2>レジ${r.id}
         <label class="login-sel">スタッフ
           <select data-login="${r.id}" aria-label="レジ${r.id}のスタッフログイン">
             <option value="">未ログイン</option>
@@ -577,17 +577,6 @@ function render(): void {
       activeShown.set(r.id, face);
       swipeTo(r.id, face);
     }
-    const idle = r.idle_revert_in;
-    setRegion(
-      `mode-${r.id}`,
-      `${
-        idle !== null
-          ? `<span class="idle" title="5分間操作がないと、登録中の取引も中止してセルフ操作モードに戻ります">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} で${
-              r.idle_voids ? (r.mode === "self_operated" ? "取引を中止します" : "取引を中止してセルフ操作モードに戻ります") : "セルフ操作モードに戻ります"
-            }</span>`
-          : ""
-      }`,
-    );
     setRegion(`counter-${r.id}`, counterMain, langOf(r.id, "counter"));
     setRegion(`floor-${r.id}`, floorMain, langOf(r.id, "floor"));
     slideOnHold(r);

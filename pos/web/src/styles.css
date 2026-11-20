@@ -159,6 +159,8 @@ button { touch-action: manipulation; }
 .ff-arrow.next { grid-column: 3; justify-self: end; }
 /* FF の単品は特大の白銀比を一行に四つ（user 2026-11-17：将来商品画像を入れるので正方形に近い形）。入らないときは白銀比のまま縮む */
 .ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-xl-w))); justify-content: center; align-content: center; gap: var(--gap); }
+/* セルフ操作モードの売り場側の FF タブ「カウンター」：呼び出しボタンを FF の単品と同じ席・同じ大きさに置く */
+.ff-grid.counter-calls > .call-btn { width: 100%; max-width: var(--btn-xl-w); height: auto; aspect-ratio: var(--silver, 1.4142); min-width: 0; padding: 0 var(--s14, 3px); }
 .ff-item { box-sizing: border-box; width: 100%; max-width: var(--btn-xl-w); height: auto; aspect-ratio: var(--silver, 1.4142); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
    無し＝グレーアウト（長押しで予約注文） */
@@ -424,7 +426,9 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   white-space: pre-line;
 }
 .toast.show { opacity: .95; transform: none; }
-.toast.error { background: var(--danger); }
+/* 受け付けなかった理由：登録画面に重ねる一瞬の表示（.reject-flash）と同じ、薄い黄の地に赤の文字。
+   クラス名を .error にすると読み込み中の .error（赤文字・余白 24px）が重なり、赤の地に赤の文字で読めなくなった */
+.toast.toast-error { background: var(--alert-bg); color: var(--alert-ink); font-weight: 600; }
 
 
 

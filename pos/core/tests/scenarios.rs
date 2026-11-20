@@ -1,3 +1,4 @@
+use janus_pos_core::age_rules::FfTabDisplay;
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{
@@ -5652,4 +5653,84 @@ fn idle_revert_voids_the_held_transaction_too() {
     assert!(!v.held);
     assert!(v.counter.lines.is_empty());
     assert_eq!(v.mode, Mode::SelfOperated);
+}
+
+/// 仕様 14.4：FF タブ表示を「両側」にしたタブの FF は、セルフ操作モードの売り場側で登録できる
+#[test]
+fn ff_tab_shown_on_both_sides_can_be_bought_in_self_operated_mode() {
+    let mut s = Store::new(1, 2, 1);
+    let display = |pw: &str, tab: &str, d: &str| json!({"type":"set_ff_tab_display","owner_id":"000","password":pw,"tab":tab,"display":d});
+    let coffee = json!({"type":"register_ff","register":1,"side":"floor","code":"FF32","qty":1});
+    let chicken = json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1});
+    assert!(
+        run(&mut s, coffee.clone()).is_err(),
+        "既定はレジカウンター側のみ"
+    );
+    assert!(
+        run(&mut s, display("0000", "drink", "both")).is_err(),
+        "オーナーだけ"
+    );
+    ok(&mut s, display("9999", "drink", "both"));
+    let snap = s.snapshot();
+    assert!(snap
+        .ff_tabs
+        .iter()
+        .any(|t| t.label == "ドリンク" && t.display == FfTabDisplay::Both));
+    assert!(snap
+        .age_rules
+        .history
+        .iter()
+        .any(|h| h.change.contains("ドリンク") && h.change.contains("両側")));
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"register_ff","register":1,"side":"counter","code":"FF32","qty":1})
+        )
+        .is_err(),
+        "セルフ操作モードのレジカウンター側は表示だけ"
+    );
+    ok(&mut s, coffee.clone());
+    let v = reg(&s, 1);
+    let l = &v.counter.lines[0].line;
+    assert_eq!(
+        l.kind,
+        LineKind::Ff {
+            state: FfState::SelfServe
+        },
+        "コーヒーはお客様がご自分でお取りになる"
+    );
+    assert!(s.snapshot().calls.is_empty(), "スタッフを呼ばない");
+    let e = run(&mut s, chicken.clone()).unwrap_err();
+    assert!(e.contains("スタッフにお申し付けください"), "{e}");
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"floor"}),
+    );
+    confirm_point(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"select_payment","register":1,"side":"floor","method":"emoney"}),
+    );
+    ok(&mut s, json!({"type":"tap_emoney","register":1}));
+    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 150);
+
+    // 作り置きの FF を両側にすると、売り場側で登録できるがお渡しはスタッフ（お渡し前・呼び出し）
+    ok(&mut s, display("9999", "fried", "both"));
+    ok(&mut s, chicken);
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.register == 1 && c.kind == CallKind::FastFood));
+    assert!(run(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"floor"})
+    )
+    .is_err());
+    ok(&mut s, display("9999", "fried", "counter"));
+    assert!(run(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"floor","code":"FF02","qty":1})
+    )
+    .is_err());
 }

@@ -66,7 +66,7 @@ export type Command = { "type": "scan", register: number, side: Side, code: stri
 /**
  * 使うポイント数（how が amount のときだけ）
  */
-points?: number, } | { "type": "release_call", register: number, } | { "type": "end_emergency", register: number, } | { "type": "void_transaction", register: number, } | { "type": "hold_transaction", register: number, } | { "type": "resume_held", register: number, } | { "type": "end_staff_mode", register: number, } | { "type": "pause", register: number, } | { "type": "cash_out", register: number, kind: CashOutKind, amount: number, password?: string, } | { "type": "cash_in", register: number, kind: CashInKind, amount: number, } | { "type": "open_menu", register: number, screen?: MenuScreen | null, exchange_to?: number, } | { "type": "insert", register: number, amount: number, } | { "type": "take_outlet", register: number, } | { "type": "claim", register: number, side: Side, } | { "type": "add_age_rule", owner_id: string, password: string, target: RuleTarget, min_age: number, } | { "type": "remove_age_rule", owner_id: string, password: string, rule_id: number, } | { "type": "set_product_age", owner_id: string, password: string, code: string, min_age?: number | null, } | { "type": "set_sale_limit", owner_id: string, password: string, code: string, limit?: number | null, } | { "type": "verify_owner", owner_id: string, password: string, } | { "type": "set_tax_rate", owner_id: string, password: string, class_id: string, rate_bp: number, } | { "type": "add_tax_class", owner_id: string, password: string, name: string, kind: TaxKind, rate_bp: number, } | { "type": "set_product_tax", owner_id: string, password: string, code: string, class_id: string, } | { "type": "set_invoice", owner_id: string, password: string, invoice_no: string, rounding: Rounding, } | { "type": "set_bell_loss", percent: number, } | { "type": "set_bell_offline", bell: number, offline: boolean, } | { "type": "set_bell_on", bell: number, on: boolean, };
+points?: number, } | { "type": "release_call", register: number, } | { "type": "end_emergency", register: number, } | { "type": "void_transaction", register: number, } | { "type": "hold_transaction", register: number, } | { "type": "resume_held", register: number, } | { "type": "end_staff_mode", register: number, } | { "type": "pause", register: number, } | { "type": "cash_out", register: number, kind: CashOutKind, amount: number, password?: string, } | { "type": "cash_in", register: number, kind: CashInKind, amount: number, } | { "type": "open_menu", register: number, screen?: MenuScreen | null, exchange_to?: number, } | { "type": "insert", register: number, amount: number, } | { "type": "take_outlet", register: number, } | { "type": "claim", register: number, side: Side, } | { "type": "add_age_rule", owner_id: string, password: string, target: RuleTarget, min_age: number, } | { "type": "remove_age_rule", owner_id: string, password: string, rule_id: number, } | { "type": "set_product_age", owner_id: string, password: string, code: string, min_age?: number | null, } | { "type": "set_sale_limit", owner_id: string, password: string, code: string, limit?: number | null, } | { "type": "set_ff_tab_display", owner_id: string, password: string, tab: FfTab, display: FfTabDisplay, } | { "type": "verify_owner", owner_id: string, password: string, } | { "type": "set_tax_rate", owner_id: string, password: string, class_id: string, rate_bp: number, } | { "type": "add_tax_class", owner_id: string, password: string, name: string, kind: TaxKind, rate_bp: number, } | { "type": "set_product_tax", owner_id: string, password: string, code: string, class_id: string, } | { "type": "set_invoice", owner_id: string, password: string, invoice_no: string, rounding: Rounding, } | { "type": "set_bell_loss", percent: number, } | { "type": "set_bell_offline", bell: number, offline: boolean, } | { "type": "set_bell_on", bell: number, on: boolean, };
 
 export type Confiscated = { name: string, qty: number, };
 
@@ -131,9 +131,19 @@ export type EmoneyView = { kind: EmoneyKind, inserted: number, balance: number |
 
 export type FfMenuItem = { code: string, name: string, price: number, level: StockLevel, tab: FfTab, tab_label: string, };
 
-export type FfState = "waiting" | "received";
+export type FfState = "waiting" | "received" | "self_serve";
 
 export type FfTab = "fried" | "drink" | "cold" | "bun" | "oden";
+
+/**
+ * FF タブ表示：タブをどちらの画面に出すか。売り場側だけに出す選択肢は持たない（スタッフはいつでも FF を登録できる）
+ */
+export type FfTabDisplay = "counter" | "both";
+
+/**
+ * FF タブ表示の設定（販売規則）
+ */
+export type FfTabView = { tab: FfTab, label: string, display: FfTabDisplay, };
 
 export type FloorLine = { id: number, touched: number, name: string, qty: number, ff_base: number, amount: number, age: number | null, age_checked: boolean, limit: number | null, 
 /**
@@ -291,7 +301,7 @@ export type ShortChoice = "cancel" | "cash" | "cash_confirmed" | "charge" | "sta
 
 export type Side = "counter" | "floor";
 
-export type Snapshot = { now: number, registers: Array<RegisterView>, bells: Array<BellView>, bell_links: Array<BellLink>, signal: BellSignal, calls: Array<Call>, call_history: Array<ResolvedCall>, age_rules: AgeRulesView, audit: Array<AuditEntry>, ff_stock: Array<FfMenuItem>, bell_loss: number, accounts: Array<AccountView>, catalog: Array<CatalogItem>, tax: TaxView, categories: Array<[Category, string]>, emoney_balance: number, };
+export type Snapshot = { now: number, registers: Array<RegisterView>, bells: Array<BellView>, bell_links: Array<BellLink>, signal: BellSignal, calls: Array<Call>, call_history: Array<ResolvedCall>, age_rules: AgeRulesView, audit: Array<AuditEntry>, ff_stock: Array<FfMenuItem>, ff_tabs: Array<FfTabView>, bell_loss: number, accounts: Array<AccountView>, catalog: Array<CatalogItem>, tax: TaxView, categories: Array<[Category, string]>, emoney_balance: number, };
 
 export type StaffState = "absent" | "ready";
 

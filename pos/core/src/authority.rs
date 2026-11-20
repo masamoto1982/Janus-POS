@@ -174,6 +174,8 @@ pub struct Context {
     pub cash_only_goods: bool,
     /// 販売期限切れの明細がある
     pub expired: bool,
+    /// 売り場側にも出す FF タブがある（販売規則の FF タブ表示で「両側」にしたタブ）
+    pub ff_floor: bool,
 }
 
 /// 1 取引の買い物点数（数量の合計）の上限。合計が税抜 5 万円を超え、レシートに収入印紙が要るケースを再現できる数
@@ -219,6 +221,7 @@ impl Context {
 
 pub type Denial = &'static str;
 
+pub const FF_ASK_STAFF: Denial = "FF はスタッフにお申し付けください";
 const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
 const PARCEL_ASK: Denial = "同じお届け先の荷物があるか選んでください";
 pub const EXPIRED: Denial = "販売期限切れの商品があります\n取り消してから、お会計に進んでください";
@@ -488,7 +491,11 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
     match action {
         Action::Scan => Ok(()),
         Action::FfButton => Ok(()),
-        Action::RegisterFf => Err("FF はスタッフにお申し付けください"),
+        Action::RegisterFf => {
+            require(c.ff_floor, FF_ASK_STAFF)?;
+            require(!paying, "お会計中です")?;
+            require(!c.items_full, ITEMS_FULL)
+        }
         Action::CheckFf => {
             check_ff(c)?;
             Err("FF のお渡し確認はスタッフがログインしてから行います")
@@ -585,6 +592,7 @@ mod tests {
                                             emoney_short: false,
                                             cash_only_goods: false,
                                             expired: false,
+                                            ff_floor: false,
                                             floor_turn,
                                             mode,
                                             phase,

@@ -2,11 +2,11 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
-use crate::age_rules::{AgeRules, RuleTarget};
+use crate::age_rules::{AgeRules, FfTabDisplay, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
-    StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
+    StaffState, ACTIONS, FF_ASK_STAFF, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
 use crate::bell::{Bell, BellSignal};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
@@ -494,6 +494,13 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         limit: Option<u32>,
     },
+    /// 販売規則：FF タブをどちらの画面に出すか（オーナー）
+    SetFfTabDisplay {
+        owner_id: String,
+        password: String,
+        tab: FfTab,
+        display: FfTabDisplay,
+    },
     /// 販売規則の設定を開くときのオーナー認証
     VerifyOwner { owner_id: String, password: String },
     /// 販売規則：税区分の税率を変える（オーナー）
@@ -703,6 +710,9 @@ fn done(msg: impl Into<String>) -> Result<Outcome, String> {
 pub enum FfState {
     Waiting,
     Received,
+    /// お客様が売り場でご自分でお取りになる（セルフ操作モードの売り場側で登録した、作り置きのない FF）。
+    /// スタッフのお渡しがないので「お渡し前」のフラグも照合もない
+    SelfServe,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1403,6 +1413,14 @@ impl Register {
         {
             out.push((CallKind::Service, l.name.to_string()));
         }
+        if let Some(l) = t.lines.iter().find(|l| {
+            l.kind
+                == LineKind::Ff {
+                    state: FfState::Waiting,
+                }
+        }) {
+            out.push((CallKind::FastFood, l.name.to_string()));
+        }
         if t.paying {
             let slips = t.bill_slips();
             if slips > 0 {
@@ -1613,6 +1631,7 @@ impl Register {
             items_full: t.item_count() >= MAX_ITEMS,
             emoney_short: t.emoney_short || t.emoney_partial,
             cash_only_goods: t.cash_only() > 0,
+            ff_floor: !rules.ff_floor_tabs.is_empty(),
         }
     }
 }
@@ -2246,7 +2265,10 @@ impl Store {
                     .txn
                     .lines
                     .iter_mut()
-                    .find(|l| l.id == line_id && matches!(l.kind, LineKind::Ff { .. }))
+                    .find(|l| {
+                        l.id == line_id
+                            && matches!(l.kind, LineKind::Ff { state } if state != FfState::SelfServe)
+                    })
                     .ok_or("FF の明細が見つかりません")?;
                 let name = l.name;
                 let matched = handed == l.qty - l.ff_base;
@@ -3296,6 +3318,21 @@ impl Store {
                 self.age_rules.set_limit(&code, limit, by, self.now)?;
                 done("販売個数の上限を変更しました")
             }
+            C::SetFfTabDisplay {
+                owner_id,
+                password,
+                tab,
+                display,
+            } => {
+                let by = self.owner(&owner_id, &password)?;
+                self.age_rules
+                    .set_ff_tab_display(tab, display, by, self.now);
+                done(format!(
+                    "FFタブ「{}」を{}に表示します",
+                    tab.label(),
+                    display.label()
+                ))
+            }
             C::VerifyOwner { owner_id, password } => {
                 self.owner(&owner_id, &password)?;
                 Ok(Outcome::default())
@@ -3960,6 +3997,13 @@ impl Store {
         force: bool,
     ) -> Result<Outcome, String> {
         self.check(register, side, Action::RegisterFf)?;
+        // セルフ操作モードの売り場側で登録できるのは、FF タブ表示が「両側」のタブの品だけ
+        let self_op = self
+            .reg(register)
+            .is_some_and(|r| r.mode == Mode::SelfOperated);
+        if self_op && !self.age_rules.ff_on_floor(code) {
+            return Err(FF_ASK_STAFF.into());
+        }
         if self.reg(register).is_some_and(|r| r.txn.bill_slips() > 0) {
             return Err(BILL_ALONE.into());
         }
@@ -4012,15 +4056,17 @@ impl Store {
             r.txn.method = None;
             r.txn.floor_turn = false;
         }
-        r.txn.push(
-            p,
-            qty,
-            LineKind::Ff {
-                state: FfState::Waiting,
-            },
-            tax,
-        );
-        self.calls.resolve(register, CallKind::FastFood, now);
+        // セルフ操作モードで登録した作り置きのない FF（コーヒーなど）はお客様がご自分でお取りになる。
+        // 作り置きの FF はスタッフのお渡し（照合）が要るので「お渡し前」になり、スタッフを呼ぶ（required_calls）
+        let state = if self_op && catalog::is_made_to_order(code) {
+            FfState::SelfServe
+        } else {
+            FfState::Waiting
+        };
+        r.txn.push(p, qty, LineKind::Ff { state }, tax);
+        if !self_op {
+            self.calls.resolve(register, CallKind::FastFood, now);
+        }
         done(format!(
             "{} ×{qty} を{}しました\nお渡ししたらチェックを入れてください",
             p.name,
@@ -4639,6 +4685,14 @@ impl Store {
             },
             audit: self.audit.clone(),
             ff_stock: self.ff_menu(),
+            ff_tabs: FfTab::ALL
+                .iter()
+                .map(|&tab| FfTabView {
+                    tab,
+                    label: tab.label(),
+                    display: self.age_rules.ff_tab_display(tab),
+                })
+                .collect(),
             bell_loss: self.bell_loss,
             accounts: ACCOUNTS
                 .iter()
@@ -5302,6 +5356,15 @@ pub struct FfMenuItem {
     pub tab_label: &'static str,
 }
 
+/// FF タブ表示の設定（販売規則）
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct FfTabView {
+    pub tab: FfTab,
+    pub label: &'static str,
+    pub display: FfTabDisplay,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AccountView {
@@ -5373,6 +5436,7 @@ pub struct Snapshot {
     pub age_rules: AgeRulesView,
     pub audit: Vec<AuditEntry>,
     pub ff_stock: Vec<FfMenuItem>,
+    pub ff_tabs: Vec<FfTabView>,
     pub bell_loss: u8,
     pub accounts: Vec<AccountView>,
     pub catalog: Vec<CatalogItem>,

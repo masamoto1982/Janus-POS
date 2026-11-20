@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +12,7 @@ use crate::authority::{Mode, PaymentMethod, Side};
 use crate::bell::{Bell, BellSignal, Packet};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{Cash, Drawer};
-use crate::catalog::{self, COUPONS};
+use crate::catalog::{self, FfTab, COUPONS};
 use crate::parcel::{Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
@@ -103,6 +103,8 @@ struct SavedAgeRules {
     rules: Vec<AgeRule>,
     history: Vec<RuleChange>,
     limits: BTreeMap<String, u32>,
+    #[serde(default)]
+    ff_floor_tabs: BTreeSet<FfTab>,
     next_id: u32,
 }
 
@@ -630,6 +632,7 @@ impl Store {
                 rules: self.age_rules.rules.clone(),
                 history: self.age_rules.history.clone(),
                 limits: self.age_rules.limits.clone(),
+                ff_floor_tabs: self.age_rules.ff_floor_tabs.clone(),
                 next_id: self.age_rules.next_id,
             },
             tax: SavedTax {
@@ -743,6 +746,7 @@ impl Store {
                 rules: s.age_rules.rules,
                 history: s.age_rules.history,
                 limits: s.age_rules.limits,
+                ff_floor_tabs: s.age_rules.ff_floor_tabs,
                 next_id: s.age_rules.next_id,
             },
             tax: TaxSettings {

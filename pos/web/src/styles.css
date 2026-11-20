@@ -986,3 +986,14 @@ body.dragging .drop-hint { display: inline; }
 .item:not(.off, .call-blink, .staff) .item-name { color: var(--operable-blue); }
 .item.coin:not(.off) { border-radius: var(--shape-round); }
 .item.staff:not(.off) { background: var(--operable-blue); color: var(--white); }
+
+/* シミュレーターまわりの一行のボタン（リセット・閉じる・認証・区分を追加・保存）もレジ画面のボタンの規則で（user 2026-11-20）：
+   高さは段の小（W=400 のレジ画面で W÷16＝25px）、文字は高さの半分、左右の余白は高さの 1/4、幅は文字なり、弱い角丸、行の高さは文字の高さ。
+   歯車は同じ高さの円 */
+:root { --chrome-b: 25px; }
+:is(.reset-btn, .rules-dlg .dlg-head button, [data-owner-submit], [data-add-tax], [data-save-invoice]) {
+  box-sizing: border-box; height: var(--chrome-b); width: auto; min-width: 0; padding: 0 calc(var(--chrome-b) / 4);
+  font-size: calc(var(--chrome-b) / 2); font-weight: 400; line-height: 1; white-space: nowrap; flex: none;
+  border-width: var(--frame-w); border-radius: calc(400px / 45.255);
+}
+.icon-btn { width: var(--chrome-b); height: var(--chrome-b); font-size: calc(var(--chrome-b) / 2); font-weight: 400; border-width: var(--frame-w); }

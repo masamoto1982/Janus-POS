@@ -153,6 +153,10 @@ button { touch-action: manipulation; }
 .ff-open-foot { flex: none; display: flex; justify-content: space-between; align-items: center; gap: var(--gap);
   padding: calc(var(--s14, 3px) + var(--s13, 5px)) var(--s10, 12px); }
 .ff-open-calls { display: flex; gap: var(--gap); }
+/* この行は独立した段（user 2026-11-20）：開いているあいだは五段構成になり、濃淡が交互になるよう
+   ヘッダー（淡）・帯（濃）・登録画面（淡）・この行（濃）・最下段（淡）と塗り分ける */
+.ff-open-foot { background: var(--tier-deep); border-top: var(--s17, 1px) solid var(--border); }
+.screen:has(.ff-open-foot) .screen-items { background: var(--screen-bg); }
 .screen .ff-open-foot button { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; border-radius: var(--shape-soft); }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない。左右の列は少なくとも円の直径を確保し、段の縁・単品とは最小間隔（--gap）

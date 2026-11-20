@@ -1,4 +1,4 @@
-import { applyLaw, fitForms, fitText } from "./law";
+import { applyLaw, fitForms, fitText, MOBILE as MOBILE_MQ } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { CancelStage, GuideKind, RulesTab } from "./view";
@@ -125,18 +125,38 @@ function save(): void {
 }
 
 /** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
+ *  モバイルは 2 台まで（複数台運用の最低台数。3 台以上のデモは現実的でない、user 2026-11-21）。
  *  台数を変えると店の状態を作り直す（コアは作るときに台数を決める） */
 const REG_COUNT_KEY = "janus-pos-registers";
-const MAX_UI_REGISTERS = 5;
 const DEFAULT_REGISTERS = 2;
+const maxRegisters = (): number => (window.matchMedia(MOBILE_MQ).matches ? 2 : 5);
 
 function savedRegCount(): number {
   try {
     const n = Number(localStorage.getItem(REG_COUNT_KEY));
-    return Number.isInteger(n) && n >= 1 && n <= MAX_UI_REGISTERS ? n : DEFAULT_REGISTERS;
+    return Number.isInteger(n) && n >= 1 ? Math.min(n, maxRegisters()) : DEFAULT_REGISTERS;
   } catch {
     return DEFAULT_REGISTERS;
   }
+}
+
+/** デスクトップは、レジ全体（見出し・画面・入出金ボックス）が画面の高さに収まるよう、レジ画面の W の上限 --W-max を決める。
+ *  画面の高さは W×√2（styles.css）。画面より上（見出し）と下（入出金ボックス）の高さは W によらないので、いまの配置から測る。
+ *  モバイルは縦にスクロールするので止めない */
+function fitRegisters(): void {
+  const root = document.documentElement;
+  if (window.matchMedia(MOBILE_MQ).matches) {
+    root.style.removeProperty("--W-max");
+    return;
+  }
+  const reg = app.querySelector<HTMLElement>(".register");
+  const screen = reg?.querySelector<HTMLElement>(".screen");
+  const floor = app.querySelector<HTMLElement>(".floor");
+  if (!reg || !screen || !floor) return;
+  const top = screen.getBoundingClientRect().top + window.scrollY;
+  const below = reg.getBoundingClientRect().bottom - screen.getBoundingClientRect().bottom + (parseFloat(getComputedStyle(floor).paddingBottom) || 0);
+  const W = Math.floor((window.innerHeight - top - below) / Math.SQRT2 - 2);
+  root.style.setProperty("--W-max", `${Math.max(160, Math.min(512, W))}px`);
 }
 
 /** ページ上部の「使い方」 */
@@ -156,6 +176,8 @@ function start(): void {
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
+  fitRegisters();
+  window.addEventListener("resize", fitRegisters);
   fitForms(app);
   app.querySelector<HTMLSelectElement>("[data-reg-count]")?.addEventListener("change", (e) => {
     const sel = e.target as HTMLSelectElement;
@@ -196,7 +218,7 @@ function buildSkeleton(): void {
   const regs = snap.registers
     .map(
       (r) => `<section class="register" data-register="${r.id}" aria-label="レジ${r.id}">
-      <h2>レジ${r.id} <span data-region="mode-${r.id}"></span>
+      <h2>レジ${r.id}
         <label class="login-sel">スタッフ
           <select data-login="${r.id}" aria-label="レジ${r.id}のスタッフログイン">
             <option value="">未ログイン</option>
@@ -254,7 +276,7 @@ function buildSkeleton(): void {
       <div class="top-tools">
       <span class="tip how-to" tabindex="0" data-tip="${esc(HOW_TO)}" aria-label="使い方：${esc(HOW_TO)}"><span class="how-to-label">使い方</span> <span class="info-icon" aria-hidden="true">i</span></span>
       <label class="reg-count">レジ
-        <select data-reg-count aria-label="レジの台数（変えると最初からやり直します）">${Array.from({ length: MAX_UI_REGISTERS }, (_, i) => i + 1)
+        <select data-reg-count aria-label="レジの台数（変えると最初からやり直します）">${Array.from({ length: Math.max(maxRegisters(), snap.registers.length) }, (_, i) => i + 1)
           .map((n) => `<option value="${n}"${n === snap.registers.length ? " selected" : ""}>${n}台</option>`)
           .join("")}</select>
       </label>
@@ -549,17 +571,6 @@ function render(): void {
       activeShown.set(r.id, face);
       swipeTo(r.id, face);
     }
-    const idle = r.idle_revert_in;
-    setRegion(
-      `mode-${r.id}`,
-      `${
-        idle !== null
-          ? `<span class="idle" title="5分間操作がないと、登録中の取引も中止してセルフ操作モードに戻ります">無操作であと ${Math.floor(idle / 60000)}:${String(Math.floor((idle % 60000) / 1000)).padStart(2, "0")} で${
-              r.idle_voids ? (r.mode === "self_operated" ? "取引を中止します" : "取引を中止してセルフ操作モードに戻ります") : "セルフ操作モードに戻ります"
-            }</span>`
-          : ""
-      }`,
-    );
     setRegion(`counter-${r.id}`, counterMain, langOf(r.id, "counter"));
     setRegion(`floor-${r.id}`, floorMain, langOf(r.id, "floor"));
     slideOnHold(r);

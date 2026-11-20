@@ -1485,10 +1485,6 @@ export function timeText(d: Date): string {
 }
 
 /** ヘッダー右の日時。年月日・曜日は別の span にし、モバイルモードでは CSS で隠して時刻だけにする（表示エリアの制約による便宜的措置） */
-export function clockHtml(d: Date): string {
-  return `<span class="clock-date">${dateText(d)} </span>${timeText(d)}`;
-}
-
 /** 呼び鈴の絵（色は CSS の currentColor：押せるときは青、押せないときはグレー） */
 const BELL_SVG = `<svg class="bell-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.5a1.5 1.5 0 0 0-1.5 1.5v.6A6.5 6.5 0 0 0 5.5 11v4.2L3.8 17.4a.9.9 0 0 0 .7 1.5h15a.9.9 0 0 0 .7-1.5l-1.7-2.2V11a6.5 6.5 0 0 0-5-6.4V4A1.5 1.5 0 0 0 12 2.5Zm-2.6 17.6a2.6 2.6 0 0 0 5.2 0Z"/></svg>`;
 

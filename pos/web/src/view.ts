@@ -2122,7 +2122,7 @@ function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[
 }
 
 /** スタッフがログインしているレジ（スタッフ操作モード）でだけ扱えるカテゴリ（たばこ・切手・金券）。
- *  どのレジにもスタッフがいないあいだは Item エリアでグレーアウトし、ドラッグできない */
+ *  どのレジにもスタッフがいないあいだは選ぶ画面の Item でグレーアウトする */
 const STAFF_ONLY_SHELF = ["tobacco", "stamp", "voucher"];
 const STAFF_ONLY_OFF = "スタッフがログインしているレジでのみ扱えます";
 

@@ -78,7 +78,7 @@ async function boot(): Promise<void> {
   const b64 = window.__JANUS_WASM_B64__;
   await init(b64 ? { module_or_path: bytesFromB64(b64) } : undefined);
   start();
-  setupDrag();
+  setupHold();
   window.addEventListener("pagehide", save);
   window.setInterval(frame, 100);
   // レイアウトの法則は部品の大きさで決まるので、段の大きさが変わったときとフォントが届いたときにも当て直す
@@ -125,6 +125,25 @@ function save(): void {
   }
 }
 
+/** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
+ *  台数を変えると店の状態を作り直す（コアは作るときに台数を決める） */
+const REG_COUNT_KEY = "janus-pos-registers";
+const MAX_UI_REGISTERS = 5;
+const DEFAULT_REGISTERS = 2;
+
+function savedRegCount(): number {
+  try {
+    const n = Number(localStorage.getItem(REG_COUNT_KEY));
+    return Number.isInteger(n) && n >= 1 && n <= MAX_UI_REGISTERS ? n : DEFAULT_REGISTERS;
+  } catch {
+    return DEFAULT_REGISTERS;
+  }
+}
+
+/** ページ上部の「使い方」 */
+const HOW_TO =
+  "Item（売り場の商品）と Wallet（お金・カード）は、レジの画面・入金ボックス・決済端末・スキャナを右クリック（タッチは長押し）して選びます。選んだものは、その機器で読んだことになります";
+
 function forget(): void {
   try {
     localStorage.removeItem(SAVE_KEY);
@@ -134,11 +153,26 @@ function forget(): void {
 }
 
 function start(): void {
-  sim = restore() ?? new PosSimulator(Date.now() & 0xffff, 2, 3);
+  sim = restore() ?? new PosSimulator(Date.now() & 0xffff, savedRegCount(), 3);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
   fitForms(app);
+  app.querySelector<HTMLSelectElement>("[data-reg-count]")?.addEventListener("change", (e) => {
+    const sel = e.target as HTMLSelectElement;
+    if (!confirm(`レジを${sel.value}台にして、最初からやり直しますか`)) {
+      sel.value = String(snap.registers.length);
+      return;
+    }
+    try {
+      localStorage.setItem(REG_COUNT_KEY, sel.value);
+    } catch {
+      /* 保存できなければ既定の台数で起動する */
+    }
+    discarding = true;
+    forget();
+    location.reload();
+  });
   app.querySelector("[data-reset]")?.addEventListener("click", () => {
     if (!confirm("保存されている状態を消して、最初からやり直しますか")) return;
     discarding = true;
@@ -179,8 +213,8 @@ function buildSkeleton(): void {
       </div>
       <div class="screens" data-swipe="${r.id}" data-shown="counter">
         <div class="screen-wrap" data-wrap="${r.id}:counter">
-          <div class="screen-cap">レジカウンター側<span class="drop-hint">ここに落とす＝レジカウンター側スキャナーで読む</span></div>
-          <section class="screen counter-screen" data-drop="${r.id}:counter">
+          <div class="screen-cap">レジカウンター側</div>
+          <section class="screen counter-screen" data-screen="${r.id}:counter">
             <div class="screen-head" data-region="head-${r.id}-counter"></div>
             <div class="screen-body"><div class="screen-main" data-region="counter-${r.id}"></div><div data-region="foot-${r.id}-counter"></div></div>
             <div class="screen-items" data-region="items-${r.id}-counter"></div>
@@ -188,8 +222,8 @@ function buildSkeleton(): void {
           </section>
         </div>
         <div class="screen-wrap" data-wrap="${r.id}:floor">
-          <div class="screen-cap">売り場側<span class="drop-hint">ここに落とす＝売り場側スキャナーで読む</span></div>
-          <section class="screen floor-screen" data-drop="${r.id}:floor">
+          <div class="screen-cap">売り場側</div>
+          <section class="screen floor-screen" data-screen="${r.id}:floor">
             <div class="screen-head" data-region="head-${r.id}-floor"></div>
             <div class="screen-body"><div class="screen-main" data-region="floor-${r.id}"></div><div data-region="foot-${r.id}-floor"></div></div>
             <div class="screen-items" data-region="items-${r.id}-floor"></div>
@@ -199,15 +233,15 @@ function buildSkeleton(): void {
       </div>
       <div class="money-io face-counter">
         <div class="money-io-counter" aria-label="レジ${r.id}の自動釣銭機（レジカウンター側の画面に付いています）">
-          <div class="money-io-boxes" data-cash-drop="${r.id}">
+          <div class="money-io-boxes">
             <button type="button" class="inlet" data-inlet="${r.id}" data-padopen="${r.id}:counter:inlet:" aria-label="レジ${r.id}の入金ボックス（押すとテンキーで金額を入れる）"><span data-region="inlet-${r.id}"></span></button>
             <button type="button" class="outlet" data-outlet="${r.id}" aria-label="レジ${r.id}の出金ボックス（金額をタッチで取り出す）"><span data-region="outlet-${r.id}"></span></button>
           </div>
         </div>
         <div class="money-io-floor" aria-label="レジ${r.id}の決済端末とスキャナ（売り場側の画面に付いています）">
           <div class="money-io-boxes">
-            <div data-pay-drop="${r.id}" data-device="terminal"><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・クレジットカードをかざす）"><span class="placeholder">決済端末</span></button></div>
-            <div data-pay-drop="${r.id}" data-device="scanner"><button type="button" class="terminal scanner" data-scanner="${r.id}" aria-label="レジ${r.id}のスキャナ（商品・決済用バーコード・ポイントカードを読む）"><span class="placeholder">スキャナ</span></button></div>
+            <div><button type="button" class="terminal" data-terminal="${r.id}" aria-label="レジ${r.id}の決済端末（電子マネー・クレジットカードをかざす）"><span class="placeholder">決済端末</span></button></div>
+            <div><button type="button" class="terminal scanner" data-scanner="${r.id}" aria-label="レジ${r.id}のスキャナ（商品・決済用バーコード・ポイントカードを読む）"><span class="placeholder">スキャナ</span></button></div>
           </div>
         </div>
       </div>
@@ -220,28 +254,24 @@ function buildSkeleton(): void {
       <img class="logo" src="${logoUrl}" width="73" height="73" alt="Janus POS ロゴ" />
       <h1>Janus POS</h1>
       <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
+      <div class="top-tools">
+      <span class="tip how-to" tabindex="0" data-tip="${esc(HOW_TO)}" aria-label="使い方：${esc(HOW_TO)}"><span class="how-to-label">使い方</span> <span class="info-icon" aria-hidden="true">i</span></span>
+      <label class="reg-count">レジ
+        <select data-reg-count aria-label="レジの台数（変えると最初からやり直します）">${Array.from({ length: MAX_UI_REGISTERS }, (_, i) => i + 1)
+          .map((n) => `<option value="${n}"${n === snap.registers.length ? " selected" : ""}>${n}台</option>`)
+          .join("")}</select>
+      </label>
       <button type="button" class="neg small reset-btn" data-reset title="保存されている状態を消して最初からやり直す">リセット</button>
+      </div>
     </header>
     <article class="floor">
-      <div class="left">
         <section class="bell-area" aria-label="Bell（呼び鈴）">
           <h2>Bell</h2>
           <div class="bells" data-region="bells"></div>
           <button type="button" class="icon-btn bell-open" data-open-bell aria-haspopup="dialog" aria-label="Bell の設定" title="Bell の設定">⚙</button>
           <div class="toast" id="toast-store"></div>
         </section>
-        ${regs}
-      </div>
-      <div class="right-col">
-        <aside class="right" aria-label="Item">
-          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> ${RULES_GEAR}</h2>
-          <div data-region="shelf"></div>
-        </aside>
-        <aside class="right wallet" aria-label="Wallet">
-          <h2><span class="tip" tabindex="0" data-tip="お金やカードは、ドラッグ＆ドロップで使います：現金は入金ボックス、ポイントカード・クーポンはレジ画面、キャッシュレスは支払方法を選んでから決済端末へ" aria-label="Wallet：お金やカードは、ドラッグ＆ドロップで使います：現金は入金ボックス、ポイントカード・クーポンはレジ画面、キャッシュレスは支払方法を選んでから決済端末へ">Wallet <span class="info-icon" aria-hidden="true">i</span></span></h2>
-          <div data-region="wallet"></div>
-        </aside>
-      </div>
+        <div class="registers" style="--n: ${snap.registers.length}">${regs}</div>
     </article>
     <footer class="bottom">
       <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>
@@ -262,7 +292,6 @@ function buildSkeleton(): void {
       <div class="dlg-head"><button class="small ghost" data-close-picker>閉じる</button></div>
       <div id="picker-body"></div>
     </dialog>
-    <div class="drag-ghost" id="ghost" hidden></div>
     ${rampFilter()}`;
 }
 
@@ -432,7 +461,7 @@ document.documentElement.addEventListener("pointerleave", () => hovering.clear()
 function render(): void {
   trackFlashes();
   for (const reg of movedRegs) {
-    app.querySelectorAll<HTMLElement>(`[data-drop^="${reg}:"] .screen-main`).forEach((el) => (el.scrollTop = 0));
+    app.querySelectorAll<HTMLElement>(`[data-screen^="${reg}:"] .screen-main`).forEach((el) => (el.scrollTop = 0));
   }
   movedRegs.clear();
   for (const r of snap.registers) {
@@ -451,7 +480,7 @@ function render(): void {
       head.classList.toggle("sos", r.emergency);
       head.classList.toggle("calling", r.lamp && !r.emergency);
       const lang = langOf(r.id, side);
-      app.querySelector(`[data-drop="${r.id}:${side}"]`)?.setAttribute("lang", lang);
+      app.querySelector(`[data-screen="${r.id}:${side}"]`)?.setAttribute("lang", lang);
       if (r.lamp) {
         head.title = lang === "en" ? trText("呼び出し中") : "呼び出し中";
       } else {
@@ -476,7 +505,7 @@ function render(): void {
       if (r.mode !== "self_operated" || r.waiting_calls.length || r.last_receipt) ffFloorOpen.delete(r.id);
       const items = itemsPanel(r, snap, ffUi(r.id), side, Date.now(), first);
       const locked = r.active_side !== null && r.active_side !== side;
-      const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
+      const el = app.querySelector(`[data-screen="${r.id}:${side}"]`);
       el?.classList.toggle("inactive", locked);
       const operable = r.active_side !== null ? r.active_side === side : r.mode !== "staff_operated" || side === "counter";
       el?.classList.toggle("operable", operable);
@@ -571,8 +600,6 @@ function render(): void {
   setRegion("owner-auth", ownerAuth ? "" : ownerAuthForm());
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("rules-pad", rulesPadPopup(snap));
-  setRegion("shelf", shelfPanel(snap));
-  setRegion("wallet", walletPanel(snap.emoney_balance));
   app.querySelectorAll<HTMLElement>(".screen-main").forEach(paginate);
 }
 
@@ -842,7 +869,7 @@ document.addEventListener("pointerover", (e) => {
   hideHint();
   hintFor = el;
   hintTimer = window.setTimeout(() => {
-    if (!el.isConnected || document.body.classList.contains("dragging")) return;
+    if (!el.isConnected) return;
     hoverTip.textContent = el.dataset.hint ?? "";
     hoverTip.hidden = false;
     const r = el.getBoundingClientRect();
@@ -867,7 +894,7 @@ const val = (key: string): string => scope.querySelector<HTMLInputElement>(`[dat
 
 function form(b: HTMLElement): void {
   const reg = Number(b.dataset.reg);
-  scope = b.closest("[data-drop]") ?? app;
+  scope = b.closest("[data-screen]") ?? app;
   switch (b.dataset.form) {
     case "service":
       send({ type: "complete_service", register: reg, line_id: Number(b.dataset.line), amount: Number(val(`svc-${reg}-${b.dataset.line}`) || 0) });
@@ -1220,57 +1247,8 @@ app.addEventListener("click", (e) => {
 /** 決済端末として読む支払方法（バーコード決済・ポイントはスキャナで読む） */
 const READER_METHODS = new Set(["emoney", "credit"]);
 
-function setupDrag(): void {
-  const ghost = document.getElementById("ghost")!;
-  let drag: { code?: string; wallet?: string; label: string; x: number; y: number; moved: boolean; id: number } | null = null;
-
-  const target = (x: number, y: number): Element | null => document.elementFromPoint(x, y)?.closest("[data-drop], [data-cash-drop], [data-pay-drop]") ?? null;
-  const end = () => {
-    drag = null;
-    ghost.hidden = true;
-    document.body.classList.remove("dragging", "dragging-cash", "dragging-tap");
-  };
-
-  app.addEventListener("pointerdown", (e) => {
-    const b = (e.target as Element).closest<HTMLElement>("[data-code], [data-wallet]");
-    if (!b || e.button !== 0 || b.closest("#picker-dlg")) return;
-    e.preventDefault();
-    drag = { code: b.dataset.code, wallet: b.dataset.wallet, label: b.querySelector(".item-name")?.textContent ?? "", x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
-  });
-
-  window.addEventListener("pointermove", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return;
-    if (!drag.moved) {
-      drag.moved = true;
-      ghost.textContent = drag.label;
-      ghost.hidden = false;
-      document.body.classList.add("dragging");
-      // ドラッグ中は、それを受け取る機器の枠だけを強調する：現金＝レジカウンター側の入金ボックス、
-      // 電子マネー・クレジットカード＝売り場側の決済端末（バーコード決済はスキャナで、赤い枠のまま）
-      document.body.classList.toggle("dragging-cash", !!drag.wallet?.startsWith("cash:"));
-      document.body.classList.toggle("dragging-tap", drag.wallet === "pay:emoney" || drag.wallet === "pay:credit");
-    }
-    ghost.style.transform = `translate(${e.clientX + 8}px, ${e.clientY + 8}px)`;
-  });
-
-  window.addEventListener("pointerup", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const d = drag;
-    const t = target(e.clientX, e.clientY);
-    end();
-    if (!d.moved) {
-      toast("toast-store", "ドラッグして、レジのレジカウンター側の画面・売り場側の画面（現金は入金ボックス、キャッシュレスは決済端末にも）に落としてください", false);
-      return;
-    }
-    if (!t) return;
-    const el = t as HTMLElement;
-    const [reg, side] = el.dataset.drop ? el.dataset.drop.split(":") : [el.dataset.cashDrop ?? el.dataset.payDrop!, el.dataset.cashDrop ? "counter" : "floor"];
-    deliver({ register: Number(reg), side: side as Side, device: el.dataset.device as Device | undefined, cashBox: !!el.dataset.cashDrop }, d.code, d.wallet);
-  });
-
-  window.addEventListener("pointercancel", end);
-
+/** 呼び出しボタン（押しているあいだ鳴る） */
+function setupHold(): void {
   app.addEventListener("pointerdown", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-hold]");
     if (!b || e.button !== 0) return;
@@ -1304,7 +1282,7 @@ function setupDrag(): void {
 }
 
 type Device = "terminal" | "scanner";
-/** Item・Wallet のものをどこに「読ませた」か。ドラッグ＆ドロップとモバイルの長押しピッカーの共通の行き先 */
+/** Item・Wallet のものをどこに「読ませた」か（ピッカーを開いた機器） */
 type Dest = { register: number; side: Side; device?: Device; cashBox?: boolean };
 
 /** レジ画面に落とす＝スキャナに読ませる。決済端末は電子マネー・クレジットカードだけ、スキャナはバーコード（商品・決済用）とポイントカードだけを読む */
@@ -1323,23 +1301,23 @@ function deliver({ register, side, device, cashBox }: Dest, code?: string, walle
   }
 }
 
-const MOBILE = window.matchMedia("(max-width: 760px)");
-const isMobile = (): boolean => MOBILE.matches;
 const LONG_PRESS_MS = 500;
 let longPress: { timer: number; x: number; y: number; id: number } | null = null;
 let swallowClick = false;
 let pickFor: Dest | null = null;
+/** 直前に押したポインターの種類。タッチの長押しでもブラウザが contextmenu を出すので、右クリックと見分ける */
+let lastPointer = "mouse";
 
 const pickerDlg = (): HTMLDialogElement => document.getElementById("picker-dlg") as HTMLDialogElement;
 
-/** モバイルの長押しピッカー。デスクトップの「レジ画面＝スキャナ」をそのまま写す：
- *  レジ画面は Item を上・Wallet を下、スキャナは Wallet を上・Item を下に並べ、どちらからでも全部を読ませられる。
+/// 仕様 15.1：Item・Wallet は常には出さず、機器を右クリック（タッチは長押し）して開くピッカーから選ぶ（user 2026-11-20、デスクトップもモバイルと同じ）。
+/** 「レジ画面＝スキャナ」：レジ画面は Item を上・Wallet を下、スキャナは Wallet を上・Item を下に並べ、どちらからでも全部を読ませられる。
  *  入金ボックス（現金）と決済端末（かざす）は Wallet だけ */
 function openPicker(dest: Dest): void {
   pickFor = dest;
   const { device, cashBox } = dest;
   const area = (label: string, html: string) => `<section class="picker-area"><h3 class="picker-area-head">${label}</h3>${html}</section>`;
-  // モバイルには右列（Item・Wallet）がないので、販売規則の設定の歯車はピッカーの Item の見出しの横に置く（user 2026-11-20）
+  // Item・Wallet の欄はないので、販売規則の設定の歯車はピッカーの Item の見出しの横に置く（user 2026-11-20）
   const items = area(`Item ${RULES_GEAR}`, shelfPanel(snap));
   const wallet = area("Wallet", walletPanel(snap.emoney_balance));
   document.getElementById("picker-body")!.innerHTML = cashBox || device === "terminal" ? wallet : device === "scanner" ? wallet + items : items + wallet;
@@ -1373,6 +1351,21 @@ function swipeTo(reg: number, side: Side): void {
   const io = el.parentElement?.querySelector(".money-io");
   io?.classList.toggle("face-counter", side === "counter");
   io?.classList.toggle("face-floor", side === "floor");
+}
+
+/** ピッカーを開く機器：レジ画面（その側のスキャナ）・入金ボックス・決済端末・スキャナ */
+function pickerDest(t: Element): Dest | null {
+  const dev = t.closest<HTMLElement>("[data-inlet], [data-terminal], [data-scanner]");
+  if (dev) {
+    const register = Number(dev.dataset.inlet ?? dev.dataset.terminal ?? dev.dataset.scanner);
+    return dev.dataset.inlet
+      ? { register, side: "counter", cashBox: true }
+      : { register, side: "floor", device: dev.dataset.terminal ? "terminal" : "scanner" };
+  }
+  const screen = t.closest<HTMLElement>("[data-screen]");
+  if (!screen) return null;
+  const [reg, side] = screen.dataset.screen!.split(":");
+  return { register: Number(reg), side: side as Side };
 }
 
 function cancelLongPress(): void {
@@ -1441,7 +1434,7 @@ function wireHoldSwipe(): void {
     const t = e.target as Element;
     const body = t.closest<HTMLElement>(".counter-screen.hold-swipe .screen-body");
     if (!body || e.button !== 0 || t.closest("input, select, textarea, [data-hold], [data-ffforce]")) return;
-    const reg = Number(body.closest<HTMLElement>("[data-drop]")!.dataset.drop!.split(":")[0]);
+    const reg = Number(body.closest<HTMLElement>("[data-screen]")!.dataset.screen!.split(":")[0]);
     start = { reg, x: e.clientX, y: e.clientY, id: e.pointerId };
   });
   window.addEventListener("pointerup", (e) => {
@@ -1612,27 +1605,18 @@ function wireSwipe(): void {
     swipeTo(Number(reg), side as Side);
   });
   app.addEventListener("pointerdown", (e) => {
-    if (!isMobile() || e.button !== 0 || pickerDlg().open) return;
+    lastPointer = e.pointerType;
+    // マウスは右クリック（下の contextmenu）。タッチ・ペンは長押し。ヘッダー（店舗メニューのスワイプ・呼び鈴）と最下段（呼び出しボタン）は長押しの対象外
+    if (e.pointerType === "mouse" || e.button !== 0 || pickerDlg().open) return;
     const t = e.target as Element;
-    if (t.closest("[data-ffforce]")) return;
-    const inlet = t.closest<HTMLElement>("[data-inlet], [data-terminal], [data-scanner]");
-    const screen = t.closest(".screen-head, .screen-items") ? null : t.closest<HTMLElement>("[data-drop]");
-    if (!inlet && !screen) return;
+    if (t.closest(".screen-head, .screen-items")) return;
+    const dest = pickerDest(t);
+    if (!dest) return;
     cancelLongPress();
     const timer = window.setTimeout(() => {
       longPress = null;
       swallowClick = true;
-      if (inlet) {
-        const register = Number(inlet.dataset.inlet ?? inlet.dataset.terminal ?? inlet.dataset.scanner);
-        openPicker(
-          inlet.dataset.inlet
-            ? { register, side: "counter", cashBox: true }
-            : { register, side: "floor", device: inlet.dataset.terminal ? "terminal" : "scanner" },
-        );
-      } else {
-        const [reg, side] = screen!.dataset.drop!.split(":");
-        openPicker({ register: Number(reg), side: side as Side });
-      }
+      openPicker(dest);
     }, LONG_PRESS_MS);
     longPress = { timer, x: e.clientX, y: e.clientY, id: e.pointerId };
   });
@@ -1652,7 +1636,12 @@ function wireSwipe(): void {
   );
   window.addEventListener("pointerdown", () => (swallowClick = false), true);
   app.addEventListener("contextmenu", (e) => {
-    if (isMobile() && (e.target as Element).closest("[data-drop], [data-inlet], [data-terminal], [data-scanner]")) e.preventDefault();
+    const t = e.target as Element;
+    if (t.closest("[data-hold], [data-ffforce]")) return;
+    const dest = pickerDest(t);
+    if (!dest) return;
+    e.preventDefault();
+    if (lastPointer === "mouse" && !pickerDlg().open) openPicker(dest);
   });
   const dlg = pickerDlg();
   dlg.addEventListener("click", (e) => {

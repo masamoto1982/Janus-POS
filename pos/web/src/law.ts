@@ -339,10 +339,18 @@ export function fitText(root: ParentNode): void {
   }
   // 3. 幅を変えられないボタン（RIGID）も文字は決めた段のまま。表示エリアに合わせて文字を下げる仕組みは廃止（user 2026-11-18）
   for (const b of buttons) if (b.matches(RIGID)) apply(b, tierOf(b));
-  // 4. モバイルモードだけは逆に、ボタンの大きさから文字を決める（user 2026-11-19：表示エリアの制約に応じた便宜的な措置）。
+  // 4. モバイルモードと、画面が W の下限より狭いとき（レジを 5 台並べたとき）だけは逆に、ボタンの大きさから文字を決める（user 2026-11-19：表示エリアの制約に応じた便宜的な措置）。
   //    画面の幅で縮んだボタン（ポイントの使い方・テンキーの「バック」など）に文字が収まらなければ、収まるまで文字を縮める。
   //    余白は上の手順と同じ（幅を変えられるボタンは左右 B÷4、変えられないボタンは B÷8）
-  if (typeof matchMedia === "function" && matchMedia(MOBILE).matches) for (const b of buttons) shrinkToFit(b, b.matches(RIGID));
+  const mobile = typeof matchMedia === "function" && matchMedia(MOBILE).matches;
+  for (const b of buttons) if (mobile || narrowScreen(b)) shrinkToFit(b, b.matches(RIGID));
+}
+
+/** 画面の幅が W の下限（384px＋枠）より狭い。styles.css の @container wrap と同じ境目 */
+const NARROW_WRAP_PX = 387;
+function narrowScreen(b: HTMLElement): boolean {
+  const wrap = b.closest<HTMLElement>(".screen-wrap");
+  return !!wrap && wrap.clientWidth > 0 && wrap.clientWidth < NARROW_WRAP_PX;
 }
 
 /** モバイルモード（幅 760px 以下）。styles.css の @media と同じ境目 */

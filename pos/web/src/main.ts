@@ -461,8 +461,8 @@ function render(): void {
     for (const side of ["counter", "floor"] as const) {
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.counter.phase !== "registering" || !r.counter.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
-      // 「FF」から開いた FF タブは、セルフ操作モードを抜けたとき・呼び出しが立ったときに閉じる
-      if (r.mode !== "self_operated" || r.waiting_calls.length) ffFloorOpen.delete(r.id);
+      // 「FF」から開いた FF タブは、セルフ操作モードを抜けたとき・呼び出しが立ったとき・取引が終わったときに閉じる（四つのボタンに戻る）
+      if (r.mode !== "self_operated" || r.waiting_calls.length || r.last_receipt) ffFloorOpen.delete(r.id);
       const items = itemsPanel(r, snap, ffUi(r.id), side, Date.now(), first);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-drop="${r.id}:${side}"]`);
@@ -1022,10 +1022,6 @@ app.addEventListener("click", (e) => {
     const first = FF_TABS.find(([k]) => snap.ff_tabs.some((t) => t.tab === k && t.display === "both"));
     ffFloorOpen.add(reg);
     if (first) ffTabs.set(reg, { tab: first[0], page: 0 });
-    return frame();
-  }
-  if (b.dataset.ffclose) {
-    ffFloorOpen.delete(Number(b.dataset.ffclose));
     return frame();
   }
   if (b.dataset.fftab) {

@@ -148,14 +148,11 @@ button { touch-action: manipulation; }
 /* タブは白銀比のボタンを上下に二分割した形（user 2026-11-17）：FF のタブは特大の白銀比ボタンの上半分（幅 特大×√2・高さ 特大÷2、縦横比 1:2√2）。
    モバイルの画面切り替えタブも同じ形を横に並べたもの。五つを帯の中央に並べ、入らない狭い画面では縦横比を保って縮む */
 .ff-tabs button.tab { flex: none; width: min(var(--btn-xl-w), calc((100% - 4 * var(--gap)) / 5)); height: auto; aspect-ratio: calc(2 * var(--silver)); }
-/* セルフ操作モードで「FF」から開いた FF タブ：最下段の上の段の下端に一行を設け、左下「バック」・右下「金券」「たばこ」「その他」（すべて小ボタン、user 2026-11-20）。
-   この行には明細を出さない（上の段の明細はこの行の上で終わる）。ボタンは最下段に属するので最下段に寄せ、上下の余白は最下段の上端から FF タブまでの余白（.screen-items の上の padding ＋ .ff-tabs の margin-top） */
-.ff-open-foot { flex: none; display: flex; justify-content: space-between; align-items: center; gap: var(--gap);
-  padding: calc(var(--s14, 3px) + var(--s13, 5px)) var(--s10, 12px); }
-.ff-open-calls { display: flex; gap: var(--gap); }
-/* この行は独立した段（user 2026-11-20）：開いているあいだは五段構成になり、濃淡が交互になるよう
-   ヘッダー（淡）・帯（濃）・登録画面（淡）・この行（濃）・最下段（淡）と塗り分ける */
-.ff-open-foot { background: var(--tier-deep); border-top: var(--s17, 1px) solid var(--border); }
+/* セルフ操作モードで「FF」から開いた FF タブ：最下段の上に一段（四段目）を設け、「金券」「たばこ」「その他」を中央に並べる（すべて小ボタン、user 2026-11-20）。
+   この段には明細を出さない。高さはヘッダーと同じ（最下段＝ヘッダー＋帯なので、ヘッダーとそろうと美しい、user）。
+   開いているあいだは五段構成になり、濃淡が交互になるよう ヘッダー（淡）・帯（濃）・登録画面（淡）・この段（濃）・最下段（淡）と塗り分ける */
+.ff-open-foot { flex: none; display: flex; justify-content: center; align-items: center; gap: var(--gap); height: var(--head-h); padding: 0 var(--s11, 8px);
+  background: var(--tier-deep); border-top: var(--s17, 1px) solid var(--border); }
 .screen:has(.ff-open-foot) .screen-items { background: var(--screen-bg); }
 .screen .ff-open-foot button { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; border-radius: var(--shape-soft); }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。

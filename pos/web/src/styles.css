@@ -148,6 +148,11 @@ button { touch-action: manipulation; }
 /* タブは白銀比のボタンを上下に二分割した形（user 2026-11-17）：FF のタブは特大の白銀比ボタンの上半分（幅 特大×√2・高さ 特大÷2、縦横比 1:2√2）。
    モバイルの画面切り替えタブも同じ形を横に並べたもの。五つを帯の中央に並べ、入らない狭い画面では縦横比を保って縮む */
 .ff-tabs button.tab { flex: none; width: min(var(--btn-xl-w), calc((100% - 4 * var(--gap)) / 5)); height: auto; aspect-ratio: calc(2 * var(--silver)); }
+/* セルフ操作モードで「FF」から開いた FF タブ：戻る部品の「バック」はタブの並びの左端（向きのある脇役は縁）。五つのタブはその右の残りに並ぶ */
+.ff-tabs.with-back { align-items: flex-end; justify-content: flex-start; }
+.ff-tabs.with-back button.ff-back { flex: none; align-self: center; margin-right: auto; }
+.ff-tabs.with-back button.tab { width: min(var(--btn-xl-w), calc((100% - var(--btn-md-w) * 2 - 6 * var(--gap)) / 5)); }
+.ff-tabs.with-back button.tab:last-child { margin-right: auto; }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない。左右の列は少なくとも円の直径を確保し、段の縁・単品とは最小間隔（--gap）
    離れる。狭い画面（モバイル）で入らないときは、円ではなく単品の群のほうが縦横比を保って縮む */
@@ -159,8 +164,6 @@ button { touch-action: manipulation; }
 .ff-arrow.next { grid-column: 3; justify-self: end; }
 /* FF の単品は特大の白銀比を一行に四つ（user 2026-11-17：将来商品画像を入れるので正方形に近い形）。入らないときは白銀比のまま縮む */
 .ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-xl-w))); justify-content: center; align-content: center; gap: var(--gap); }
-/* セルフ操作モードの売り場側の FF タブ「カウンター」：呼び出しボタンを FF の単品と同じ席・同じ大きさに置く */
-.ff-grid.counter-calls > .call-btn { width: 100%; max-width: var(--btn-xl-w); height: auto; aspect-ratio: var(--silver, 1.4142); min-width: 0; padding: 0 var(--s14, 3px); }
 .ff-item { box-sizing: border-box; width: 100%; max-width: var(--btn-xl-w); height: auto; aspect-ratio: var(--silver, 1.4142); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
    無し＝グレーアウト（長押しで予約注文） */

@@ -1570,21 +1570,28 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const a = (n: Action) => find(r.floor.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
+    // 販売規則の FF タブ表示で「両側」にしたタブがあるときは、「FF」を押すと最下段にレジカウンター側と同じすべての FF タブを開く（user 2026-11-20）。
+    // 「両側」のタブはお客様が登録でき、それ以外のタブに触れるとスタッフの呼び出し（「FF」の呼び出しと同じ）。「バック」で四つのボタンに戻る
+    const floorTabs = new Set(snap.ff_tabs.filter((t) => t.display === "both").map((t) => t.tab as string));
+    if (floorTabs.size && ffFloorOpen.has(reg)) {
+      const tab = floorTabs.has(ui.tab) ? ui.tab : FF_TABS.find(([k]) => floorTabs.has(k))![0];
+      const ffCall = a("ff_button");
+      const tabBtn = ([k, label]: readonly [string, string]) =>
+        floorTabs.has(k)
+          ? `<button type="button" role="tab" class="tab ff-tab ${k === tab ? "on" : ""}" data-fftab="${reg}:${k}" aria-selected="${k === tab}">${label}</button>`
+          : `<button type="button" role="tab" class="tab ff-tab call-tab" aria-selected="false" data-hold="${esc(JSON.stringify({ type: "ff_button", register: reg }))}"${ffCall.allowed ? "" : ` disabled title="${esc(ffCall.reason ?? "")}"`} title="スタッフを呼び出します">${label}</button>`;
+      const back = `<button type="button" class="md ghost back-btn ff-back" data-ffclose="${reg}">バック</button>`;
+      return `<div class="tabs ff-tabs with-back" role="tablist" aria-label="FF">${back}${FF_TABS.map(tabBtn).join("")}</div>${ffPage(reg, side, snap, tab, ui.page, a("register_ff"))}`;
+    }
+    const ffBtn = floorTabs.size
+      ? `<button type="button" class="call-btn ff" data-ffopen="${reg}"${a("ff_button").allowed ? "" : " disabled"}><b>FF</b><small>揚げ物など</small></button>`
+      : callBtn("FF", "揚げ物など", { type: "ff_button", register: reg }, a("ff_button"), "ff");
     const callBtns = [
-      callBtn("FF", "揚げ物など", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
+      ffBtn,
       callBtn("金券", "切手・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
     ].join("");
-    // 販売規則の FF タブ表示で「両側」にしたタブがあれば、最下段を FF タブに置き換える（そのタブだけ）。
-    // 呼び出しボタンは最後のタブ「カウンター」にまとめる（カウンター内の商品はスタッフが対応する）
-    const floorTabs = snap.ff_tabs.filter((t) => t.display === "both");
-    if (floorTabs.length) {
-      const tab = ui.tab === COUNTER_TAB || floorTabs.some((t) => t.tab === ui.tab) ? ui.tab : floorTabs[0].tab;
-      const tabs = [...floorTabs.map((t) => [t.tab, t.label] as const), [COUNTER_TAB, "カウンター"] as const];
-      if (tab === COUNTER_TAB) return `${ffTabRow(reg, tabs, tab)}<div class="ff-page"><div class="ff-grid counter-calls">${callBtns}</div></div>`;
-      return `${ffTabRow(reg, tabs, tab)}${ffPage(reg, side, snap, tab, ui.page, a("register_ff"))}`;
-    }
     // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。文は受け取り方に誤りの余地がない一番具体的な表現なので、ボタン群の上に置く（user 2026-11-17）
     return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${callBtns}</div>`;
   }
@@ -1597,8 +1604,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"))}`;
 }
 
-/** セルフ操作モードの売り場側の FF タブで、呼び出しボタンをまとめたタブ */
-export const COUNTER_TAB = "counter";
+/** セルフ操作モードで「FF」を押して FF タブを開いているレジ */
+export const ffFloorOpen = new Set<number>();
 
 function ffTabRow(reg: number, tabs: readonly (readonly [string, string])[], cur: string): string {
   const row = tabs

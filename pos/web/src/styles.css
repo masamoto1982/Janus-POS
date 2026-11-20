@@ -72,7 +72,6 @@ button { touch-action: manipulation; }
 
 
 .screens { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 760px) { .screens { grid-template-columns: 1fr; } }
 
 .screen-wrap { min-width: 0; display: flex; flex-direction: column; }
 .screen-cap { font-size: var(--text-sm); letter-spacing: .08em; color: var(--muted); margin: 0 0 3px 2px; }
@@ -87,7 +86,7 @@ button { touch-action: manipulation; }
    二段目＝待ち受けの帯／合計の帯 2（W÷√2⁵。大ボタン＋上下の間隔）
    三段目＝10（W×0.88）
    四段目＝FF・金券・たばこ・その他の段 3＝一段目＋二段目（FF の商品登録ボタンが来るので広く、user 2026-11-16） */
-.screen-wrap { container-type: inline-size; }
+.screen-wrap { container: wrap / inline-size; }
 @property --W { syntax: "<length>"; inherits: true; initial-value: 400px; }
 /* 最小間隔も長さとして登録する：law.ts が getComputedStyle で px の値として読むため（登録しないと calc の式のまま返り、8px で計算していた） */
 @property --gap { syntax: "<length>"; inherits: true; initial-value: 6px; }
@@ -494,21 +493,32 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .top h1 { font-size: var(--text-num); margin: 0; white-space: nowrap; }
 .top .logo { width: 73px; height: 73px; flex: none; }
 .build-badge { font-size: var(--text-sm); font-weight: 600; color: var(--white); background: var(--grey-4); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
-.reset-btn { margin-left: auto; white-space: nowrap; flex: none; }
+.top-tools { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.how-to { font-size: var(--text-sm); color: var(--muted); white-space: nowrap; }
+.reg-count { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); white-space: nowrap; }
+.reset-btn { white-space: nowrap; flex: none; }
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
 .tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: var(--grey-4); color: var(--white); font-size: var(--text-sm); font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
 .tip:hover::after, .tip:focus-visible::after { opacity: 1; }
+/* 右端の「使い方」は吹き出しを右にそろえる（左にそろえると画面の外にはみ出す） */
+.how-to::after { left: auto; right: 0; }
 .floor, .bottom {
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.floor { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; padding-block: 16px; align-items: start; }
-@media (max-width: 900px) { .floor { grid-template-columns: 1fr; } }
-.left { display: grid; gap: 16px; min-width: 0; }
-.register, .bell-area, .right {
+.floor { display: grid; gap: 16px; padding-block: 16px; align-items: start; }
+/* レジは 1〜5 台を横に並べる（user 2026-11-20：Item・Wallet をピッカーにして空いた幅を使う）。
+   デスクトップは常に二つの面を並べるので、一台の幅は「横幅を台数で割った幅」、ただし二つの面が入る 812px を下回るなら折り返す
+   （モバイルは一列）。台数が少なくて広すぎるときは 1240px で止めて中央に */
+.registers {
+  --n: 2; display: grid; gap: 16px; align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(812px, (100% - (var(--n) - 1) * 16px) / var(--n))), 1fr));
+}
+.register { width: 100%; max-width: 1240px; justify-self: center; }
+.register, .bell-area {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
-.register h2, .bell-area h2, .right h2 { margin: 0 0 8px; font-size: var(--text-num); display: flex; gap: 8px; align-items: center; }
+.register h2, .bell-area h2 { margin: 0 0 8px; font-size: var(--text-num); display: flex; gap: 8px; align-items: center; }
 .hw { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 10px; }
 .hw .row { margin: 0; }
 
@@ -538,8 +548,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .screen-head:is(.calling, .sos) { background: color-mix(in oklch, var(--head-call-bg) calc(var(--blink-on) * 100%), var(--head-call-off)); }
 .screen-head.sos :is(.mode-title, .clock) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), currentColor); }
 
-.right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
-@media (max-width: 900px) { .right-col { position: static; max-height: none; } }
 .shelf + .shelf { margin-top: 6px; }
 .shelf h3 { margin: 0 0 4px; font-size: var(--text-lg); color: var(--muted); font-weight: 600; letter-spacing: .04em; }
 .items { display: flex; flex-wrap: wrap; gap: var(--gap); }
@@ -577,18 +585,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .item-sub.item-date { font-size: var(--text-sm); }
 .items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
-.drop-hint { display: none; margin-left: 8px; letter-spacing: 0; }
-body.dragging, body.dragging * { cursor: grabbing !important; }
-body.dragging .screen { border-color: var(--accent); }
-body.dragging .screen::after { content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; border: var(--s16, var(--frame-w)) solid var(--accent); }
-body.dragging-cash .money-io .inlet { border-color: var(--accent); box-shadow: inset 0 0 0 var(--frame-w) var(--accent); }
-body.dragging-tap .money-io .terminal:not(.scanner) { border-color: var(--accent); outline-color: var(--accent); }
-body.dragging .drop-hint { display: inline; }
-.drag-ghost {
-  position: fixed; left: 0; top: 0; z-index: 10; pointer-events: none;
-  background: var(--accent); color: var(--accent-ink); padding: 6px 10px; border-radius: 8px; font-weight: 600;
-  box-shadow: 0 6px 18px color-mix(in oklch, var(--black) 25%, transparent);
-}
 
 .bottom { border-top: 1px solid var(--border); background: var(--panel); padding-block: 8px; }
 
@@ -648,7 +644,7 @@ body.dragging .drop-hint { display: inline; }
 .mirror .muted { color: var(--muted); }
 .login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: var(--text-sm); font-weight: 500; color: var(--muted); }
 /* シミュレーターまわりのセレクタは一行のボタンと同じ高さ（--chrome-b）。文字・幅は law.ts fitForms */
-.login-sel select { height: var(--chrome-b); filter: url(#ramp); }
+:is(.login-sel, .reg-count) select { height: var(--chrome-b); filter: url(#ramp); }
 
 .rules-open { margin-left: auto; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
@@ -737,7 +733,6 @@ body.dragging .drop-hint { display: inline; }
   .money-io .terminal.fx-tap::after, .money-io .terminal.fx-scan::before { animation-duration: 0.01s; }
 }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
-@media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-counter, .money-io-floor { grid-column: 1; } }
 
 /* スタッフ操作モードの売り場側の最下段＝サイネージ（販促の告知・公共性の情報）。押せる部品は置かない */
 .signage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
@@ -844,22 +839,33 @@ body.dragging .drop-hint { display: inline; }
   /* 見出しを強調の段のまま収めるため、ビルド番号は入りきらない分を省く */
   .build-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top .logo { width: 36px; height: 36px; }
+  /* 上部は狭いので「使い方」は i だけにし、使い方・台数・リセットは入りきらなければ二行目へ回す */
+  .how-to-label { display: none; }
+  .top { flex-wrap: wrap; row-gap: 4px; }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
-  .left { gap: 8px; }
+  .registers { gap: 8px; }
   /* 最下段の添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す。帯の言語・電子マネーは余裕があるので出す */
   .call-btn small { display: none; }
   /* ヘッダー右の日時は時刻だけ（年月日・曜日は表示エリアが狭いので出さない。便宜的措置で、デスクトップでは出す） */
   .screen-head .clock-date { display: none; }
-  .right-col { display: none; }
   .bell-area { gap: 6px 8px; padding: 8px 44px 8px 10px; }
   .bell-area .bell-open { position: absolute; top: 6px; right: 6px; margin: 0; }
   .bells { gap: 6px; }
   .bell-unit { gap: 4px; padding: 3px 8px; font-size: var(--text-sm); }
   .bell-unit .bell-icon { font-size: var(--text-sm); }
   .register { padding: 8px; }
+  .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
+}
+/* 長押しでピッカーを開く機器は、長押しで文字選択・コールアウトを出さない */
+.screen, [data-inlet], [data-terminal], [data-scanner] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+/* モバイルモードでは一つの面だけを出してタブで切り替える。デスクトップは常に二つの面を並べる（user 2026-11-20） */
+@media (max-width: 760px) {
   .register h2 { flex-wrap: wrap; row-gap: 4px; margin-bottom: 4px; }
   .register h2 .idle { font-size: var(--text-sm); }
+  /* 無操作の残り時間は見出しの下の一行に回す（レジ番号・スタッフのセレクタの行を崩さない） */
+  .register h2 > [data-region^="mode-"] { order: 1; flex-basis: 100%; font-size: var(--text-sm); line-height: 1.4; }
+  .register h2 .idle { margin-left: 0; }
   .swipe-tabs { display: flex; border-bottom: none; }
   /* 画面切り替えのタブは横いっぱいのまま、白銀比のボタンを上下に二分割した形（FF のタブと同じ、縦横比 1:2√2）を
      見ている側に 3 つ分・見ていない側に 2 つ分（user 2026-11-17）。高さは幅から逆算（以前の半分） */
@@ -871,10 +877,17 @@ body.dragging .drop-hint { display: inline; }
   .screens[data-shown="counter"] .screen-wrap[data-wrap$=":floor"],
   .screens[data-shown="floor"] .screen-wrap[data-wrap$=":counter"] { display: none; }
   .screen-cap { display: none; }
-  .screen, [data-inlet], [data-terminal], [data-scanner] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-  .money-io { margin-top: 6px; }
+  .money-io { grid-template-columns: 1fr; margin-top: 6px; }
+  .money-io-counter, .money-io-floor { grid-column: 1; }
   .money-io.face-counter .money-io-floor, .money-io.face-floor .money-io-counter { display: none; }
-  .picker-dlg .shelf, .picker-dlg .wallet { max-width: none; }
+  /* 面が一つなら W の下限 384px をなくし、画面の内幅そのものにする（文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
+  .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); }
+}
+/* 画面が W の下限より狭いとき（モバイル）は、ヘッダー右の日時は時刻だけ・最下段の呼び出しボタンの添え字は出さない
+   （表示エリアの制約による便宜的措置。実機では出す） */
+@container wrap (width < 387px) {
+  .screen-head .clock-date { display: none; }
+  .call-btn small { display: none; }
 }
 
 .bill-n { font-size: var(--text-num); font-weight: 800; margin: 0 .12em; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -967,7 +980,6 @@ body.dragging .drop-hint { display: inline; }
 [data-law].law-on > * { position: absolute; margin: 0; box-sizing: border-box; max-width: none; }
 /* モバイルモードでは W の下限 384px をなくし、画面の内幅そのものにする（user 2026-11-18：表示エリアの制約による便宜的措置。
    文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
-@media (max-width: 760px) { .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); } }
 
 /* スワイプの手がかり（user 2026-11-20）：隠れているものがある側の縁に白いグラデーションを敷き、隠し領域をにおわせる。
    青のグラデーションは上の文字が沈むのでやめ、操作できる側の段もミントに戻した（青のドット模様も文字が読みにくく見送り）。
@@ -992,8 +1004,8 @@ body.dragging .drop-hint { display: inline; }
    操作できる部品は操作の青（--operable-blue）。積極＝青の背景・白文字、消極＝青の枠線・青の文字・背景なし、押せない部品はグレー。
    形は四つ（弱い角丸・強い角丸・タブ・円）から選ぶ。セレクタ（プルダウン・チェックボックス）も操作できる部品なので青。
    周辺機器（入金・出金ボックス、決済端末、スキャナ、Bell の呼び鈴端末）はレジ画面の外でも中でもない機械なので対象外 */
-:is(.top, .bell-area, .register > h2, .right-col, .rules-dlg) { --btn-on: var(--operable-blue); --msg-strong: var(--operable-blue); }
-:is(.top, .bell-area, .register > h2, .right-col, .rules-dlg) :is(select, input[type="checkbox"]) { accent-color: var(--operable-blue); }
+:is(.top, .bell-area, .register > h2, .rules-dlg) { --btn-on: var(--operable-blue); --msg-strong: var(--operable-blue); }
+:is(.top, .bell-area, .register > h2, .rules-dlg) :is(select, input[type="checkbox"]) { accent-color: var(--operable-blue); }
 /* テンキーはレジ画面と同じ形（ボタンは青のランプで青にする）。見出しの文字はレジ画面と同じ濃いグレー */
 .rules-dlg .qty-pop { --msg-strong: var(--grey-4); --btn-on: var(--grey-4); }
 /* 歯車は円の消極ボタン */

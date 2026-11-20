@@ -508,12 +508,13 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 }
 .floor { display: grid; gap: 16px; padding-block: 16px; align-items: start; }
 /* レジは 1〜5 台を横に並べる（user 2026-11-20：Item・Wallet をピッカーにして空いた幅を使う）。
-   一台の幅は「横幅を台数で割った幅」、ただし 330px を下回るなら折り返す。台数が少なくて広すぎるときは 1240px で止めて中央に */
+   デスクトップは常に二つの面を並べるので、一台の幅は「横幅を台数で割った幅」、ただし二つの面が入る 812px を下回るなら折り返す
+   （モバイルは一列）。台数が少なくて広すぎるときは 1240px で止めて中央に */
 .registers {
   --n: 2; display: grid; gap: 16px; align-items: start;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(330px, (100% - (var(--n) - 1) * 16px) / var(--n))), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(812px, (100% - (var(--n) - 1) * 16px) / var(--n))), 1fr));
 }
-.register { container: reg / inline-size; width: 100%; max-width: 1240px; justify-self: center; }
+.register { width: 100%; max-width: 1240px; justify-self: center; }
 .register, .bell-area {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
@@ -858,9 +859,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 }
 /* 長押しでピッカーを開く機器は、長押しで文字選択・コールアウトを出さない */
 .screen, [data-inlet], [data-terminal], [data-scanner] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
-/* 二つの面を横に並べる幅（画面の W の下限 384px＋枠 × 2＋間隔）がないレジは、一つの面だけを出してタブで切り替える
-   （モバイルと、デスクトップでレジを 3 台以上並べたとき。user 2026-11-20） */
-@container reg (width < 786px) {
+/* モバイルモードでは一つの面だけを出してタブで切り替える。デスクトップは常に二つの面を並べる（user 2026-11-20） */
+@media (max-width: 760px) {
   .register h2 { flex-wrap: wrap; row-gap: 4px; margin-bottom: 4px; }
   .register h2 .idle { font-size: var(--text-sm); }
   /* 無操作の残り時間は見出しの下の一行に回す（レジ番号・スタッフのセレクタの行を崩さない） */
@@ -883,7 +883,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   /* 面が一つなら W の下限 384px をなくし、画面の内幅そのものにする（文字を縮める仕組みはやめたので、W が実際の幅より大きいと帯などがはみ出す） */
   .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); }
 }
-/* 画面が W の下限より狭いとき（モバイル、レジを 5 台並べたとき）は、ヘッダー右の日時は時刻だけ・最下段の呼び出しボタンの添え字は出さない
+/* 画面が W の下限より狭いとき（モバイル）は、ヘッダー右の日時は時刻だけ・最下段の呼び出しボタンの添え字は出さない
    （表示エリアの制約による便宜的措置。実機では出す） */
 @container wrap (width < 387px) {
   .screen-head .clock-date { display: none; }

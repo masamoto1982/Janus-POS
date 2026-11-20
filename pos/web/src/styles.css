@@ -853,8 +853,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .register:nth-child(n + 3) { display: none; }
   /* 最下段の添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す。帯の言語・電子マネーは余裕があるので出す */
   .call-btn small { display: none; }
-  /* ヘッダー右の日時は時刻だけ（年月日・曜日は表示エリアが狭いので出さない。便宜的措置で、デスクトップでは出す） */
-  .screen-head .clock-date { display: none; }
   .bell-area { gap: 6px 8px; padding: 8px 44px 8px 10px; }
   .bell-area .bell-open { position: absolute; top: 6px; right: 6px; margin: 0; }
   .bells { gap: 6px; }
@@ -887,10 +885,9 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   /* モバイルは画面の高さでは止めない（縦にスクロールする） */
   .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); }
 }
-/* 画面が W の下限より狭いとき（モバイル）は、ヘッダー右の日時は時刻だけ・最下段の呼び出しボタンの添え字は出さない
+/* 画面が狭いとき（モバイル）は、最下段の呼び出しボタンの添え字は出さない
    （表示エリアの制約による便宜的措置。実機では出す） */
 @container wrap (width < 387px) {
-  .screen-head .clock-date { display: none; }
   .call-btn small { display: none; }
 }
 

@@ -98,8 +98,8 @@ const DICT: Record<string, string> = {
   // 登録画面
   会計: "Pay",
   お会計: "Pay",
-  取引中止: "Cancel",
-  "取引を中止する（確認があります）": "Cancel the transaction (asks to confirm)",
+  取消し: "Cancel",
+  取引か商品を取り消す: "Cancel the transaction or an item",
   明細はありません: "No items yet",
   縦スワイプで続きを表示: "Swipe up or down to see more",
   どのバーコードからでも読めます: "Any barcode can be scanned",
@@ -156,9 +156,18 @@ const DICT: Record<string, string> = {
   お渡し数: "Handed",
   お受け取り数: "Received",
 
-  // 取引中止
-  "取引を中止しますか？": "Cancel this transaction?",
-  取引の中止を確認しています: "Confirming the cancellation",
+  // 取消し
+  取り消すものを選んでください: "Choose what to cancel",
+  取引を取り消す: "Cancel transaction",
+  商品を取り消す: "Cancel an item",
+  取り消す商品をスキャンしてください: "Scan the item to cancel",
+  スキャンした商品を1点取り消します: "One of the scanned item will be removed",
+  "取引を取り消しますか？": "Cancel this transaction?",
+  取引の取り消しを確認しています: "Confirming the cancellation",
+  スタッフが取り消しの操作をしています: "Staff are cancelling",
+  "商品のバーコードではありません": "That is not an item barcode",
+  取り消せるのは登録した商品だけです: "Only registered items can be cancelled",
+  "登録するときは、もう一度スキャンしてください": "To register it, scan it again",
 
   // 支払い
   現金: "Cash",
@@ -631,7 +640,7 @@ const REJECT_EN: Record<string, string> = {
   "お会計中です（登録に戻ってから選び直してください）": "Checking out (go back to registration, then choose again)",
   "お受け取りの手続き中ではありません": "No parcel pickup in progress",
   "お受け取りの手続き中ではありません（先にお客様の受取用バーコードを読み取ってください）": "No parcel pickup in progress (scan the customer's pickup barcode first)",
-  "お支払いをやめるときは取引中止にしてください": "To stop paying, void the transaction",
+  "お支払いをやめるときは取引を取り消してください": "To stop paying, void the transaction",
   "お渡し済みの FF の数量はスタッフが変更します": "Staff change the quantity of FF already handed over",
   "お金の出し入れは、レジカウンター側の画面の店舗メニューで行います": "Cash in and out is done from the store menu on the counter-side screen",
   "お預かりの荷物のバーコードは、スタッフがレジカウンター側で読み取ります": "Staff scan the stored parcel's barcode on the counter side",
@@ -674,7 +683,7 @@ const REJECT_EN: Record<string, string> = {
   "登録されていないスタッフバーコードです": "Unknown staff barcode",
   "登録されていないバーコードです": "Unknown barcode",
   "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです": "Please pay separately\nParcel pickups are handled one at a time",
-  "荷物のお受け取りをやめるときは取引中止にしてください": "To stop the pickup, void the transaction",
+  "荷物のお受け取りをやめるときは取引を取り消してください": "To stop the pickup, void the transaction",
   "荷物のバーコードを読んで照合してから、お渡しください": "Scan the parcel's barcode to match it before handing it over",
   "荷物の商品が見つかりません": "Parcel item not found",
   "荷物の料金は、サイズと届け先の郵便番号で決まります": "The parcel fee depends on its size and postal code",
@@ -765,6 +774,8 @@ const RULES: Rule[] = [
   [/^お引換え ×(\d+)$/, (m) => `Redeemed ×${m[1]}`],
   [/^割引 ([\d,]+)$/, (m) => `¥${m[1]} off`],
   [/^(.+)を取り消します$/, (m) => `Cancel ${t(m[1])}`],
+  [/^(.+)を1点取り消しました$/, (m) => `Removed one ${t(m[1])}`],
+  [/^(.+)は登録されていません$/, (m) => `${t(m[1])} was not registered`],
   [/^(.+)に (\d+)枚 適用中$/, (m) => `${plural(m[2], "coupon")} applied to ${t(m[1])}`],
 ];
 

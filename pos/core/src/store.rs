@@ -46,11 +46,13 @@ const HOLD_PARCEL: &str = "宅配便のある取引は保留できません";
 const HOLD_TICKET: &str = "チケットのある取引は保留できません";
 const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、スタッフがログインしてから行います";
 const PICKUP_ALONE: &str = "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです";
-const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引中止にしてください";
+const CANCEL_NOT_ITEM: &str = "商品のバーコードではありません\n取り消せるのは登録した商品だけです";
+const CANCEL_NOT_REGISTERED: &str = "は登録されていません\n登録するときは、もう一度スキャンしてください";
+const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引を取り消してください";
 const PARCEL_SLIP_TO_REMOVE: &str =
     "宅配便を取り消すときは、取り消す荷物の伝票のバーコードを読み取ってください";
 const BILL_NO_REMOVE: &str =
-    "公共料金の払込票は取り消せません\nお支払いをやめるときは取引中止にしてください";
+    "公共料金の払込票は取り消せません\nお支払いをやめるときは取引を取り消してください";
 const NO_POINTS: &str =
     "ポイントを使える商品がありません（宅配便・代金引換・公共料金・チケット・切手・たばこにはポイントを使えません）";
 const EXPIRED_STAFF_ONLY: &str = "販売期限切れの商品は、スタッフが回収します";
@@ -267,6 +269,12 @@ pub enum Command {
         register: u8,
         side: Side,
         line_id: u32,
+    },
+    /// 商品取消し：読んだ商品の明細を一点減らす（一点なら明細ごと取り消す）。登録していない商品は登録せず、そう知らせる
+    CancelItem {
+        register: u8,
+        side: Side,
+        code: String,
     },
     /// 明細の数量を変える
     SetQty {
@@ -557,6 +565,7 @@ impl Command {
             | C::PickupHandover { register }
             | C::PickupFound { register, .. }
             | C::RemoveLine { register, .. }
+            | C::CancelItem { register, .. }
             | C::SetQty { register, .. }
             | C::RemoveCoupon { register, .. }
             | C::DismissReturned { register }
@@ -607,6 +616,7 @@ impl Command {
             C::RegisterFf { side, .. }
             | C::CheckFf { side, .. }
             | C::RemoveLine { side, .. }
+            | C::CancelItem { side, .. }
             | C::SetQty { side, .. }
             | C::RemoveCoupon { side, .. }
             | C::Checkout { side, .. }
@@ -2561,6 +2571,11 @@ impl Store {
                 }
                 done(format!("{}を取り消しました", l.name))
             }
+            C::CancelItem {
+                register,
+                side,
+                code,
+            } => self.cancel_item(register, side, &code),
             C::SetQty {
                 register,
                 side,
@@ -3533,6 +3548,39 @@ impl Store {
         }
         self.presses += 1;
         Ok(())
+    }
+
+    /// 商品取消し：読んだ商品のいちばん新しい明細を一点減らす（一点なら明細ごと取り消す）。
+    /// 登録していない商品は登録せずに知らせる（取り消せたら登録済みだった、取り消せなければ登録していなかったとわかる）
+    fn cancel_item(&mut self, register: u8, side: Side, code: &str) -> Result<Outcome, String> {
+        self.check(register, side, Action::RemoveLine)?;
+        let Scanned::Product(p) = catalog::classify(code) else {
+            return Err(CANCEL_NOT_ITEM.into());
+        };
+        let r = self.reg(register).ok_or("レジがありません")?;
+        let Some(l) = r
+            .txn
+            .lines
+            .iter()
+            .filter(|l| l.code == p.code)
+            .max_by_key(|l| l.touched)
+        else {
+            return Err(format!("{}{CANCEL_NOT_REGISTERED}", p.name));
+        };
+        let (line_id, qty, name, ff) = (l.id, l.qty, l.name, matches!(l.kind, LineKind::Ff { .. }));
+        let res = if qty > 1 {
+            self.set_qty(register, side, line_id, qty - 1)?
+        } else {
+            self.apply(Command::RemoveLine {
+                register,
+                side,
+                line_id,
+            })?
+        };
+        if ff {
+            return Ok(res);
+        }
+        done(format!("{name}を1点取り消しました"))
     }
 
     fn set_qty(

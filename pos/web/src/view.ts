@@ -1046,17 +1046,34 @@ export function welcome(r: RegisterView, side: Side, emoney?: Gate): string {
     </div>`;
 }
 
-export const voidAsk = new Map<number, Side>();
+/** 取消しの段階：choose＝「取引を取り消す」「商品を取り消す」の二択、void＝取引の取り消しの確認、item＝取り消す商品のスキャン待ち */
+export type CancelStage = "choose" | "void" | "item";
+/** 取消しを押したレジと、押した側・段階（user 2026-11-20、旧「取引中止」） */
+export const cancelAsk = new Map<number, { side: Side; stage: CancelStage }>();
 
-function voidBtn(reg: number, side: Side, st: Gate): string {
-  const title = st.allowed ? "取引を中止する（確認があります）" : (st.reason ?? "");
-  return `<button type="button" class="void-btn"${st.allowed ? ` data-void-ask="${reg}:${side}"` : " disabled"} title="${esc(title)}">取引中止</button>`;
+/** 取消し：取引を取り消すか、明細があれば商品を取り消すかを選ぶ入口。取引を取り消せるときに押せる */
+function cancelBtn(reg: number, side: Side, st: Gate): string {
+  const title = st.allowed ? "取引か商品を取り消す" : (st.reason ?? "");
+  return `<button type="button" class="void-btn"${st.allowed ? ` data-cancel-ask="${reg}:${side}:choose"` : " disabled"} title="${esc(title)}">取消し</button>`;
 }
 
-function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }[]; total: number; inserted: number }): string {
+function cancelScreen(r: RegisterView, side: Side, view: { lines: { qty: number }[]; total: number; inserted: number }): string {
   const reg = r.id;
-  if (r.mode === "staff_operated" && side === "floor") return pairNote("取引の中止を確認しています");
-  const st = find(r.mode === "staff_operated" ? r.counter.actions : r.floor.actions, "void_transaction");
+  const stage = cancelAsk.get(reg)?.stage ?? "choose";
+  const acts = r.mode === "staff_operated" ? r.counter.actions : r.floor.actions;
+  if (r.mode === "staff_operated" && side === "floor") return pairNote(stage === "void" ? "取引の取り消しを確認しています" : "スタッフが取り消しの操作をしています");
+  const backTo = (to: CancelStage | "") => `<div class="back-foot"><button type="button" class="md ghost back-btn" data-cancel-ask="${reg}:${side}:${to}">バック</button></div>`;
+  if (stage === "choose") {
+    const item = find(acts, "remove_line");
+    const itemBtn = `<button type="button" class="primary"${item.allowed ? ` data-cancel-ask="${reg}:${side}:item"` : ` disabled title="${esc(item.reason ?? "")}"`}>商品を取り消す</button>`;
+    return `<div class="point-screen cancel-screen">
+      ${msg("取り消すものを選んでください")}
+      <div class="point-choices pair"><button type="button" class="ghost" data-cancel-ask="${reg}:${side}:void">取引を取り消す</button>${itemBtn}</div>
+    </div>${backTo("")}`;
+  }
+  if (stage === "item")
+    return `<div class="point-screen cancel-screen">${msg("取り消す商品をスキャンしてください", "スキャンした商品を1点取り消します")}</div>${backTo("choose")}`;
+  const st = find(acts, "void_transaction");
   const back = [
     view.inserted ? `入れたお金 ${yen(view.inserted)} は出金ボックスに戻ります` : "",
     r.prepaid && r.prepaid_method === "電子マネー" ? `電子マネーで払った ${yen(r.prepaid)} は残高に戻ります` : "",
@@ -1067,10 +1084,9 @@ function voidConfirm(r: RegisterView, side: Side, view: { lines: { qty: number }
     .map((s) => `<br>${s}`)
     .join("");
   return `<div class="point-screen void-screen">
-      ${msg("取引を中止しますか？", `登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}`)}
+      ${msg("取引を取り消しますか？", `登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}`)}
       <div class="point-choices">${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}</div>
-    </div>
-    <div class="back-foot"><button type="button" class="md ghost back-btn" data-void-cancel="${reg}">バック</button></div>`;
+    </div>${backTo("choose")}`;
 }
 
 const STAFF_OP_GUIDES: [GuideKind, string, string][] = [
@@ -1106,7 +1122,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (r.pickup_handover && !v.lines.length) return confirm(pickupHandover(reg, side, r.pickup_handover, r.last_receipt?.change_total ?? 0));
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet, r.last_receipt.method.includes("現金") ? r.last_receipt.paid : 0) : thanks(r.last_receipt)));
-  if (!v.lines.length && !v.coupons.length && !v.point_card) voidAsk.delete(reg);
+  if (!v.lines.length && !v.coupons.length && !v.point_card) cancelAsk.delete(reg);
   // ポイントカード（アプリ）だけ読んだときも取引は始まっているので、登録画面に進む
   if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
   const ro = side === "floor";
@@ -1146,7 +1162,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
           : btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.max_items,
     r.points,
-    ro || voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
+    ro || cancelAsk.has(reg) ? "" : cancelBtn(reg, side, a("void_transaction")),
     "",
     paying && v.method === "cash" && v.inserted > 0 ? tenderSum(v.total - r.prepaid, v.inserted) : "",
     !ro,
@@ -1160,8 +1176,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       : agePending
         ? backCorner({ type: "early_age_check", register: reg, side: "counter", start: false }, a("early_age_check"))
         : "";
-  const screen = (body: string) => `${top}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
-  if (voidAsk.has(reg)) return screen(voidConfirm(r, side, v));
+  const screen = (body: string) => `${top}${confirm(body + (cancelAsk.has(reg) ? "" : back))}`;
+  if (cancelAsk.has(reg)) return screen(cancelScreen(r, side, v));
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
   if (!paying && pickup && !pickup.matched)
     return screen(
@@ -1317,14 +1333,14 @@ export function tenderSum(total: number, inserted: number): string {
   return `${cell("お預かり", inserted)}${diff >= 0 ? cell("お釣り", diff) : cell("不足", -diff, " short")}`;
 }
 
-/** 取引中止・お会計が消える段階でも、同じ幅の見えない席を残す（合計の位置を全段階で動かさない、user 2026-11-18） */
+/** 取消し・お会計が消える段階でも、同じ幅の見えない席を残す（合計の位置を全段階で動かさない、user 2026-11-18） */
 const bandSlot = (label: string) => `<button type="button" class="band-slot" aria-hidden="true" tabindex="-1" disabled>${label}</button>`;
 
-/** slots＝この面が取引中止・お会計を持つ（操作できる側）。持つ面では、ボタンが消えても席を残す */
+/** slots＝この面が取消し・お会計を持つ（操作できる側）。持つ面では、ボタンが消えても席を残す */
 export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = "", slots = false): string {
-  // ポイントカードだけ読んだときも、取引中止と読んだポイントを出す
+  // ポイントカードだけ読んだときも、取消しと読んだポイントを出す
   if (count === 0 && (points?.balance ?? null) === null) return "";
-  if (slots && !voidHtml) voidHtml = bandSlot("取引中止");
+  if (slots && !voidHtml) voidHtml = bandSlot("取消し");
   if (slots && !action) action = bandSlot("お会計");
   const full = count >= max ? `<small class="full">上限</small>` : "";
   const point = tender || pointInfo(points);
@@ -1577,7 +1593,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
   // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
   if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length) return callingRow(r, side, snap.now);
-  if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || voidAsk.has(reg)) return "";
+  if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || cancelAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {
     const a = (n: Action) => find(r.floor.actions, n);
@@ -1768,17 +1784,17 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
       : ""),
     r.max_items,
     r.points,
-    voidAsk.has(reg) ? "" : voidBtn(reg, side, a("void_transaction")),
+    cancelAsk.has(reg) ? "" : cancelBtn(reg, side, a("void_transaction")),
     "",
     "",
     true,
   );
 
-  if (!c.lines.length && !c.coupons.length && !c.point_card) voidAsk.delete(reg);
+  if (!c.lines.length && !c.coupons.length && !c.point_card) cancelAsk.delete(reg);
   if (!c.lines.length && !c.coupons.length && !c.point_card && !c.returned.length) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
-  const screen = (body: string) => `${top}${confirm(body + (voidAsk.has(reg) ? "" : back))}`;
-  if (voidAsk.has(reg)) return screen(voidConfirm(r, side, c));
+  const screen = (body: string) => `${top}${confirm(body + (cancelAsk.has(reg) ? "" : back))}`;
+  if (cancelAsk.has(reg)) return screen(cancelScreen(r, side, c));
   const slips = c.bills.length;
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : c.stamp_pending ? billNote(slips, "スタッフが領収証に収入印紙を貼り付けます") : billPayCard(slips, true));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));
@@ -1798,7 +1814,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (c.phase === "paying" && c.point_pending) return screen(pointCheck(reg, side, a("confirm_point_card")));
   scanGuide.delete(`${reg}:${side}`);
   if (c.phase === "paying" && c.method === "points" && r.points.balance !== null && !r.prepaid)
-    return `${top}${confirm(pointsUse(r, side, a("select_payment"), "ポイントの使い方を選んでください") + (voidAsk.has(reg) ? "" : backCorner({ type: "select_payment", register: reg, side, method: "points" }, a("select_payment"))))}`;
+    return `${top}${confirm(pointsUse(r, side, a("select_payment"), "ポイントの使い方を選んでください") + (cancelAsk.has(reg) ? "" : backCorner({ type: "select_payment", register: reg, side, method: "points" }, a("select_payment"))))}`;
   if (c.phase === "paying")
     return screen(`<div class="paybox pay-stage">
         <div class="big">お支払い方法を選択してください</div>

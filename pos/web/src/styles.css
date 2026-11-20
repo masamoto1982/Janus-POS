@@ -206,7 +206,7 @@ button { touch-action: manipulation; }
 .num { text-align: right; white-space: nowrap; }
 
 .reg-top { --sum-h: var(--s7); --row: calc(var(--s6) - var(--sum-h)); position: sticky; top: calc(-1 * var(--s11, 8px)); z-index: 1; display: flex; justify-content: center; align-items: center; gap: 0 var(--gap); min-height: var(--s6); margin: calc(-1 * var(--s11, 8px)) calc(-1 * var(--s10, 12px)) var(--s11, 8px); padding: var(--s11, 8px) var(--s10, 12px); background: var(--tier-deep); color: var(--reg-top-ink); border-bottom: var(--s17, 1px) solid var(--border); box-sizing: content-box; }
-/* 取消し・合計・お会計は群ごと中央に置き、表示後に law.ts alignBand が取消し・お会計を最下段の両端へ広げる（user 2026-11-20、.edged）。
+/* 取消し・合計・お会計は帯の中で均等に置く（user 2026-11-20、下の space-evenly）。
    中央（合計・お預かり・お釣り）は文字を縮めない。消えたボタンの席は残すので、合計の位置はどの段階でも動かない */
 .reg-top .mid { flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .reg-top .total { font-size: var(--text-num); }
@@ -222,10 +222,8 @@ button { touch-action: manipulation; }
 .reg-top .void > button, .reg-top .action > button, .reg-top .action > .counter-only > button { box-sizing: border-box; flex: none; width: calc(var(--btn-w) * 2); height: var(--btn-h); padding: var(--s15, 2px); font-size: var(--text-sm); white-space: nowrap; }
 /* 消えたボタンの席（見えない・押せない）。幅は本物と同じく law.ts fitText が文字から決める */
 .reg-top .band-slot { visibility: hidden; }
-/* 取消し・お会計を最下段の両端（FF の左端・その他の右端）にそろえる（user 2026-11-20、law.ts alignBand）。合計は帯の中央 */
-.reg-top.edged:not(.welcome-band) { display: grid; grid-template-columns: 1fr auto 1fr; }
-.reg-top.edged .void { justify-self: start; }
-.reg-top.edged .action { justify-self: end; }
+/* 二段目（合計の帯）は取消し・合計・お会計を均等配置する（user 2026-11-20）。第一待ち受けの帯は寄り添ったまま */
+.reg-top:not(.welcome-band) { justify-content: space-evenly; }
 .reg-top .count .full { margin-left: var(--s11, 8px); font-weight: 700; }
 /* 現金の投入中：合計の下（ポイントの行）にお預かり・お釣り（不足）を出す（B-4）。両画面同じ形 */
 .reg-top .info:has(.tender-cell) { gap: 0 var(--s11, 8px); }

@@ -468,39 +468,3 @@ export function fitForms(root: ParentNode): void {
     g.forEach((f, i) => (f.style.width = `${ws[i]}px`));
   }
 }
-
-/**
- * 合計の帯の取消し・お会計を、セルフ操作モードの最下段の両端にそろえる（user 2026-11-20）：
- * 取消しの左端＝「FF」の左端、お会計の右端＝「その他」の右端。合計（大きさの違う文字と添え字の組み合わせ）は
- * それだけで複雑なので、ボタンを寄せて情報を密集させない。第一待ち受けの帯（単純な図形）は寄せたまま。
- * 最下段のない画面（スタッフ操作モード）は、同じ幅の画面で最後に測った最下段の位置を使う
- */
-const bandEdges = new Map<number, { l: number; r: number }>();
-
-export function alignBand(root: ParentNode): void {
-  const host = root instanceof Element ? root.closest(".screen") : null;
-  const screens = host ? [host] : [...root.querySelectorAll<HTMLElement>(".screen")];
-  if (root instanceof Element && root.matches(".screen")) screens.splice(0, screens.length, root);
-  const widthOf = (s: Element) => Math.round(s.getBoundingClientRect().width);
-  // 先に最下段を測る（どの画面の帯にも使えるように、画面の幅ごとに覚える）
-  for (const s of document.querySelectorAll<HTMLElement>(".screen")) {
-    const btns = [...s.querySelectorAll<HTMLElement>(".call-row:not(.calling) > .call-btn")].filter((b) => b.getClientRects().length > 0);
-    if (btns.length < 2) continue;
-    const sr = s.getBoundingClientRect();
-    bandEdges.set(widthOf(s), { l: btns[0].getBoundingClientRect().left - sr.left, r: sr.right - btns[btns.length - 1].getBoundingClientRect().right });
-  }
-  for (const s of screens) {
-    const edge = bandEdges.get(widthOf(s));
-    const sr = s.getBoundingClientRect();
-    for (const top of s.querySelectorAll<HTMLElement>(".reg-top:not(.welcome-band)")) {
-      if (!edge) {
-        top.classList.remove("edged");
-        continue;
-      }
-      const tr = top.getBoundingClientRect();
-      top.style.paddingLeft = `${Math.max(0, sr.left + edge.l - tr.left)}px`;
-      top.style.paddingRight = `${Math.max(0, tr.right - (sr.right - edge.r))}px`;
-      top.classList.add("edged");
-    }
-  }
-}

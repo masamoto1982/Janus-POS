@@ -316,7 +316,7 @@ pub const CATALOG: &[Product] = &[
     p("FF79", "しいたけ", 90, Reduced8, FastFood),
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(rename_all = "snake_case")]
 pub enum FfTab {
@@ -328,6 +328,14 @@ pub enum FfTab {
 }
 
 impl FfTab {
+    pub const ALL: [FfTab; 5] = [
+        FfTab::Fried,
+        FfTab::Drink,
+        FfTab::Cold,
+        FfTab::Bun,
+        FfTab::Oden,
+    ];
+
     pub fn label(self) -> &'static str {
         match self {
             FfTab::Fried => "フライヤー",
@@ -413,6 +421,10 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF78", 4),
     ("FF79", 0),
 ];
+
+pub fn ff_tab(code: &str) -> Option<FfTab> {
+    FF_MENU.iter().find(|(c, _)| *c == code).map(|&(_, t)| t)
+}
 
 pub fn is_made_to_order(code: &str) -> bool {
     FF_MADE_TO_ORDER.contains(&code)

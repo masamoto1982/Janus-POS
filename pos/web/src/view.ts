@@ -1,5 +1,6 @@
 import type {
   Action,
+  FfTabDisplay,
   ActionState,
   EmoneyKind,
   ShortChoice,
@@ -1569,27 +1570,47 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const a = (n: Action) => find(r.floor.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
-    // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。文は受け取り方に誤りの余地がない一番具体的な表現なので、ボタン群の上に置く（user 2026-11-17）
-    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${[
+    const callBtns = [
       callBtn("FF", "揚げ物など", { type: "ff_button", register: reg }, a("ff_button"), "ff"),
       callBtn("金券", "切手・印紙", { type: "call_staff", register: reg, topic: "voucher" }, a("call_staff"), "voucher"),
       callBtn("たばこ", "紙巻き・電子", { type: "call_staff", register: reg, topic: "tobacco" }, a("call_staff"), "tob"),
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
-    ].join("")}</div>`;
+    ].join("");
+    // 販売規則の FF タブ表示で「両側」にしたタブがあれば、最下段を FF タブに置き換える（そのタブだけ）。
+    // 呼び出しボタンは最後のタブ「カウンター」にまとめる（カウンター内の商品はスタッフが対応する）
+    const floorTabs = snap.ff_tabs.filter((t) => t.display === "both");
+    if (floorTabs.length) {
+      const tab = ui.tab === COUNTER_TAB || floorTabs.some((t) => t.tab === ui.tab) ? ui.tab : floorTabs[0].tab;
+      const tabs = [...floorTabs.map((t) => [t.tab, t.label] as const), [COUNTER_TAB, "カウンター"] as const];
+      if (tab === COUNTER_TAB) return `${ffTabRow(reg, tabs, tab)}<div class="ff-page"><div class="ff-grid counter-calls">${callBtns}</div></div>`;
+      return `${ffTabRow(reg, tabs, tab)}${ffPage(reg, side, snap, tab, ui.page, a("register_ff"))}`;
+    }
+    // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。文は受け取り方に誤りの余地がない一番具体的な表現なので、ボタン群の上に置く（user 2026-11-17）
+    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${callBtns}</div>`;
   }
   if (r.mode === "staff_operated" && side === "floor") return signage(now);
   if (r.mode === "staff_operated" && r.counter.phase === "paying") return "";
   if (r.mode === "staff_operated" && (r.counter.returned.length || r.counter.confiscated.length || r.counter.ff_collect.length)) return "";
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
-  const view = r.counter;
-  const can = find(view.actions, "register_ff");
-  const items = snap.ff_stock.filter((f) => f.tab === ui.tab);
+  const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
+  return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"))}`;
+}
+
+/** セルフ操作モードの売り場側の FF タブで、呼び出しボタンをまとめたタブ */
+export const COUNTER_TAB = "counter";
+
+function ffTabRow(reg: number, tabs: readonly (readonly [string, string])[], cur: string): string {
+  const row = tabs
+    .map(([k, label]) => `<button type="button" role="tab" class="tab ff-tab ${k === cur ? "on" : ""}" data-fftab="${reg}:${k}" aria-selected="${k === cur}">${label}</button>`)
+    .join("");
+  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${row}</div>`;
+}
+
+function ffPage(reg: number, side: Side, snap: Snapshot, tab: string, wantPage: number, can: Gate): string {
+  const items = snap.ff_stock.filter((f) => f.tab === tab);
   const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
-  const page = Math.min(ui.page, pages - 1);
-  const tabs = FF_TABS.map(
-    ([k, label]) => `<button type="button" role="tab" class="tab ff-tab ${k === ui.tab ? "on" : ""}" data-fftab="${reg}:${k}" aria-selected="${k === ui.tab}">${label}</button>`,
-  ).join("");
+  const page = Math.min(wantPage, pages - 1);
   const grid = items
     .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
     .map((f) => {
@@ -1603,7 +1624,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // 隠れたページのない側は何も置かない
   const arrow = (dir: -1 | 1) =>
     `<button type="button" class="ff-arrow ${dir < 0 ? "prev" : "next"}" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "&lt;" : "&gt;"}</button>`;
-  return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${tabs}</div><div class="ff-page">${page > 0 ? arrow(-1) : ""}<div class="ff-grid">${grid}</div>${page < pages - 1 ? arrow(1) : ""}</div>`;
+  return `<div class="ff-page">${page > 0 ? arrow(-1) : ""}<div class="ff-grid">${grid}</div>${page < pages - 1 ? arrow(1) : ""}</div>`;
 }
 
 const MENU_LABEL: Record<MenuScreen, string> = {
@@ -1800,7 +1821,7 @@ function limitSelect(p: Snapshot["catalog"][number]): string {
   return `<select data-limit="${esc(p.code)}" aria-label="${esc(p.name)}の販売個数の上限">${opts}</select>`;
 }
 
-export type RulesTab = "age" | "limit" | "tax";
+export type RulesTab = "age" | "limit" | "tax" | "fftab";
 
 const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   {
@@ -1814,7 +1835,26 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
     note: "年確は会計ボタンを押した時点で、カゴの中で最も厳しい年齢で1回だけ行います<br>酒・たばこは法令どおり20歳以上で固定され、変更できません",
   },
   { id: "limit", label: "個数制限", note: "1回のお会計で売れる販売個数の上限です<br>超える分はスキャンしても登録されません" },
+  {
+    id: "fftab",
+    label: "FFタブ表示",
+    note: "FFのタブごとに、どちらの画面に出すかを決めます<br>「両側」にしたタブは、セルフ操作モードの売り場側の最下段に出て、お客様がご自分で登録できます<br>コーヒーなど作り置きのない品はお客様がご自分でお取りになり、揚げ物など作り置きの品はスタッフがお渡しします",
+  },
 ];
+
+const FF_TAB_DISPLAYS: { id: FfTabDisplay; label: string }[] = [
+  { id: "counter", label: "レジカウンター側のみ" },
+  { id: "both", label: "両側" },
+];
+
+function ffTabRows(s: Snapshot): string {
+  return s.ff_tabs
+    .map((t) => {
+      const opts = FF_TAB_DISPLAYS.map((d) => `<option value="${d.id}" ${d.id === t.display ? "selected" : ""}>${d.label}</option>`).join("");
+      return `<tr><td>${esc(t.label)}</td><td><select data-fftab-display="${t.tab}" aria-label="${esc(t.label)}のタブを出す画面">${opts}</select></td></tr>`;
+    })
+    .join("");
+}
 
 function shelfRows(s: Snapshot, cols: number, row: (p: Snapshot["catalog"][number]) => string): string {
   return SHELVES.map((g) => {
@@ -1899,7 +1939,9 @@ export function ownerPanel(s: Snapshot, tab: RulesTab): string {
       ? `<table class="lines rules"><thead><tr><th>商品</th><th>法令</th><th>店舗の年確</th><th class="num">会計時の年確</th></tr></thead><tbody>${ageRows(s)}</tbody></table>`
       : cur.id === "limit"
         ? `<table class="lines rules"><thead><tr><th>商品</th><th>販売個数</th></tr></thead><tbody>${shelfRows(s, 2, (p) => `<tr><td>${esc(p.name)}</td><td>${limitSelect(p)}</td></tr>`)}</tbody></table>`
-        : taxPanel(s);
+        : cur.id === "fftab"
+          ? `<table class="lines rules"><thead><tr><th>タブ</th><th>表示する画面</th></tr></thead><tbody>${ffTabRows(s)}</tbody></table>`
+          : taxPanel(s);
   const hist = s.age_rules.history.length
     ? s.age_rules.history.map((h) => `<li>${esc(h.by)}：${esc(h.change)}</li>`).join("")
     : `<li class="muted">変更はまだありません</li>`;

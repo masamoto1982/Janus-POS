@@ -137,6 +137,7 @@ const DICT: Record<string, string> = {
   ドリンク: "Drinks",
   コールド: "Cold",
   中華まん: "Steamed buns",
+  カウンター: "Counter",
   おでん: "Oden",
   前のページ: "Previous page",
   次のページ: "Next page",

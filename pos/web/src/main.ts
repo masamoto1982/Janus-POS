@@ -1,6 +1,6 @@
 import { applyLaw, fitText } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { CashOutKind, Command, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
+import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
@@ -597,7 +597,7 @@ function toast(where: string, text: string, error: boolean): void {
   const el = document.getElementById(where);
   if (!el) return;
   el.textContent = text;
-  el.className = `toast show ${error ? "error" : ""}`;
+  el.className = `toast show ${error ? "toast-error" : ""}`;
   window.clearTimeout(toastTimers.get(where));
   toastTimers.set(
     where,
@@ -923,6 +923,11 @@ app.addEventListener("change", (e) => {
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
+  if (sel.dataset.fftabDisplay && ownerAuth) {
+    const ok = send({ type: "set_ff_tab_display", ...ownerAuth, tab: sel.dataset.fftabDisplay as FfTab, display: sel.value as FfTabDisplay });
+    if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
+    return;
+  }
   if (sel.dataset.limit && ownerAuth) {
     const ok = send({
       type: "set_sale_limit",
@@ -942,7 +947,7 @@ app.addEventListener("change", (e) => {
 
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
-const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
+const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_ff_tab_display", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
 let ownerAuth: { owner_id: string; password: string } | null = null;
 let rulesTab: RulesTab = "tax";
 

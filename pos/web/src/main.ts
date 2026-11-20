@@ -171,11 +171,11 @@ function buildSkeleton(): void {
           </select>
         </label>
       </h2>
-      <div class="tabs swipe-tabs" role="tablist" aria-label="表示する画面（スワイプでも切り替わります）">
+      <div class="tabs swipe-tabs" role="tablist" aria-label="表示する画面">
         <button type="button" role="tab" class="tab on" aria-selected="true" data-swipe-to="${r.id}:counter">レジカウンター側</button>
         <button type="button" role="tab" class="tab" aria-selected="false" data-swipe-to="${r.id}:floor">売り場側</button>
       </div>
-      <div class="screens" data-swipe="${r.id}">
+      <div class="screens" data-swipe="${r.id}" data-shown="counter">
         <div class="screen-wrap" data-wrap="${r.id}:counter">
           <div class="screen-cap">レジカウンター側<span class="drop-hint">ここに落とす＝レジカウンター側スキャナーで読む</span></div>
           <section class="screen counter-screen" data-drop="${r.id}:counter">
@@ -527,7 +527,7 @@ function render(): void {
     const face: Side = r.menu ? "counter" : r.mode === "staff_operated" ? "counter" : "floor";
     if (face !== activeShown.get(r.id)) {
       activeShown.set(r.id, face);
-      if (isMobile()) swipeTo(r.id, face);
+      swipeTo(r.id, face);
     }
     const idle = r.idle_revert_in;
     setRegion(
@@ -1298,20 +1298,17 @@ function cashDrop(register: number, d: number): Command {
   return d === 2000 ? { type: "insert_cash", register, denomination: d, count: 1 } : { type: "insert", register, amount: d };
 }
 
+/// 仕様 15.9：モバイルのレジカウンター側・売り場側の切り替えはタブだけ（横スワイプは登録画面の保留と競合するので使わない）
 function swipeTo(reg: number, side: Side): void {
   const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
-  el?.scrollTo({ left: side === "floor" ? el.scrollWidth : 0, behavior: "smooth" });
-}
-
-function syncSwipeTabs(reg: number): void {
-  const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
-  const side: Side = el && el.scrollLeft > el.clientWidth / 2 ? "floor" : "counter";
+  if (!el) return;
+  el.dataset.shown = side;
   app.querySelectorAll<HTMLElement>(`[data-swipe-to^="${reg}:"]`).forEach((b) => {
     const on = b.dataset.swipeTo === `${reg}:${side}`;
     b.classList.toggle("on", on);
     b.setAttribute("aria-selected", String(on));
   });
-  const io = app.querySelector(`[data-swipe="${reg}"]`)?.parentElement?.querySelector(".money-io");
+  const io = el.parentElement?.querySelector(".money-io");
   io?.classList.toggle("face-counter", side === "counter");
   io?.classList.toggle("face-floor", side === "floor");
 }
@@ -1423,9 +1420,6 @@ function wireSwipe(): void {
     if (!b) return;
     const [reg, side] = b.dataset.swipeTo!.split(":");
     swipeTo(Number(reg), side as Side);
-  });
-  app.querySelectorAll<HTMLElement>("[data-swipe]").forEach((el) => {
-    el.addEventListener("scroll", () => syncSwipeTabs(Number(el.dataset.swipe)), { passive: true });
   });
   app.addEventListener("pointerdown", (e) => {
     if (!isMobile() || e.button !== 0 || pickerDlg().open) return;

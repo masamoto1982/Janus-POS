@@ -151,12 +151,16 @@ button { touch-action: manipulation; }
 /* セルフ操作モードで「FF」から開いた FF タブ：最下段の上の段の下端に、左下「バック」・右下「金券」「たばこ」「その他」を重ねる（すべて小ボタン、user 2026-11-20）。
    重ねる帯の高さは小ボタンの二倍。下の明細は登録画面に重ねる理由の表示（.reject-flash）と同じぼかしで滲ませ、ボタンを浮かせる */
 .screen-body > [data-region^="foot-"] { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; pointer-events: none; }
-.ff-open-foot { pointer-events: auto; height: calc(var(--btn-md-h) * 2); box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: var(--gap); padding: 0 var(--s10, 12px);
-  -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px)); }
+.ff-open-foot { position: relative; pointer-events: auto; height: calc(var(--btn-md-h) * 2); box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: var(--gap); padding: 0 var(--s10, 12px); }
+/* ぼかしは帯の上の小ボタン一つ分から徐々に効かせ、帯の中では全面に効かせる（急に始まると明細に目隠しをしたように見えた、user 2026-11-20）。ボタンはぼかしの層の上 */
+.ff-open-foot::before { content: ""; position: absolute; inset: calc(var(--btn-md-h) * -1) 0 0 0; z-index: -1; pointer-events: none;
+  -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px));
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 38%); mask-image: linear-gradient(to bottom, transparent, #000 38%); }
+.ff-open-foot > * { position: relative; }
 .ff-open-calls { display: flex; gap: var(--gap); }
 .screen .ff-open-foot button { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; border-radius: var(--shape-soft); }
-/* 重ねた帯の下に最後の明細が隠れたままにならないよう、上の段は帯の高さだけ余分にスクロールできる */
-.screen-body:has(.ff-open-foot) > .screen-main { padding-bottom: calc(var(--btn-md-h) * 2 + var(--s11, 8px)); }
+/* 重ねた帯の下に最後の明細が隠れたままにならないよう、上の段は帯とぼかしの始まりの高さだけ余分にスクロールできる */
+.screen-body:has(.ff-open-foot) > .screen-main { padding-bottom: calc(var(--btn-md-h) * 3); }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない。左右の列は少なくとも円の直径を確保し、段の縁・単品とは最小間隔（--gap）
    離れる。狭い画面（モバイル）で入らないときは、円ではなく単品の群のほうが縦横比を保って縮む */

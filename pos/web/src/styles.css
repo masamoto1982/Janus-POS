@@ -890,6 +890,9 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .money-io { grid-template-columns: 1fr; margin-top: 6px; }
   .money-io-counter, .money-io-floor { grid-column: 1; }
   .money-io.face-counter .money-io-floor, .money-io.face-floor .money-io-counter { display: none; }
+  /* レジ画面の上で縦にスワイプしてもページがスクロールする（user 2026-11-20：画面の殆どがレジ画面なので、
+     止めると 2 台目のレジを見る術がない）。明細が端まで来たらページへ引き継ぐ */
+  .screen-main, .screen-main > .lines-scroll { overscroll-behavior-y: auto; }
   /* モバイルは画面の高さでは止めない（縦にスクロールする） */
   .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); }
 }

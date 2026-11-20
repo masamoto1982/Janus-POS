@@ -125,14 +125,14 @@ function save(): void {
 }
 
 /** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
- *  モバイルは 2 台まで（複数台運用の最低台数。3 台以上のデモは現実的でない、user 2026-11-21）。
+ *  モバイルは 2 台ちょうど（複数台運用の最低台数。3 台以上のデモは現実的でなく、1 台では複数台のデモができない、user 2026-11-20）。
  *  デスクトップは 2 台から（user 2026-11-21：1 台では、呼び出しの通知が発生したレジにだけ出ることや、
  *  チケットの取引が僅差で重なるケースのデモができない）
  *  台数を変えると店の状態を作り直す（コアは作るときに台数を決める） */
 const REG_COUNT_KEY = "janus-pos-registers";
 const DEFAULT_REGISTERS = 2;
 const isMobileMode = (): boolean => window.matchMedia(MOBILE_MQ).matches;
-const minRegisters = (): number => (isMobileMode() ? 1 : 2);
+const minRegisters = (): number => 2;
 const maxRegisters = (): number => (isMobileMode() ? 2 : 5);
 
 function savedRegCount(): number {
@@ -176,7 +176,13 @@ function forget(): void {
 }
 
 function start(): void {
-  sim = restore() ?? new PosSimulator(Date.now() & 0xffff, savedRegCount(), 3);
+  let restored = restore();
+  // 最低台数に足りない保存状態（以前の 1 台）は捨てて、既定の台数で作り直す
+  if (restored && (JSON.parse(restored.snapshot()) as Snapshot).registers.length < minRegisters()) {
+    forget();
+    restored = null;
+  }
+  sim = restored ?? new PosSimulator(Date.now() & 0xffff, savedRegCount(), 3);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
@@ -1486,6 +1492,11 @@ function paginate(main: HTMLElement, force = false): void {
   pad.setAttribute("aria-hidden", "true");
   pad.innerHTML = `<td colspan="3" style="height:${Math.max(0, view - lastH)}px"></td>`;
   rows[rows.length - 1].after(pad);
+  // 最後のページの位置がちょうどスクロールの端になるよう合わせる（端に余りがあると、そこで吸い付いて止まり、
+  // モバイルで縦のスワイプがページへ引き継がれない）
+  const padTd = pad.firstElementChild as HTMLElement;
+  const extra = box.scrollHeight - box.clientHeight - pageTop(box, rows, starts[starts.length - 1], head);
+  if (Math.abs(extra) > 0.5) padTd.style.height = `${Math.max(0, view - lastH - extra)}px`;
   box.scrollTop = pageTop(box, rows, state.starts[state.page], head);
   const bar = document.createElement("div");
   bar.className = "page-bar";

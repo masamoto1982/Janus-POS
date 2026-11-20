@@ -27,3 +27,5 @@ npm run gen:types    # Rust の型を変えたら web/src/types.ts を作り直�
 ## ライセンス
 
 MIT（[LICENSE](LICENSE)）
+
+公開するビルドに入る第三者のソフトウェア（wasm に組み込まれる Rust クレート、Rust 標準ライブラリ、Vite が差し込むコード）のライセンス表記は [pos/web/public/THIRD-PARTY-NOTICES.txt](pos/web/public/THIRD-PARTY-NOTICES.txt)。ビルドすると `dist/THIRD-PARTY-NOTICES.txt` として一緒に配布される。依存関係を変えたら `cd pos && npm run gen:notices` で作り直す（CI が食い違いを止める）。

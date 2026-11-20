@@ -14,7 +14,8 @@
     "preview": "vite preview",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "gen:design": "node scripts/design-sheet.mjs"
+    "gen:design": "node scripts/design-sheet.mjs",
+    "gen:notices": "node scripts/third-party-notices.mjs"
   },
   "devDependencies": {
     "typescript": "^5.3.3",

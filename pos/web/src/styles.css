@@ -120,10 +120,9 @@ button { touch-action: manipulation; }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s15, 2px); min-width: 0; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: var(--s11, 8px); }
-/* スタッフ操作モードのレジカウンター側のヘッダー右：店舗メニュー・保留・保留に戻る（user 2026-11-20：スワイプをやめ、とりあえずボタン）。
-   中の高さ・幅は文字なり。ボタンを出しているあいだは日時を時刻だけにする（ヘッダーの右の列に入りきらないため。年月日は売り場側に出ている） */
-.screen-head .head-btn { width: auto; height: var(--btn-md-h); padding: 0 var(--s11, 8px); font-size: var(--text-sm); white-space: nowrap; }
-.screen-head:has(.head-btn) .clock-date { display: none; }
+/* 無操作の残り時間（レジカウンター側だけ）。時刻の上に同じ小テキストで、強い色にはしない */
+.screen-head .head-time { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
+.screen-head .idle-left { font-size: var(--text-sm); line-height: 1.2; color: var(--msg-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .screen-head .clock { font-size: var(--text-sm); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-body:has(> .slide-from-right, > .slide-from-left) { overflow: hidden; }
@@ -1020,3 +1019,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .item:not(.off, .call-blink) { background: transparent; }
 .items.uniform .item, .wallet-cards .item, .item.bill { padding: calc(var(--btn-xl-h) / 8); }
 .wallet-cards .item, .item.bill { padding: calc(var(--btn-h) / 8); }
+
+/* スタッフ操作モードのレジカウンター側の操作（user 2026-11-20：スワイプをやめ、とりあえずボタン）。中の高さ・幅は文字なり。
+   待ち受けの左下＝保留に戻る（戻る部品は左）、右下＝店舗メニュー。登録画面のスタッフ名の右＝保留 */
+.screen button.staff-btn { width: auto; height: var(--btn-md-h); padding: 0 var(--s11, 8px); font-size: var(--text-sm); white-space: nowrap; }
+.staff-operated-welcome { position: relative; }
+.welcome-foot { position: absolute; left: var(--gap); right: var(--gap); bottom: var(--gap); display: flex; justify-content: space-between; }
+.staff-head .staff-btn { margin-left: var(--s11, 8px); height: var(--btn-sm-h); vertical-align: middle; }

@@ -4600,7 +4600,8 @@ impl Store {
             return Ok(Outcome::default());
         };
         let r = self.reg_mut(register)?;
-        if !r.idle() {
+        // 保留した取引があるあいだも取引中
+        if !r.idle() || r.on_hold.is_some() {
             return Err("取引中は店舗メニューを開けません".into());
         }
         let to = exchange_to

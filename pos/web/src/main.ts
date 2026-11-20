@@ -1458,7 +1458,7 @@ function wireHoldSwipe(): void {
 
 /** 明細のページ送り（user 2026-11-20）：縦スワイプ一回で一ページ。スクロールはしない。
  *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）は常に出し、その下に入りきる行だけを並べる。
- *  見切れる行は出さず次のページの一行目にし、続きがあるページの下には「続きは次のページにあります」を出す。右上にページ数「1/3」。
+ *  見切れる行は出さず次のページの一行目にし、続きがあるページの下には「縦スワイプで続きを表示」を出す。内税の行の左端にページ数「Page:1/3」（user 2026-11-20）。
  *  明細の数が変わったら（新しい明細は一番上に来るので）一ページ目に戻す。
  *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため */
 const mainPage = new Map<string, { page: number; count: number; pages: number }>();
@@ -1481,13 +1481,15 @@ function paginate(main: HTMLElement): void {
     main.classList.remove("more-below");
     return;
   }
+  const [side, reg] = pageKey(main).split("-");
+  const lang = langOf(Number(reg), side as Side);
   const box = main.getBoundingClientRect();
   const pad = parseFloat(getComputedStyle(main).paddingBottom) || 0;
   const tbody = rows[0].parentElement!;
   const bottom = box.bottom - pad;
   const more = document.createElement("p");
   more.className = "page-more";
-  more.innerHTML = `続きは次のページにあります<small>上へスワイプ</small>`;
+  more.textContent = lang === "en" ? trText("縦スワイプで続きを表示") : "縦スワイプで続きを表示";
   main.append(more);
   const moreH = more.getBoundingClientRect().height;
   const top = tbody.getBoundingClientRect().top;
@@ -1519,9 +1521,9 @@ function paginate(main: HTMLElement): void {
   if (head) {
     const no = document.createElement("span");
     no.className = "page-no";
-    no.textContent = `${state.page + 1}/${state.pages}`;
+    no.textContent = `Page:${state.page + 1}/${state.pages}`;
     no.setAttribute("aria-label", `${state.pages}ページ中${state.page + 1}ページ目`);
-    head.append(no);
+    head.prepend(no);
   }
 }
 

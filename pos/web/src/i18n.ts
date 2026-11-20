@@ -101,6 +101,7 @@ const DICT: Record<string, string> = {
   取引中止: "Cancel",
   "取引を中止する（確認があります）": "Cancel the transaction (asks to confirm)",
   明細はありません: "No items yet",
+  縦スワイプで続きを表示: "Swipe up or down to see more",
   どのバーコードからでも読めます: "Any barcode can be scanned",
   "スタッフ：": "Staff: ",
   "（オーナー）": " (Owner)",

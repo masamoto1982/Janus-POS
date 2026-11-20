@@ -131,8 +131,11 @@ button { touch-action: manipulation; }
 .screen-main.slide-from-left { animation: slide-from-left 0.28s ease-out; }
 @keyframes slide-from-right { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes slide-from-left { from { transform: translateX(-100%); } to { transform: none; } }
-.screen-main { flex: 1 1 0; min-height: 0; overflow: hidden auto; padding: var(--s11, 8px) var(--s10, 12px); touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none; }
-/* 明細が増えたときのスクロールは縦スワイプだけ（user 2026-11-20）：スクロールバーは出さず、横には動かない。マウスは縦のドラッグ（wireMainDrag） */
+.screen-main { flex: 1 1 0; min-height: 0; overflow: hidden; padding: var(--s11, 8px) var(--s10, 12px); touch-action: none; overscroll-behavior: contain; scrollbar-width: none; }
+/* 明細は縦スワイプのページ送りだけ（user 2026-11-20）：スクロールバーは出さず、指やホイールで連続しては動かない。送るのは main.ts turnPage。
+   最後のページでも一行目が帯の直下に来るよう、明細の下に余白（--page-pad）を足す */
+.screen-main::after { content: ""; display: block; height: var(--page-pad, 0px); }
+.screen-main:has(> .confirm, > .welcome-band)::after { display: none; }
 .screen-main::-webkit-scrollbar { display: none; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }

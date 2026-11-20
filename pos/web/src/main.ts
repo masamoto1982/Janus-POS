@@ -1456,51 +1456,104 @@ function wireHoldSwipe(): void {
   window.addEventListener("pointercancel", () => (start = null));
 }
 
-/** 登録画面の下にまだ明細が隠れているか（縦にスクロールできて末尾まで来ていない）。隠れているあいだだけ下の縁に白のグラデーションを出す */
-function markMoreBelow(main: HTMLElement): void {
-  main.classList.toggle("more-below", main.scrollHeight - main.scrollTop - main.clientHeight > 1);
+/** 明細のページ送り（user 2026-11-20）：縦スワイプ一回で一ページ。次のページは、いまのページで見切れた行（全部は見えていない最初の行）から始まる。
+ *  前のページは、いまのページの一行目の直前で終わる。ページの境目は明細の行で決まり、行が途中で切れたまま次のページに重ならない。
+ *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため。
+ *  合計の帯（.reg-top）は上に貼り付いているので、見えている範囲は帯の下端から画面の下端まで */
+type Page = { top: number; bottom: number; rows: HTMLElement[] };
+function pageOf(main: HTMLElement): Page {
+  const box = main.getBoundingClientRect();
+  const band = main.querySelector<HTMLElement>(":scope > .reg-top");
+  const top = band ? band.getBoundingClientRect().bottom : box.top;
+  const rows = [...main.querySelectorAll<HTMLElement>(".lines tr:not(:has(th))")];
+  return { top, bottom: box.bottom, rows };
 }
 
-/** 明細のスクロールは縦スワイプだけ（user 2026-11-20）。スクロールバーは出さない（CSS）。
- *  タッチは touch-action: pan-y でブラウザに縦だけ任せる。マウスは縦のドラッグで同じように動かす（横のドラッグは保留のスワイプに残す）。
- *  ドラッグで動かしたら、離したときのクリックは捨てる（ボタンの上から始めても押したことにならない） */
-const MAIN_DRAG_PX = 8;
+/** 最後のページでも一行目が帯の直下に来るよう、明細の下に足す余白（--page-pad）。画面の中身を描き直しても .screen-main は残るので消えない */
+function scrollMainBy(main: HTMLElement, delta: number): void {
+  const want = main.scrollTop + delta;
+  const max = main.scrollHeight - main.clientHeight;
+  const pad = parseFloat(main.style.getPropertyValue("--page-pad")) || 0;
+  if (want > max) main.style.setProperty("--page-pad", `${pad + want - max}px`);
+  else if (want <= 0) main.style.removeProperty("--page-pad");
+  main.scrollTop = Math.max(0, want);
+  markMoreBelow(main);
+}
+
+function turnPage(main: HTMLElement, dir: 1 | -1): void {
+  const { top, bottom, rows } = pageOf(main);
+  const view = bottom - top;
+  if (!rows.length) {
+    scrollMainBy(main, dir * view);
+    return;
+  }
+  if (dir === 1) {
+    const cut = rows.find((r) => r.getBoundingClientRect().bottom > bottom + 0.5);
+    if (cut) scrollMainBy(main, cut.getBoundingClientRect().top - top);
+    return;
+  }
+  if (main.scrollTop <= 0) return;
+  const first = rows.find((r) => r.getBoundingClientRect().top >= top - 0.5) ?? rows[rows.length - 1];
+  const from = first.getBoundingClientRect().top - view;
+  const head = rows.find((r) => r.getBoundingClientRect().top >= from - 0.5)!;
+  if (head === rows[0]) scrollMainBy(main, -main.scrollTop);
+  else scrollMainBy(main, head.getBoundingClientRect().top - top);
+}
+
+/** 下のページにまだ明細が残っているか。残っているあいだだけ下の縁に白のグラデーションを出す */
+function markMoreBelow(main: HTMLElement): void {
+  if (main.scrollTop <= 0) main.style.removeProperty("--page-pad");
+  const { bottom, rows } = pageOf(main);
+  const more = rows.length
+    ? rows.some((r) => r.getBoundingClientRect().bottom > bottom + 0.5)
+    : main.scrollHeight - main.scrollTop - main.clientHeight > 1;
+  main.classList.toggle("more-below", more);
+}
+
+/** 明細は縦スワイプだけで送る（スクロールバーは出さない、CSS）。タッチもマウスも縦に MAIN_SWIPE_PX 以上動かして離すと一ページ。
+ *  上へのスワイプ＝次のページ、下へ＝前のページ。横のスワイプは保留に残す。
+ *  ホイール・トラックパッドは一続きの回転を一ページとして扱う（WHEEL_QUIET_MS のあいだ止まるまで次を受け付けない） */
+const MAIN_SWIPE_PX = 30;
+const WHEEL_QUIET_MS = 250;
 function wireMainScroll(): void {
-  app.addEventListener("scroll", (e) => {
-    const t = e.target;
-    if (t instanceof HTMLElement && t.classList.contains("screen-main")) markMoreBelow(t);
-  }, true);
   window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach(markMoreBelow));
-  let drag: { main: HTMLElement; x: number; y: number; top: number; id: number; on: boolean } | null = null;
+  let start: { main: HTMLElement; x: number; y: number; id: number } | null = null;
   app.addEventListener("pointerdown", (e) => {
-    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    if (e.button !== 0) return;
     const t = e.target as Element;
     const main = t.closest<HTMLElement>(".screen-main");
-    if (!main || main.scrollHeight <= main.clientHeight || t.closest("input, select, textarea")) return;
-    drag = { main, x: e.clientX, y: e.clientY, top: main.scrollTop, id: e.pointerId, on: false };
-  });
-  window.addEventListener("pointermove", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dx = e.clientX - drag.x;
-    const dy = e.clientY - drag.y;
-    if (!drag.on) {
-      if (Math.abs(dy) < MAIN_DRAG_PX) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        drag = null;
-        return;
-      }
-      drag.on = true;
-    }
-    window.getSelection()?.removeAllRanges();
-    drag.main.scrollTop = drag.top - dy;
+    if (!main || t.closest("input, select, textarea, [data-code], [data-wallet]")) return;
+    start = { main, x: e.clientX, y: e.clientY, id: e.pointerId };
   });
   const end = (e: PointerEvent): void => {
-    if (!drag || e.pointerId !== drag.id) return;
-    if (drag.on) swallowClick = true;
-    drag = null;
+    if (!start || e.pointerId !== start.id) return;
+    const { main, x, y } = start;
+    start = null;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    if (Math.abs(dy) < MAIN_SWIPE_PX || Math.abs(dx) > Math.abs(dy)) return;
+    swallowClick = true;
+    turnPage(main, dy < 0 ? 1 : -1);
   };
   window.addEventListener("pointerup", end);
-  window.addEventListener("pointercancel", end);
+  window.addEventListener("pointercancel", () => (start = null));
+  app.addEventListener("dragstart", (e) => {
+    if ((e.target as Element).closest?.(".screen-main")) e.preventDefault();
+  });
+  let wheelAt = 0;
+  app.addEventListener(
+    "wheel",
+    (e) => {
+      const main = (e.target as Element).closest<HTMLElement>(".screen-main");
+      if (!main || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      const now = Date.now();
+      const quiet = now - wheelAt > WHEEL_QUIET_MS;
+      wheelAt = now;
+      if (quiet && e.deltaY !== 0) turnPage(main, e.deltaY > 0 ? 1 : -1);
+    },
+    { passive: false },
+  );
 }
 
 /** 保留したら第二待ち受けを右から、保留した取引に戻ったらそれを左から滑り込ませる（両画面とも） */

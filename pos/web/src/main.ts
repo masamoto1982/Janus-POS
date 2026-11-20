@@ -148,6 +148,7 @@ function start(): void {
   wireSwipe();
   wireMenuSwipe();
   wireHoldSwipe();
+  wireMainScroll();
   wireForceRegister();
   rulesDlg().addEventListener("close", lockRules);
   // テンキーを開いているあいだの Esc はテンキーだけを閉じる（ダイアログは閉じない）
@@ -572,6 +573,7 @@ function render(): void {
   setRegion("rules-pad", rulesPadPopup(snap));
   setRegion("shelf", shelfPanel(snap));
   setRegion("wallet", walletPanel(snap.emoney_balance));
+  app.querySelectorAll<HTMLElement>(".screen-main").forEach(markMoreBelow);
 }
 
 
@@ -1452,6 +1454,53 @@ function wireHoldSwipe(): void {
     else if (dx > 0 && r.held) send({ type: "resume_held", register: reg });
   });
   window.addEventListener("pointercancel", () => (start = null));
+}
+
+/** 登録画面の下にまだ明細が隠れているか（縦にスクロールできて末尾まで来ていない）。隠れているあいだだけ下の縁に白のグラデーションを出す */
+function markMoreBelow(main: HTMLElement): void {
+  main.classList.toggle("more-below", main.scrollHeight - main.scrollTop - main.clientHeight > 1);
+}
+
+/** 明細のスクロールは縦スワイプだけ（user 2026-11-20）。スクロールバーは出さない（CSS）。
+ *  タッチは touch-action: pan-y でブラウザに縦だけ任せる。マウスは縦のドラッグで同じように動かす（横のドラッグは保留のスワイプに残す）。
+ *  ドラッグで動かしたら、離したときのクリックは捨てる（ボタンの上から始めても押したことにならない） */
+const MAIN_DRAG_PX = 8;
+function wireMainScroll(): void {
+  app.addEventListener("scroll", (e) => {
+    const t = e.target;
+    if (t instanceof HTMLElement && t.classList.contains("screen-main")) markMoreBelow(t);
+  }, true);
+  window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach(markMoreBelow));
+  let drag: { main: HTMLElement; x: number; y: number; top: number; id: number; on: boolean } | null = null;
+  app.addEventListener("pointerdown", (e) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    const t = e.target as Element;
+    const main = t.closest<HTMLElement>(".screen-main");
+    if (!main || main.scrollHeight <= main.clientHeight || t.closest("input, select, textarea")) return;
+    drag = { main, x: e.clientX, y: e.clientY, top: main.scrollTop, id: e.pointerId, on: false };
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dx = e.clientX - drag.x;
+    const dy = e.clientY - drag.y;
+    if (!drag.on) {
+      if (Math.abs(dy) < MAIN_DRAG_PX) return;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        drag = null;
+        return;
+      }
+      drag.on = true;
+    }
+    window.getSelection()?.removeAllRanges();
+    drag.main.scrollTop = drag.top - dy;
+  });
+  const end = (e: PointerEvent): void => {
+    if (!drag || e.pointerId !== drag.id) return;
+    if (drag.on) swallowClick = true;
+    drag = null;
+  };
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
 }
 
 /** 保留したら第二待ち受けを右から、保留した取引に戻ったらそれを左から滑り込ませる（両画面とも） */

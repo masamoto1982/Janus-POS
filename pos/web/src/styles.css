@@ -148,21 +148,12 @@ button { touch-action: manipulation; }
 /* タブは白銀比のボタンを上下に二分割した形（user 2026-11-17）：FF のタブは特大の白銀比ボタンの上半分（幅 特大×√2・高さ 特大÷2、縦横比 1:2√2）。
    モバイルの画面切り替えタブも同じ形を横に並べたもの。五つを帯の中央に並べ、入らない狭い画面では縦横比を保って縮む */
 .ff-tabs button.tab { flex: none; width: min(var(--btn-xl-w), calc((100% - 4 * var(--gap)) / 5)); height: auto; aspect-ratio: calc(2 * var(--silver)); }
-/* セルフ操作モードで「FF」から開いた FF タブ：最下段の上の段の下端に、左下「バック」・右下「金券」「たばこ」「その他」を重ねる（すべて小ボタン、user 2026-11-20）。
-   重ねる帯の高さは小ボタンの二倍。下の明細は登録画面に重ねる理由の表示（.reject-flash）と同じぼかしで滲ませ、ボタンを浮かせる */
-.screen-body > [data-region^="foot-"] { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; pointer-events: none; }
-.ff-open-foot { position: relative; pointer-events: auto; height: calc(var(--btn-md-h) * 2); box-sizing: border-box; display: flex; justify-content: space-between; align-items: flex-end; gap: var(--gap);
-  /* ボタンは最下段に属するので最下段に寄せる：下の余白＝最下段の上端から FF タブまでの余白（.screen-items の上の padding ＋ .ff-tabs の margin-top）、user 2026-11-20 */
-  padding: 0 var(--s10, 12px) calc(var(--s14, 3px) + var(--s13, 5px)); }
-/* ぼかしは帯の上の小ボタン一つ分から徐々に効かせ、帯の中では全面に効かせる（急に始まると明細に目隠しをしたように見えた、user 2026-11-20）。ボタンはぼかしの層の上 */
-.ff-open-foot::before { content: ""; position: absolute; inset: calc(var(--btn-md-h) * -1) 0 0 0; z-index: -1; pointer-events: none;
-  -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px));
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 38%); mask-image: linear-gradient(to bottom, transparent, #000 38%); }
-.ff-open-foot > * { position: relative; }
+/* セルフ操作モードで「FF」から開いた FF タブ：最下段の上の段の下端に一行を設け、左下「バック」・右下「金券」「たばこ」「その他」（すべて小ボタン、user 2026-11-20）。
+   この行には明細を出さない（上の段の明細はこの行の上で終わる）。ボタンは最下段に属するので最下段に寄せ、上下の余白は最下段の上端から FF タブまでの余白（.screen-items の上の padding ＋ .ff-tabs の margin-top） */
+.ff-open-foot { flex: none; display: flex; justify-content: space-between; align-items: center; gap: var(--gap);
+  padding: calc(var(--s14, 3px) + var(--s13, 5px)) var(--s10, 12px); }
 .ff-open-calls { display: flex; gap: var(--gap); }
 .screen .ff-open-foot button { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); height: var(--btn-md-h); padding: 0 var(--s15, 2px); font-size: var(--text-sm); line-height: 1; border-radius: var(--shape-soft); }
-/* 重ねた帯の下に最後の明細が隠れたままにならないよう、上の段は帯とぼかしの始まりの高さだけ余分にスクロールできる */
-.screen-body:has(.ff-open-foot) > .screen-main { padding-bottom: calc(var(--btn-md-h) * 3); }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない。左右の列は少なくとも円の直径を確保し、段の縁・単品とは最小間隔（--gap）
    離れる。狭い画面（モバイル）で入らないときは、円ではなく単品の群のほうが縦横比を保って縮む */

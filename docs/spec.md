@@ -936,7 +936,7 @@ npm run build
 (cd core && cargo test)
 ```
 
-- CI（`.github/workflows/ci.yml`）は push（main）と PR で cargo test・types.ts の一致検査・仕様書の生成箇所の一致検査・WASM のビルド・Vitest・型検査とビルドを行う。
+- CI（`.github/workflows/ci.yml`）は push（main）と PR で cargo test・clippy（警告で落とす）・types.ts の一致検査・仕様書の生成箇所の一致検査・WASM のビルド・THIRD-PARTY-NOTICES.txt の一致検査・Vitest・型検査とビルドを行う。
 - 仕様書のうち事実の部分（16 章の定数、17 章のコマンド、3.2 の商品・FF・クーポン、10.1 の料金表、付録 A のシナリオ一覧）は `<!-- generated:名前 -->` と `<!-- /generated -->` の印で囲み、コードとデータから生成する（`pos/core/tests/spec_tables.rs`）。印の外は手書き。コードを変えたら `cd pos && npm run gen:spec` で作り直す。食い違うと CI が落ちる。
 - シナリオテストには doc コメントで「/// 仕様 節番号：一行の説明」を書く。付録 A に節ごとに並ぶ。
 - `main` への push で GitHub Pages に `pos/dist` を公開する（`.github/workflows/pages.yml`）。

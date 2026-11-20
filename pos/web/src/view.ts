@@ -1508,21 +1508,22 @@ function bellBtn(r: RegisterView, side: Side): string {
 }
 
 /** スタッフ操作モードのレジカウンター側の操作（user 2026-11-20：スワイプをやめ、とりあえずボタンを置く）。
- *  待ち受けの左下＝保留した取引に戻る（割り込む前だけ）、右下＝店舗メニュー（開けるときだけ。閉じるのはメニューのバック）。
+ *  ヘッダー中央＝店舗メニュー（開けるとき＝取引がないときだけ。取引中はヘッダー中央に呼び鈴が来る。閉じるのはメニューのバック）。
+ *  待ち受けの左下＝保留した取引に戻る（割り込む前だけ）。
  *  登録画面のスタッフ名の右＝保留（保留できない取引で押すと理由を出す） */
 const staffBtn = (label: string, cmd: Command) => `<button type="button" class="staff-btn neg" data-cmd="${esc(JSON.stringify(cmd))}">${label}</button>`;
 const staffCounter = (r: RegisterView, side: Side): boolean => side === "counter" && r.mode === "staff_operated" && !r.paused && !r.emergency && !r.menu;
 function welcomeFoot(r: RegisterView, side: Side): string {
   if (!staffCounter(r, side)) return "";
   const back = r.held && !inTransaction(r) ? staffBtn("保留に戻る", { type: "resume_held", register: r.id }) : "";
-  const menu = storeMenuUsable(r) ? staffBtn("店舗メニュー", { type: "open_menu", register: r.id, screen: "top" }) : "";
-  return back || menu ? `<div class="welcome-foot"><span>${back}</span><span>${menu}</span></div>` : "";
+  return back ? `<div class="welcome-foot"><span>${back}</span><span></span></div>` : "";
 }
 const holdBtn = (r: RegisterView, side: Side): string =>
   staffCounter(r, side) && !r.held && r.counter.lines.length > 0 ? staffBtn("保留", { type: "hold_transaction", register: r.id }) : "";
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
-  const bell = bellBtn(r, side);
+  const menu = staffCounter(r, side) && storeMenuUsable(r) ? staffBtn("店舗メニュー", { type: "open_menu", register: r.id, screen: "top" }) : "";
+  const bell = menu + bellBtn(r, side);
   const mode = r.emergency ? `<span class="mode-title emergency">非常事態モード</span>` : r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
   // 無操作の残り時間はレジカウンター側のヘッダーの右に出す（user 2026-11-21：レジの見出しから画面の中へ）。
   // 待ち時間をお客様に見せないため売り場側には出さない

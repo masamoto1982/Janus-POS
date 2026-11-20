@@ -131,22 +131,17 @@ button { touch-action: manipulation; }
 @keyframes slide-from-right { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes slide-from-left { from { transform: translateX(-100%); } to { transform: none; } }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: hidden auto; padding: var(--s11, 8px) var(--s10, 12px); overscroll-behavior-y: contain; }
-/* 明細はスクロールバーで送る（user 2026-11-20：スワイプはやめた）。ページの考え方は残す（main.ts paginate）：
-   内税の行と見出しはスクロールせず、明細の行だけが .lines-scroll の中でスクロールし、各ページの一行目に吸い付く。
-   ページの下に「Page:1/3 スクロールで続きを表示」（最後のページはページ数だけ） */
+/* 明細はボタンでページを送る（user 2026-11-20：スクロールバー・スワイプでは送らない。明細がスクロールすると
+   モバイルでページの縦スクロールと取り合いになる）。ページの考え方（main.ts paginate）：内税の行と見出しは動かず、
+   明細の行だけが .lines-scroll の中で送られる。下に「< Page:1/3 >」 */
 .screen-main:has(> .lines-scroll) { display: flex; flex-direction: column; overflow: hidden; }
 .screen-main:has(> .lines-scroll) > :not(.lines-scroll) { flex: none; }
-.screen-main > .lines-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scroll-snap-type: y mandatory; }
+.screen-main > .lines-scroll { flex: 1 1 0; min-height: 0; overflow: hidden; }
 .lines-scroll .lines thead th { position: sticky; top: 0; z-index: 1; background: var(--screen-bg, white); }
-.lines-scroll .lines tr.page-start { scroll-snap-align: start; }
 .lines-scroll .lines tr.page-pad td { padding: 0; border: 0; }
-/* 標準のスクロールバーはスマホでは動かしているあいだしか出ないので隠し、いつも見える細いバー（.page-bar、main.ts placeBar）を自前で描く */
-.screen-main:has(> .lines-scroll) { position: relative; }
-.screen-main > .lines-scroll { scrollbar-width: none; padding-right: calc(var(--s11, 8px) + var(--s13, 4px)); }
-.screen-main > .lines-scroll::-webkit-scrollbar { display: none; }
-.screen-main > .page-bar { position: absolute; width: var(--s11, 8px); border-radius: var(--shape-round); background: color-mix(in oklch, var(--msg-strong) 15%, transparent); touch-action: none; cursor: pointer; }
-.screen-main > .page-bar .page-thumb { position: absolute; left: 0; right: 0; border-radius: var(--shape-round); background: var(--operable-blue, var(--msg-strong)); }
-.screen-main > .page-more { margin: 0; display: flex; justify-content: center; gap: var(--s11, 8px); font-size: var(--text-sm); color: var(--msg-strong); line-height: 1.6; }
+.lines-scroll .lines tr.off-page { visibility: hidden; }
+.screen-main > .page-more { margin: var(--s13, 4px) 0 0; display: flex; justify-content: center; align-items: center; gap: var(--gap, 8px); font-size: var(--text-sm); color: var(--msg-strong); line-height: 1.6; }
+.screen-main > .page-more .page-turn.off { visibility: hidden; }
 .screen-main > .page-more .page-no { font-variant-numeric: tabular-nums; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
@@ -891,8 +886,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .money-io-counter, .money-io-floor { grid-column: 1; }
   .money-io.face-counter .money-io-floor, .money-io.face-floor .money-io-counter { display: none; }
   /* レジ画面の上で縦にスワイプしてもページがスクロールする（user 2026-11-20：画面の殆どがレジ画面なので、
-     止めると 2 台目のレジを見る術がない）。明細が端まで来たらページへ引き継ぐ */
-  .screen-main, .screen-main > .lines-scroll { overscroll-behavior-y: auto; }
+     止めると 2 台目のレジを見る術がない）。明細はスクロールせずボタンで送る */
+  .screen-main { overscroll-behavior-y: auto; }
   /* モバイルは画面の高さでは止めない（縦にスクロールする） */
   .screen { --W: min(100cqi - 2 * var(--frame-w), 512px); }
 }

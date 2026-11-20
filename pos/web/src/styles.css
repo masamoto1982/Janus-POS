@@ -850,9 +850,10 @@ body.dragging .drop-hint { display: inline; }
   .swipe-tabs .tab { flex: none; box-sizing: border-box; width: calc((100% - var(--gap, 8px)) * 2 / 5); height: auto; aspect-ratio: calc(2 * 2 * 1.4142); padding: 0 4px; font-size: var(--text-sm); line-height: 1; transition: width .2s; }
   .swipe-tabs .tab.on { width: calc((100% - var(--gap, 8px)) * 3 / 5); aspect-ratio: calc(3 * 2 * 1.4142); }
   .swipe-tabs .tab.operable { filter: url(#ramp); }
-  .screens { display: flex; gap: 0; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; }
-  .screens::-webkit-scrollbar { display: none; }
-  .screens .screen-wrap { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+  /* 面の切り替えはタブだけ（横スワイプは登録画面の保留と競合するため、user 2026-11-20）。見ていない面は出さない */
+  .screens { display: block; }
+  .screens[data-shown="counter"] .screen-wrap[data-wrap$=":floor"],
+  .screens[data-shown="floor"] .screen-wrap[data-wrap$=":counter"] { display: none; }
   .screen-cap { display: none; }
   .screen, [data-inlet], [data-terminal], [data-scanner] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
   .money-io { margin-top: 6px; }

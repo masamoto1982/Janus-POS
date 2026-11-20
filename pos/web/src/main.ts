@@ -1,4 +1,4 @@
-import { applyLaw, fitForms, fitText } from "./law";
+import { alignBand, applyLaw, fitForms, fitText } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
 import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { CancelStage, GuideKind, RulesTab } from "./view";
@@ -82,9 +82,9 @@ async function boot(): Promise<void> {
   window.addEventListener("pagehide", save);
   window.setInterval(frame, 100);
   // レイアウトの法則は部品の大きさで決まるので、段の大きさが変わったときとフォントが届いたときにも当て直す
-  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), fitForms(e.target), applyLaw(e.target), fitNotes(e.target))));
+  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), fitForms(e.target), applyLaw(e.target), alignBand(e.target), fitNotes(e.target))));
   app.querySelectorAll(".screen-main, .screen-items").forEach((el) => relaid.observe(el));
-  void document.fonts?.ready.then(() => (fitText(app), fitForms(document), applyLaw(app), fitNotes(app)));
+  void document.fonts?.ready.then(() => (fitText(app), fitForms(document), applyLaw(app), alignBand(app), fitNotes(app)));
 }
 
 /** 最下段の添え書きが一行に入りきらないときは、文字を縮めずに電光掲示板のように流す（user 2026-11-20）。
@@ -334,6 +334,7 @@ function setRegion(name: string, raw: string, lang: Lang = "ja"): void {
   fitText(el);
   fitForms(el);
   applyLaw(el);
+  alignBand(el);
   fitNotes(el);
 
   el.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-key]").forEach((i) => {

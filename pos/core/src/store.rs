@@ -884,11 +884,14 @@ struct Txn {
     limit_hit: Vec<&'static str>,
 }
 
+/// クーポンの適用先（値引き額、税率、明細の番号）
+type CouponTarget = (u32, u32, u32);
+
 impl Txn {
     /// クーポンの適用先。クーポンは一番近くの対象商品に付く：クーポンより前に登録した対象商品の明細のうち
     /// 一番新しいもの、なければクーポンより後に登録した一番古いもの（明細の数量の数までクーポンが効く）。
     /// あとから読んだ商品が付いているクーポンを奪うことはない。適用先は（値引き額、税率、明細の番号）
-    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<(u32, u32, u32)>)> {
+    fn coupon_uses(&self) -> Vec<(u32, &'static Coupon, Option<CouponTarget>)> {
         let mut used: Vec<(u32, u32)> = vec![];
         self.coupons
             .iter()
@@ -4364,7 +4367,7 @@ impl Store {
 
     fn exchange(&mut self, register: u8, amount: u32, to: u32) -> Result<Outcome, String> {
         self.check_active(register, Action::CashIn)?;
-        if amount % to != 0 {
+        if !amount.is_multiple_of(to) {
             return Err(format!("{to}円単位で入れてください"));
         }
         let now = self.now;

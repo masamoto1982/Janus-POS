@@ -368,3 +368,75 @@ function shrinkToFit(b: HTMLElement, rigid: boolean): void {
   else scale(b);
 }
 
+
+/**
+ * 入力フォームとセレクタの大きさ（user 2026-11-20）：角の丸みの弱いボタンの決まりから角の丸みを除いたものがフォームの仕組み。
+ * ボタン・フォーム・セレクタの高さと幅を同じ理屈で決めると、違う部品が並んでも取り回しが楽になる。
+ *   高さ B＝ボタンと同じ四段（特大 W/8・大 W/11.3・小 W/16・極小 W/22.6）から CSS が選ぶ
+ *   文字＝B÷2（一行のボタンの特大と同じ）。入力例は小テキスト（打ち込む文字より大きくはしない）
+ *   幅＝文字＋左右の余白 B÷4＋枠。文字はいちばん長く打ち込んだときの見本（data-fit）か入力例の長い方。
+ *     セレクタはいちばん長い選択肢＋開く印（B÷2）
+ *   一文字差の幅そろえも同じ：同じ並びの同じ高さのフォーム・セレクタで、文字数が一文字しか違わなければ広い方の幅に
+ * レジ画面の外（シミュレーターまわり・販売規則の設定）も同じ仕組み。B はそこで決めた段の高さ
+ */
+const FORMS = "button.pad-field, select, input:not([type=checkbox], [type=radio], [type=range])";
+let ruler: CanvasRenderingContext2D | null | undefined;
+function textWidth(text: string, el: HTMLElement, size: number, weight?: string): number {
+  if (ruler === undefined) ruler = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;
+  if (!ruler || !text) return 0;
+  const cs = getComputedStyle(el);
+  ruler.font = `${weight ?? cs.fontWeight} ${size}px ${cs.fontFamily}`;
+  return ruler.measureText(text).width;
+}
+
+/** その場所の小テキストの大きさ（レジ画面は W/32、外は :root の値） */
+function smallText(el: HTMLElement): number {
+  const probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;font-size:var(--text-sm)";
+  el.parentElement!.appendChild(probe);
+  const px = parseFloat(getComputedStyle(probe).fontSize) || 12;
+  probe.remove();
+  return px;
+}
+
+export function fitForms(root: ParentNode): void {
+  const forms = [...root.querySelectorAll<HTMLElement>(FORMS)].filter((f) => !f.closest(".qty-pop") && f.getClientRects().length > 0);
+  const chars = new Map<HTMLElement, number>();
+  for (const f of forms) {
+    f.style.removeProperty("width");
+    const B = f.offsetHeight;
+    if (!B) continue;
+    const size = B / 2;
+    f.style.fontSize = `${size}px`;
+    f.style.lineHeight = "1";
+    const border = parseFloat(getComputedStyle(f).borderLeftWidth) || 0;
+    const isSelect = f instanceof HTMLSelectElement;
+    const samples = isSelect ? [...f.options].map((o) => o.text) : [f.dataset.fit ?? (f as HTMLInputElement).value ?? f.textContent ?? ""];
+    const main = Math.max(0, ...samples.map((t) => textWidth(t, f, size)));
+    // 入力例は小テキスト（user 2026-11-18）。ただし打ち込む文字より大きくはしない（CSS の min(1em, --text-sm) と同じ）
+    const span = f.querySelector<HTMLElement>(".placeholder");
+    const hintText = span?.textContent ?? (f as HTMLInputElement).placeholder ?? "";
+    const hint = span ? span.getBoundingClientRect().width : hintText ? textWidth(hintText, f, Math.min(size, smallText(f)), "400") : 0;
+    const mark = isSelect ? B / 2 : 0;
+    f.style.paddingTop = f.style.paddingBottom = "0";
+    f.style.paddingLeft = `${Math.max(0, B / 4 - border)}px`;
+    f.style.paddingRight = `${Math.max(0, B / 4 + mark - border)}px`;
+    f.style.width = `${Math.ceil(Math.max(main, hint) + B / 2 + mark + 2 * border)}px`;
+    // 文字数は一文字ずつ数える（数字も一文字：「二文字のフォームと三文字のフォーム」）
+    chars.set(f, Math.max(...samples.map((t) => [...t].length)));
+  }
+  const groups = new Map<string, HTMLElement[]>();
+  const rows = new Map<Element, number>();
+  for (const f of chars.keys()) {
+    const row = f.closest("[data-law], .field-row, tr, .menu-form, .parcel-fields") ?? f.parentElement;
+    if (!row) continue;
+    if (!rows.has(row)) rows.set(row, rows.size);
+    const key = `${rows.get(row)}:${Math.round(f.offsetHeight)}`;
+    groups.set(key, [...(groups.get(key) ?? []), f]);
+  }
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const ws = alignByLength(g.map((f) => ({ chars: chars.get(f)!, width: f.offsetWidth })));
+    g.forEach((f, i) => (f.style.width = `${ws[i]}px`));
+  }
+}

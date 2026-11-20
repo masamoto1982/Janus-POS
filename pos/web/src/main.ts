@@ -125,14 +125,14 @@ function save(): void {
 }
 
 /** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
- *  モバイルは 2 台まで（複数台運用の最低台数。3 台以上のデモは現実的でない、user 2026-11-21）。
+ *  モバイルは 2 台ちょうど（複数台運用の最低台数。3 台以上のデモは現実的でなく、1 台では複数台のデモができない、user 2026-11-20）。
  *  デスクトップは 2 台から（user 2026-11-21：1 台では、呼び出しの通知が発生したレジにだけ出ることや、
  *  チケットの取引が僅差で重なるケースのデモができない）
  *  台数を変えると店の状態を作り直す（コアは作るときに台数を決める） */
 const REG_COUNT_KEY = "janus-pos-registers";
 const DEFAULT_REGISTERS = 2;
 const isMobileMode = (): boolean => window.matchMedia(MOBILE_MQ).matches;
-const minRegisters = (): number => (isMobileMode() ? 1 : 2);
+const minRegisters = (): number => 2;
 const maxRegisters = (): number => (isMobileMode() ? 2 : 5);
 
 function savedRegCount(): number {
@@ -176,7 +176,13 @@ function forget(): void {
 }
 
 function start(): void {
-  sim = restore() ?? new PosSimulator(Date.now() & 0xffff, savedRegCount(), 3);
+  let restored = restore();
+  // 最低台数に足りない保存状態（以前の 1 台）は捨てて、既定の台数で作り直す
+  if (restored && (JSON.parse(restored.snapshot()) as Snapshot).registers.length < minRegisters()) {
+    forget();
+    restored = null;
+  }
+  sim = restored ?? new PosSimulator(Date.now() & 0xffff, savedRegCount(), 3);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
@@ -1418,10 +1424,11 @@ function wireForceRegister(): void {
   });
 }
 
-/** 明細のページ（user 2026-11-20）：明細はスクロールバーで送り、ページの考え方は残す。
- *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）はスクロールせず、明細の行だけが .lines-scroll の中でスクロールする。
- *  見えている高さに入りきる行を一ページとし、各ページの一行目にスクロールが吸い付く（scroll-snap）。最後のページの一行目まで上げられるよう下に余白を足す。
- *  複数ページのときは下に「Page:1/3 スクロールで続きを表示」（最後のページはページ数だけ）。明細の数が変わったら一ページ目に戻す。
+/** 明細のページ（user 2026-11-20）：明細はボタンでページを送る（スクロールバー・スワイプでは送らない。
+ *  明細がスクロールすると、モバイルでページの縦スクロールと取り合いになる）。
+ *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）は動かず、明細の行だけが .lines-scroll の中で送られる。
+ *  見えている高さに入りきる行を一ページとし、ページの一行目を見出しの下に合わせる。最後のページの一行目まで上げられるよう下に余白を足す。
+ *  複数ページのときは下に「&lt; Page:1/3 &gt;」（円形のボタンは FF のページ送りと同じ、端のページでは出さない）。明細の数が変わったら一ページ目に戻す。
  *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため */
 const mainPage = new Map<string, { page: number; count: number; starts: number[] }>();
 const pageKey = (main: HTMLElement): string => main.dataset.region ?? "";
@@ -1434,7 +1441,6 @@ function paginate(main: HTMLElement, force = false): void {
   // 中身を描き直していなければ、スクロールの位置もページもそのまま
   if (box.classList.contains("lines-scroll") && !force) return;
   main.querySelector(":scope > .page-more")?.remove();
-  main.querySelector(":scope > .page-bar")?.remove();
   if (!box.classList.contains("lines-scroll")) {
     box = document.createElement("div");
     box.className = "lines-scroll";
@@ -1453,11 +1459,9 @@ function paginate(main: HTMLElement, force = false): void {
   // ページの下の行を先に置き、その分を引いた高さで割り付ける
   const more = document.createElement("p");
   more.className = "page-more";
-  more.innerHTML = `<span class="page-no">Page:1/1</span><span class="page-hint"></span>`;
+  more.innerHTML = `<button type="button" class="ff-arrow page-turn prev" data-linepage="-1" aria-label="${lang === "en" ? trText("前のページ") : "前のページ"}">&lt;</button><span class="page-no">Page:1/1</span><button type="button" class="ff-arrow page-turn next" data-linepage="1" aria-label="${lang === "en" ? trText("次のページ") : "次のページ"}">&gt;</button>`;
   main.append(more);
   const head = table.querySelector("thead")?.getBoundingClientRect().height ?? 0;
-  // 見出しは上に貼り付けたまま（sticky）なので、吸い付く位置は見出しの下
-  box.style.scrollPaddingTop = `${head}px`;
   const view = box.clientHeight - head;
   const heights = rows.map((r) => r.getBoundingClientRect().height);
   const starts: number[] = [0];
@@ -1486,19 +1490,13 @@ function paginate(main: HTMLElement, force = false): void {
   pad.setAttribute("aria-hidden", "true");
   pad.innerHTML = `<td colspan="3" style="height:${Math.max(0, view - lastH)}px"></td>`;
   rows[rows.length - 1].after(pad);
-  box.scrollTop = pageTop(box, rows, state.starts[state.page], head);
-  const bar = document.createElement("div");
-  bar.className = "page-bar";
-  bar.setAttribute("aria-hidden", "true");
-  bar.innerHTML = `<span class="page-thumb"></span>`;
-  main.append(bar);
   showPage(main, lang);
 }
 
 const pageTop = (box: HTMLElement, rows: HTMLElement[], i: number, head: number): number =>
   rows[i].getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - head;
 
-/** スクロールした位置から今のページを決め、「Page:2/3」を書き換える */
+/** 今のページの一行目を見出しの下に合わせ、「Page:2/3」とボタンを書き換える */
 function showPage(main: HTMLElement, lang = langOf(Number(pageKey(main).split("-")[1]), pageKey(main).split("-")[0] as Side)): void {
   const st = mainPage.get(pageKey(main));
   const box = main.querySelector<HTMLElement>(":scope > .lines-scroll");
@@ -1506,83 +1504,31 @@ function showPage(main: HTMLElement, lang = langOf(Number(pageKey(main).split("-
   if (!st || !box || !more) return;
   const rows = [...box.querySelectorAll<HTMLElement>("tbody > tr")].filter((r) => !r.querySelector("td.empty") && !r.classList.contains("page-pad"));
   const head = box.querySelector("thead")?.getBoundingClientRect().height ?? 0;
-  let page = 0;
-  st.starts.forEach((i, p) => {
-    if (rows[i] && pageTop(box, rows, i, head) <= box.scrollTop + 1) page = p;
-  });
+  const page = Math.max(0, Math.min(st.page, st.starts.length - 1));
   st.page = page;
-  const last = page === st.starts.length - 1;
+  // ほかのページの行は隠す（次のページの一行目が下に見切れて覗かないように）
+  const from = st.starts[page];
+  const to = st.starts[page + 1] ?? rows.length;
+  rows.forEach((r, i) => r.classList.toggle("off-page", i < from || i >= to));
+  if (rows[st.starts[page]]) box.scrollTop = page === 0 ? 0 : pageTop(box, rows, st.starts[page], head);
   const no = more.querySelector<HTMLElement>(".page-no")!;
   no.textContent = `Page:${page + 1}/${st.starts.length}`;
-  no.setAttribute("aria-label", `${st.starts.length}ページ中${page + 1}ページ目`);
-  const hint = more.querySelector<HTMLElement>(".page-hint")!;
-  hint.textContent = last ? "" : lang === "en" ? trText("スクロールで続きを表示") : "スクロールで続きを表示";
-  hint.hidden = last;
-  placeBar(main, box, head);
-}
-
-/** 明細のスクロールバー（user 2026-11-20）。スマホのブラウザは標準のスクロールバーを動かしているあいだしか出さないので、
- *  いつも見える細いバーを自前で描く（標準のバーは CSS で隠す）。つまみはドラッグでき、離すとページの一行目に吸い付く */
-function placeBar(main: HTMLElement, box: HTMLElement, head: number): void {
-  const bar = main.querySelector<HTMLElement>(":scope > .page-bar");
-  if (!bar) return;
-  const m = main.getBoundingClientRect();
-  const b = box.getBoundingClientRect();
-  const trackH = box.clientHeight - head;
-  bar.style.top = `${b.top - m.top + head}px`;
-  bar.style.left = `${b.right - m.left - bar.offsetWidth}px`;
-  bar.style.height = `${trackH}px`;
-  const thumb = bar.firstElementChild as HTMLElement;
-  const view = box.clientHeight - head;
-  const total = Math.max(view, box.scrollHeight - head);
-  const h = Math.max(trackH * (view / total), trackH / 8);
-  const max = box.scrollHeight - box.clientHeight;
-  thumb.style.height = `${h}px`;
-  thumb.style.top = `${max > 0 ? (trackH - h) * (box.scrollTop / max) : 0}px`;
+  no.setAttribute("aria-label", lang === "en" ? `Page ${page + 1} of ${st.starts.length}` : `${st.starts.length}ページ中${page + 1}ページ目`);
+  // 端のページでは出さない（場所は空けたまま、Page の位置を動かさない）
+  more.querySelector<HTMLElement>(".page-turn.prev")!.classList.toggle("off", page === 0);
+  more.querySelector<HTMLElement>(".page-turn.next")!.classList.toggle("off", page === st.starts.length - 1);
 }
 
 function wireMainScroll(): void {
-  let drag: { box: HTMLElement; bar: HTMLElement; y: number; top: number; id: number } | null = null;
-  app.addEventListener("pointerdown", (e) => {
-    const bar = (e.target as Element).closest<HTMLElement>(".page-bar");
-    const box = bar?.parentElement?.querySelector<HTMLElement>(":scope > .lines-scroll");
-    if (!bar || !box) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const thumb = bar.firstElementChild as HTMLElement;
-    const r = thumb.getBoundingClientRect();
-    // つまみの外を押したら、その位置へつまみの中心を移してからドラッグ
-    if (e.clientY < r.top || e.clientY > r.bottom) {
-      const tr = bar.getBoundingClientRect();
-      const ratio = (e.clientY - tr.top - r.height / 2) / Math.max(1, tr.height - r.height);
-      box.scrollTop = Math.max(0, Math.min(1, ratio)) * (box.scrollHeight - box.clientHeight);
-    }
-    box.style.scrollSnapType = "none";
-    bar.setPointerCapture(e.pointerId);
-    drag = { box, bar, y: e.clientY, top: box.scrollTop, id: e.pointerId };
-  });
-  window.addEventListener("pointermove", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const thumb = drag.bar.firstElementChild as HTMLElement;
-    const room = Math.max(1, drag.bar.clientHeight - thumb.offsetHeight);
-    drag.box.scrollTop = drag.top + ((e.clientY - drag.y) / room) * (drag.box.scrollHeight - drag.box.clientHeight);
-  });
-  const end = (e: PointerEvent): void => {
-    if (!drag || e.pointerId !== drag.id) return;
-    drag.box.style.scrollSnapType = "";
-    drag = null;
-  };
-  window.addEventListener("pointerup", end);
-  window.addEventListener("pointercancel", end);
   window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach((m) => paginate(m, true)));
-  app.addEventListener(
-    "scroll",
-    (e) => {
-      const t = e.target;
-      if (t instanceof HTMLElement && t.classList.contains("lines-scroll")) showPage(t.parentElement as HTMLElement);
-    },
-    true,
-  );
+  app.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-linepage]");
+    const main = b?.closest<HTMLElement>(".screen-main");
+    const st = main && mainPage.get(pageKey(main));
+    if (!b || !main || !st) return;
+    st.page += Number(b.dataset.linepage);
+    showPage(main);
+  });
 }
 
 /** 保留したら第二待ち受けを右から、保留した取引に戻ったらそれを左から滑り込ませる（両画面とも） */

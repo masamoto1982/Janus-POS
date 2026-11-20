@@ -151,7 +151,9 @@ button { touch-action: manipulation; }
 /* セルフ操作モードで「FF」から開いた FF タブ：最下段の上の段の下端に、左下「バック」・右下「金券」「たばこ」「その他」を重ねる（すべて小ボタン、user 2026-11-20）。
    重ねる帯の高さは小ボタンの二倍。下の明細は登録画面に重ねる理由の表示（.reject-flash）と同じぼかしで滲ませ、ボタンを浮かせる */
 .screen-body > [data-region^="foot-"] { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; pointer-events: none; }
-.ff-open-foot { position: relative; pointer-events: auto; height: calc(var(--btn-md-h) * 2); box-sizing: border-box; display: flex; justify-content: space-between; align-items: center; gap: var(--gap); padding: 0 var(--s10, 12px); }
+.ff-open-foot { position: relative; pointer-events: auto; height: calc(var(--btn-md-h) * 2); box-sizing: border-box; display: flex; justify-content: space-between; align-items: flex-end; gap: var(--gap);
+  /* ボタンは最下段に属するので最下段に寄せる：下の余白＝最下段の上端から FF タブまでの余白（.screen-items の上の padding ＋ .ff-tabs の margin-top）、user 2026-11-20 */
+  padding: 0 var(--s10, 12px) calc(var(--s14, 3px) + var(--s13, 5px)); }
 /* ぼかしは帯の上の小ボタン一つ分から徐々に効かせ、帯の中では全面に効かせる（急に始まると明細に目隠しをしたように見えた、user 2026-11-20）。ボタンはぼかしの層の上 */
 .ff-open-foot::before { content: ""; position: absolute; inset: calc(var(--btn-md-h) * -1) 0 0 0; z-index: -1; pointer-events: none;
   -webkit-backdrop-filter: blur(var(--s12, 6px)); backdrop-filter: blur(var(--s12, 6px));

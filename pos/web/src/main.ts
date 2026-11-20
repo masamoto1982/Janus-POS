@@ -35,7 +35,6 @@ import {
   padValueKey,
   type PadTarget,
   screenHead,
-  storeMenuUsable,
   isoDate,
   scanGuide,
   cancelAsk,
@@ -202,8 +201,6 @@ function start(): void {
     location.reload();
   });
   wireSwipe();
-  wireMenuSwipe();
-  wireHoldSwipe();
   wireMainScroll();
   wireForceRegister();
   rulesDlg().addEventListener("close", lockRules);
@@ -483,7 +480,12 @@ document.documentElement.addEventListener("pointerleave", () => hovering.clear()
 function render(): void {
   trackFlashes();
   for (const reg of movedRegs) {
-    app.querySelectorAll<HTMLElement>(`[data-screen^="${reg}:"] .screen-main`).forEach((el) => (el.scrollTop = 0));
+    app.querySelectorAll<HTMLElement>(`[data-screen^="${reg}:"] .screen-main`).forEach((el) => {
+      el.scrollTop = 0;
+      mainPage.delete(pageKey(el));
+      const box = el.querySelector<HTMLElement>(":scope > .lines-scroll");
+      if (box) box.scrollTop = 0;
+    });
   }
   movedRegs.clear();
   for (const r of snap.registers) {
@@ -532,14 +534,6 @@ function render(): void {
       const operable = r.active_side !== null ? r.active_side === side : r.mode !== "staff_operated" || side === "counter";
       el?.classList.toggle("operable", operable);
       el?.classList.toggle("mode-staff", r.mode === "staff_operated");
-      el?.classList.toggle("hold-swipe", side === "counter" && r.mode === "staff_operated" && !r.menu);
-      // 隠れているものがある側の縁を、操作の青の濃い青→段の薄い青のグラデーションで示す（user 2026-11-20）：
-      // ヘッダーの左＝店舗メニュー（開けるときだけ。取引中は開けないので出さない）、開いているあいだは右＝もとの画面。登録画面の左＝保留した取引（あるときだけ）
-      const staffCounter = side === "counter" && r.mode === "staff_operated" && !r.paused;
-      const menuSwipe = side === "counter" && storeMenuUsable(r);
-      el?.classList.toggle("swipe-menu-open", menuSwipe && !r.menu);
-      el?.classList.toggle("swipe-menu-close", menuSwipe && !!r.menu);
-      el?.classList.toggle("swipe-resume", staffCounter && !r.menu && r.held);
       el?.classList.toggle("mode-self", r.mode === "self_operated");
       el?.classList.toggle("calling", side === "counter" && r.lamp);
       el?.classList.toggle("head-blink", r.lamp || r.emergency);
@@ -611,7 +605,7 @@ function render(): void {
   setRegion("owner-auth", ownerAuth ? "" : ownerAuthForm());
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("rules-pad", rulesPadPopup(snap));
-  app.querySelectorAll<HTMLElement>(".screen-main").forEach(paginate);
+  app.querySelectorAll<HTMLElement>(".screen-main").forEach((m) => paginate(m));
 }
 
 
@@ -1349,8 +1343,16 @@ function cashDrop(register: number, d: number): Command {
   return d === 2000 ? { type: "insert_cash", register, denomination: d, count: 1 } : { type: "insert", register, amount: d };
 }
 
-/// 仕様 15.9：モバイルのレジカウンター側・売り場側の切り替えはタブだけ（横スワイプは登録画面の保留と競合するので使わない）
+/// 仕様 15.9：モバイルのレジカウンター側・売り場側は横スワイプかタブで切り替える（保留をボタンにしたので横スワイプを戻した、user 2026-11-20）
 function swipeTo(reg: number, side: Side): void {
+  const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
+  if (!el) return;
+  markShown(reg, side);
+  if (el.scrollWidth > el.clientWidth) el.scrollTo({ left: side === "floor" ? el.scrollWidth : 0, behavior: "smooth" });
+}
+
+/** 表にしている面をタブと入出金・決済端末の出し分けに写す */
+function markShown(reg: number, side: Side): void {
   const el = app.querySelector<HTMLElement>(`[data-swipe="${reg}"]`);
   if (!el) return;
   el.dataset.shown = side;
@@ -1384,7 +1386,6 @@ function cancelLongPress(): void {
   longPress = null;
 }
 
-const MENU_SWIPE_PX = 40;
 function wireForceRegister(): void {
   let hold: { timer: number; x: number; y: number; id: number } | null = null;
   const cancel = () => {
@@ -1412,183 +1413,111 @@ function wireForceRegister(): void {
   });
 }
 
-function wireMenuSwipe(): void {
-  let start: { reg: number; x: number; y: number; id: number } | null = null;
-  app.addEventListener("pointerdown", (e) => {
-    const head = (e.target as Element).closest<HTMLElement>(".counter-screen .screen-head");
-    if (!head || e.button !== 0 || (e.target as Element).closest("[data-hold]")) return;
-    const reg = Number(head.dataset.region!.split("-")[1]);
-    start = { reg, x: e.clientX, y: e.clientY, id: e.pointerId };
-  });
-  const end = (e: PointerEvent) => {
-    if (!start || e.pointerId !== start.id) return;
-    const { reg, x, y } = start;
-    start = null;
-    const dx = e.clientX - x;
-    const dy = e.clientY - y;
-    if (Math.abs(dx) < MENU_SWIPE_PX || Math.abs(dy) > Math.abs(dx) / 2) return;
-    const r = snap.registers.find((v) => v.id === reg);
-    if (!r || !storeMenuUsable(r)) return;
-    if (dx > 0 && !r.menu) send({ type: "open_menu", register: reg, screen: "top" });
-    if (dx < 0 && r.menu) send({ type: "open_menu", register: reg, screen: null });
-  };
-  window.addEventListener("pointerup", end);
-  window.addEventListener("pointercancel", () => (start = null));
-}
-
-/** 保留：スタッフ操作モードのレジカウンター側の登録画面を左へスワイプすると取引を保留し、右から第二待ち受けが出る。
- *  割り込みの取引を始める前の第二待ち受けを右へスワイプすると、保留した取引に戻る。スワイプできることを示す手がかりは置かない。
- *  ヘッダーのスワイプ（店舗メニュー）とは場所で分ける：保留は画面の本体（.screen-body）だけ */
-function wireHoldSwipe(): void {
-  let start: { reg: number; x: number; y: number; id: number } | null = null;
-  app.addEventListener("pointerdown", (e) => {
-    const t = e.target as Element;
-    const body = t.closest<HTMLElement>(".counter-screen.hold-swipe .screen-body");
-    if (!body || e.button !== 0 || t.closest("input, select, textarea, [data-hold], [data-ffforce]")) return;
-    const reg = Number(body.closest<HTMLElement>("[data-screen]")!.dataset.screen!.split(":")[0]);
-    start = { reg, x: e.clientX, y: e.clientY, id: e.pointerId };
-  });
-  window.addEventListener("pointerup", (e) => {
-    if (!start || e.pointerId !== start.id) return;
-    const { reg, x, y } = start;
-    start = null;
-    const dx = e.clientX - x;
-    const dy = e.clientY - y;
-    if (Math.abs(dx) < MENU_SWIPE_PX || Math.abs(dy) > Math.abs(dx) / 2) return;
-    const r = snap.registers.find((v) => v.id === reg);
-    if (!r || r.mode !== "staff_operated" || r.menu) return;
-    swallowClick = true;
-    if (dx < 0 && r.counter.lines.length > 0) send({ type: "hold_transaction", register: reg });
-    else if (dx > 0 && r.held) send({ type: "resume_held", register: reg });
-  });
-  window.addEventListener("pointercancel", () => (start = null));
-}
-
-/** 明細のページ送り（user 2026-11-20）：縦スワイプ一回で一ページ。スクロールはしない。
- *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）は常に出し、その下に入りきる行だけを並べる。
- *  見切れる行は出さず次のページの一行目にし、ページの下に「Page:1/3 縦スワイプで続きを表示」を出す（最後のページはページ数だけ、user 2026-11-20）。
- *  明細の数が変わったら（新しい明細は一番上に来るので）一ページ目に戻す。
+/** 明細のページ（user 2026-11-20）：明細はスクロールバーで送り、ページの考え方は残す。
+ *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）はスクロールせず、明細の行だけが .lines-scroll の中でスクロールする。
+ *  見えている高さに入りきる行を一ページとし、各ページの一行目にスクロールが吸い付く（scroll-snap）。最後のページの一行目まで上げられるよう下に余白を足す。
+ *  複数ページのときは下に「Page:1/3 スクロールで続きを表示」（最後のページはページ数だけ）。明細の数が変わったら一ページ目に戻す。
  *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため */
-const mainPage = new Map<string, { page: number; count: number; pages: number }>();
+const mainPage = new Map<string, { page: number; count: number; starts: number[] }>();
 const pageKey = (main: HTMLElement): string => main.dataset.region ?? "";
 
-function paginate(main: HTMLElement): void {
-  const table = main.querySelector<HTMLElement>(":scope > table.lines.cols3");
+/** force＝描き直していなくても割り付け直す（画面の大きさが変わったとき） */
+function paginate(main: HTMLElement, force = false): void {
+  const table = main.querySelector<HTMLElement>(":scope > table.lines.cols3, :scope > .lines-scroll > table.lines.cols3");
+  if (!table) return;
+  let box = table.parentElement as HTMLElement;
+  // 中身を描き直していなければ、スクロールの位置もページもそのまま
+  if (box.classList.contains("lines-scroll") && !force) return;
   main.querySelector(":scope > .page-more")?.remove();
-  if (!table) {
-    main.classList.remove("more-below");
-    return;
+  if (!box.classList.contains("lines-scroll")) {
+    box = document.createElement("div");
+    box.className = "lines-scroll";
+    table.replaceWith(box);
+    box.append(table);
   }
-  const rows = [...table.querySelectorAll<HTMLElement>("tbody > tr")].filter((r) => !r.querySelector("td.empty"));
-  rows.forEach((r) => (r.hidden = false));
+  const rows = [...table.querySelectorAll<HTMLElement>("tbody > tr")].filter((r) => !r.querySelector("td.empty") && !r.classList.contains("page-pad"));
+  table.querySelector("tbody > tr.page-pad")?.remove();
+  rows.forEach((r) => r.classList.remove("page-start"));
   const st = mainPage.get(pageKey(main));
-  const state = st && st.count === rows.length ? st : { page: 0, count: rows.length, pages: 1 };
+  const state = st && st.count === rows.length ? st : { page: 0, count: rows.length, starts: [0] };
   mainPage.set(pageKey(main), state);
-  if (!rows.length) {
-    main.classList.remove("more-below");
-    return;
-  }
+  if (!rows.length) return;
   const [side, reg] = pageKey(main).split("-");
   const lang = langOf(Number(reg), side as Side);
-  const box = main.getBoundingClientRect();
-  const pad = parseFloat(getComputedStyle(main).paddingBottom) || 0;
-  const tbody = rows[0].parentElement!;
-  const bottom = box.bottom - pad;
-  // 複数ページのときは、どのページの下にも「Page:1/4 縦スワイプで続きを表示」の行を置く（最後のページはページ数だけ）。その行の分を引いて割り付ける
+  // ページの下の行を先に置き、その分を引いた高さで割り付ける
   const more = document.createElement("p");
   more.className = "page-more";
   more.innerHTML = `<span class="page-no">Page:1/1</span><span class="page-hint"></span>`;
   main.append(more);
-  const moreH = more.getBoundingClientRect().height;
-  const top = tbody.getBoundingClientRect().top;
+  const head = table.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+  // 見出しは上に貼り付けたまま（sticky）なので、吸い付く位置は見出しの下
+  box.style.scrollPaddingTop = `${head}px`;
+  const view = box.clientHeight - head;
   const heights = rows.map((r) => r.getBoundingClientRect().height);
-  const fits = heights.reduce((t, h) => t + h, 0) <= bottom - top + 0.5;
   const starts: number[] = [0];
-  if (!fits) {
+  if (heights.reduce((t, h) => t + h, 0) > view + 0.5) {
     let used = 0;
     for (let i = 0; i < rows.length; i++) {
-      if (used > 0 && used + heights[i] > bottom - top - moreH + 0.5) {
+      if (used > 0 && used + heights[i] > view + 0.5) {
         starts.push(i);
         used = 0;
       }
       used += heights[i];
     }
   }
-  state.pages = starts.length;
-  state.page = Math.min(state.page, state.pages - 1);
-  const from = starts[state.page];
-  const to = starts[state.page + 1] ?? rows.length;
-  rows.forEach((r, i) => (r.hidden = i < from || i >= to));
-  const last = state.page === state.pages - 1;
-  main.classList.toggle("more-below", !last);
-  if (state.pages === 1) {
+  state.starts = starts;
+  state.page = Math.min(state.page, starts.length - 1);
+  if (starts.length === 1) {
     more.remove();
+    box.scrollTop = 0;
     return;
   }
-  const no = more.querySelector<HTMLElement>(".page-no")!;
-  no.textContent = `Page:${state.page + 1}/${state.pages}`;
-  no.setAttribute("aria-label", `${state.pages}ページ中${state.page + 1}ページ目`);
-  const hint = more.querySelector<HTMLElement>(".page-hint")!;
-  if (last) hint.remove();
-  else hint.textContent = lang === "en" ? trText("縦スワイプで続きを表示") : "縦スワイプで続きを表示";
+  starts.forEach((i) => rows[i].classList.add("page-start"));
+  // 最後のページの一行目を一番上まで上げられるように、残りの高さを埋める
+  const lastH = heights.slice(starts[starts.length - 1]).reduce((t, h) => t + h, 0);
+  const pad = document.createElement("tr");
+  pad.className = "page-pad";
+  pad.setAttribute("aria-hidden", "true");
+  pad.innerHTML = `<td colspan="3" style="height:${Math.max(0, view - lastH)}px"></td>`;
+  rows[rows.length - 1].after(pad);
+  box.scrollTop = pageTop(box, rows, state.starts[state.page], head);
+  showPage(main, lang);
 }
 
-function turnPage(main: HTMLElement, dir: 1 | -1): void {
+const pageTop = (box: HTMLElement, rows: HTMLElement[], i: number, head: number): number =>
+  rows[i].getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - head;
+
+/** スクロールした位置から今のページを決め、「Page:2/3」を書き換える */
+function showPage(main: HTMLElement, lang = langOf(Number(pageKey(main).split("-")[1]), pageKey(main).split("-")[0] as Side)): void {
   const st = mainPage.get(pageKey(main));
-  if (main.querySelector(":scope > table.lines.cols3") && st) {
-    const next = st.page + dir;
-    if (next < 0 || next >= st.pages) return;
-    st.page = next;
-    paginate(main);
-    return;
-  }
-  // 明細の表のない画面（照合の一覧など）は、見えている高さずつ送る
-  main.scrollTop = Math.max(0, main.scrollTop + dir * main.clientHeight * 0.9);
+  const box = main.querySelector<HTMLElement>(":scope > .lines-scroll");
+  const more = main.querySelector<HTMLElement>(":scope > .page-more");
+  if (!st || !box || !more) return;
+  const rows = [...box.querySelectorAll<HTMLElement>("tbody > tr")].filter((r) => !r.querySelector("td.empty") && !r.classList.contains("page-pad"));
+  const head = box.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+  let page = 0;
+  st.starts.forEach((i, p) => {
+    if (rows[i] && pageTop(box, rows, i, head) <= box.scrollTop + 1) page = p;
+  });
+  st.page = page;
+  const last = page === st.starts.length - 1;
+  const no = more.querySelector<HTMLElement>(".page-no")!;
+  no.textContent = `Page:${page + 1}/${st.starts.length}`;
+  no.setAttribute("aria-label", `${st.starts.length}ページ中${page + 1}ページ目`);
+  const hint = more.querySelector<HTMLElement>(".page-hint")!;
+  hint.textContent = last ? "" : lang === "en" ? trText("スクロールで続きを表示") : "スクロールで続きを表示";
+  hint.hidden = last;
 }
 
-/** 明細は縦スワイプだけで送る（スクロールバーは出さない、CSS）。タッチもマウスも縦に MAIN_SWIPE_PX 以上動かして離すと一ページ。
- *  上へのスワイプ＝次のページ、下へ＝前のページ。横のスワイプは保留に残す。
- *  ホイール・トラックパッドは一続きの回転を一ページとして扱う（WHEEL_QUIET_MS のあいだ止まるまで次を受け付けない） */
-const MAIN_SWIPE_PX = 30;
-const WHEEL_QUIET_MS = 250;
 function wireMainScroll(): void {
-  window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach(paginate));
-  let start: { main: HTMLElement; x: number; y: number; id: number } | null = null;
-  app.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0) return;
-    const t = e.target as Element;
-    const main = t.closest<HTMLElement>(".screen-main");
-    if (!main || t.closest("input, select, textarea, [data-code], [data-wallet]")) return;
-    start = { main, x: e.clientX, y: e.clientY, id: e.pointerId };
-  });
-  const end = (e: PointerEvent): void => {
-    if (!start || e.pointerId !== start.id) return;
-    const { main, x, y } = start;
-    start = null;
-    const dx = e.clientX - x;
-    const dy = e.clientY - y;
-    if (Math.abs(dy) < MAIN_SWIPE_PX || Math.abs(dx) > Math.abs(dy)) return;
-    swallowClick = true;
-    turnPage(main, dy < 0 ? 1 : -1);
-  };
-  window.addEventListener("pointerup", end);
-  window.addEventListener("pointercancel", () => (start = null));
-  app.addEventListener("dragstart", (e) => {
-    if ((e.target as Element).closest?.(".screen-main")) e.preventDefault();
-  });
-  let wheelAt = 0;
+  window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach((m) => paginate(m, true)));
   app.addEventListener(
-    "wheel",
+    "scroll",
     (e) => {
-      const main = (e.target as Element).closest<HTMLElement>(".screen-main");
-      if (!main || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-      e.preventDefault();
-      const now = Date.now();
-      const quiet = now - wheelAt > WHEEL_QUIET_MS;
-      wheelAt = now;
-      if (quiet && e.deltaY !== 0) turnPage(main, e.deltaY > 0 ? 1 : -1);
+      const t = e.target;
+      if (t instanceof HTMLElement && t.classList.contains("lines-scroll")) showPage(t.parentElement as HTMLElement);
     },
-    { passive: false },
+    true,
   );
 }
 
@@ -1609,6 +1538,17 @@ function slideOnHold(r: RegisterView): void {
 }
 
 function wireSwipe(): void {
+  app.querySelectorAll<HTMLElement>("[data-swipe]").forEach((el) => {
+    el.addEventListener(
+      "scroll",
+      () => {
+        if (el.scrollWidth <= el.clientWidth) return;
+        const side: Side = el.scrollLeft > (el.scrollWidth - el.clientWidth) / 2 ? "floor" : "counter";
+        if (el.dataset.shown !== side) markShown(Number(el.dataset.swipe), side);
+      },
+      { passive: true },
+    );
+  });
   app.addEventListener("click", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-swipe-to]");
     if (!b) return;

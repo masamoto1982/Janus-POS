@@ -435,9 +435,9 @@ pub enum Command {
     EndEmergency { register: u8 },
     /// 取引を中止する
     VoidTransaction { register: u8 },
-    /// 商品登録中の取引を保留して、次の取引を受け付ける（スタッフ操作モードのレジカウンター側、登録画面の左スワイプ）
+    /// 商品登録中の取引を保留して、次の取引を受け付ける（スタッフ操作モードのレジカウンター側、登録画面の「保留」）
     HoldTransaction { register: u8 },
-    /// 割り込みの取引を始める前に、保留した取引に戻る（第二待ち受けの右スワイプ）
+    /// 割り込みの取引を始める前に、保留した取引に戻る（第二待ち受けの「保留に戻る」）
     ResumeHeld { register: u8 },
     /// ログアウトしてセルフ操作モードに戻る
     EndStaffMode { register: u8 },

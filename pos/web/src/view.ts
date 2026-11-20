@@ -1108,6 +1108,7 @@ function staffOperatedWelcome(r: RegisterView, side: Side): string {
   return `${welcomeBand(r, side, find(r.counter.actions, "emoney"), ro)}<div class="welcome staff-operated-welcome">${msg(head, sub)}
       <div class="guide-row" data-law>${guides}</div>
       ${guide && !ro ? `<p class="guide">${guide[2]}</p>` : ""}
+      ${welcomeFoot(r, side)}
     </div>`;
 }
 
@@ -1227,7 +1228,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   stampVerifying.delete(`${reg}:${side}`);
   return `${top}
     <div class="staff-head">
-      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
+      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}${holdBtn(r, side)}</span>
       ${taxNote(v)}
     </div>
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th>${qtyHead(v.lines)}</th><th class="num">小計</th></tr></thead>
@@ -1506,6 +1507,20 @@ function bellBtn(r: RegisterView, side: Side): string {
   return bell;
 }
 
+/** スタッフ操作モードのレジカウンター側の操作（user 2026-11-20：スワイプをやめ、とりあえずボタンを置く）。
+ *  待ち受けの左下＝保留した取引に戻る（割り込む前だけ）、右下＝店舗メニュー（開けるときだけ。閉じるのはメニューのバック）。
+ *  登録画面のスタッフ名の右＝保留（保留できない取引で押すと理由を出す） */
+const staffBtn = (label: string, cmd: Command) => `<button type="button" class="staff-btn neg" data-cmd="${esc(JSON.stringify(cmd))}">${label}</button>`;
+const staffCounter = (r: RegisterView, side: Side): boolean => side === "counter" && r.mode === "staff_operated" && !r.paused && !r.emergency && !r.menu;
+function welcomeFoot(r: RegisterView, side: Side): string {
+  if (!staffCounter(r, side)) return "";
+  const back = r.held && !inTransaction(r) ? staffBtn("保留に戻る", { type: "resume_held", register: r.id }) : "";
+  const menu = storeMenuUsable(r) ? staffBtn("店舗メニュー", { type: "open_menu", register: r.id, screen: "top" }) : "";
+  return back || menu ? `<div class="welcome-foot"><span>${back}</span><span>${menu}</span></div>` : "";
+}
+const holdBtn = (r: RegisterView, side: Side): string =>
+  staffCounter(r, side) && !r.held && r.counter.lines.length > 0 ? staffBtn("保留", { type: "hold_transaction", register: r.id }) : "";
+
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bell = bellBtn(r, side);
   const mode = r.emergency ? `<span class="mode-title emergency">非常事態モード</span>` : r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
@@ -1513,7 +1528,7 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   // 待ち時間をお客様に見せないため売り場側には出さない
   // 日時は時刻だけ（user 2026-11-21：シミュレーターはデスクトップ・モバイルとも省略する。実機では年月日・曜日も出すのが望ましい）
   const idle = side === "counter" ? idleLeft(r) : "";
-  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r">${idle}<time class="clock" title="${esc(dateText(now))}">${timeText(now)}</time></span>`;
+  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><span class="head-time">${idle}<time class="clock" title="${esc(dateText(now))}">${timeText(now)}</time></span></span>`;
 }
 
 /** 無操作で取引を中止する（またはセルフ操作モードに戻る）までの残り時間 */
@@ -1721,14 +1736,15 @@ export function storeMenu(r: RegisterView): string {
   const screen = (body: string) => `<div class="menu-screen"><div class="menu-body">${body}</div>${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
+      return `<div class="menu-screen"><div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
         <div class="menu-list" data-law>${MENU_ITEMS
           .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>
         <div class="menu-list" data-law>
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
           ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
-        </div>`;
+        </div>
+        ${backFootRow(go(null))}</div>`;
     case "journal":
     case "waste":
     case "ff_fresh":

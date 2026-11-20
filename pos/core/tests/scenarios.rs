@@ -5592,6 +5592,19 @@ fn held_transaction_comes_back_after_the_interrupting_one() {
     assert!(reg(&s, 1).held, "戻った取引は再び保留できる");
 }
 
+/// 仕様 5.7：保留した取引があるあいだは取引中なので、第二待ち受けからも店舗メニューを開けない
+#[test]
+fn store_menu_stays_closed_while_a_transaction_is_held() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    hold(&mut s, 1).unwrap();
+    assert!(reg(&s, 1).counter.lines.is_empty());
+    let err = run(&mut s, json!({"type":"open_menu","register":1,"screen":"top"})).unwrap_err();
+    assert!(err.contains("取引中"), "{err}");
+    assert!(reg(&s, 1).menu.is_none());
+}
+
 /// 仕様 5.7：割り込みの後始末の途中で次の商品を読むと、保留した取引に戻してから登録する
 #[test]
 fn scanning_during_the_interrupt_aftercare_goes_to_the_held_transaction() {

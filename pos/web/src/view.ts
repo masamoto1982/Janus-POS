@@ -1719,7 +1719,8 @@ const MENU_LABEL: Record<MenuScreen, string> = {
 const MENU_ITEMS: MenuScreen[] = ["refund", "emergency", "deposit", "expense", "changer", "journal", "waste", "ff_fresh"];
 
 export function storeMenuUsable(r: RegisterView): boolean {
-  return r.mode === "staff_operated" && r.counter.state === "ready" && !r.paused && (r.menu !== null || !inTransaction(r));
+  // 保留した取引があるあいだも取引中（user 2026-11-21：保留中にヘッダー中央で店舗メニューと呼び鈴が並んだ）
+  return r.mode === "staff_operated" && r.counter.state === "ready" && !r.paused && (r.menu !== null || (!inTransaction(r) && !r.held));
 }
 
 /** 取引中（明細・クーポンがある、または電子マネーの手続き中）は店舗メニューを開けない */

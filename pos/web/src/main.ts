@@ -474,6 +474,7 @@ function render(): void {
       el?.classList.toggle("swipe-menu-open", menuSwipe && !r.menu);
       el?.classList.toggle("swipe-menu-close", menuSwipe && !!r.menu);
       el?.classList.toggle("swipe-resume", staffCounter && !r.menu && r.held);
+      if (el instanceof HTMLElement) setSwipeDots(el);
       el?.classList.toggle("mode-self", r.mode === "self_operated");
       el?.classList.toggle("calling", side === "counter" && r.lamp);
       el?.classList.toggle("head-blink", r.lamp || r.emergency);
@@ -1455,3 +1456,37 @@ function wireSwipe(): void {
 boot().catch((e) => {
   app.innerHTML = `<p class="error">読み込みに失敗しました：${esc(e)}</p>`;
 });
+
+// スワイプの縁は単純なグラデーションではなく、縁に近いほど大きく濃いドット模様（網点）で示す（user 2026-11-20）。
+// 網点の色は操作の青（--operable-blue＝oklch(0.44 0.13 262.2) を sRGB にしたもの。SVG の中では oklch を使わない）。
+// 網点の大きさは画面の内幅で決まるので、幅が変わったときだけ SVG を作り直して CSS 変数に渡す
+const swipeDotsCache = new WeakMap<HTMLElement, number>();
+function setSwipeDots(el: HTMLElement): void {
+  const w = Math.round(el.clientWidth);
+  if (!w || swipeDotsCache.get(el) === w) return;
+  swipeDotsCache.set(el, w);
+  el.style.setProperty("--swipe-dots-l", `url("${swipeDotsSvg(w, false)}")`);
+  el.style.setProperty("--swipe-dots-r", `url("${swipeDotsSvg(w, true)}")`);
+}
+function swipeDotsSvg(w: number, flip: boolean): string {
+  const pitch = Math.max(4, w / 56); // 網点の間隔
+  const dx = pitch * 0.866; // 六方の並び
+  // 網点が覆う割合：縁で 6 割、離れるにつれて二乗で減り、引き潮で横幅の 1/3・満ち潮で 1/2 の位置で消える
+  const cover = (x: number, reach: number) => 0.6 * Math.max(0, 1 - x / reach) ** 2;
+  const radius = (x: number, reach: number) => Math.sqrt((cover(x, reach) * pitch * dx) / Math.PI);
+  const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const defs: string[] = [];
+  const rects: string[] = [];
+  for (let i = 0; i * dx < w; i++) {
+    const x = i * dx + dx / 2;
+    const lo = radius(x, w / 3), hi = radius(x, w / 2);
+    if (hi < 0.3) break;
+    const cx = flip ? w - x : x;
+    const y0 = i % 2 ? pitch / 2 : 0;
+    const anim = still ? "" : `<animate attributeName="r" values="${lo.toFixed(2)};${hi.toFixed(2)};${lo.toFixed(2)}" dur="2.4s" repeatCount="indefinite" calcMode="spline" keySplines="0.42 0 0.58 1;0.42 0 0.58 1"/>`;
+    defs.push(`<pattern id="c${i}" width="${w}" height="${pitch.toFixed(2)}" y="${y0.toFixed(2)}" patternUnits="userSpaceOnUse"><circle cx="${cx.toFixed(2)}" cy="${(pitch / 2).toFixed(2)}" r="${(still ? hi : lo).toFixed(2)}">${anim}</circle></pattern>`);
+    rects.push(`<rect width="100%" height="100%" fill="url(#c${i})"/>`);
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}"><defs fill="#284e99">${defs.join("")}</defs>${rects.join("")}</svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg);
+}

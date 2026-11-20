@@ -573,7 +573,7 @@ function render(): void {
   setRegion("rules-pad", rulesPadPopup(snap));
   setRegion("shelf", shelfPanel(snap));
   setRegion("wallet", walletPanel(snap.emoney_balance));
-  app.querySelectorAll<HTMLElement>(".screen-main").forEach(markMoreBelow);
+  app.querySelectorAll<HTMLElement>(".screen-main").forEach(paginate);
 }
 
 
@@ -1456,58 +1456,86 @@ function wireHoldSwipe(): void {
   window.addEventListener("pointercancel", () => (start = null));
 }
 
-/** 明細のページ送り（user 2026-11-20）：縦スワイプ一回で一ページ。次のページは、いまのページで見切れた行（全部は見えていない最初の行）から始まる。
- *  前のページは、いまのページの一行目の直前で終わる。ページの境目は明細の行で決まり、行が途中で切れたまま次のページに重ならない。
- *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため。
- *  合計の帯（.reg-top）は上に貼り付いているので、見えている範囲は帯の下端から画面の下端まで */
-type Page = { top: number; bottom: number; rows: HTMLElement[] };
-function pageOf(main: HTMLElement): Page {
-  const box = main.getBoundingClientRect();
-  const band = main.querySelector<HTMLElement>(":scope > .reg-top");
-  const top = band ? band.getBoundingClientRect().bottom : box.top;
-  const rows = [...main.querySelectorAll<HTMLElement>(".lines tr:not(:has(th))")];
-  return { top, bottom: box.bottom, rows };
-}
+/** 明細のページ送り（user 2026-11-20）：縦スワイプ一回で一ページ。スクロールはしない。
+ *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）は常に出し、その下に入りきる行だけを並べる。
+ *  見切れる行は出さず次のページの一行目にし、続きがあるページの下には「続きは次のページにあります」を出す。右上にページ数「1/3」。
+ *  明細の数が変わったら（新しい明細は一番上に来るので）一ページ目に戻す。
+ *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため */
+const mainPage = new Map<string, { page: number; count: number; pages: number }>();
+const pageKey = (main: HTMLElement): string => main.dataset.region ?? "";
 
-/** 最後のページでも一行目が帯の直下に来るよう、明細の下に足す余白（--page-pad）。画面の中身を描き直しても .screen-main は残るので消えない */
-function scrollMainBy(main: HTMLElement, delta: number): void {
-  const want = main.scrollTop + delta;
-  const max = main.scrollHeight - main.clientHeight;
-  const pad = parseFloat(main.style.getPropertyValue("--page-pad")) || 0;
-  if (want > max) main.style.setProperty("--page-pad", `${pad + want - max}px`);
-  else if (want <= 0) main.style.removeProperty("--page-pad");
-  main.scrollTop = Math.max(0, want);
-  markMoreBelow(main);
+function paginate(main: HTMLElement): void {
+  const table = main.querySelector<HTMLElement>(":scope > table.lines.cols3");
+  main.querySelector(":scope > .page-more")?.remove();
+  main.querySelector(".page-no")?.remove();
+  if (!table) {
+    main.classList.remove("more-below");
+    return;
+  }
+  const rows = [...table.querySelectorAll<HTMLElement>("tbody > tr")].filter((r) => !r.querySelector("td.empty"));
+  rows.forEach((r) => (r.hidden = false));
+  const st = mainPage.get(pageKey(main));
+  const state = st && st.count === rows.length ? st : { page: 0, count: rows.length, pages: 1 };
+  mainPage.set(pageKey(main), state);
+  if (!rows.length) {
+    main.classList.remove("more-below");
+    return;
+  }
+  const box = main.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(main).paddingBottom) || 0;
+  const tbody = rows[0].parentElement!;
+  const bottom = box.bottom - pad;
+  const more = document.createElement("p");
+  more.className = "page-more";
+  more.innerHTML = `続きは次のページにあります<small>上へスワイプ</small>`;
+  main.append(more);
+  const moreH = more.getBoundingClientRect().height;
+  const top = tbody.getBoundingClientRect().top;
+  const heights = rows.map((r) => r.getBoundingClientRect().height);
+  const fits = heights.reduce((t, h) => t + h, 0) <= bottom - top + 0.5;
+  // ページの切れ目：続きがあるページは案内の分だけ低い。最後のページは案内がない
+  const starts: number[] = [0];
+  if (!fits) {
+    let used = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const rest = heights.slice(i).reduce((t, h) => t + h, 0);
+      const room = bottom - top - (used + rest <= bottom - top + 0.5 ? 0 : moreH);
+      if (used > 0 && used + heights[i] > room + 0.5) {
+        starts.push(i);
+        used = 0;
+      }
+      used += heights[i];
+    }
+  }
+  state.pages = starts.length;
+  state.page = Math.min(state.page, state.pages - 1);
+  const from = starts[state.page];
+  const to = starts[state.page + 1] ?? rows.length;
+  rows.forEach((r, i) => (r.hidden = i < from || i >= to));
+  const last = state.page === state.pages - 1;
+  if (last) more.remove();
+  main.classList.toggle("more-below", !last);
+  const head = main.querySelector<HTMLElement>(":scope > .staff-head");
+  if (head) {
+    const no = document.createElement("span");
+    no.className = "page-no";
+    no.textContent = `${state.page + 1}/${state.pages}`;
+    no.setAttribute("aria-label", `${state.pages}ページ中${state.page + 1}ページ目`);
+    head.append(no);
+  }
 }
 
 function turnPage(main: HTMLElement, dir: 1 | -1): void {
-  const { top, bottom, rows } = pageOf(main);
-  const view = bottom - top;
-  if (!rows.length) {
-    scrollMainBy(main, dir * view);
+  const st = mainPage.get(pageKey(main));
+  if (main.querySelector(":scope > table.lines.cols3") && st) {
+    const next = st.page + dir;
+    if (next < 0 || next >= st.pages) return;
+    st.page = next;
+    paginate(main);
     return;
   }
-  if (dir === 1) {
-    const cut = rows.find((r) => r.getBoundingClientRect().bottom > bottom + 0.5);
-    if (cut) scrollMainBy(main, cut.getBoundingClientRect().top - top);
-    return;
-  }
-  if (main.scrollTop <= 0) return;
-  const first = rows.find((r) => r.getBoundingClientRect().top >= top - 0.5) ?? rows[rows.length - 1];
-  const from = first.getBoundingClientRect().top - view;
-  const head = rows.find((r) => r.getBoundingClientRect().top >= from - 0.5)!;
-  if (head === rows[0]) scrollMainBy(main, -main.scrollTop);
-  else scrollMainBy(main, head.getBoundingClientRect().top - top);
-}
-
-/** 下のページにまだ明細が残っているか。残っているあいだだけ下の縁に白のグラデーションを出す */
-function markMoreBelow(main: HTMLElement): void {
-  if (main.scrollTop <= 0) main.style.removeProperty("--page-pad");
-  const { bottom, rows } = pageOf(main);
-  const more = rows.length
-    ? rows.some((r) => r.getBoundingClientRect().bottom > bottom + 0.5)
-    : main.scrollHeight - main.scrollTop - main.clientHeight > 1;
-  main.classList.toggle("more-below", more);
+  // 明細の表のない画面（照合の一覧など）は、見えている高さずつ送る
+  main.scrollTop = Math.max(0, main.scrollTop + dir * main.clientHeight * 0.9);
 }
 
 /** 明細は縦スワイプだけで送る（スクロールバーは出さない、CSS）。タッチもマウスも縦に MAIN_SWIPE_PX 以上動かして離すと一ページ。
@@ -1516,7 +1544,7 @@ function markMoreBelow(main: HTMLElement): void {
 const MAIN_SWIPE_PX = 30;
 const WHEEL_QUIET_MS = 250;
 function wireMainScroll(): void {
-  window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach(markMoreBelow));
+  window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach(paginate));
   let start: { main: HTMLElement; x: number; y: number; id: number } | null = null;
   app.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;

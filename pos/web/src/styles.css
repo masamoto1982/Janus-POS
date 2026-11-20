@@ -132,10 +132,12 @@ button { touch-action: manipulation; }
 @keyframes slide-from-right { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes slide-from-left { from { transform: translateX(-100%); } to { transform: none; } }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: hidden; padding: var(--s11, 8px) var(--s10, 12px); touch-action: none; overscroll-behavior: contain; scrollbar-width: none; }
-/* 明細は縦スワイプのページ送りだけ（user 2026-11-20）：スクロールバーは出さず、指やホイールで連続しては動かない。送るのは main.ts turnPage。
-   最後のページでも一行目が帯の直下に来るよう、明細の下に余白（--page-pad）を足す */
-.screen-main::after { content: ""; display: block; height: var(--page-pad, 0px); }
-.screen-main:has(> .confirm, > .welcome-band)::after { display: none; }
+/* 明細は縦スワイプのページ送りだけ（user 2026-11-20）：スクロールせず、入りきる行だけを並べる（main.ts paginate・turnPage）。
+   内税の行と見出しは常に出し、右上にページ数「1/3」、続きがあるページの下に「続きは次のページにあります」 */
+.screen-main .lines tr[hidden] { display: none; }
+.staff-head .page-no { flex: none; font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--ink); }
+.screen-main > .page-more { margin: 0; display: flex; justify-content: center; align-items: baseline; gap: var(--s11, 8px); font-size: var(--text-sm); color: var(--msg-strong); line-height: 1.6; }
+.screen-main > .page-more small { font-size: var(--text-sm); color: var(--msg-weak); }
 .screen-main::-webkit-scrollbar { display: none; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }

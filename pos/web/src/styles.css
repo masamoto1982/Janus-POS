@@ -997,3 +997,10 @@ body.dragging .drop-hint { display: inline; }
   border-width: var(--frame-w); border-radius: calc(400px / 45.255);
 }
 .icon-btn { width: var(--chrome-b); height: var(--chrome-b); font-size: calc(var(--chrome-b) / 2); font-weight: 400; border-width: var(--frame-w); }
+
+/* Item・Wallet の品物（user 2026-11-20 に確認中、Claude の推奨案）：大きさは今のまま（高さ 64・幅 116、硬貨は 48 の円）。
+   消極ボタンなので背景なし（Wallet の種類は行で分かれている）。余白は高さの 1/8。
+   名前を大にすると幅 116 に収まらず省略・折り返しが出たので、名前・添え字とも小のまま */
+.item:not(.off, .call-blink) { background: transparent; }
+.items.uniform .item, .wallet-cards .item, .item.bill { padding: calc(var(--btn-xl-h) / 8); }
+.wallet-cards .item, .item.bill { padding: calc(var(--btn-h) / 8); }

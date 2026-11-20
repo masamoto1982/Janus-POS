@@ -1552,7 +1552,44 @@ function placeBar(main: HTMLElement, box: HTMLElement, head: number): void {
   thumb.style.top = `${max > 0 ? (trackH - h) * (box.scrollTop / max) : 0}px`;
 }
 
+/** モバイル：明細が端まで来たあとの縦スワイプはページへ引き継ぐ（user 2026-11-20：画面の殆どがレジ画面なので、
+ *  止まると 2 台目のレジを見る術がない）。Chromium は明細の表の上で始めた縦スワイプを端の明細に掴ませたまま
+ *  ページへ渡さないことがあるので、ページが自分で動かないときだけ、指の動いた分だけページを送る */
+function wireLinesChain(): void {
+  let g: { box: HTMLElement; y: number; sy: number; manual: boolean } | null = null;
+  app.addEventListener(
+    "touchstart",
+    (e) => {
+      const box = (e.target as Element).closest<HTMLElement>(".lines-scroll");
+      g = box && e.touches.length === 1 && window.matchMedia(MOBILE_MQ).matches ? { box, y: e.touches[0].clientY, sy: window.scrollY, manual: true } : null;
+    },
+    { passive: true },
+  );
+  app.addEventListener(
+    "touchmove",
+    (e) => {
+      if (!g || e.touches.length !== 1) return;
+      const y = e.touches[0].clientY;
+      const dy = g.y - y;
+      g.y = y;
+      // ページが自分で動いたら（ブラウザが引き継いだら）任せる
+      if (Math.abs(window.scrollY - g.sy) > 0.5) g.manual = false;
+      if (!g.manual || dy === 0) return;
+      const { box } = g;
+      // 上の端は一ページ目の一行目（見出しの下に吸い付く位置なので 0 とは限らない）
+      const row = box.querySelector<HTMLElement>("tbody > tr.page-start");
+      const top = row ? pageTop(box, [row], 0, box.querySelector("thead")?.getBoundingClientRect().height ?? 0) : 0;
+      const atEnd = dy > 0 ? box.scrollTop >= box.scrollHeight - box.clientHeight - 1 : box.scrollTop <= Math.max(0, top) + 1;
+      if (atEnd) window.scrollBy(0, dy);
+      g.sy = window.scrollY;
+    },
+    { passive: true },
+  );
+  for (const ev of ["touchend", "touchcancel"] as const) app.addEventListener(ev, () => (g = null), { passive: true });
+}
+
 function wireMainScroll(): void {
+  wireLinesChain();
   let drag: { box: HTMLElement; bar: HTMLElement; y: number; top: number; id: number } | null = null;
   app.addEventListener("pointerdown", (e) => {
     const bar = (e.target as Element).closest<HTMLElement>(".page-bar");

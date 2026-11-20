@@ -118,7 +118,7 @@ button { touch-action: manipulation; }
 .screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); height: var(--head-h);
   padding: 0 var(--s11, 8px); border-bottom: var(--s17, 1px) solid var(--border); background: var(--head-bg); }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s15, 2px); min-width: 0; }
-.screen-head .head-c { justify-self: center; display: flex; align-items: center; }
+.screen-head .head-c { justify-self: center; display: flex; align-items: center; gap: var(--s11, 8px); }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: var(--s11, 8px); }
 /* 無操作の残り時間（レジカウンター側だけ）。時刻の上に同じ小テキストで、強い色にはしない */
 .screen-head .head-time { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
@@ -1021,7 +1021,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .wallet-cards .item, .item.bill { padding: calc(var(--btn-h) / 8); }
 
 /* スタッフ操作モードのレジカウンター側の操作（user 2026-11-20：スワイプをやめ、とりあえずボタン）。中の高さ・幅は文字なり。
-   待ち受けの左下＝保留に戻る（戻る部品は左）、右下＝店舗メニュー。登録画面のスタッフ名の右＝保留 */
+   ヘッダー中央＝店舗メニュー（取引がないとき）、待ち受けの左下＝保留に戻る（戻る部品は左）、登録画面のスタッフ名の右＝保留 */
 .screen button.staff-btn { width: auto; height: var(--btn-md-h); padding: 0 var(--s11, 8px); font-size: var(--text-sm); white-space: nowrap; }
 .staff-operated-welcome { position: relative; }
 .welcome-foot { position: absolute; left: var(--gap); right: var(--gap); bottom: var(--gap); display: flex; justify-content: space-between; }

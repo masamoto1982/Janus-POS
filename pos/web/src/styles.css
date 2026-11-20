@@ -688,7 +688,7 @@ body.dragging .drop-hint { display: inline; }
 .money-io .outlet.blink b { color: var(--accent); animation: io-blink 1s steps(1) infinite; }
 @media (max-width: 760px) { .money-io { grid-template-columns: 1fr; } .money-io-counter, .money-io-floor { grid-column: 1; } }
 
-/* スタッフ操作モードの売り場側の最下段＝サイネージ（セール情報・詐欺防止の呼びかけ）。押せる部品は置かない */
+/* スタッフ操作モードの売り場側の最下段＝サイネージ（販促の告知・公共性の情報）。押せる部品は置かない */
 .signage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 /* 第一待ち受け：三段目いっぱいに稼働モードを特大の文字で（有人レジ／セルフレジ） */
 .first-welcome { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 0 var(--s9, 16px); text-align: center; }

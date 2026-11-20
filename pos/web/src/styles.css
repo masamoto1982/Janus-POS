@@ -131,7 +131,9 @@ button { touch-action: manipulation; }
 .screen-main.slide-from-left { animation: slide-from-left 0.28s ease-out; }
 @keyframes slide-from-right { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes slide-from-left { from { transform: translateX(-100%); } to { transform: none; } }
-.screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: var(--s11, 8px) var(--s10, 12px); }
+.screen-main { flex: 1 1 0; min-height: 0; overflow: hidden auto; padding: var(--s11, 8px) var(--s10, 12px); touch-action: pan-y; overscroll-behavior: contain; scrollbar-width: none; }
+/* 明細が増えたときのスクロールは縦スワイプだけ（user 2026-11-20）：スクロールバーは出さず、横には動かない。マウスは縦のドラッグ（wireMainDrag） */
+.screen-main::-webkit-scrollbar { display: none; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
 /* FF の段は三つの余白をそろえる（user 2026-11-20）：段の上端〜タブ、タブの線〜単品ボタン、単品ボタン〜段の下端。
@@ -966,11 +968,16 @@ body.dragging .drop-hint { display: inline; }
 /* 縁はスワイプの向きへゆっくり伸びては戻る。濃さが半分になる位置はヘッダーも登録画面も同じく引き潮＝横幅の 1/3・満ち潮＝横幅の 1/2（user 2026-11-20） */
 @property --swipe-reach { syntax: "<number>"; inherits: true; initial-value: 1; }
 @keyframes swipe-reach { 0%, 100% { --swipe-reach: 0.6667; } 50% { --swipe-reach: 1; } }
-.counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: swipe-reach 2.4s ease-in-out infinite; }
 .counter-screen.swipe-menu-open:not(.calling, .sos) .screen-head { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 .counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 .counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
-@media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }
+.counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: swipe-reach 2.4s ease-in-out infinite; }
+/* 登録画面の下にまだ明細が隠れているあいだ（縦にスクロールできて末尾まで来ていないあいだ）は、下の縁に同じ白のグラデーション（user 2026-11-20）。
+   背景に敷くので文字の上には重ならない（ぼかし・文字への被せは可読性が落ちるので使わない）。背景はスクロールせず見えている範囲の下端に留まる。
+   濃さが半分になる位置は横の縁と同じく引き潮＝高さの 1/3・満ち潮＝高さの 1/2 */
+.screen-main.more-below:not(.slide-from-right, .slide-from-left) { animation: swipe-reach 2.4s ease-in-out infinite;
+  background: linear-gradient(to top, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
+@media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume), .screen-main.more-below { animation: none; } }
 
 /* レジ画面の外（シミュレーターまわり）にも、レジ画面の中の色と形を広げる（user 2026-11-20）：
    操作できる部品は操作の青（--operable-blue）。積極＝青の背景・白文字、消極＝青の枠線・青の文字・背景なし、押せない部品はグレー。

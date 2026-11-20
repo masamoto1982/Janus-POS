@@ -965,3 +965,22 @@ body.dragging .drop-hint { display: inline; }
 .counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 .counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 @media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }
+
+/* レジ画面の外（シミュレーターまわり）にも、レジ画面の中の色と形を広げる（user 2026-11-20）：
+   操作できる部品は操作の青（--operable-blue）。積極＝青の背景・白文字、消極＝青の枠線・青の文字・背景なし、押せない部品はグレー。
+   形は四つ（弱い角丸・強い角丸・タブ・円）から選ぶ。セレクタ（プルダウン・チェックボックス）も操作できる部品なので青。
+   周辺機器（入金・出金ボックス、決済端末、スキャナ、Bell の呼び鈴端末）はレジ画面の外でも中でもない機械なので対象外 */
+:is(.top, .bell-area, .register > h2, .right-col, .rules-dlg) { --btn-on: var(--operable-blue); --msg-strong: var(--operable-blue); }
+:is(.top, .bell-area, .register > h2, .right-col, .rules-dlg) :is(select, input[type="checkbox"]) { accent-color: var(--operable-blue); }
+/* テンキーはレジ画面と同じ形（ボタンは青のランプで青にする）。見出しの文字はレジ画面と同じ濃いグレー */
+.rules-dlg .qty-pop { --msg-strong: var(--grey-4); --btn-on: var(--grey-4); }
+/* 歯車は円の消極ボタン */
+.icon-btn { color: var(--operable-blue); border: var(--frame-w) solid var(--operable-blue); background: transparent; }
+.icon-btn:hover { color: var(--operable-blue); }
+/* Item・Wallet の品物は消極ボタン（弱い角丸、硬貨は円）：青の枠線・青の名前・背景なし。お金・カードの種類の淡い塗り（濃度1）は残す。
+   スタッフのカードは積極（青の背景・白文字）。押せない品物（スタッフ不在のたばこ など）はグレーのまま */
+.item:not(.off, .call-blink) { border: var(--frame-w) solid var(--operable-blue); border-radius: var(--shape-soft); }
+.item:not(.off, .call-blink, .bill, .coin, .pay, .card, .coupon, .staff) { background: transparent; }
+.item:not(.off, .call-blink, .staff) .item-name { color: var(--operable-blue); }
+.item.coin:not(.off) { border-radius: var(--shape-round); }
+.item.staff:not(.off) { background: var(--operable-blue); color: var(--white); }

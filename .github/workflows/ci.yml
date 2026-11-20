@@ -55,6 +55,10 @@ jobs:
         working-directory: pos
         run: npm install
 
+      - name: THIRD-PARTY-NOTICES.txt matches the dependencies
+        working-directory: pos
+        run: node scripts/third-party-notices.mjs --check
+
       - name: Vitest
         working-directory: pos
         run: npm test

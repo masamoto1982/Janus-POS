@@ -1458,7 +1458,7 @@ function wireHoldSwipe(): void {
 
 /** 明細のページ送り（user 2026-11-20）：縦スワイプ一回で一ページ。スクロールはしない。
  *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）は常に出し、その下に入りきる行だけを並べる。
- *  見切れる行は出さず次のページの一行目にし、続きがあるページの下には「縦スワイプで続きを表示」を出す。内税の行の左端にページ数「Page:1/3」（user 2026-11-20）。
+ *  見切れる行は出さず次のページの一行目にし、ページの下に「Page:1/3 縦スワイプで続きを表示」を出す（最後のページはページ数だけ、user 2026-11-20）。
  *  明細の数が変わったら（新しい明細は一番上に来るので）一ページ目に戻す。
  *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため */
 const mainPage = new Map<string, { page: number; count: number; pages: number }>();
@@ -1467,7 +1467,6 @@ const pageKey = (main: HTMLElement): string => main.dataset.region ?? "";
 function paginate(main: HTMLElement): void {
   const table = main.querySelector<HTMLElement>(":scope > table.lines.cols3");
   main.querySelector(":scope > .page-more")?.remove();
-  main.querySelector(".page-no")?.remove();
   if (!table) {
     main.classList.remove("more-below");
     return;
@@ -1487,22 +1486,20 @@ function paginate(main: HTMLElement): void {
   const pad = parseFloat(getComputedStyle(main).paddingBottom) || 0;
   const tbody = rows[0].parentElement!;
   const bottom = box.bottom - pad;
+  // 複数ページのときは、どのページの下にも「Page:1/4 縦スワイプで続きを表示」の行を置く（最後のページはページ数だけ）。その行の分を引いて割り付ける
   const more = document.createElement("p");
   more.className = "page-more";
-  more.textContent = lang === "en" ? trText("縦スワイプで続きを表示") : "縦スワイプで続きを表示";
+  more.innerHTML = `<span class="page-no">Page:1/1</span><span class="page-hint"></span>`;
   main.append(more);
   const moreH = more.getBoundingClientRect().height;
   const top = tbody.getBoundingClientRect().top;
   const heights = rows.map((r) => r.getBoundingClientRect().height);
   const fits = heights.reduce((t, h) => t + h, 0) <= bottom - top + 0.5;
-  // ページの切れ目：続きがあるページは案内の分だけ低い。最後のページは案内がない
   const starts: number[] = [0];
   if (!fits) {
     let used = 0;
     for (let i = 0; i < rows.length; i++) {
-      const rest = heights.slice(i).reduce((t, h) => t + h, 0);
-      const room = bottom - top - (used + rest <= bottom - top + 0.5 ? 0 : moreH);
-      if (used > 0 && used + heights[i] > room + 0.5) {
+      if (used > 0 && used + heights[i] > bottom - top - moreH + 0.5) {
         starts.push(i);
         used = 0;
       }
@@ -1515,16 +1512,17 @@ function paginate(main: HTMLElement): void {
   const to = starts[state.page + 1] ?? rows.length;
   rows.forEach((r, i) => (r.hidden = i < from || i >= to));
   const last = state.page === state.pages - 1;
-  if (last) more.remove();
   main.classList.toggle("more-below", !last);
-  const head = main.querySelector<HTMLElement>(":scope > .staff-head");
-  if (head) {
-    const no = document.createElement("span");
-    no.className = "page-no";
-    no.textContent = `Page:${state.page + 1}/${state.pages}`;
-    no.setAttribute("aria-label", `${state.pages}ページ中${state.page + 1}ページ目`);
-    head.prepend(no);
+  if (state.pages === 1) {
+    more.remove();
+    return;
   }
+  const no = more.querySelector<HTMLElement>(".page-no")!;
+  no.textContent = `Page:${state.page + 1}/${state.pages}`;
+  no.setAttribute("aria-label", `${state.pages}ページ中${state.page + 1}ページ目`);
+  const hint = more.querySelector<HTMLElement>(".page-hint")!;
+  if (last) hint.remove();
+  else hint.textContent = lang === "en" ? trText("縦スワイプで続きを表示") : "縦スワイプで続きを表示";
 }
 
 function turnPage(main: HTMLElement, dir: 1 | -1): void {

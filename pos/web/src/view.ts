@@ -1850,6 +1850,66 @@ function limitSelect(p: Snapshot["catalog"][number]): string {
   return `<select data-limit="${esc(p.code)}" aria-label="${esc(p.name)}の販売個数の上限">${opts}</select>`;
 }
 
+/** 販売規則の設定のテンキー（user 2026-11-20）：レジ画面と同じテンキーを、数を打つ欄（オーナーの番号・パスワード・税率・登録番号）にだけ付ける。
+ *  区分名のような文字の欄・プルダウンには付けない */
+export type RulesPadTarget = "oid" | "opw" | "rate" | "newrate" | "inv";
+export type RulesPadEntry = { target: RulesPadTarget; id?: string; digits: string; error?: string };
+export const RULES_PAD: Record<RulesPadTarget, { title: string; unit: string; max: number; decimals?: number; code?: boolean; prefix?: string; mask?: boolean }> = {
+  oid: { title: "オーナーの従業員番号", unit: "", max: 8, code: true },
+  opw: { title: "オーナーのパスワード", unit: "", max: 8, code: true, mask: true },
+  rate: { title: "税率", unit: "%", max: 5, decimals: 2 },
+  newrate: { title: "追加する税区分の税率", unit: "%", max: 5, decimals: 2 },
+  inv: { title: "インボイスの登録番号（T＋13桁）", unit: "", max: 13, code: true, prefix: "T" },
+};
+/** 開いているテンキー（ひとつだけ）と、テンキーで打った値（決定で送らず、画面のボタンで送る欄の分） */
+export const rulesPad: { entry: RulesPadEntry | null } = { entry: null };
+export const rulesValue = new Map<string, string>();
+export const rulesShow = (target: RulesPadTarget, digits: string): string => {
+  const d = RULES_PAD[target];
+  return d.mask ? "●".repeat(digits.length) : digits && d.prefix ? `${d.prefix}${digits}` : digits;
+};
+
+export function rulesPadField(target: RulesPadTarget, value: string, placeholder: string, aria: string, id?: string, cls = ""): string {
+  const e = rulesPad.entry;
+  const on = e?.target === target && e.id === id;
+  const shown = rulesShow(target, value);
+  return `<button type="button" class="pad-field ${cls}${on ? " typing" : ""}" data-rpadopen="${target}:${esc(id ?? "")}" aria-label="${esc(aria)}（押すとテンキーで入力）">${
+    shown ? esc(shown) : `<span class="placeholder">${esc(placeholder)}</span>`
+  }</button>`;
+}
+
+export function rulesPadPopup(s: Snapshot): string {
+  const e = rulesPad.entry;
+  if (!e) return "";
+  const d = RULES_PAD[e.target];
+  const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-rpad="${key}">${label}</button>`;
+  // 登録番号は何も打たずに決定すると未登録に戻す。税率は 0% も打てる
+  const ok = e.digits !== "" ? !e.digits.endsWith(".") : e.target === "inv";
+  const name = e.target === "rate" ? s.tax.classes.find((c) => c.id === e.id)?.name : undefined;
+  const title = name ? `${name}の税率` : d.title;
+  const note = e.target === "inv" && e.digits === "" ? `<div class="qty-pop-note muted">何も打たずに決定すると未登録に戻します</div>` : "";
+  const last = `${PAD_GAP}${k("0")}${d.decimals ? k(".", ".") : PAD_GAP}${k("cancel", "バック", "pad-key pad-fn ghost back-btn")}${k("back", "←", "pad-key pad-fn neg")}<button type="button" class="pad-key pad-fn primary" data-rpad="ok"${ok ? "" : " disabled"}>決定</button>`;
+  const shown = rulesShow(e.target, e.digits);
+  return `<div class="qty-pop" data-rpad-backdrop="1">
+      <div class="qty-pop-box" role="dialog" aria-label="${esc(title)}">
+        <div class="qty-pop-name">${esc(title)}</div>
+        <div class="qty-pop-value">${shown ? `${esc(shown)}${d.unit ? `<small> ${d.unit}</small>` : ""}` : `<span class="muted">${d.unit || "　"}</span>`}</div>
+        ${note}${e.error ? `<div class="pad-error" role="alert">${esc(e.error)}</div>` : ""}
+        <div class="qty-pop-keys">${["7", "8", "9", "4", "5", "6", "1", "2", "3"].map((x) => k(x)).join("")}${last}</div>
+      </div>
+    </div>`;
+}
+
+/** オーナー認証：従業員番号とパスワードをテンキーで打ち、「認証」で送る（欄が二つなので、テンキーの決定は欄を埋めるだけ） */
+export function ownerAuthForm(): string {
+  return `<p class="muted">販売規則を変えられるのはオーナーだけです<br>オーナーの従業員番号とパスワードを入れてください<br>閉じると認証は解除されます</p>
+    <div class="field-row">
+      <span class="field-label">従業員番号${rulesPadField("oid", rulesValue.get("oid") ?? "000", "例 000", "オーナーの従業員番号")}</span>
+      <span class="field-label">パスワード${rulesPadField("opw", rulesValue.get("opw") ?? "", "", "オーナーのパスワード")}</span>
+      <button type="button" data-owner-submit>認証</button>
+    </div>`;
+}
+
 export type RulesTab = "age" | "limit" | "tax" | "fftab";
 
 const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
@@ -1933,7 +1993,7 @@ function taxPanel(s: Snapshot): string {
         <td class="num">${
           fixedZero(c.kind)
             ? `<span class="muted">0%（固定）</span>`
-            : `<input class="rate-in" type="number" min="0" max="100" step="0.01" value="${c.rate_bp / 100}" data-key="rate-${esc(c.id)}" data-tax-rate="${esc(c.id)}" aria-label="${esc(c.name)}の税率（%）" />%`
+            : `<span class="field-label">${rulesPadField("rate", String(c.rate_bp / 100), "", `${c.name}の税率（%）`, c.id)}%</span>`
         }</td></tr>`,
     )
     .join("");
@@ -1945,15 +2005,15 @@ function taxPanel(s: Snapshot): string {
   );
   return `<h4>税区分</h4>
     <table class="lines rules"><thead><tr><th>区分</th><th>種類</th><th class="num">税率</th></tr></thead><tbody>${classes}</tbody></table>
-    <div class="row wrap tax-add">
-      <input data-key="new-tax-name" data-new-tax="name" placeholder="区分名（例：新軽減税率）" aria-label="追加する税区分の名前" />
+    <div class="field-row tax-add">
+      <label class="field-label">区分名<input data-key="new-tax-name" data-new-tax="name" placeholder="例 新税率" aria-label="追加する税区分の名前" /></label>
       <select data-key="new-tax-kind" data-new-tax="kind" aria-label="追加する税区分の種類">${TAX_KINDS.map((k) => `<option value="${k.id}">${k.label}</option>`).join("")}</select>
-      <input class="rate-in" type="number" min="0" max="100" step="0.01" data-key="new-tax-rate" data-new-tax="rate" placeholder="税率" aria-label="追加する税区分の税率（%）" />%
+      <span class="field-label">税率${rulesPadField("newrate", rulesValue.get("newrate") ?? "", "例 10", "追加する税区分の税率（%）")}%</span>
       <button class="small" data-add-tax>区分を追加</button>
     </div>
     <h4>インボイス</h4>
-    <div class="row wrap">
-      <input data-key="invoice-no" data-invoice="no" value="${esc(t.invoice_no)}" placeholder="登録番号（T＋13桁）" aria-label="適格請求書発行事業者の登録番号" />
+    <div class="field-row">
+      <span class="field-label">登録番号${rulesPadField("inv", rulesValue.get("inv") ?? t.invoice_no.replace(/^T/, ""), "例 T1234567890123", "適格請求書発行事業者の登録番号（T＋13桁）", undefined, "wide")}</span>
       <label>端数処理 <select data-key="invoice-rounding" data-invoice="rounding" aria-label="消費税の端数処理">${ROUNDINGS.map((r) => `<option value="${r.id}" ${r.id === t.rounding ? "selected" : ""}>${r.label}</option>`).join("")}</select></label>
       <button class="small" data-save-invoice>保存</button>
     </div>

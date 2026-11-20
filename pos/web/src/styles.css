@@ -91,7 +91,8 @@ button { touch-action: manipulation; }
 @property --W { syntax: "<length>"; inherits: true; initial-value: 400px; }
 /* 最小間隔も長さとして登録する：law.ts が getComputedStyle で px の値として読むため（登録しないと calc の式のまま返り、8px で計算していた） */
 @property --gap { syntax: "<length>"; inherits: true; initial-value: 6px; }
-.screen {
+/* 販売規則の設定のダイアログも同じ段を持つ：入力フォームとテンキーをレジ画面の中と同じ形・大きさにする（user 2026-11-20）。W は 400px に固定 */
+.screen, #rules-dlg {
   --W: clamp(384px, 100cqi - 2 * var(--frame-w), 512px);
   /* 白銀比の階段 --sN＝W÷√2ⁿ（W=400 で s11≒8.8・s13≒4.4・s15≒2.2・s17≒1.1）。レジ画面の中の大きさはすべてこの段から選ぶ。
      段を使う規則は var(--sN, 元の px) と書き、レジ画面の外（.screen の外）では元の px のまま */
@@ -111,6 +112,9 @@ button { touch-action: manipulation; }
   --btn-sm-h: calc(var(--W) / 22.627); --btn-sm-w: calc(var(--btn-sm-h) * var(--silver));
   --gap: calc(var(--W) / 45.255);
   --head-h: calc(var(--W) / 11.314); --band-h: calc(var(--W) / 5.657); --items-h: calc(var(--head-h) * 3); --tier3-h: calc(var(--head-h) * 10);
+}
+#rules-dlg { --W: 400px; }
+.screen {
   font-size: var(--text-sm); position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: calc(var(--s15, 2px) + var(--head-h) + var(--band-h) + var(--tier3-h) + var(--items-h)); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); height: var(--head-h);
   padding: 0 var(--s11, 8px); border-bottom: var(--s17, 1px) solid var(--border); background: var(--head-bg); }
@@ -328,7 +332,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .screen.sos .call-row.calling .sos-store { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
 /* 解除のあと：発動・解除の時刻（レシートの中身） */
 .screen .sos-log { display: flex; flex-wrap: wrap; gap: var(--s13, 4px) var(--s8, 24px); justify-content: center; margin: 0; color: var(--msg-strong); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
-.bell-sub { margin: var(--s9, 16px) 0 var(--s13, 4px); font-size: var(--text-sm); }
+.bell-sub { margin: var(--s9, 16px) 0 var(--s13, 4px); font-size: var(--text-lg); }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--s11, 8px); align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
@@ -462,10 +466,13 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .loading, .error { padding: 24px; }
 .error { color: var(--danger); }
 
-.top h1 { font-size: var(--text-lg); margin: 0; }
+/* シミュレーターまわりの文字もレジ画面と同じ四段階（user 2026-11-20）：ページ・エリア・ダイアログの見出し＝強調（--text-num）、
+   その中の項目の見出し（日配食品・税区分 など）＝大（--text-lg）、項目・本文・ボタン＝小（--text-sm）。特大（--text-xl）はレジ画面の中だけ。
+   見出しは必ず中の項目より大きく。モバイルでも段を変えない */
+.top h1 { font-size: var(--text-num); margin: 0; white-space: nowrap; }
 .top .logo { width: 73px; height: 73px; flex: none; }
 .build-badge { font-size: var(--text-sm); font-weight: 600; color: var(--white); background: var(--grey-4); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
-.reset-btn { margin-left: auto; }
+.reset-btn { margin-left: auto; white-space: nowrap; flex: none; }
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
 .tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: var(--grey-4); color: var(--white); font-size: var(--text-sm); font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
@@ -479,7 +486,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .register, .bell-area, .right {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
-.register h2, .bell-area h2, .right h2 { margin: 0 0 8px; font-size: var(--text-lg); display: flex; gap: 8px; align-items: center; }
+.register h2, .bell-area h2, .right h2 { margin: 0 0 8px; font-size: var(--text-num); display: flex; gap: 8px; align-items: center; }
 .hw { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 10px; }
 .hw .row { margin: 0; }
 
@@ -512,7 +519,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
 @media (max-width: 900px) { .right-col { position: static; max-height: none; } }
 .shelf + .shelf { margin-top: 6px; }
-.shelf h3 { margin: 0 0 4px; font-size: var(--text-sm); color: var(--muted); font-weight: 600; letter-spacing: .04em; }
+.shelf h3 { margin: 0 0 4px; font-size: var(--text-lg); color: var(--muted); font-weight: 600; letter-spacing: .04em; }
 .items { display: flex; flex-wrap: wrap; gap: var(--gap); }
 .item {
   display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left;
@@ -624,7 +631,7 @@ body.dragging .drop-hint { display: inline; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
 .rules-dlg::backdrop { background: color-mix(in oklch, var(--black) 45%, transparent); }
 .rules-dlg .dlg-head { display: flex; align-items: center; gap: 8px; }
-.rules-dlg .dlg-head h2 { margin: 0; font-size: var(--text-lg); flex: 1; }
+.rules-dlg .dlg-head h2 { margin: 0; font-size: var(--text-num); flex: 1; }
 .rules-dlg .toast { position: sticky; top: 0; z-index: 1; margin: 6px 0; }
 .rules-dlg .toast:not(.show) { display: none; }
 .lines.rules tr.grp th { text-align: left; padding-top: 10px; color: var(--muted); font-size: var(--text-sm); }
@@ -633,11 +640,27 @@ body.dragging .drop-hint { display: inline; }
 .ffmenu.center { justify-content: center; }
 .icon-btn { width: var(--s8, 26px); height: var(--s8, 26px); padding: 0; border-radius: var(--shape-round); font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .icon-btn:hover { color: var(--ink); }
-.rules-dlg h3 { font-size: var(--text-sm); margin: 14px 0 6px; }
-.rules-dlg h4 { font-size: var(--text-sm); margin: 14px 0 6px; }
+.rules-dlg :is(h3, h4) { font-size: var(--text-lg); margin: 14px 0 6px; }
 .rules-dlg .rules-tabs { margin-top: 12px; }
-.rules-dlg .rate-in { width: 6em; text-align: right; }
-.rules-dlg .owner-auth[hidden] { display: none; }
+/* 販売規則の設定の入力フォームはレジ画面の中と同じ（user 2026-11-20）：角丸なし・背景なし・操作の青の枠、高さ小 W/16×幅 W/4、
+   打ち込んだ文字は大テキスト・入力例は小テキストの青2。数を打つ欄は押すとレジ画面と同じテンキーが開く。
+   青はレジ画面と同じく濃いグレーを青のランプ（#ramp）に通して出す。セレクタ（プルダウン）は入力フォームではないので対象外 */
+#rules-dlg :is(button.pad-field, input:not([type="checkbox"])) {
+  box-sizing: border-box; width: var(--s4); height: var(--btn-md-h); padding: 0 var(--s13); font-size: var(--text-lg); line-height: 1; vertical-align: middle; filter: url(#ramp);
+}
+#rules-dlg button.pad-field { white-space: nowrap; overflow: hidden; color: var(--ink); }
+#rules-dlg input::placeholder { color: var(--input-hint); font-size: var(--text-sm); font-weight: 400; }
+/* インボイスの登録番号（T＋13 桁）だけは大テキストの 14 文字が W/4 に収まらないので幅を 2 倍にする */
+#rules-dlg button.pad-field.wide { width: calc(var(--s4) * 2); }
+#rules-dlg .field-label { display: inline-flex; align-items: center; gap: var(--s12); margin-right: var(--s11); }
+#rules-dlg .field-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s11); margin: var(--s11) 0; }
+/* テンキーはダイアログの上に重ねる（レジ画面では画面の中に重ねる） */
+#rules-dlg .qty-pop { position: fixed; }
+#rules-dlg .qty-pop button { filter: url(#ramp); }
+/* バック・←・決定は、レジ画面で law.ts fitText が縮めるのと同じ小テキスト */
+#rules-dlg .qty-pop .pad-fn { font-size: var(--text-sm); }
+#rules-dlg .qty-pop button:disabled { opacity: 1; filter: grayscale(1); background: var(--off-bg); color: var(--off-ink); border-color: var(--border); }
+#rules-dlg .owner-auth[hidden] { display: none; }
 .menu-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); margin-bottom: var(--s11, 8px); }
 .menu-head > .muted { text-align: right; }
 .menu-body { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s11, 8px); text-align: center; }
@@ -799,11 +822,12 @@ body.dragging .drop-hint { display: inline; }
 .picker-dlg .dlg-head { justify-content: flex-end; }
 /* 長押しピッカーの Item・Wallet の見出し（デスクトップの右側の見出しと同じ大きさ） */
 .picker-area + .picker-area { margin-top: 16px; }
-.picker-area-head { margin: 0 0 8px; font-size: var(--text-lg); }
+.rules-dlg .picker-area-head { margin: 0 0 8px; font-size: var(--text-num); display: flex; align-items: center; gap: 8px; }
 @media (max-width: 760px) {
-  .top { padding-block: 6px; }
+  .top { padding-block: 6px; gap: 8px; padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+  /* 見出しを強調の段のまま収めるため、ビルド番号は入りきらない分を省く */
+  .build-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top .logo { width: 36px; height: 36px; }
-  .top h1 { font-size: var(--text-lg); }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   .left { gap: 8px; }
@@ -818,7 +842,7 @@ body.dragging .drop-hint { display: inline; }
   .bell-unit { gap: 4px; padding: 3px 8px; font-size: var(--text-sm); }
   .bell-unit .bell-icon { font-size: var(--text-sm); }
   .register { padding: 8px; }
-  .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: var(--text-sm); margin-bottom: 4px; }
+  .register h2 { flex-wrap: wrap; row-gap: 4px; margin-bottom: 4px; }
   .register h2 .idle { font-size: var(--text-sm); }
   .swipe-tabs { display: flex; border-bottom: none; }
   /* 画面切り替えのタブは横いっぱいのまま、白銀比のボタンを上下に二分割した形（FF のタブと同じ、縦横比 1:2√2）を
@@ -942,3 +966,22 @@ body.dragging .drop-hint { display: inline; }
 .counter-screen.swipe-menu-close:not(.calling, .sos) .screen-head { background: linear-gradient(to left, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 .counter-screen.swipe-resume .screen-body { background: linear-gradient(to right, var(--swipe-edge), var(--swipe-soft) calc(var(--swipe-w) * var(--swipe-reach) / 3), calc(var(--swipe-w) * var(--swipe-reach)), transparent); }
 @media (prefers-reduced-motion: reduce) { .counter-screen:is(.swipe-menu-open, .swipe-menu-close, .swipe-resume) { animation: none; } }
+
+/* レジ画面の外（シミュレーターまわり）にも、レジ画面の中の色と形を広げる（user 2026-11-20）：
+   操作できる部品は操作の青（--operable-blue）。積極＝青の背景・白文字、消極＝青の枠線・青の文字・背景なし、押せない部品はグレー。
+   形は四つ（弱い角丸・強い角丸・タブ・円）から選ぶ。セレクタ（プルダウン・チェックボックス）も操作できる部品なので青。
+   周辺機器（入金・出金ボックス、決済端末、スキャナ、Bell の呼び鈴端末）はレジ画面の外でも中でもない機械なので対象外 */
+:is(.top, .bell-area, .register > h2, .right-col, .rules-dlg) { --btn-on: var(--operable-blue); --msg-strong: var(--operable-blue); }
+:is(.top, .bell-area, .register > h2, .right-col, .rules-dlg) :is(select, input[type="checkbox"]) { accent-color: var(--operable-blue); }
+/* テンキーはレジ画面と同じ形（ボタンは青のランプで青にする）。見出しの文字はレジ画面と同じ濃いグレー */
+.rules-dlg .qty-pop { --msg-strong: var(--grey-4); --btn-on: var(--grey-4); }
+/* 歯車は円の消極ボタン */
+.icon-btn { color: var(--operable-blue); border: var(--frame-w) solid var(--operable-blue); background: transparent; }
+.icon-btn:hover { color: var(--operable-blue); }
+/* Item・Wallet の品物は消極ボタン（弱い角丸、硬貨は円）：青の枠線・青の名前・背景なし。お金・カードの種類の淡い塗り（濃度1）は残す。
+   スタッフのカードは積極（青の背景・白文字）。押せない品物（スタッフ不在のたばこ など）はグレーのまま */
+.item:not(.off, .call-blink) { border: var(--frame-w) solid var(--operable-blue); border-radius: var(--shape-soft); }
+.item:not(.off, .call-blink, .bill, .coin, .pay, .card, .coupon, .staff) { background: transparent; }
+.item:not(.off, .call-blink, .staff) .item-name { color: var(--operable-blue); }
+.item.coin:not(.off) { border-radius: var(--shape-round); }
+.item.staff:not(.off) { background: var(--operable-blue); color: var(--white); }

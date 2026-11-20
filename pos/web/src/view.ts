@@ -1485,10 +1485,6 @@ export function timeText(d: Date): string {
 }
 
 /** ヘッダー右の日時。年月日・曜日は別の span にし、モバイルモードでは CSS で隠して時刻だけにする（表示エリアの制約による便宜的措置） */
-export function clockHtml(d: Date): string {
-  return `<span class="clock-date">${dateText(d)} </span>${timeText(d)}`;
-}
-
 /** 呼び鈴の絵（色は CSS の currentColor：押せるときは青、押せないときはグレー） */
 const BELL_SVG = `<svg class="bell-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M12 2.5a1.5 1.5 0 0 0-1.5 1.5v.6A6.5 6.5 0 0 0 5.5 11v4.2L3.8 17.4a.9.9 0 0 0 .7 1.5h15a.9.9 0 0 0 .7-1.5l-1.7-2.2V11a6.5 6.5 0 0 0-5-6.4V4A1.5 1.5 0 0 0 12 2.5Zm-2.6 17.6a2.6 2.6 0 0 0 5.2 0Z"/></svg>`;
 
@@ -1513,7 +1509,25 @@ function bellBtn(r: RegisterView, side: Side): string {
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const bell = bellBtn(r, side);
   const mode = r.emergency ? `<span class="mode-title emergency">非常事態モード</span>` : r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
-  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock">${clockHtml(now)}</time></span>`;
+  // 無操作の残り時間はレジカウンター側のヘッダーの右に出す（user 2026-11-21：レジの見出しから画面の中へ）。
+  // 待ち時間をお客様に見せないため売り場側には出さない
+  // 日時は時刻だけ（user 2026-11-21：シミュレーターはデスクトップ・モバイルとも省略する。実機では年月日・曜日も出すのが望ましい）
+  const idle = side === "counter" ? idleLeft(r) : "";
+  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r">${idle}<time class="clock" title="${esc(dateText(now))}">${timeText(now)}</time></span>`;
+}
+
+/** 無操作で取引を中止する（またはセルフ操作モードに戻る）までの残り時間 */
+function idleLeft(r: RegisterView): string {
+  const ms = r.idle_revert_in;
+  if (ms === null) return "";
+  const left = `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+  const what = r.idle_voids ? "取引の中止" : "自動ログアウト";
+  const title = r.idle_voids
+    ? r.mode === "self_operated"
+      ? "5分間操作がないと、取引を中止します"
+      : "5分間操作がないと、取引を中止してセルフ操作モードに戻ります"
+    : "5分間操作がないと、スタッフをログアウトしてセルフ操作モードに戻ります";
+  return `<span class="idle-left" title="${title}">${what}まで あと${left}</span>`;
 }
 
 export const FF_TABS = [

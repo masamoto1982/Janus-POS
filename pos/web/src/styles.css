@@ -148,11 +148,12 @@ button { touch-action: manipulation; }
 /* タブは白銀比のボタンを上下に二分割した形（user 2026-11-17）：FF のタブは特大の白銀比ボタンの上半分（幅 特大×√2・高さ 特大÷2、縦横比 1:2√2）。
    モバイルの画面切り替えタブも同じ形を横に並べたもの。五つを帯の中央に並べ、入らない狭い画面では縦横比を保って縮む */
 .ff-tabs button.tab { flex: none; width: min(var(--btn-xl-w), calc((100% - 4 * var(--gap)) / 5)); height: auto; aspect-ratio: calc(2 * var(--silver)); }
-/* セルフ操作モードで「FF」から開いた FF タブ：戻る部品の「バック」はタブの並びの左端（向きのある脇役は縁）。五つのタブはその右の残りに並ぶ */
-.ff-tabs.with-back { align-items: flex-end; justify-content: flex-start; }
-.ff-tabs.with-back button.ff-back { flex: none; align-self: center; margin-right: auto; }
-.ff-tabs.with-back button.tab { width: min(var(--btn-xl-w), calc((100% - var(--btn-md-w) * 2 - 6 * var(--gap)) / 5)); }
-.ff-tabs.with-back button.tab:last-child { margin-right: auto; }
+/* セルフ操作モードで「FF」から開いた FF タブ：最下段の上の段の下端に、左下「バック」（戻る部品は左下）・右下「金券」「たばこ」「その他」。
+   三つの呼び出しボタンとバックは同じ高さ（大）、間隔は --gap */
+.ff-open-foot { flex: none; display: flex; justify-content: space-between; align-items: flex-end; gap: var(--gap); padding: 0 var(--s10, 12px) var(--s11, 8px); }
+.ff-open-foot > .back-btn { width: calc(var(--btn-w) * 2); height: var(--btn-h); font-size: var(--text-lg); padding: 0 var(--s15, 2px); }
+.ff-open-calls { display: flex; gap: var(--gap); }
+.ff-open-calls > .call-btn { box-sizing: border-box; width: var(--btn-w); height: var(--btn-h); padding: 0 var(--s15, 2px); }
 /* FF の単品の群が主役で段の中央。ページ送りの「<」「>」は向きのある脇役で、隠れたページがある側の縁（レイアウトの法則）。
    左右の列は同じ幅なので、矢印のあるなしで群は動かない。左右の列は少なくとも円の直径を確保し、段の縁・単品とは最小間隔（--gap）
    離れる。狭い画面（モバイル）で入らないときは、円ではなく単品の群のほうが縦横比を保って縮む */

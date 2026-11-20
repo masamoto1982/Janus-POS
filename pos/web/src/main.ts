@@ -34,6 +34,7 @@ import {
   scanGuide,
   voidAsk,
   ffFloorOpen,
+  ffOpenFoot,
   parcelError,
   bellPanel,
   bellSettings,
@@ -166,7 +167,7 @@ function buildSkeleton(): void {
           <div class="screen-cap">レジカウンター側<span class="drop-hint">ここに落とす＝レジカウンター側スキャナーで読む</span></div>
           <section class="screen counter-screen" data-drop="${r.id}:counter">
             <div class="screen-head" data-region="head-${r.id}-counter"></div>
-            <div class="screen-body"><div class="screen-main" data-region="counter-${r.id}"></div></div>
+            <div class="screen-body"><div class="screen-main" data-region="counter-${r.id}"></div><div data-region="foot-${r.id}-counter"></div></div>
             <div class="screen-items" data-region="items-${r.id}-counter"></div>
             <div data-region="pop-${r.id}-counter"></div>
           </section>
@@ -175,7 +176,7 @@ function buildSkeleton(): void {
           <div class="screen-cap">売り場側<span class="drop-hint">ここに落とす＝売り場側スキャナーで読む</span></div>
           <section class="screen floor-screen" data-drop="${r.id}:floor">
             <div class="screen-head" data-region="head-${r.id}-floor"></div>
-            <div class="screen-body"><div class="screen-main" data-region="floor-${r.id}"></div></div>
+            <div class="screen-body"><div class="screen-main" data-region="floor-${r.id}"></div><div data-region="foot-${r.id}-floor"></div></div>
             <div class="screen-items" data-region="items-${r.id}-floor"></div>
             <div data-region="pop-${r.id}-floor"></div>
           </section>
@@ -488,6 +489,7 @@ function render(): void {
       const lang = langOf(r.id, side);
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side), lang);
       setRegion(`items-${r.id}-${side}`, items, lang);
+      setRegion(`foot-${r.id}-${side}`, items.includes("ff-open") ? ffOpenFoot(r) : "", lang);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       if (side === "counter" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {

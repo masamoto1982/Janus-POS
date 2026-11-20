@@ -289,6 +289,9 @@ input, select, button.pad-field {
 input:disabled, select:disabled { border-color: var(--border); }
 button.pad-field { display: inline-flex; align-items: center; justify-content: flex-end; font-weight: 600; font-variant-numeric: tabular-nums; cursor: text; }
 input::placeholder { color: var(--input-hint); opacity: 1; font-size: min(1em, var(--text-sm)); font-weight: 400; text-align: center; }
+/* 入力例は打ち込む文字より小さいので、欄の文字の行に載せると下にずれる（user 2026-11-20：区分名の入力例が縦にずれていた）。
+   空のあいだは欄の文字そのものを入力例の大きさにして、上下の中央に置く。fitForms が inline で決めた大きさ（--form-fs）を上書きする */
+input:placeholder-shown { font-size: min(var(--form-fs, 1em), var(--text-sm)) !important; }
 /* 入力例は小テキスト（打ち込む文字より大きくはしない）・青の濃度2（user 2026-11-18：一番薄い青1は白・緑1の段で読めない） */
 button.pad-field .placeholder { color: var(--input-hint); font-size: min(1em, var(--text-sm)); font-weight: 400; }
 /* 入力例は欄の中央（user 2026-11-20）。打ち込んだ数字は右寄せのまま */

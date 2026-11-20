@@ -389,6 +389,17 @@ function textWidth(text: string, el: HTMLElement, size: number, weight?: string)
   return ruler.measureText(text).width;
 }
 
+/** 和文の字面の中心が、行の箱の中心よりどれだけ上にあるか（px） */
+function inkLift(el: HTMLElement, size: number): number {
+  if (ruler === undefined) textWidth("", el, size);
+  if (!ruler) return 0;
+  const cs = getComputedStyle(el);
+  ruler.font = `${cs.fontWeight} ${size}px ${cs.fontFamily}`;
+  const m = ruler.measureText("例");
+  if (!m.fontBoundingBoxAscent) return 0;
+  return ((m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) - (m.fontBoundingBoxAscent - m.fontBoundingBoxDescent)) / 2;
+}
+
 /** その場所の小テキストの大きさ（レジ画面は W/32、外は :root の値） */
 function smallText(el: HTMLElement): number {
   const probe = document.createElement("span");
@@ -404,11 +415,16 @@ export function fitForms(root: ParentNode): void {
   const chars = new Map<HTMLElement, number>();
   for (const f of forms) {
     f.style.removeProperty("width");
+    f.style.removeProperty("height");
+    f.style.removeProperty("padding-top");
+    f.style.removeProperty("padding-bottom");
     const B = f.offsetHeight;
     if (!B) continue;
     const size = B / 2;
     f.style.fontSize = `${size}px`;
-    f.style.lineHeight = "1";
+    f.style.setProperty("--form-fs", `${size}px`);
+    // 入力欄（input）は行の高さを 1 にすると和文の字面が上にずれる（user 2026-11-20）。ボタン形の欄・セレクタと同じく字面の中心で上下中央に
+    f.style.lineHeight = f instanceof HTMLInputElement ? "normal" : "1";
     const border = parseFloat(getComputedStyle(f).borderLeftWidth) || 0;
     const isSelect = f instanceof HTMLSelectElement;
     const samples = isSelect ? [...f.options].map((o) => o.text) : [f.dataset.fit ?? (f as HTMLInputElement).value ?? f.textContent ?? ""];
@@ -418,7 +434,19 @@ export function fitForms(root: ParentNode): void {
     const hintText = span?.textContent ?? (f as HTMLInputElement).placeholder ?? "";
     const hint = span ? span.getBoundingClientRect().width : hintText ? textWidth(hintText, f, Math.min(size, smallText(f)), "400") : 0;
     const mark = isSelect ? B / 2 : 0;
-    f.style.paddingTop = f.style.paddingBottom = "0";
+    // 上下の中央は字面の中央で合わせる（user 2026-11-20：区分名の入力例が上にずれていた）。行の箱は欧文の書体で決まり、
+    // 和文の字面はその中央より上に載るので、ずれた分だけ上の余白で押し下げる（見本は和文の「例」）
+    const lift = inkLift(f, size);
+    if (isSelect) {
+      // セレクタは固定の高さの中で上の余白を無視して中央に置くので、高さを余白で組み立てる
+      const room = B - 2 * border - size;
+      f.style.height = "auto";
+      f.style.paddingTop = `${Math.max(0, room / 2 + lift)}px`;
+      f.style.paddingBottom = `${Math.max(0, room / 2 - lift)}px`;
+    } else {
+      f.style.paddingTop = `${Math.max(0, 2 * lift)}px`;
+      f.style.paddingBottom = "0";
+    }
     f.style.paddingLeft = `${Math.max(0, B / 4 - border)}px`;
     f.style.paddingRight = `${Math.max(0, B / 4 + mark - border)}px`;
     f.style.width = `${Math.ceil(Math.max(main, hint) + B / 2 + mark + 2 * border)}px`;

@@ -91,7 +91,8 @@ button { touch-action: manipulation; }
 @property --W { syntax: "<length>"; inherits: true; initial-value: 400px; }
 /* 最小間隔も長さとして登録する：law.ts が getComputedStyle で px の値として読むため（登録しないと calc の式のまま返り、8px で計算していた） */
 @property --gap { syntax: "<length>"; inherits: true; initial-value: 6px; }
-.screen {
+/* 販売規則の設定のダイアログも同じ段を持つ：入力フォームとテンキーをレジ画面の中と同じ形・大きさにする（user 2026-11-20）。W は 400px に固定 */
+.screen, #rules-dlg {
   --W: clamp(384px, 100cqi - 2 * var(--frame-w), 512px);
   /* 白銀比の階段 --sN＝W÷√2ⁿ（W=400 で s11≒8.8・s13≒4.4・s15≒2.2・s17≒1.1）。レジ画面の中の大きさはすべてこの段から選ぶ。
      段を使う規則は var(--sN, 元の px) と書き、レジ画面の外（.screen の外）では元の px のまま */
@@ -111,6 +112,9 @@ button { touch-action: manipulation; }
   --btn-sm-h: calc(var(--W) / 22.627); --btn-sm-w: calc(var(--btn-sm-h) * var(--silver));
   --gap: calc(var(--W) / 45.255);
   --head-h: calc(var(--W) / 11.314); --band-h: calc(var(--W) / 5.657); --items-h: calc(var(--head-h) * 3); --tier3-h: calc(var(--head-h) * 10);
+}
+#rules-dlg { --W: 400px; }
+.screen {
   font-size: var(--text-sm); position: relative; border-radius: 0; min-width: 0; overflow: hidden; height: calc(var(--s15, 2px) + var(--head-h) + var(--band-h) + var(--tier3-h) + var(--items-h)); display: flex; flex-direction: column; }
 .screen-head { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); height: var(--head-h);
   padding: 0 var(--s11, 8px); border-bottom: var(--s17, 1px) solid var(--border); background: var(--head-bg); }
@@ -636,8 +640,25 @@ body.dragging .drop-hint { display: inline; }
 .rules-dlg h3 { font-size: var(--text-sm); margin: 14px 0 6px; }
 .rules-dlg h4 { font-size: var(--text-sm); margin: 14px 0 6px; }
 .rules-dlg .rules-tabs { margin-top: 12px; }
-.rules-dlg .rate-in { width: 6em; text-align: right; }
-.rules-dlg .owner-auth[hidden] { display: none; }
+/* 販売規則の設定の入力フォームはレジ画面の中と同じ（user 2026-11-20）：角丸なし・背景なし・操作の青の枠、高さ小 W/16×幅 W/4、
+   打ち込んだ文字は大テキスト・入力例は小テキストの青2。数を打つ欄は押すとレジ画面と同じテンキーが開く。
+   青はレジ画面と同じく濃いグレーを青のランプ（#ramp）に通して出す。セレクタ（プルダウン）は入力フォームではないので対象外 */
+#rules-dlg :is(button.pad-field, input:not([type="checkbox"])) {
+  box-sizing: border-box; width: var(--s4); height: var(--btn-md-h); padding: 0 var(--s13); font-size: var(--text-lg); line-height: 1; vertical-align: middle; filter: url(#ramp);
+}
+#rules-dlg button.pad-field { white-space: nowrap; overflow: hidden; color: var(--ink); }
+#rules-dlg input::placeholder { color: var(--input-hint); font-size: var(--text-sm); font-weight: 400; }
+/* インボイスの登録番号（T＋13 桁）だけは大テキストの 14 文字が W/4 に収まらないので幅を 2 倍にする */
+#rules-dlg button.pad-field.wide { width: calc(var(--s4) * 2); }
+#rules-dlg .field-label { display: inline-flex; align-items: center; gap: var(--s12); margin-right: var(--s11); }
+#rules-dlg .field-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s11); margin: var(--s11) 0; }
+/* テンキーはダイアログの上に重ねる（レジ画面では画面の中に重ねる） */
+#rules-dlg .qty-pop { position: fixed; }
+#rules-dlg .qty-pop button { filter: url(#ramp); }
+/* バック・←・決定は、レジ画面で law.ts fitText が縮めるのと同じ小テキスト */
+#rules-dlg .qty-pop .pad-fn { font-size: var(--text-sm); }
+#rules-dlg .qty-pop button:disabled { opacity: 1; filter: grayscale(1); background: var(--off-bg); color: var(--off-ink); border-color: var(--border); }
+#rules-dlg .owner-auth[hidden] { display: none; }
 .menu-head { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--s11, 8px); margin-bottom: var(--s11, 8px); }
 .menu-head > .muted { text-align: right; }
 .menu-body { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: var(--s11, 8px); text-align: center; }

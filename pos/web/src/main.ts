@@ -23,6 +23,12 @@ import {
   isWelcome,
   qtyPopup,
   padEntry,
+  ownerAuthForm,
+  rulesPad,
+  rulesPadPopup,
+  rulesValue,
+  RULES_PAD,
+  type RulesPadTarget,
   padPopup,
   PAD,
   padValue,
@@ -143,18 +149,12 @@ function start(): void {
   wireHoldSwipe();
   wireForceRegister();
   rulesDlg().addEventListener("close", lockRules);
-  rulesDlg()
-    .querySelector("[data-owner-auth]")
-    ?.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-owner="${k}"]`);
-      const creds = { owner_id: field("id")?.value.trim() ?? "", password: field("pw")?.value ?? "" };
-      if (!send({ type: "verify_owner", ...creds })) return;
-      ownerAuth = creds;
-      field("pw")!.value = "";
-      rulesDlg().querySelector<HTMLElement>("[data-owner-auth]")!.hidden = true;
-      render();
-    });
+  // テンキーを開いているあいだの Esc はテンキーだけを閉じる（ダイアログは閉じない）
+  rulesDlg().addEventListener("cancel", (e) => {
+    if (!rulesPad.entry) return;
+    e.preventDefault();
+    rulesPadKey("cancel");
+  });
   render();
 }
 
@@ -232,7 +232,7 @@ function buildSkeleton(): void {
       </div>
       <div class="right-col">
         <aside class="right" aria-label="Item">
-          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> <button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="販売規則の設定" title="販売規則の設定">⚙</button></h2>
+          <h2><span class="tip" tabindex="0" data-tip="お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします" aria-label="Item：お買い物をするには、アイテムをレジエリアにドラッグ＆ドロップします">Item <span class="info-icon" aria-hidden="true">i</span></span> ${RULES_GEAR}</h2>
           <div data-region="shelf"></div>
         </aside>
         <aside class="right wallet" aria-label="Wallet">
@@ -246,16 +246,10 @@ function buildSkeleton(): void {
     </footer>
     <dialog class="rules-dlg" id="rules-dlg" aria-labelledby="rules-title">
       <div class="dlg-head"><h2 id="rules-title">販売規則の設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
-      <form class="owner-auth" data-owner-auth>
-        <p class="muted">販売規則を変えられるのはオーナーだけです<br>オーナーの従業員番号とパスワードを入れてください<br>閉じると認証は解除されます</p>
-        <div class="row wrap">
-          <input data-owner="id" placeholder="オーナーの従業員番号" value="000" aria-label="オーナーの従業員番号" />
-          <input data-owner="pw" type="password" placeholder="パスワード" autocomplete="off" aria-label="オーナーのパスワード" />
-          <button type="submit">認証</button>
-        </div>
-      </form>
+      <div class="owner-auth" data-region="owner-auth"></div>
       <div class="toast" id="toast-rules"></div>
       <div data-region="owner"></div>
+      <div data-region="rules-pad"></div>
     </dialog>
     <dialog class="rules-dlg bell-dlg" id="bell-dlg" aria-labelledby="bell-title">
       <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
@@ -571,7 +565,9 @@ function render(): void {
   }
   setRegion("bells", bellPanel(snap));
   setRegion("bell-settings", bellSettings(snap));
+  setRegion("owner-auth", ownerAuth ? "" : ownerAuthForm());
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
+  setRegion("rules-pad", rulesPadPopup(snap));
   setRegion("shelf", shelfPanel(snap));
   setRegion("wallet", walletPanel(snap.emoney_balance));
 }
@@ -921,12 +917,6 @@ app.addEventListener("change", (e) => {
     if (!send({ type: "check_ff", register: Number(reg), side: side as Side, line_id: line, handed: 1 })) box.checked = false;
     return;
   }
-  if (sel.dataset.taxRate && ownerAuth) {
-    const rate = Number((sel as unknown as HTMLInputElement).value);
-    const ok = Number.isFinite(rate) && send({ type: "set_tax_rate", ...ownerAuth, class_id: sel.dataset.taxRate, rate_bp: Math.round(rate * 100) });
-    if (!ok) (sel as unknown as HTMLInputElement).value = (sel as unknown as HTMLInputElement).defaultValue;
-    return;
-  }
   if (sel.dataset.taxClass && ownerAuth) {
     const ok = send({ type: "set_product_tax", ...ownerAuth, code: sel.dataset.taxClass, class_id: sel.value });
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
@@ -964,6 +954,7 @@ app.addEventListener("change", (e) => {
   sel.blur();
 });
 
+const RULES_GEAR = `<button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="販売規則の設定" title="販売規則の設定">⚙</button>`;
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
 const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_ff_tab_display", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
@@ -973,10 +964,46 @@ let rulesTab: RulesTab = "tax";
 function lockRules(): void {
   ownerAuth = null;
   rulesTab = "tax";
-  const pw = rulesDlg().querySelector<HTMLInputElement>(`[data-owner="pw"]`);
-  if (pw) pw.value = "";
-  const form = rulesDlg().querySelector<HTMLElement>("[data-owner-auth]");
-  if (form) form.hidden = false;
+  rulesPad.entry = null;
+  rulesValue.clear();
+  render();
+}
+
+function verifyOwner(): void {
+  const creds = { owner_id: rulesValue.get("oid") ?? "000", password: rulesValue.get("opw") ?? "" };
+  rulesValue.delete("opw");
+  if (!send({ type: "verify_owner", ...creds })) return render();
+  ownerAuth = creds;
+  rulesValue.delete("oid");
+  render();
+}
+
+/** 販売規則の設定のテンキー。打ち方はレジ画面のテンキーと同じ（小数は税率だけ、0.01% 単位） */
+function rulesPadKey(k: string): void {
+  const e = rulesPad.entry;
+  if (!e) return;
+  const d = RULES_PAD[e.target];
+  if (k !== "ok") e.error = undefined;
+  if (k === "cancel") rulesPad.entry = null;
+  else if (k === "back") e.digits = e.digits.slice(0, -1);
+  else if (k === ".") {
+    if (d.decimals && !e.digits.includes(".") && e.digits.length < d.max) e.digits = (e.digits || "0") + ".";
+  } else if (/^[0-9]$/.test(k) && e.digits.replace(".", "").length < d.max) {
+    const next = e.digits + k;
+    const dec = next.split(".")[1];
+    if (dec !== undefined && dec.length > (d.decimals ?? 0)) return;
+    e.digits = d.code || next.includes(".") ? next : next.replace(/^0+(?=\d)/, "");
+  } else if (k === "ok") {
+    if (e.digits.endsWith(".") || (e.digits === "" && e.target !== "inv")) return;
+    if (e.target === "rate") {
+      // 区分の税率：欄ひとつなので、テンキーの決定でそのまま変える。受け付けられなければ理由を出してテンキーを開いたままにする
+      if (!ownerAuth || !send({ type: "set_tax_rate", ...ownerAuth, class_id: e.id!, rate_bp: Math.round(Number(e.digits) * 100) }, true)) {
+        e.error = lastError ?? "受け付けられません";
+        return render();
+      }
+    } else rulesValue.set(e.target, e.digits);
+    rulesPad.entry = null;
+  }
   render();
 }
 
@@ -991,6 +1018,12 @@ document.addEventListener(
   { capture: true },
 );
 document.addEventListener("keydown", (e) => {
+  if (rulesPad.entry && rulesDlg().open && !e.isComposing && !(e.target as HTMLElement).closest?.("input, select, textarea")) {
+    const k = /^[0-9.]$/.test(e.key) ? e.key : e.key === "Backspace" ? "back" : e.key === "Enter" ? "ok" : null;
+    if (!k) return;
+    e.preventDefault();
+    return rulesPadKey(k);
+  }
   if ((!qtyEntry.size && !padEntry.size) || e.isComposing || (e.target as HTMLElement).closest?.("input, select, textarea")) return;
   const k = /^[0-9.]$/.test(e.key) ? e.key : e.key === "Backspace" ? "back" : e.key === "Enter" ? "ok" : e.key === "Escape" ? "cancel" : null;
   if (!k) return;
@@ -1003,11 +1036,27 @@ document.addEventListener("touchend", unlockAudio, { capture: true });
 app.addEventListener("click", (e) => {
   const backdrop = (e.target as HTMLElement).dataset?.qtypadBackdrop;
   if (backdrop) return qtyKey(backdrop, "cancel");
+  if ((e.target as HTMLElement).dataset?.rpadBackdrop) return rulesPadKey("cancel");
   const padBackdrop = (e.target as HTMLElement).dataset?.padBackdrop;
   if (padBackdrop) return padKey(padBackdrop, "cancel");
   const b = (e.target as Element).closest("button");
   if (!b || b.disabled) return;
-  if (b.hasAttribute("data-open-rules")) return rulesDlg().showModal();
+  if (b.hasAttribute("data-open-rules")) {
+    // モバイルは長押しピッカーの Item の見出しから開く：ピッカーを閉じてから開く
+    if (pickerDlg().open) {
+      pickerDlg().close();
+      pickFor = null;
+    }
+    return rulesDlg().showModal();
+  }
+  if (b.hasAttribute("data-owner-submit")) return verifyOwner();
+  if (b.dataset.rpadopen !== undefined) {
+    const [target, id] = b.dataset.rpadopen.split(":") as [RulesPadTarget, string];
+    const same = rulesPad.entry?.target === target && (rulesPad.entry.id ?? "") === id;
+    rulesPad.entry = same ? null : { target, id: id || undefined, digits: "" };
+    return render();
+  }
+  if (b.dataset.rpad) return rulesPadKey(b.dataset.rpad);
   if (b.hasAttribute("data-close-rules")) return rulesDlg().close();
   if (b.dataset.rulesTab) {
     rulesTab = b.dataset.rulesTab as RulesTab;
@@ -1015,18 +1064,21 @@ app.addEventListener("click", (e) => {
   }
   if (b.hasAttribute("data-add-tax") && ownerAuth) {
     const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-new-tax="${k}"]`)!;
-    const rate = Number(field("rate").value || 0);
+    const rate = Number(rulesValue.get("newrate") || 0);
     if (
       send({ type: "add_tax_class", ...ownerAuth, name: field("name").value, kind: field("kind").value as TaxKind, rate_bp: Math.round(rate * 100) })
     ) {
       field("name").value = "";
-      field("rate").value = "";
+      rulesValue.delete("newrate");
+      render();
     }
     return;
   }
   if (b.hasAttribute("data-save-invoice") && ownerAuth) {
-    const field = (k: string) => rulesDlg().querySelector<HTMLInputElement>(`[data-invoice="${k}"]`)!;
-    send({ type: "set_invoice", ...ownerAuth, invoice_no: field("no").value, rounding: field("rounding").value as Rounding });
+    const rounding = rulesDlg().querySelector<HTMLSelectElement>(`[data-invoice="rounding"]`)!.value as Rounding;
+    const digits = rulesValue.get("inv") ?? snap.tax.invoice_no.replace(/^T/, "");
+    if (send({ type: "set_invoice", ...ownerAuth, invoice_no: digits ? `T${digits}` : "", rounding })) rulesValue.delete("inv");
+    render();
     return;
   }
   if (b.hasAttribute("data-open-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).showModal();
@@ -1278,7 +1330,8 @@ function openPicker(dest: Dest): void {
   pickFor = dest;
   const { device, cashBox } = dest;
   const area = (label: string, html: string) => `<section class="picker-area"><h3 class="picker-area-head">${label}</h3>${html}</section>`;
-  const items = area("Item", shelfPanel(snap));
+  // モバイルには右列（Item・Wallet）がないので、販売規則の設定の歯車はピッカーの Item の見出しの横に置く（user 2026-11-20）
+  const items = area(`Item ${RULES_GEAR}`, shelfPanel(snap));
   const wallet = area("Wallet", walletPanel(snap.emoney_balance));
   document.getElementById("picker-body")!.innerHTML = cashBox || device === "terminal" ? wallet : device === "scanner" ? wallet + items : items + wallet;
   pickerDlg().showModal();

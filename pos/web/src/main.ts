@@ -573,7 +573,7 @@ function render(): void {
   setRegion("rules-pad", rulesPadPopup(snap));
   setRegion("shelf", shelfPanel(snap));
   setRegion("wallet", walletPanel(snap.emoney_balance));
-  app.querySelectorAll<HTMLElement>(".screen-main").forEach(markMoreBelow);
+  app.querySelectorAll<HTMLElement>(".screen-main").forEach(paginate);
 }
 
 
@@ -1456,51 +1456,132 @@ function wireHoldSwipe(): void {
   window.addEventListener("pointercancel", () => (start = null));
 }
 
-/** 登録画面の下にまだ明細が隠れているか（縦にスクロールできて末尾まで来ていない）。隠れているあいだだけ下の縁に白のグラデーションを出す */
-function markMoreBelow(main: HTMLElement): void {
-  main.classList.toggle("more-below", main.scrollHeight - main.scrollTop - main.clientHeight > 1);
+/** 明細のページ送り（user 2026-11-20）：縦スワイプ一回で一ページ。スクロールはしない。
+ *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）は常に出し、その下に入りきる行だけを並べる。
+ *  見切れる行は出さず次のページの一行目にし、ページの下に「Page:1/3 縦スワイプで続きを表示」を出す（最後のページはページ数だけ、user 2026-11-20）。
+ *  明細の数が変わったら（新しい明細は一番上に来るので）一ページ目に戻す。
+ *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため */
+const mainPage = new Map<string, { page: number; count: number; pages: number }>();
+const pageKey = (main: HTMLElement): string => main.dataset.region ?? "";
+
+function paginate(main: HTMLElement): void {
+  const table = main.querySelector<HTMLElement>(":scope > table.lines.cols3");
+  main.querySelector(":scope > .page-more")?.remove();
+  if (!table) {
+    main.classList.remove("more-below");
+    return;
+  }
+  const rows = [...table.querySelectorAll<HTMLElement>("tbody > tr")].filter((r) => !r.querySelector("td.empty"));
+  rows.forEach((r) => (r.hidden = false));
+  const st = mainPage.get(pageKey(main));
+  const state = st && st.count === rows.length ? st : { page: 0, count: rows.length, pages: 1 };
+  mainPage.set(pageKey(main), state);
+  if (!rows.length) {
+    main.classList.remove("more-below");
+    return;
+  }
+  const [side, reg] = pageKey(main).split("-");
+  const lang = langOf(Number(reg), side as Side);
+  const box = main.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(main).paddingBottom) || 0;
+  const tbody = rows[0].parentElement!;
+  const bottom = box.bottom - pad;
+  // 複数ページのときは、どのページの下にも「Page:1/4 縦スワイプで続きを表示」の行を置く（最後のページはページ数だけ）。その行の分を引いて割り付ける
+  const more = document.createElement("p");
+  more.className = "page-more";
+  more.innerHTML = `<span class="page-no">Page:1/1</span><span class="page-hint"></span>`;
+  main.append(more);
+  const moreH = more.getBoundingClientRect().height;
+  const top = tbody.getBoundingClientRect().top;
+  const heights = rows.map((r) => r.getBoundingClientRect().height);
+  const fits = heights.reduce((t, h) => t + h, 0) <= bottom - top + 0.5;
+  const starts: number[] = [0];
+  if (!fits) {
+    let used = 0;
+    for (let i = 0; i < rows.length; i++) {
+      if (used > 0 && used + heights[i] > bottom - top - moreH + 0.5) {
+        starts.push(i);
+        used = 0;
+      }
+      used += heights[i];
+    }
+  }
+  state.pages = starts.length;
+  state.page = Math.min(state.page, state.pages - 1);
+  const from = starts[state.page];
+  const to = starts[state.page + 1] ?? rows.length;
+  rows.forEach((r, i) => (r.hidden = i < from || i >= to));
+  const last = state.page === state.pages - 1;
+  main.classList.toggle("more-below", !last);
+  if (state.pages === 1) {
+    more.remove();
+    return;
+  }
+  const no = more.querySelector<HTMLElement>(".page-no")!;
+  no.textContent = `Page:${state.page + 1}/${state.pages}`;
+  no.setAttribute("aria-label", `${state.pages}ページ中${state.page + 1}ページ目`);
+  const hint = more.querySelector<HTMLElement>(".page-hint")!;
+  if (last) hint.remove();
+  else hint.textContent = lang === "en" ? trText("縦スワイプで続きを表示") : "縦スワイプで続きを表示";
 }
 
-/** 明細のスクロールは縦スワイプだけ（user 2026-11-20）。スクロールバーは出さない（CSS）。
- *  タッチは touch-action: pan-y でブラウザに縦だけ任せる。マウスは縦のドラッグで同じように動かす（横のドラッグは保留のスワイプに残す）。
- *  ドラッグで動かしたら、離したときのクリックは捨てる（ボタンの上から始めても押したことにならない） */
-const MAIN_DRAG_PX = 8;
+function turnPage(main: HTMLElement, dir: 1 | -1): void {
+  const st = mainPage.get(pageKey(main));
+  if (main.querySelector(":scope > table.lines.cols3") && st) {
+    const next = st.page + dir;
+    if (next < 0 || next >= st.pages) return;
+    st.page = next;
+    paginate(main);
+    return;
+  }
+  // 明細の表のない画面（照合の一覧など）は、見えている高さずつ送る
+  main.scrollTop = Math.max(0, main.scrollTop + dir * main.clientHeight * 0.9);
+}
+
+/** 明細は縦スワイプだけで送る（スクロールバーは出さない、CSS）。タッチもマウスも縦に MAIN_SWIPE_PX 以上動かして離すと一ページ。
+ *  上へのスワイプ＝次のページ、下へ＝前のページ。横のスワイプは保留に残す。
+ *  ホイール・トラックパッドは一続きの回転を一ページとして扱う（WHEEL_QUIET_MS のあいだ止まるまで次を受け付けない） */
+const MAIN_SWIPE_PX = 30;
+const WHEEL_QUIET_MS = 250;
 function wireMainScroll(): void {
-  app.addEventListener("scroll", (e) => {
-    const t = e.target;
-    if (t instanceof HTMLElement && t.classList.contains("screen-main")) markMoreBelow(t);
-  }, true);
-  window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach(markMoreBelow));
-  let drag: { main: HTMLElement; x: number; y: number; top: number; id: number; on: boolean } | null = null;
+  window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach(paginate));
+  let start: { main: HTMLElement; x: number; y: number; id: number } | null = null;
   app.addEventListener("pointerdown", (e) => {
-    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    if (e.button !== 0) return;
     const t = e.target as Element;
     const main = t.closest<HTMLElement>(".screen-main");
-    if (!main || main.scrollHeight <= main.clientHeight || t.closest("input, select, textarea")) return;
-    drag = { main, x: e.clientX, y: e.clientY, top: main.scrollTop, id: e.pointerId, on: false };
-  });
-  window.addEventListener("pointermove", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dx = e.clientX - drag.x;
-    const dy = e.clientY - drag.y;
-    if (!drag.on) {
-      if (Math.abs(dy) < MAIN_DRAG_PX) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        drag = null;
-        return;
-      }
-      drag.on = true;
-    }
-    window.getSelection()?.removeAllRanges();
-    drag.main.scrollTop = drag.top - dy;
+    if (!main || t.closest("input, select, textarea, [data-code], [data-wallet]")) return;
+    start = { main, x: e.clientX, y: e.clientY, id: e.pointerId };
   });
   const end = (e: PointerEvent): void => {
-    if (!drag || e.pointerId !== drag.id) return;
-    if (drag.on) swallowClick = true;
-    drag = null;
+    if (!start || e.pointerId !== start.id) return;
+    const { main, x, y } = start;
+    start = null;
+    const dx = e.clientX - x;
+    const dy = e.clientY - y;
+    if (Math.abs(dy) < MAIN_SWIPE_PX || Math.abs(dx) > Math.abs(dy)) return;
+    swallowClick = true;
+    turnPage(main, dy < 0 ? 1 : -1);
   };
   window.addEventListener("pointerup", end);
-  window.addEventListener("pointercancel", end);
+  window.addEventListener("pointercancel", () => (start = null));
+  app.addEventListener("dragstart", (e) => {
+    if ((e.target as Element).closest?.(".screen-main")) e.preventDefault();
+  });
+  let wheelAt = 0;
+  app.addEventListener(
+    "wheel",
+    (e) => {
+      const main = (e.target as Element).closest<HTMLElement>(".screen-main");
+      if (!main || Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+      e.preventDefault();
+      const now = Date.now();
+      const quiet = now - wheelAt > WHEEL_QUIET_MS;
+      wheelAt = now;
+      if (quiet && e.deltaY !== 0) turnPage(main, e.deltaY > 0 ? 1 : -1);
+    },
+    { passive: false },
+  );
 }
 
 /** 保留したら第二待ち受けを右から、保留した取引に戻ったらそれを左から滑り込ませる（両画面とも） */

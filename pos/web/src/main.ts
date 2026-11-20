@@ -1434,6 +1434,7 @@ function paginate(main: HTMLElement, force = false): void {
   // 中身を描き直していなければ、スクロールの位置もページもそのまま
   if (box.classList.contains("lines-scroll") && !force) return;
   main.querySelector(":scope > .page-more")?.remove();
+  main.querySelector(":scope > .page-bar")?.remove();
   if (!box.classList.contains("lines-scroll")) {
     box = document.createElement("div");
     box.className = "lines-scroll";
@@ -1486,6 +1487,11 @@ function paginate(main: HTMLElement, force = false): void {
   pad.innerHTML = `<td colspan="3" style="height:${Math.max(0, view - lastH)}px"></td>`;
   rows[rows.length - 1].after(pad);
   box.scrollTop = pageTop(box, rows, state.starts[state.page], head);
+  const bar = document.createElement("div");
+  bar.className = "page-bar";
+  bar.setAttribute("aria-hidden", "true");
+  bar.innerHTML = `<span class="page-thumb"></span>`;
+  main.append(bar);
   showPage(main, lang);
 }
 
@@ -1512,9 +1518,62 @@ function showPage(main: HTMLElement, lang = langOf(Number(pageKey(main).split("-
   const hint = more.querySelector<HTMLElement>(".page-hint")!;
   hint.textContent = last ? "" : lang === "en" ? trText("スクロールで続きを表示") : "スクロールで続きを表示";
   hint.hidden = last;
+  placeBar(main, box, head);
+}
+
+/** 明細のスクロールバー（user 2026-11-20）。スマホのブラウザは標準のスクロールバーを動かしているあいだしか出さないので、
+ *  いつも見える細いバーを自前で描く（標準のバーは CSS で隠す）。つまみはドラッグでき、離すとページの一行目に吸い付く */
+function placeBar(main: HTMLElement, box: HTMLElement, head: number): void {
+  const bar = main.querySelector<HTMLElement>(":scope > .page-bar");
+  if (!bar) return;
+  const m = main.getBoundingClientRect();
+  const b = box.getBoundingClientRect();
+  const trackH = box.clientHeight - head;
+  bar.style.top = `${b.top - m.top + head}px`;
+  bar.style.left = `${b.right - m.left - bar.offsetWidth}px`;
+  bar.style.height = `${trackH}px`;
+  const thumb = bar.firstElementChild as HTMLElement;
+  const view = box.clientHeight - head;
+  const total = Math.max(view, box.scrollHeight - head);
+  const h = Math.max(trackH * (view / total), trackH / 8);
+  const max = box.scrollHeight - box.clientHeight;
+  thumb.style.height = `${h}px`;
+  thumb.style.top = `${max > 0 ? (trackH - h) * (box.scrollTop / max) : 0}px`;
 }
 
 function wireMainScroll(): void {
+  let drag: { box: HTMLElement; bar: HTMLElement; y: number; top: number; id: number } | null = null;
+  app.addEventListener("pointerdown", (e) => {
+    const bar = (e.target as Element).closest<HTMLElement>(".page-bar");
+    const box = bar?.parentElement?.querySelector<HTMLElement>(":scope > .lines-scroll");
+    if (!bar || !box) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const thumb = bar.firstElementChild as HTMLElement;
+    const r = thumb.getBoundingClientRect();
+    // つまみの外を押したら、その位置へつまみの中心を移してからドラッグ
+    if (e.clientY < r.top || e.clientY > r.bottom) {
+      const tr = bar.getBoundingClientRect();
+      const ratio = (e.clientY - tr.top - r.height / 2) / Math.max(1, tr.height - r.height);
+      box.scrollTop = Math.max(0, Math.min(1, ratio)) * (box.scrollHeight - box.clientHeight);
+    }
+    box.style.scrollSnapType = "none";
+    bar.setPointerCapture(e.pointerId);
+    drag = { box, bar, y: e.clientY, top: box.scrollTop, id: e.pointerId };
+  });
+  window.addEventListener("pointermove", (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const thumb = drag.bar.firstElementChild as HTMLElement;
+    const room = Math.max(1, drag.bar.clientHeight - thumb.offsetHeight);
+    drag.box.scrollTop = drag.top + ((e.clientY - drag.y) / room) * (drag.box.scrollHeight - drag.box.clientHeight);
+  });
+  const end = (e: PointerEvent): void => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.box.style.scrollSnapType = "";
+    drag = null;
+  };
+  window.addEventListener("pointerup", end);
+  window.addEventListener("pointercancel", end);
   window.addEventListener("resize", () => app.querySelectorAll<HTMLElement>(".screen-main").forEach((m) => paginate(m, true)));
   app.addEventListener(
     "scroll",

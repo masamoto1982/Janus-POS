@@ -1520,6 +1520,17 @@ export const SIGNAGE: readonly (readonly [string, string])[] = [
 ];
 export const SIGNAGE_MS = 8000;
 
+/** セルフ操作モードの最下段の添え書き（user 2026-11-20）。売り場側に開示した FF タブがあるときは、
+ *  「〇〇がセルフレジで買えるようになりました」とサイネージと同じ間隔（SIGNAGE_MS）で切り替える。
+ *  入りきらない文は main.ts の fitNotes が電光掲示板のように流す（文字は縮めない） */
+export function callNote(floorTabs: ReadonlySet<string>, now = Date.now()): string {
+  const notes = ["カウンター内の商品はスタッフが対応いたします（一部商品除く）"];
+  const open = FF_TABS.filter(([k]) => floorTabs.has(k)).map(([, label]) => label);
+  if (open.length) notes.push(`${open.join("・")}がセルフレジで買えるようになりました`);
+  const note = notes[Math.floor(now / SIGNAGE_MS) % notes.length];
+  return `<p class="call-note${notes.length > 1 ? " rotating" : ""}"><span>${esc(note)}</span></p>`;
+}
+
 export function signage(now = Date.now()): string {
   const [big, small] = SIGNAGE[Math.floor(now / SIGNAGE_MS) % SIGNAGE.length];
   return `<div class="signage" aria-label="お知らせ" data-i18n-skip>${msg(esc(big), esc(small))}</div>`;
@@ -1593,7 +1604,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
       callBtn("その他", "", { type: "call_staff", register: reg, topic: "other" }, a("call_staff"), "other"),
     ].join("");
     // 事前の案内なしに呼び鈴が鳴るとお客様を驚かせるので、添え書きを出す。文は受け取り方に誤りの余地がない一番具体的な表現なので、ボタン群の上に置く（user 2026-11-17）
-    return `<p class="call-note">カウンター内の商品はスタッフが対応いたします</p><div class="call-row" data-law>${callBtns}</div>`;
+    return `${callNote(floorTabs, now)}<div class="call-row" data-law>${callBtns}</div>`;
   }
   if (r.mode === "staff_operated" && side === "floor") return signage(now);
   if (r.mode === "staff_operated" && r.counter.phase === "paying") return "";

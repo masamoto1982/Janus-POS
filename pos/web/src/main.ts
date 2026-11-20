@@ -76,9 +76,22 @@ async function boot(): Promise<void> {
   window.addEventListener("pagehide", save);
   window.setInterval(frame, 100);
   // レイアウトの法則は部品の大きさで決まるので、段の大きさが変わったときとフォントが届いたときにも当て直す
-  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), applyLaw(e.target))));
+  const relaid = new ResizeObserver((es) => es.forEach((e) => (fitText(e.target), applyLaw(e.target), fitNotes(e.target))));
   app.querySelectorAll(".screen-main, .screen-items").forEach((el) => relaid.observe(el));
-  void document.fonts?.ready.then(() => (fitText(app), applyLaw(app)));
+  void document.fonts?.ready.then(() => (fitText(app), applyLaw(app), fitNotes(app)));
+}
+
+/** 最下段の添え書きが一行に入りきらないときは、文字を縮めずに電光掲示板のように流す（user 2026-11-20）。
+ *  文頭で止まって読ませてから文末まで流し、文末でまた止まる。流す距離＝はみ出した幅 */
+function fitNotes(root: Element): void {
+  root.querySelectorAll<HTMLElement>(".call-note").forEach((p) => {
+    const span = p.firstElementChild as HTMLElement | null;
+    if (!span) return;
+    const over = Math.ceil(span.offsetWidth - p.clientWidth);
+    p.classList.toggle("marquee", over > 0);
+    if (over > 0) p.style.setProperty("--marquee", `${-over}px`);
+    else p.style.removeProperty("--marquee");
+  });
 }
 
 const SAVE_KEY = "janus-pos-state";
@@ -324,6 +337,7 @@ function setRegion(name: string, raw: string, lang: Lang = "ja"): void {
   el.innerHTML = html;
   fitText(el);
   applyLaw(el);
+  fitNotes(el);
 
   el.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-key]").forEach((i) => {
     const v = values.get(i.dataset.key!);

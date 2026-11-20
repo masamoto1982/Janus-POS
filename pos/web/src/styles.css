@@ -719,10 +719,20 @@ body.dragging .drop-hint { display: inline; }
    点いているあいだは赤 --sos-head＋白文字、消えているあいだはその段のふだんの色 */
 .screen.sos .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--sos-head) calc(var(--blink-on) * 100%), var(--tier-deep)); }
 .screen.sos .call-row.calling :is(.big, p.small) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
-/* セルフ操作モードの最下段：ボタン群の上に「カウンター内の商品はスタッフが対応いたします」を添え、案内とボタン群をまとめて縦の中央に置く（user 2026-11-16） */
+/* セルフ操作モードの最下段：ボタン群の上に「カウンター内の商品はスタッフが対応いたします（一部商品除く）」を添え、案内とボタン群をまとめて縦の中央に置く（user 2026-11-16） */
 .screen-items:has(> .call-note) { justify-content: center; }
 .screen-items:has(> .call-note) > .call-row { flex: none; }
-.call-note { margin: 0; color: var(--msg-strong); font-size: var(--text-sm); line-height: 1.35; text-align: center; }
+.call-note { margin: 0; color: var(--msg-strong); font-size: var(--text-sm); line-height: 1.35; text-align: center; white-space: nowrap; overflow: hidden; }
+.call-note > span { display: inline-block; }
+/* 売り場側に開示した FF タブがあるときは、添え書きをサイネージと同じ間隔で切り替える。切り替わりはふわっと出す */
+.call-note.rotating { animation: note-in 0.4s ease-out; }
+@keyframes note-in { from { opacity: 0; } to { opacity: 1; } }
+/* 一行に入りきらない添え書きは電光掲示板のように流す（文字は縮めない、user 2026-11-20）：
+   文頭で止まって読ませ、文末まで流し、文末で止まる。一巡はサイネージの切り替えと同じ 8 秒 */
+.call-note.marquee { text-align: left; }
+.call-note.marquee > span { animation: note-scroll 8s linear infinite; }
+@keyframes note-scroll { 0%, 20% { transform: none; } 75%, 100% { transform: translateX(var(--marquee)); } }
+@media (prefers-reduced-motion: reduce) { .call-note.marquee > span { animation: none; } }
 .call-btn { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .call-btn.pressing { transform: translate(var(--s17, 1px), var(--s15, 2px)); }
 .call-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; height: var(--btn-h); max-height: 100%; min-height: 0; padding: 0 var(--s13, 4px); border-radius: var(--shape-soft); line-height: 1; }

@@ -2184,16 +2184,22 @@ function walletItem(key: string, name: string, sub: string, cls: string): string
 export function walletPanel(emoneyBalance: number): string {
   const bills = [10000, 5000, 2000, 1000].map((d) => walletItem(`cash:${d}`, `${d.toLocaleString()}円`, "", "bill"));
   const coins = [500, 100, 50, 10, 5, 1].map((d) => walletItem(`cash:${d}`, `${d}円`, "", "coin"));
-  const cards = [
-    item("PC12345678", "ポイントカード", "", "card", WALLET_PURPOSE.PC12345678),
-    item("PC87654321", "ポイントアプリ", "", "card", WALLET_PURPOSE.PC87654321),
-    item("CP0001", "引換券", "ソフトドリンク", "coupon", WALLET_PURPOSE.CP0001),
-    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon", WALLET_PURPOSE.CP0002),
+  // 並び（user 2026-11-20）：紙幣／硬貨／決済（電子マネー・バーコード決済・クレジットカード）／クーポン／ポイント、種類ごとに改行する
+  const pays = [
+    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay"),
     walletItem("pay:qr", "バーコード決済", "", "pay"),
     walletItem("pay:credit", "クレジットカード", "", "pay"),
-    walletItem("pay:emoney", "電子マネー", `残高 ${yen(emoneyBalance)}`, "pay"),
   ];
-  return `<div class="shelf"><div class="items">${[...bills, ...coins].join("")}</div><div class="items wallet-cards">${cards.join("")}</div></div>`;
+  const coupons = [
+    item("CP0001", "引換券", "ソフトドリンク", "coupon", WALLET_PURPOSE.CP0001),
+    item("CP0002", "割引券", "サンドイッチ 50円引き", "coupon", WALLET_PURPOSE.CP0002),
+  ];
+  const points = [
+    item("PC12345678", "ポイントカード", "", "card", WALLET_PURPOSE.PC12345678),
+    item("PC87654321", "ポイントアプリ", "", "card", WALLET_PURPOSE.PC87654321),
+  ];
+  const row = (xs: string[], cls = "") => `<div class="items${cls}">${xs.join("")}</div>`;
+  return `<div class="shelf">${row(bills)}${row(coins)}${[pays, coupons, points].map((xs) => row(xs, " wallet-cards")).join("")}</div>`;
 }
 
 export function sideOf(cmd: Command): "counter" | "floor" | "store" {

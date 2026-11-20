@@ -1607,18 +1607,14 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
 /** セルフ操作モードで「FF」を押して FF タブを開いているレジ */
 export const ffFloorOpen = new Set<number>();
 
-/** FF タブを開いているあいだ、最下段の上の段の下端に置く行：左下に「バック」（四つのボタンに戻る）、右下に「金券」「たばこ」「その他」（user 2026-11-20） */
+/** FF タブを開いているあいだ、最下段の上の段の下端に重ねる行：左下に「バック」（四つのボタンに戻る）、右下に「金券」「たばこ」「その他」（user 2026-11-20）。
+ *  存在感は控えめに、すべて小ボタン・添え字なし。下の明細は滲ませて（登録画面に重ねる理由の表示と同じぼかし）ボタンを浮かせる */
 export function ffOpenFoot(r: RegisterView): string {
   const reg = r.id;
-  const a = (n: Action) => find(r.floor.actions, n);
-  const callBtn = (main: string, sub: string, topic: "voucher" | "tobacco" | "other", st: Gate) =>
-    `<button class="call-btn" data-hold="${esc(JSON.stringify({ type: "call_staff", register: reg, topic }))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
-  const calls = [
-    callBtn("金券", "切手・印紙", "voucher", a("call_staff")),
-    callBtn("たばこ", "紙巻き・電子", "tobacco", a("call_staff")),
-    callBtn("その他", "", "other", a("call_staff")),
-  ].join("");
-  return `<div class="ff-open-foot"><button type="button" class="ghost back-btn" data-ffclose="${reg}">バック</button><div class="ff-open-calls">${calls}</div></div>`;
+  const can = find(r.floor.actions, "call_staff");
+  const callBtn = (label: string, topic: "voucher" | "tobacco" | "other") =>
+    `<button type="button" class="ghost ff-foot-call" data-hold="${esc(JSON.stringify({ type: "call_staff", register: reg, topic }))}"${can.allowed ? "" : ` disabled title="${esc(can.reason ?? "")}"`}>${label}</button>`;
+  return `<div class="ff-open-foot"><button type="button" class="ghost" data-ffclose="${reg}">バック</button><div class="ff-open-calls">${callBtn("金券", "voucher")}${callBtn("たばこ", "tobacco")}${callBtn("その他", "other")}</div></div>`;
 }
 
 function ffTabRow(reg: number, tabs: readonly (readonly [string, string])[], cur: string): string {

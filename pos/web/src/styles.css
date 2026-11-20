@@ -332,7 +332,7 @@ button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-
 .screen.sos .call-row.calling .sos-store { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
 /* 解除のあと：発動・解除の時刻（レシートの中身） */
 .screen .sos-log { display: flex; flex-wrap: wrap; gap: var(--s13, 4px) var(--s8, 24px); justify-content: center; margin: 0; color: var(--msg-strong); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
-.bell-sub { margin: var(--s9, 16px) 0 var(--s13, 4px); font-size: var(--text-sm); }
+.bell-sub { margin: var(--s9, 16px) 0 var(--s13, 4px); font-size: var(--text-lg); }
 
 .staff-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--s11, 8px); align-items: center; }
 .staff-head .tax-note { margin-left: auto; }
@@ -466,10 +466,13 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .loading, .error { padding: 24px; }
 .error { color: var(--danger); }
 
-.top h1 { font-size: var(--text-lg); margin: 0; }
+/* シミュレーターまわりの文字もレジ画面と同じ四段階（user 2026-11-20）：ページ・エリア・ダイアログの見出し＝強調（--text-num）、
+   その中の項目の見出し（日配食品・税区分 など）＝大（--text-lg）、項目・本文・ボタン＝小（--text-sm）。特大（--text-xl）はレジ画面の中だけ。
+   見出しは必ず中の項目より大きく。モバイルでも段を変えない */
+.top h1 { font-size: var(--text-num); margin: 0; white-space: nowrap; }
 .top .logo { width: 73px; height: 73px; flex: none; }
 .build-badge { font-size: var(--text-sm); font-weight: 600; color: var(--white); background: var(--grey-4); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
-.reset-btn { margin-left: auto; }
+.reset-btn { margin-left: auto; white-space: nowrap; flex: none; }
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
 .tip::after { content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 20; width: max-content; max-width: 280px; padding: 6px 10px; border-radius: 8px; background: var(--grey-4); color: var(--white); font-size: var(--text-sm); font-weight: 500; line-height: 1.5; white-space: normal; opacity: 0; pointer-events: none; transition: opacity .12s; }
@@ -483,7 +486,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .register, .bell-area, .right {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
-.register h2, .bell-area h2, .right h2 { margin: 0 0 8px; font-size: var(--text-lg); display: flex; gap: 8px; align-items: center; }
+.register h2, .bell-area h2, .right h2 { margin: 0 0 8px; font-size: var(--text-num); display: flex; gap: 8px; align-items: center; }
 .hw { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin-top: 10px; }
 .hw .row { margin: 0; }
 
@@ -516,7 +519,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .right-col { display: grid; gap: 16px; min-width: 0; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); max-height: calc(100vh - 24px); overflow-y: auto; }
 @media (max-width: 900px) { .right-col { position: static; max-height: none; } }
 .shelf + .shelf { margin-top: 6px; }
-.shelf h3 { margin: 0 0 4px; font-size: var(--text-sm); color: var(--muted); font-weight: 600; letter-spacing: .04em; }
+.shelf h3 { margin: 0 0 4px; font-size: var(--text-lg); color: var(--muted); font-weight: 600; letter-spacing: .04em; }
 .items { display: flex; flex-wrap: wrap; gap: var(--gap); }
 .item {
   display: flex; flex-direction: column; align-items: flex-start; gap: 0; text-align: left;
@@ -628,7 +631,7 @@ body.dragging .drop-hint { display: inline; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
 .rules-dlg::backdrop { background: color-mix(in oklch, var(--black) 45%, transparent); }
 .rules-dlg .dlg-head { display: flex; align-items: center; gap: 8px; }
-.rules-dlg .dlg-head h2 { margin: 0; font-size: var(--text-lg); flex: 1; }
+.rules-dlg .dlg-head h2 { margin: 0; font-size: var(--text-num); flex: 1; }
 .rules-dlg .toast { position: sticky; top: 0; z-index: 1; margin: 6px 0; }
 .rules-dlg .toast:not(.show) { display: none; }
 .lines.rules tr.grp th { text-align: left; padding-top: 10px; color: var(--muted); font-size: var(--text-sm); }
@@ -637,8 +640,7 @@ body.dragging .drop-hint { display: inline; }
 .ffmenu.center { justify-content: center; }
 .icon-btn { width: var(--s8, 26px); height: var(--s8, 26px); padding: 0; border-radius: var(--shape-round); font-size: var(--text-sm); line-height: 1; background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
 .icon-btn:hover { color: var(--ink); }
-.rules-dlg h3 { font-size: var(--text-sm); margin: 14px 0 6px; }
-.rules-dlg h4 { font-size: var(--text-sm); margin: 14px 0 6px; }
+.rules-dlg :is(h3, h4) { font-size: var(--text-lg); margin: 14px 0 6px; }
 .rules-dlg .rules-tabs { margin-top: 12px; }
 /* 販売規則の設定の入力フォームはレジ画面の中と同じ（user 2026-11-20）：角丸なし・背景なし・操作の青の枠、高さ小 W/16×幅 W/4、
    打ち込んだ文字は大テキスト・入力例は小テキストの青2。数を打つ欄は押すとレジ画面と同じテンキーが開く。
@@ -820,11 +822,12 @@ body.dragging .drop-hint { display: inline; }
 .picker-dlg .dlg-head { justify-content: flex-end; }
 /* 長押しピッカーの Item・Wallet の見出し（デスクトップの右側の見出しと同じ大きさ） */
 .picker-area + .picker-area { margin-top: 16px; }
-.picker-area-head { margin: 0 0 8px; font-size: var(--text-lg); }
+.rules-dlg .picker-area-head { margin: 0 0 8px; font-size: var(--text-num); display: flex; align-items: center; gap: 8px; }
 @media (max-width: 760px) {
-  .top { padding-block: 6px; }
+  .top { padding-block: 6px; gap: 8px; padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+  /* 見出しを強調の段のまま収めるため、ビルド番号は入りきらない分を省く */
+  .build-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top .logo { width: 36px; height: 36px; }
-  .top h1 { font-size: var(--text-lg); }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   .left { gap: 8px; }
@@ -839,7 +842,7 @@ body.dragging .drop-hint { display: inline; }
   .bell-unit { gap: 4px; padding: 3px 8px; font-size: var(--text-sm); }
   .bell-unit .bell-icon { font-size: var(--text-sm); }
   .register { padding: 8px; }
-  .register h2 { flex-wrap: wrap; row-gap: 4px; font-size: var(--text-sm); margin-bottom: 4px; }
+  .register h2 { flex-wrap: wrap; row-gap: 4px; margin-bottom: 4px; }
   .register h2 .idle { font-size: var(--text-sm); }
   .swipe-tabs { display: flex; border-bottom: none; }
   /* 画面切り替えのタブは横いっぱいのまま、白銀比のボタンを上下に二分割した形（FF のタブと同じ、縦横比 1:2√2）を

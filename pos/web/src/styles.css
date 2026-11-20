@@ -130,8 +130,11 @@ button { touch-action: manipulation; }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: auto; padding: var(--s11, 8px) var(--s10, 12px); }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
-/* FF のタブの線と単品ボタンの間、単品ボタンと段の下端の間は同じ余白（user 2026-11-16 に倍へ） */
-.screen-items:has(> .ff-tabs) { gap: var(--s12, 6px); padding-bottom: var(--s12, 6px); }
+/* FF の段は三つの余白をそろえる（user 2026-11-20）：段の上端〜タブ、タブの線〜単品ボタン、単品ボタン〜段の下端。
+   残りの高さを三等分する（space-evenly）ので、画面の幅が変わってもそろったまま */
+.screen-items:has(> .ff-tabs) { gap: 0; padding-top: 0; padding-bottom: 0; justify-content: space-evenly; }
+.screen-items > .ff-tabs { margin-top: 0; }
+.screen-items:has(> .ff-tabs) > .ff-page { flex: none; }
 /* テキストは五段階（:root の --text-*）：特大（第一待ち受けの稼働モード・休止中・呼び出しの用件）／強調（数字・残高不足）／大（案内の一行目・入力欄）／小（案内の二行目・本文・ボタン）／極小（小ボタン・ラベル・添え字）
    大テキストは必ず小テキストより上に、4px 空けて置く（web の msg()） */
 .screen { --muted: var(--msg-weak); }

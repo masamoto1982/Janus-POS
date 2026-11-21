@@ -42,9 +42,7 @@ Janus-POS は、先人の研究と多くの人の仕事の上に成り立って�
 
 - **色**：四つの色（赤 #FF4B00・青 #005AFF・緑 #03AF7A・橙 #F6AA00）は、NPO法人カラーユニバーサルデザイン機構（CUDO）の「カラーユニバーサルデザイン推奨配色セット」をもとに、OKLCH で定義し直したものです。色の見え方の多様性に向き合い、誰にとっても見分けやすい配色を研究して公開してくださった皆さまに、深く感謝します。この配色セットに出会うきっかけをくださった記事「[見やすいグラフの色分けをまとめました（カラーコード）](https://contents-open.hatenablog.com/entry/2021/08/19/231157)」の筆者にも感謝します。
 - **オープンソース**：Rust、Serde、wasm-bindgen、TypeScript、Vite、Vitest をはじめ、Janus-POS を支えるオープンソースソフトウェアの作者と貢献者の皆さまに感謝します（ライセンス表記は下記）。
-- **生成 AI**：Janus-POS の設計と実装は Anthropic の Claude とともに進め、仮のロゴは Google の Gemini で作りました。Anthropic、Google をはじめ、生成 AI をつくり育ててきたすべての皆さんへ。
-
-ありがとう。
+- **生成 AI**：Janus-POS の設計と実装は Anthropic の Claude とともに進め、仮のロゴは Google の Gemini で作りました。Anthropic、Google をはじめ、生成 AI をつくり育ててきたすべての皆さまに感謝します。
 
 ## ライセンス
 

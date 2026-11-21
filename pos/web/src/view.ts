@@ -1052,15 +1052,22 @@ export type CancelStage = "choose" | "void" | "item";
 /** 取消しを押したレジと、押した側・段階（user 2026-11-20、旧「取引中止」） */
 export const cancelAsk = new Map<number, { side: Side; stage: CancelStage }>();
 
-/** 取消し：取引を取り消すか、明細があれば商品を取り消すかを選ぶ入口。取引を取り消せるときに押せる */
-function cancelBtn(reg: number, side: Side, st: Gate): string {
-  const title = st.allowed ? "取引か商品を取り消す" : (st.reason ?? "");
-  return `<button type="button" class="void-btn"${st.allowed ? ` data-cancel-ask="${reg}:${side}:choose"` : " disabled"} title="${esc(title)}">取消し</button>`;
+/** 帯の左のボタンの名前：スタッフ操作モードは「取消し」、セルフ操作モードは「取引中止」（user 2026-11-21） */
+const cancelLabel = (r: RegisterView) => (r.mode === "staff_operated" ? "取消し" : "取引中止");
+
+/** 取消し：取引を取り消すか、明細があれば商品を取り消すかを選ぶ入口。取引を取り消せるときに押せる。
+ *  商品取消し（取消しキー＋スキャン）はレジの素人のお客様には学習の負担が大きいので、スタッフ操作モードだけ（user 2026-11-21）。
+ *  セルフ操作モードは「取引中止」で、押すとすぐ取引の中止の確認に進む */
+function cancelBtn(r: RegisterView, side: Side, st: Gate): string {
+  const staff = r.mode === "staff_operated";
+  const title = st.allowed ? (staff ? "取引か商品を取り消す" : "取引を中止する（確認があります）") : (st.reason ?? "");
+  return `<button type="button" class="void-btn"${st.allowed ? ` data-cancel-ask="${r.id}:${side}:${staff ? "choose" : "void"}"` : " disabled"} title="${esc(title)}">${cancelLabel(r)}</button>`;
 }
 
 function cancelScreen(r: RegisterView, side: Side, view: { lines: { qty: number }[]; total: number; inserted: number }): string {
   const reg = r.id;
-  const stage = cancelAsk.get(reg)?.stage ?? "choose";
+  const staff = r.mode === "staff_operated";
+  const stage = staff ? (cancelAsk.get(reg)?.stage ?? "choose") : "void";
   const acts = r.mode === "staff_operated" ? r.counter.actions : r.floor.actions;
   if (r.mode === "staff_operated" && side === "floor") return pairNote(stage === "void" ? "取引の取り消しを確認しています" : "スタッフが取り消しの操作をしています");
   const backTo = (to: CancelStage | "") => `<div class="back-foot"><button type="button" class="md ghost back-btn" data-cancel-ask="${reg}:${side}:${to}">バック</button></div>`;
@@ -1072,8 +1079,9 @@ function cancelScreen(r: RegisterView, side: Side, view: { lines: { qty: number 
       <div class="point-choices pair"><button type="button" class="ghost" data-cancel-ask="${reg}:${side}:void">取引を取り消す</button>${itemBtn}</div>
     </div>${backTo("")}`;
   }
+  // FF はスキャンできないので、最下段に FF タブを出し、押した FF を取り消す（itemsPanel、user 2026-11-21）
   if (stage === "item")
-    return `<div class="point-screen cancel-screen">${msg("取り消す商品をスキャンしてください", "スキャンした商品を1点取り消します")}</div>${backTo("choose")}`;
+    return `<div class="point-screen cancel-screen">${msg("取り消す商品をスキャンしてください", "FFは下のボタンを押してください")}</div>${backTo("choose")}`;
   const st = find(acts, "void_transaction");
   const back = [
     view.inserted ? `入れたお金 ${yen(view.inserted)} は出金ボックスに戻ります` : "",
@@ -1085,9 +1093,9 @@ function cancelScreen(r: RegisterView, side: Side, view: { lines: { qty: number 
     .map((s) => `<br>${s}`)
     .join("");
   return `<div class="point-screen void-screen">
-      ${msg("取引を取り消しますか？", `登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}`)}
+      ${msg(staff ? "取引を取り消しますか？" : "取引を中止しますか？", `登録した ${itemCount(view.lines)}点（合計 ${yen(view.total)}）をすべて取り消します${back}`)}
       <div class="point-choices">${btn("はい", { type: "void_transaction", register: reg }, st, "primary")}</div>
-    </div>${backTo("choose")}`;
+    </div>${backTo(staff ? "choose" : "")}`;
 }
 
 const STAFF_OP_GUIDES: [GuideKind, string, string][] = [
@@ -1164,10 +1172,11 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
           : btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.max_items,
     r.points,
-    ro || cancelAsk.has(reg) ? "" : cancelBtn(reg, side, a("void_transaction")),
+    ro || cancelAsk.has(reg) ? "" : cancelBtn(r, side, a("void_transaction")),
     "",
     paying && v.method === "cash" && v.inserted > 0 ? tenderSum(v.total - r.prepaid, v.inserted) : "",
     !ro,
+    cancelLabel(r),
   );
   const back = ro
     ? ""
@@ -1339,10 +1348,10 @@ export function tenderSum(total: number, inserted: number): string {
 const bandSlot = (label: string) => `<button type="button" class="band-slot" aria-hidden="true" tabindex="-1" disabled>${label}</button>`;
 
 /** slots＝この面が取消し・お会計を持つ（操作できる側）。持つ面では、ボタンが消えても席を残す */
-export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = "", slots = false): string {
+export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = "", slots = false, voidLabel = "取消し"): string {
   // ポイントカードだけ読んだときも、取消しと読んだポイントを出す
   if (count === 0 && (points?.balance ?? null) === null) return "";
-  if (slots && !voidHtml) voidHtml = bandSlot("取消し");
+  if (slots && !voidHtml) voidHtml = bandSlot(voidLabel);
   if (slots && !action) action = bandSlot("お会計");
   const full = count >= max ? `<small class="full">上限</small>` : "";
   const point = tender || pointInfo(points);
@@ -1624,6 +1633,13 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
   // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
   if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length) return callingRow(r, side, snap.now);
+  // スタッフ操作モードの「取り消す商品をスキャンしてください」の場面では、最下段に FF タブを出す。
+  // FF はスキャンできないので、取り消したい FF のボタンを押すと取り消しが成立する（user 2026-11-21）
+  const asked = cancelAsk.get(reg);
+  if (r.mode === "staff_operated" && side === "counter" && asked?.stage === "item" && !r.paused && !r.menu) {
+    const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
+    return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "remove_line"), r.counter.lines, true)}`;
+  }
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || cancelAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {
@@ -1641,7 +1657,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
         floorTabs.has(k)
           ? `<button type="button" role="tab" class="tab ff-tab ${k === tab ? "on" : ""}" data-fftab="${reg}:${k}" aria-selected="${k === tab}">${label}</button>`
           : `<button type="button" role="tab" class="tab ff-tab call-tab" aria-selected="false" data-hold="${esc(JSON.stringify({ type: "ff_button", register: reg }))}"${ffCall.allowed ? "" : ` disabled title="${esc(ffCall.reason ?? "")}"`} title="スタッフを呼び出します">${label}</button>`;
-      return `<div class="tabs ff-tabs ff-open" role="tablist" aria-label="FF">${FF_TABS.map(tabBtn).join("")}</div>${ffPage(reg, side, snap, tab, ui.page, a("register_ff"))}`;
+      return `<div class="tabs ff-tabs ff-open" role="tablist" aria-label="FF">${FF_TABS.map(tabBtn).join("")}</div>${ffPage(reg, side, snap, tab, ui.page, a("register_ff"), r.floor.lines)}`;
     }
     const ffBtn = floorTabs.size
       ? `<button type="button" class="call-btn ff" data-ffopen="${reg}"${a("ff_button").allowed ? "" : " disabled"}><b>FF</b><small>揚げ物など</small></button>`
@@ -1661,7 +1677,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
   const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
-  return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"))}`;
+  return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
 }
 
 /** セルフ操作モードで「FF」を押して FF タブを開いているレジ */
@@ -1685,16 +1701,26 @@ function ffTabRow(reg: number, tabs: readonly (readonly [string, string])[], cur
   return `<div class="tabs ff-tabs" role="tablist" aria-label="FF">${row}</div>`;
 }
 
-function ffPage(reg: number, side: Side, snap: Snapshot, tab: string, wantPage: number, can: Gate): string {
+const withBadge = (button: string, badge: string) => (badge ? button.replace(/<\/button>$/, `${badge}</button>`) : button);
+
+/** 登録数量のバッジ：オーダーの入った FF ボタンの右上に丸数字（user 2026-11-21）。取消しで押す FF を探しやすくする */
+const ffBadge = (n: number) => (n > 0 ? `<span class="ff-badge" aria-label="${n}点登録済み">${n}</span>` : "");
+
+/** cancel＝商品取消しの場面：押すと登録せず、その FF を1点取り消す（欠品の品も取り消せる） */
+function ffPage(reg: number, side: Side, snap: Snapshot, tab: string, wantPage: number, can: Gate, lines: readonly { name: string; kind: string; qty: number }[] = [], cancel = false): string {
   const items = snap.ff_stock.filter((f) => f.tab === tab);
+  // 売り場側の明細には商品コードがないので、FF の名前で数える（FF の名前は重ならない）
+  const ordered = (name: string) => lines.reduce((n, l) => n + (l.kind === "ff" && l.name === name ? l.qty : 0), 0);
   const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
   const page = Math.min(wantPage, pages - 1);
   const grid = items
     .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
     .map((f) => {
+      const badge = ffBadge(ordered(f.name));
+      if (cancel) return withBadge(btn(ffLabel(f.code, f.name), { type: "cancel_item", register: reg, side, code: f.code }, can, `ff-item ${f.level === "out" ? "low" : f.level}`), badge);
       const cmd: Command = { type: "register_ff", register: reg, side, code: f.code, qty: 1 };
-      if (f.level !== "out" || !can.allowed) return btn(ffLabel(f.code, f.name), cmd, can, `ff-item ${f.level}`);
-      return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${twoLine(ffLabel(f.code, f.name))}</button>`;
+      if (f.level !== "out" || !can.allowed) return withBadge(btn(ffLabel(f.code, f.name), cmd, can, `ff-item ${f.level}`), badge);
+      return `<button type="button" class="ff-item out" aria-disabled="true" data-ffforce="${esc(JSON.stringify({ ...cmd, force: true }))}" title="欠品：長押しで予約注文として登録します">${twoLine(ffLabel(f.code, f.name))}${badge}</button>`;
     })
     .join("");
   // ページ送りは、隠れたページがある側の縁に押せる「<」（前）・「>」（次）（user 2026-11-17）。単品の群とは列を分け、
@@ -1817,10 +1843,11 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
       : ""),
     r.max_items,
     r.points,
-    cancelAsk.has(reg) ? "" : cancelBtn(reg, side, a("void_transaction")),
+    cancelAsk.has(reg) ? "" : cancelBtn(r, side, a("void_transaction")),
     "",
     "",
     true,
+    cancelLabel(r),
   );
 
   if (!c.lines.length && !c.coupons.length && !c.point_card) cancelAsk.delete(reg);

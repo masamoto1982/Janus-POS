@@ -307,7 +307,8 @@ export function fitText(root: ParentNode): void {
     b.style.whiteSpace = "nowrap";
     // 余白 B÷8 はボタンの外形から測る（枠線はその中に含める）
     b.style.padding = `${Math.max(0, pad(b) - (parseFloat(getComputedStyle(b).borderTopWidth) || 0))}px`;
-    for (const el of b.querySelectorAll<HTMLElement>("*")) el.style.fontSize = "inherit";
+    // FF の登録数量のバッジは文字の段を一つ下げる（styles.css の .ff-badge）ので、ここでは揃えない
+    for (const el of b.querySelectorAll<HTMLElement>(":not(.ff-badge)")) el.style.fontSize = "inherit";
     if (two) {
       two.main.style.fontSize = `${base / STEPS[k]}px`;
       two.sub.style.fontSize = `${base / STEPS[k + 2]}px`;

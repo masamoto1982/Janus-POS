@@ -169,6 +169,11 @@ const DICT: Record<string, string> = {
   "商品のバーコードではありません": "That is not an item barcode",
   取り消せるのは登録した商品だけです: "Only registered items can be cancelled",
   "登録するときは、もう一度スキャンしてください": "To register it, scan it again",
+  "登録するときは、もう一度押してください": "To register it, press it again",
+  FFは下のボタンを押してください: "For FF, press its button below",
+  取引中止: "Cancel",
+  "取引を中止しますか？": "Cancel this transaction?",
+  商品の取り消しはスタッフ操作モードだけです: "Only staff can cancel items",
 
   // 支払い
   現金: "Cash",

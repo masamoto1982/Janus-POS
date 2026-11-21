@@ -48,6 +48,9 @@ const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、スタッフが�
 const PICKUP_ALONE: &str = "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです";
 const CANCEL_NOT_ITEM: &str = "商品のバーコードではありません\n取り消せるのは登録した商品だけです";
 const CANCEL_NOT_REGISTERED: &str = "は登録されていません\n登録するときは、もう一度スキャンしてください";
+const CANCEL_FF_NOT_REGISTERED: &str = "は登録されていません\n登録するときは、もう一度押してください";
+/// 商品取消しはスタッフ操作モードだけ（user 2026-11-21：取消しキー＋スキャンはお客様には学習の負担が大きい）
+const CANCEL_STAFF_ONLY: &str = "商品の取り消しはスタッフ操作モードだけです";
 const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引を取り消してください";
 const PARCEL_SLIP_TO_REMOVE: &str =
     "宅配便を取り消すときは、取り消す荷物の伝票のバーコードを読み取ってください";
@@ -3557,10 +3560,18 @@ impl Store {
     /// 登録していない商品は登録せずに知らせる（取り消せたら登録済みだった、取り消せなければ登録していなかったとわかる）
     fn cancel_item(&mut self, register: u8, side: Side, code: &str) -> Result<Outcome, String> {
         self.check(register, side, Action::RemoveLine)?;
-        let Scanned::Product(p) = catalog::classify(code) else {
-            return Err(CANCEL_NOT_ITEM.into());
-        };
         let r = self.reg(register).ok_or("レジがありません")?;
+        if r.mode != Mode::StaffOperated {
+            return Err(CANCEL_STAFF_ONLY.into());
+        }
+        // FF はスキャンせず、取消しの画面の最下段の FF ボタンで選ぶ（user 2026-11-21）
+        let p = match catalog::classify(code) {
+            Scanned::Product(p) => p,
+            _ => catalog::find(code)
+                .filter(|p| p.category == Category::FastFood)
+                .ok_or(CANCEL_NOT_ITEM)?,
+        };
+        let not_registered = if p.category == Category::FastFood { CANCEL_FF_NOT_REGISTERED } else { CANCEL_NOT_REGISTERED };
         let Some(l) = r
             .txn
             .lines
@@ -3568,9 +3579,13 @@ impl Store {
             .filter(|l| l.code == p.code)
             .max_by_key(|l| l.touched)
         else {
-            return Err(format!("{}{CANCEL_NOT_REGISTERED}", p.name));
+            return Err(format!("{}{not_registered}", p.name));
         };
-        let (line_id, qty, name, ff) = (l.id, l.qty, l.name, matches!(l.kind, LineKind::Ff { .. }));
+        let (line_id, qty, name) = (l.id, l.qty, l.name);
+        let handed = l.kind
+            == LineKind::Ff {
+                state: FfState::Received,
+            };
         let res = if qty > 1 {
             self.set_qty(register, side, line_id, qty - 1)?
         } else {
@@ -3580,7 +3595,8 @@ impl Store {
                 line_id,
             })?
         };
-        if ff {
+        // お渡し済みの FF は回収の案内（ff_collect）が出るので、そちらの知らせを優先する
+        if handed {
             return Ok(res);
         }
         done(format!("{name}を1点取り消しました"))

@@ -3386,11 +3386,29 @@ fn cancel_scan_removes_one_and_tells_when_the_item_was_not_registered() {
     assert!(run(&mut s, cancel("PC0000000001")).unwrap_err().contains("商品のバーコードではありません"));
     ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
     assert!(run(&mut s, cancel(BREAD)).is_err(), "お会計中は取り消せない");
-    // セルフ操作モードのお客様も取り消せる
+    // セルフ操作モードでは商品取消しはできない（取引中止だけ）
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "floor", BREAD);
-    ok(&mut s, json!({"type":"cancel_item","register":1,"side":"floor","code":BREAD}));
-    assert!(reg(&s, 1).floor.lines.is_empty());
+    let e = run(&mut s, json!({"type":"cancel_item","register":1,"side":"floor","code":BREAD})).unwrap_err();
+    assert!(e.contains("スタッフ操作モードだけ"), "{e}");
+    assert_eq!(reg(&s, 1).floor.lines.len(), 1);
+}
+
+/// 仕様 12.1：商品取消しの FF は最下段の FF ボタンで選ぶ（FF のコードで取り消す）
+#[test]
+fn cancel_ff_by_its_button_removes_one() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    ok(&mut s, json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":2}));
+    let cancel = |code: &str| json!({"type":"cancel_item","register":1,"side":"counter","code":code});
+    let msg = run(&mut s, cancel("FF01")).unwrap().unwrap();
+    assert!(msg.ends_with("を1点取り消しました"), "{msg}");
+    assert_eq!(reg(&s, 1).counter.lines.iter().find(|l| l.line.code == "FF01").unwrap().line.qty, 1);
+    ok(&mut s, cancel("FF01"));
+    assert!(reg(&s, 1).counter.lines.iter().all(|l| l.line.code != "FF01"));
+    let e = run(&mut s, cancel("FF01")).unwrap_err();
+    assert!(e.contains("登録されていません") && e.contains("もう一度押して"), "{e}");
 }
 
 /// 仕様 12.3：店舗メニューからログアウト・休止する

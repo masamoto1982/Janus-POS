@@ -829,6 +829,8 @@ function send(cmd: Command, quiet = false): boolean {
     cancelAsk.delete(cmd.register);
     cmd = { type: "cancel_item", register: cmd.register, side: asked.side, code: cmd.code };
   }
+  // 最下段の FF ボタンで取り消したときも一度きり（user 2026-11-21）
+  if (cmd.type === "cancel_item") cancelAsk.delete(cmd.register);
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   lastError = res.ok ? undefined : res.error;

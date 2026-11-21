@@ -678,13 +678,14 @@ export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
 /** 日配食品は数量を増やせない。同じ商品でも一点ずつ販売期限が違うので、一つを読んで数量を増やすと
  *  期限切れの品がお客様に渡ってしまう（ポカヨケ）。続けて読んでも一点ずつ別の行になるので、
- *  数量の欄は「削除」と数字だけ（サービス商品と同じ固定の形） */
+ *  数量の欄は「削除」と数字だけ（サービス商品と同じ固定の形）。数字の枠は数量フォームと同じ幅にして、
+ *  削除・数字・空きの位置を数量フォームのある明細（−・数字・＋）とそろえる（user 2026-11-21） */
 
 /** 数量の欄。販売個数の上限（max）に達した明細は＋を出さない（幅は残して列をそろえる） */
 function qtyCell(reg: number, side: Side, l: { id: number; qty: number }, st: Gate, remove: Command, fixed = false, fresh = false, max?: number): string {
   if (!st.allowed) return `${l.qty}`;
   if (fresh) return qtyCell(reg, side, l, st, remove, true);
-  if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed">${l.qty}</b><i class="qty-pad" aria-hidden="true"></i></span>`;
+  if (fixed) return `<span class="qty-step">${btn("削除", remove, st, "small neg")}<b class="qty-fixed" data-fit="00">${l.qty}</b><i class="qty-pad" aria-hidden="true"></i></span>`;
   const step = (d: number): Command => ({ type: "set_qty", register: reg, side, line_id: l.id, qty: l.qty + d });
   const minus = l.qty <= 1 ? btn("削除", remove, st, "small neg") : btn("−", step(-1), st, "small neg");
   const e = qtyEntry.get(`${reg}:${side}`);

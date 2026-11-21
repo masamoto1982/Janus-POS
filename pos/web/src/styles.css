@@ -803,7 +803,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 /* 明細の削除・数量・＋は中の白銀比（user 2026-11-17） */
 .screen-main .qty-step button { box-sizing: border-box; flex: 0 1 var(--btn-md-w); width: var(--btn-md-w); height: var(--btn-md-h); min-width: 0; padding: 0 var(--s15, 2px); font-size: var(--text-sm); }
 .screen-main .qty-step .qty-key { flex: none; padding: 0; justify-content: center; font-weight: 600; }
-.qty-fixed, .qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-md-w); width: var(--btn-md-w); min-width: 0; text-align: center; }
+.qty-pad, .qty-plus-gone { box-sizing: border-box; flex: 0 1 var(--btn-md-w); width: var(--btn-md-w); min-width: 0; text-align: center; }
+/* 固定数量の数字は数量フォーム（.qty-key）と同じ箱：同じ高さ・同じ太さの透明な枠・同じ文字。幅は law.ts fitForms が数量フォームと同じ式で決めるので、
+   削除の位置が数量フォームのある明細とそろう（user 2026-11-21：食品と非食品で削除が横にわずかにずれていた） */
+.qty-fixed { box-sizing: border-box; flex: none; display: inline-flex; align-items: center; justify-content: center; height: var(--btn-md-h); padding: 0; border: var(--s16, 1.5px) solid transparent; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums; }
 .qty-pop { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; background: color-mix(in oklch, var(--black) 28%, transparent); }
 .qty-pop-box { background: var(--panel); border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: var(--s11, 10px); padding: var(--s11, 8px); width: max-content; max-width: calc(100% - var(--s9, 16px)); max-height: calc(100% - var(--s10, 12px)); display: flex; flex-direction: column; gap: var(--s11, 8px); box-shadow: 0 var(--s12, 6px) var(--s9, 18px) color-mix(in oklch, var(--black) 25%, transparent); }
 /* テンキーも席順：見出しと入力欄が主役で上・中央、添え書きはその下、戻る（←・バック）は左、決定は右 */

@@ -387,7 +387,8 @@ function shrinkToFit(b: HTMLElement, rigid: boolean): void {
  *   一文字差の幅そろえも同じ：同じ並びの同じ高さのフォーム・セレクタで、文字数が一文字しか違わなければ広い方の幅に
  * レジ画面の外（シミュレーターまわり・販売規則の設定）も同じ仕組み。B はそこで決めた段の高さ
  */
-const FORMS = "button.pad-field, select, input:not([type=checkbox], [type=radio], [type=range])";
+// 固定数量の数字（.qty-fixed）も数量フォームと同じ幅に決める（枠は透明）。削除の位置が明細ごとにずれないように（user 2026-11-21）
+const FORMS = "button.pad-field, .qty-fixed, select, input:not([type=checkbox], [type=radio], [type=range])";
 let ruler: CanvasRenderingContext2D | null | undefined;
 function textWidth(text: string, el: HTMLElement, size: number, weight?: string): number {
   if (ruler === undefined) ruler = typeof document !== "undefined" ? document.createElement("canvas").getContext("2d") : null;

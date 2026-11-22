@@ -65,7 +65,7 @@ function build(): HTMLElement {
           ).join("")}
         </ol>
       </section>
-      <p class="splash-hint">${touch ? "タップ" : "クリック"}ではじめる<br />上部の <span class="info-icon" aria-label="使い方">i</span> でいつでも見直せます</p>
+      <p class="splash-hint">${touch ? "タップ" : "クリック"}でデモンストレーションを開始します<br />上部の <span class="info-icon" aria-label="使い方">i</span> でいつでも見直せます</p>
     </div>`;
   return el;
 }

@@ -24,6 +24,11 @@ impl PosSimulator {
             .map_err(|e| JsValue::from_str(&e))
     }
 
+    /// レジを一台足す。足せたら true
+    pub fn add_register(&mut self) -> bool {
+        self.store.add_register()
+    }
+
     pub fn save(&self) -> String {
         self.store.save_json()
     }

@@ -1826,45 +1826,62 @@ pub fn ring_volume(waiting_ms: u64) -> f32 {
     RING_MIN + (1.0 - RING_MIN) * t
 }
 
+impl Register {
+    fn new(id: u8) -> Register {
+        Register {
+            id,
+            mode: Mode::SelfOperated,
+            staff: None,
+            owner: None,
+            closing: false,
+            on_hold: None,
+            txn: Txn::default(),
+            drawer: Drawer::default(),
+            last_receipt: None,
+            bill_handover: None,
+            parcel_handover: None,
+            ticket_handover: vec![],
+            tickets_issued: false,
+            held_change: Cash::default(),
+            tickets_received: None,
+            tickets_handed: None,
+            pickup_handover: None,
+            receipt_stamp: None,
+            last_op: 0,
+            outlet: Cash::default(),
+            outlet_since: None,
+            idle_hold: None,
+            menu: None,
+            paused: false,
+            touch: None,
+            pressing: false,
+            emoney: None,
+            press_log: vec![],
+            press_since: None,
+            emergency: None,
+            emergency_log: None,
+        }
+    }
+}
+
+impl Store {
+    /// レジを一台足す（シミュレーターの「⊕」、user 2026-11-22）。今の店の状態はそのまま、新しいレジは待ち受けから始まる。
+    /// MAX_REGISTERS に達していれば足さずに false
+    pub fn add_register(&mut self) -> bool {
+        let n = self.registers.len() as u8;
+        if n >= MAX_REGISTERS {
+            return false;
+        }
+        self.registers.push(Register::new(n + 1));
+        true
+    }
+}
+
 impl Store {
     pub fn new(seed: u64, registers: u8, bells: u8) -> Store {
         let registers = registers.clamp(1, MAX_REGISTERS);
         let bells = bells.clamp(1, MAX_BELLS);
-        let regs = (1..=registers)
-            .map(|id| Register {
-                id,
-                mode: Mode::SelfOperated,
-                staff: None,
-                owner: None,
-                closing: false,
-                on_hold: None,
-                txn: Txn::default(),
-                drawer: Drawer::default(),
-                last_receipt: None,
-                bill_handover: None,
-                parcel_handover: None,
-                ticket_handover: vec![],
-                tickets_issued: false,
-                held_change: Cash::default(),
-                tickets_received: None,
-                tickets_handed: None,
-                pickup_handover: None,
-                receipt_stamp: None,
-                last_op: 0,
-                outlet: Cash::default(),
-                outlet_since: None,
-                idle_hold: None,
-                menu: None,
-                paused: false,
-                touch: None,
-                pressing: false,
-                emoney: None,
-                press_log: vec![],
-                press_since: None,
-                emergency: None,
-                emergency_log: None,
-            })
-            .collect();
+        let regs = (1..=registers).map(Register::new).collect();
         Store {
             now: 0,
             rng: Rng::new(seed),

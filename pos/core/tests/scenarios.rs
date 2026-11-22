@@ -5794,3 +5794,20 @@ fn ff_tab_shown_on_both_sides_can_be_bought_in_self_operated_mode() {
     )
     .is_err());
 }
+
+/// 仕様 3：レジは店の状態を保ったまま一台ずつ足せ、MAX_REGISTERS で止まる
+#[test]
+fn add_register_keeps_state_and_stops_at_max() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    assert!(s.add_register());
+    assert_eq!(reg(&s, 1).counter.lines.len(), 1);
+    assert_eq!(reg(&s, 3).id, 3);
+    assert!(reg(&s, 3).counter.lines.is_empty());
+    let back = Store::load_json(&s.save_json()).unwrap_or_else(|e| panic!("load failed: {e}"));
+    assert_eq!(reg(&back, 3).id, 3);
+    while s.add_register() {}
+    assert_eq!(s.snapshot().registers.len(), usize::from(janus_pos_core::store::MAX_REGISTERS));
+    assert!(!s.add_register());
+}

@@ -126,24 +126,13 @@ function save(): void {
 }
 
 /** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
- *  モバイルは 2 台ちょうど（複数台運用の最低台数。3 台以上のデモは現実的でなく、1 台では複数台のデモができない、user 2026-11-20）。
- *  デスクトップは 2 台から（user 2026-11-21：1 台では、呼び出しの通知が発生したレジにだけ出ることや、
- *  チケットの取引が僅差で重なるケースのデモができない）
- *  台数を変えると店の状態を作り直す（コアは作るときに台数を決める） */
-const REG_COUNT_KEY = "janus-pos-registers";
+ *  2 台で起動し、デスクトップは最後のレジの横の「⊕」で一台ずつ足す（user 2026-11-22：ヘッダーのセレクタで指定する形から変更）。
+ *  足しても店の状態はそのまま。減らすには「リセット」で 2 台からやり直す。
+ *  2 台から始めるのは、1 台では呼び出しの通知が発生したレジにだけ出ることや、チケットの取引が僅差で重なるケースのデモができないため（user 2026-11-21）。
+ *  モバイルは 2 台ちょうどで「⊕」を出さない（3 台以上のデモは現実的でない、user 2026-11-20） */
 const DEFAULT_REGISTERS = 2;
-const isMobileMode = (): boolean => window.matchMedia(MOBILE_MQ).matches;
+const MAX_REGISTERS = 5;
 const minRegisters = (): number => 2;
-const maxRegisters = (): number => (isMobileMode() ? 2 : 5);
-
-function savedRegCount(): number {
-  try {
-    const n = Number(localStorage.getItem(REG_COUNT_KEY));
-    return Number.isInteger(n) && n >= 1 ? Math.min(Math.max(n, minRegisters()), maxRegisters()) : DEFAULT_REGISTERS;
-  } catch {
-    return DEFAULT_REGISTERS;
-  }
-}
 
 /** デスクトップは、レジ全体（見出し・画面・入出金ボックス）が画面の高さに収まるよう、レジ画面の W の上限 --W-max を決める。
  *  画面の高さは W×√2（styles.css）。画面より上（見出し）と下（入出金ボックス）の高さは W によらないので、いまの配置から測る。
@@ -179,26 +168,17 @@ function start(): void {
     forget();
     restored = null;
   }
-  sim = restored ?? new PosSimulator(Date.now() & 0xffff, savedRegCount(), 3);
+  sim = restored ?? new PosSimulator(Date.now() & 0xffff, DEFAULT_REGISTERS, 3);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
   fitRegisters();
   window.addEventListener("resize", fitRegisters);
   fitForms(app);
-  app.querySelector<HTMLSelectElement>("[data-reg-count]")?.addEventListener("change", (e) => {
-    const sel = e.target as HTMLSelectElement;
-    if (!confirm(`レジを${sel.value}台にして、最初からやり直しますか`)) {
-      sel.value = String(snap.registers.length);
-      return;
-    }
-    try {
-      localStorage.setItem(REG_COUNT_KEY, sel.value);
-    } catch {
-      /* 保存できなければ既定の台数で起動する */
-    }
-    discarding = true;
-    forget();
+  // 「⊕」でレジを一台足す。今の状態を保存して読み直す（足したレジの分の骨組みを作り直す）
+  app.querySelector("[data-add-register]")?.addEventListener("click", () => {
+    if (!sim.add_register()) return;
+    save();
     location.reload();
   });
   app.querySelector("[data-how-to]")?.addEventListener("click", openSplash);
@@ -283,12 +263,6 @@ function buildSkeleton(): void {
       <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
       <div class="top-tools">
       <button type="button" class="neg small how-to" data-how-to title="使用方法のスプラッシュ画面を出す">使用方法</button>
-      <label class="reg-count">レジ
-        <select data-reg-count aria-label="レジの台数（変えると最初からやり直します）">${Array.from({ length: Math.max(maxRegisters(), snap.registers.length) }, (_, i) => i + 1)
-          .filter((n) => n >= minRegisters() || n === snap.registers.length)
-          .map((n) => `<option value="${n}"${n === snap.registers.length ? " selected" : ""}>${n}台</option>`)
-          .join("")}</select>
-      </label>
       <button type="button" class="neg small reset-btn" data-reset title="保存されている状態を消して最初からやり直す">リセット</button>
       </div>
     </header>
@@ -299,7 +273,11 @@ function buildSkeleton(): void {
           <button type="button" class="icon-btn bell-open" data-open-bell aria-haspopup="dialog" aria-label="Bell の設定" title="Bell の設定">⚙</button>
           <div class="toast" id="toast-store"></div>
         </section>
-        <div class="registers" style="--n: ${snap.registers.length}">${regs}</div>
+        <div class="registers" style="--n: ${snap.registers.length}">${regs}${
+          snap.registers.length < MAX_REGISTERS
+            ? `<button type="button" class="icon-btn add-register" data-add-register aria-label="レジを1台足す" title="レジを1台足す">+</button>`
+            : ""
+        }</div>
     </article>
     <footer class="bottom">
       <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>

@@ -507,7 +507,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .top-tools { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 /* ヘッダーの「使用方法」はスプラッシュ（使い方）を出し直すボタン（user 2026-11-22）。リセットと同じ小さな消極ボタン */
 .how-to { white-space: nowrap; flex: none; }
-.reg-count { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); white-space: nowrap; }
 .reset-btn { white-space: nowrap; flex: none; }
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
 .info-icon { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); color: var(--muted); font: 700 11px/1 serif; font-style: italic; }
@@ -519,9 +518,11 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .floor { display: grid; gap: 16px; padding-block: 16px; align-items: start; }
 /* デスクトップはすべてのレジを横一列に並べ、画面の横幅を台数で等分する（user 2026-11-21：折り返すとレジ一台すら画面に収まらず、デモにならない）。
    どのレジも常に二つの面を並べる。画面の W は等分した幅に合わせて縮み（下限なし）、さらにレジ全体が画面の高さに収まるよう
-   --W-max（main.ts fitRegisters）で止める。止まったときはレジの幅も二つの面の分だけにして中央に置く */
-.registers { --n: 2; display: grid; gap: 16px; align-items: start; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
-.register { container: reg / inline-size; width: 100%; max-width: calc(2 * (var(--W-max, 512px) + 2 * var(--frame-w)) + 12px + 26px); justify-self: center; }
+   --W-max（main.ts fitRegisters）で止める。止まったときはレジの幅も二つの面の分だけにして中央に置く。
+   最後のレジのすぐ右に、レジを一台足す「⊕」（円の消極ボタン、5 台で消える、user 2026-11-22）。レジと一緒に中央に寄せる */
+.registers { --n: 2; display: flex; gap: 16px; align-items: start; justify-content: center; }
+.add-register { flex: none; align-self: center; }
+.register { container: reg / inline-size; flex: 1 1 0; min-width: 0; max-width: calc(2 * (var(--W-max, 512px) + 2 * var(--frame-w)) + 12px + 26px); }
 .register, .bell-area {
   background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
 }
@@ -655,7 +656,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .mirror .muted { color: var(--muted); }
 .login-sel { margin-left: auto; display: inline-flex; gap: 6px; align-items: center; font-size: var(--text-sm); font-weight: 500; color: var(--muted); }
 /* シミュレーターまわりのセレクタは一行のボタンと同じ高さ（--chrome-b）。文字・幅は law.ts fitForms */
-:is(.login-sel, .reg-count) select { height: var(--chrome-b); filter: url(#ramp); }
+.login-sel select { height: var(--chrome-b); filter: url(#ramp); }
 
 .rules-open { margin-left: auto; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
@@ -852,13 +853,15 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   /* 見出しを強調の段のまま収めるため、ビルド番号は入りきらない分を省く */
   .build-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top .logo { width: 36px; height: 36px; }
-  /* 上部は狭いので、使用方法・台数・リセットは入りきらなければ二行目へ回す */
+  /* 上部は狭いので、使用方法・リセットは入りきらなければ二行目へ回す */
   .top { flex-wrap: wrap; row-gap: 4px; }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   /* モバイルは縦に並べ、2 台まで（複数台運用の最低台数。3 台以上のデモは現実的でない、user 2026-11-21） */
-  .registers { gap: 8px; grid-template-columns: minmax(0, 1fr); }
+  .registers { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
   .register { max-width: none; }
+  /* モバイルは 2 台ちょうどなので「⊕」を出さない */
+  .add-register { display: none; }
   .register:nth-child(n + 3) { display: none; }
   /* 最下段の添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す。帯の言語・電子マネーは余裕があるので出す */
   .call-btn small { display: none; }

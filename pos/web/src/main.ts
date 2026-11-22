@@ -282,7 +282,7 @@ function buildSkeleton(): void {
       <h1>Janus POS</h1>
       <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
       <div class="top-tools">
-      <button type="button" class="how-to" data-how-to aria-label="使い方を見る"><span class="how-to-label">使い方</span> <span class="info-icon" aria-hidden="true">i</span></button>
+      <button type="button" class="neg small how-to" data-how-to title="使用方法のスプラッシュ画面を出す">使用方法</button>
       <label class="reg-count">レジ
         <select data-reg-count aria-label="レジの台数（変えると最初からやり直します）">${Array.from({ length: Math.max(maxRegisters(), snap.registers.length) }, (_, i) => i + 1)
           .filter((n) => n >= minRegisters() || n === snap.registers.length)

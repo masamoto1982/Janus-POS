@@ -1,8 +1,8 @@
 // 起動時のスプラッシュ画面（user 2026-11-22）。Ajisai のスプラッシュ（initSplashScreen）を流用し、
-// ロゴ・名前のあとにシミュレーターの使い方を出す。上部の「使い方 i」に気づかないとデモが成り立たないので、
+// ロゴ・名前のあとにシミュレーターの使い方を出す。ヘッダーのアイコンに気づかないとデモが成り立たないので、
 // 初めて開いたときは必ず目に入る形にした。クリック・タップ・キー入力で閉じ、待たせない。
 // 案内はマウスかタッチかを見分けて、その端末の操作だけを書く（user 2026-11-22）。
-// 一つのタブで一度だけ（作業中の再読み込みでは出さない）。「使い方 i」を押すといつでも出し直せる。
+// 一つのタブで一度だけ（作業中の再読み込みでは出さない）。ヘッダーの「使用方法」を押すといつでも出し直せる。
 // wasm の読み込みを待たない（DOM だけで動く）
 import logoUrl from "./logo.jpg";
 import { esc } from "./view";
@@ -65,12 +65,12 @@ function build(): HTMLElement {
           ).join("")}
         </ol>
       </section>
-      <p class="splash-hint">${touch ? "タップ" : "クリック"}でデモンストレーションを開始します<br />上部の <span class="info-icon" aria-label="使い方">i</span> でいつでも見直せます</p>
+      <p class="splash-hint">${touch ? "タップ" : "クリック"}でデモンストレーションを開始します</p>
     </div>`;
   return el;
 }
 
-/** スプラッシュを出す。初回は自動で、二度目以降は「使い方 i」から */
+/** スプラッシュを出す。初回は自動で、二度目以降はヘッダーの「使用方法」から */
 export function openSplash(): void {
   if (document.querySelector(".splash-screen")) return;
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;

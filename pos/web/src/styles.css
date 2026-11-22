@@ -505,8 +505,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .top .logo { width: 73px; height: 73px; flex: none; }
 .build-badge { font-size: var(--text-sm); font-weight: 600; color: var(--white); background: var(--grey-4); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
 .top-tools { margin-left: auto; display: flex; align-items: center; gap: 12px; }
-/* 「使い方 i」はスプラッシュ（使い方）を出し直すボタン（user 2026-11-22、吹き出しは廃止） */
-.how-to { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font-size: var(--text-sm); color: var(--muted); white-space: nowrap; cursor: pointer; }
+/* ヘッダーの「使用方法」はスプラッシュ（使い方）を出し直すボタン（user 2026-11-22）。リセットと同じ小さな消極ボタン */
+.how-to { white-space: nowrap; flex: none; }
 .reg-count { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-sm); white-space: nowrap; }
 .reset-btn { white-space: nowrap; flex: none; }
 .tip { position: relative; display: inline-flex; align-items: center; gap: 6px; cursor: help; }
@@ -852,8 +852,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   /* 見出しを強調の段のまま収めるため、ビルド番号は入りきらない分を省く */
   .build-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .top .logo { width: 36px; height: 36px; }
-  /* 上部は狭いので「使い方」は i だけにし、使い方・台数・リセットは入りきらなければ二行目へ回す */
-  .how-to-label { display: none; }
+  /* 上部は狭いので、使用方法・台数・リセットは入りきらなければ二行目へ回す */
   .top { flex-wrap: wrap; row-gap: 4px; }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
@@ -1013,11 +1012,11 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .item.coin:not(.off) { border-radius: var(--shape-round); }
 .item.staff:not(.off) { background: var(--operable-blue); color: var(--white); }
 
-/* シミュレーターまわりの一行のボタン（リセット・閉じる・認証・区分を追加・保存）もレジ画面のボタンの規則で（user 2026-11-20）：
+/* シミュレーターまわりの一行のボタン（使用方法・リセット・閉じる・認証・区分を追加・保存）もレジ画面のボタンの規則で（user 2026-11-20）：
    高さは段の小（W=400 のレジ画面で W÷16＝25px）、文字は高さの半分、左右の余白は高さの 1/4、幅は文字なり、弱い角丸、行の高さは文字の高さ。
    歯車は同じ高さの円 */
 :root { --chrome-b: 25px; }
-:is(.reset-btn, .rules-dlg .dlg-head button, [data-owner-submit], [data-add-tax], [data-save-invoice]) {
+:is(.how-to, .reset-btn, .rules-dlg .dlg-head button, [data-owner-submit], [data-add-tax], [data-save-invoice]) {
   box-sizing: border-box; height: var(--chrome-b); width: auto; min-width: 0; padding: 0 calc(var(--chrome-b) / 4);
   font-size: calc(var(--chrome-b) / 2); font-weight: 400; line-height: 1; white-space: nowrap; flex: none;
   border-width: var(--frame-w); border-radius: calc(400px / 45.255);
@@ -1068,7 +1067,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .splash-step-text { display: grid; gap: 2px; min-width: 0; }
 .splash-step-text strong { font-size: var(--text-lg); }
 .splash-hint { margin: 0; font-size: var(--text-sm); color: var(--muted); line-height: 1.7; }
-.splash-hint .info-icon { vertical-align: -3px; margin-inline: 2px; }
 .splash-lead { text-wrap: pretty; word-break: keep-all; overflow-wrap: anywhere; }
 .splash-step-text { text-wrap: pretty; }
 @keyframes splash-logo-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }

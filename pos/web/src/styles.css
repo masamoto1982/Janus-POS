@@ -186,10 +186,10 @@ button { touch-action: manipulation; }
 .ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-xl-w))); justify-content: center; align-content: center; gap: var(--gap); }
 .ff-item { box-sizing: border-box; width: 100%; max-width: var(--btn-xl-w); height: auto; aspect-ratio: var(--silver, 1.4142); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
 /* 登録数量のバッジ：オーダーの入った FF ボタンの右上に「②」のような丸数字（user 2026-11-21）。
-   文字の色をそのまま輪郭と数字に使う（青文字のボタンは青、塗りのボタンは白、押せないボタンはグレー）。
+   背景は注意喚起の薄い黄色 --alert-bg、輪郭と数字は黄色の背景に添えるオレンジ --alert-note（user 2026-11-22）。
    文字はボタンの主役（絵文字）より一段小さい（fitText が決めたボタンの文字 ÷√2） */
 .ff-item { position: relative; }
-.ff-badge { position: absolute; top: var(--s14, 3px); right: var(--s14, 3px); box-sizing: border-box; min-width: 1.6em; height: 1.6em; padding: 0 0.3em; border: var(--s16, 1.5px) solid currentColor; border-radius: 0.8em; display: flex; align-items: center; justify-content: center; font-size: calc(1em / var(--silver, 1.4142)); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none; }
+.ff-badge { position: absolute; top: var(--s14, 3px); right: var(--s14, 3px); box-sizing: border-box; min-width: 1.6em; height: 1.6em; padding: 0 0.3em; border: var(--s16, 1.5px) solid var(--alert-note); border-radius: 0.8em; background: var(--alert-bg); color: var(--alert-note); display: flex; align-items: center; justify-content: center; font-size: calc(1em / var(--silver, 1.4142)); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; pointer-events: none; }
 /* FF単品の在庫：作り置きの無い商品＝積極（青背景・白文字）、豊富（二桁）・希薄（一桁）＝青枠・青文字（背景なし）、
    無し＝グレーアウト（長押しで予約注文） */
 .screen [data-region] button.ff-item.out {

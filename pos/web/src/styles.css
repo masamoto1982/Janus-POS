@@ -1067,10 +1067,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .splash-step-no { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--grey-4); color: var(--white); font-size: var(--text-lg); font-weight: 700; }
 .splash-step-text { display: grid; gap: 2px; min-width: 0; }
 .splash-step-text strong { font-size: var(--text-lg); }
-.splash-step-text span { font-size: var(--text-sm); color: var(--muted); }
 .splash-hint { margin: 0; font-size: var(--text-sm); color: var(--muted); line-height: 1.7; }
 .splash-hint .info-icon { vertical-align: -3px; margin-inline: 2px; }
-.splash-lead, .splash-step-text { text-wrap: pretty; word-break: keep-all; overflow-wrap: anywhere; }
+.splash-lead { text-wrap: pretty; word-break: keep-all; overflow-wrap: anywhere; }
+.splash-step-text { text-wrap: pretty; }
 @keyframes splash-logo-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
 @keyframes splash-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 760px) {

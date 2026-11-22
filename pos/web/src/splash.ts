@@ -15,22 +15,13 @@ export function isTouchDevice(): boolean {
   return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 }
 
-/** スプラッシュに出す使い方（シミュレーターまわりの文言なので英訳しない、文末の「。」は付けない）。
+/** スプラッシュに出す使い方（user 2026-11-22 の二手順、シミュレーターまわりの文言なので英訳しない、文末の「。」は付けない）。
     マウスの端末には右クリック、タッチの端末には長押しだけを書く */
-export function howToSteps(touch: boolean): readonly { head: string; body: string }[] {
+export function howToSteps(touch: boolean): readonly string[] {
+  const press = touch ? "長押し" : "右クリック";
   return [
-    {
-      head: touch ? "機器を長押し" : "機器を右クリック",
-      body: "レジの画面・入金ボックス・決済端末・スキャナ",
-    },
-    {
-      head: "Item か Wallet から選ぶ",
-      body: "Item＝売り場の商品、Wallet＝お金・カード",
-    },
-    {
-      head: "その機器で読んだことになる",
-      body: "商品をスキャン・お金を投入・カードをかざす など",
-    },
+    `レジ画面、スキャナを${press}で商品登録またはポイント読み取り`,
+    `決済手段に応じ、入金、スキャナ、決済端末のいずれかを${press}`,
   ];
 }
 
@@ -70,11 +61,11 @@ function build(): HTMLElement {
         <h2 class="splash-howto-head">使い方</h2>
         <ol class="splash-steps">
           ${howToSteps(touch).map(
-            (s, i) => `<li class="splash-step"><span class="splash-step-no" aria-hidden="true">${i + 1}</span><span class="splash-step-text"><strong>${esc(s.head)}</strong><span>${esc(s.body)}</span></span></li>`,
+            (s, i) => `<li class="splash-step"><span class="splash-step-no" aria-hidden="true">${i + 1}</span><span class="splash-step-text"><strong>${esc(s)}</strong></span></li>`,
           ).join("")}
         </ol>
       </section>
-      <p class="splash-hint">${touch ? "タップ" : "クリック"}ではじめる<br />上部の <span class="info-icon" aria-label="使い方">i</span> でいつでも見直せます</p>
+      <p class="splash-hint">${touch ? "タップ" : "クリック"}でデモンストレーションを開始します<br />上部の <span class="info-icon" aria-label="使い方">i</span> でいつでも見直せます</p>
     </div>`;
   return el;
 }

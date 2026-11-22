@@ -1076,7 +1076,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 @keyframes splash-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 760px) {
   .splash-content { gap: 10px; padding-block: 16px; }
-  .splash-logo { width: 56px; height: 56px; }
+  /* モバイルのロゴは 56px の 2.5 倍（user 2026-11-22：小さすぎた） */
+  .splash-logo { width: 140px; height: 140px; }
   .splash-howto-head { margin-bottom: 6px; }
   .splash-steps { gap: 6px; }
   .splash-step { padding: 8px 10px; gap: 10px; }

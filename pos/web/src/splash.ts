@@ -5,6 +5,7 @@
 // 一つのタブで一度だけ（作業中の再読み込みでは出さない）。ヘッダーの「使用方法」を押すといつでも出し直せる。
 // wasm の読み込みを待たない（DOM だけで動く）
 import logoUrl from "./logo.jpg";
+import { MOBILE } from "./law";
 import { esc } from "./view";
 
 const SESSION_KEY = "janus-splash-seen";
@@ -15,13 +16,20 @@ export function isTouchDevice(): boolean {
   return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
 }
 
+/** モバイルの配置（幅 760px 以下）か。レジカウンター側と売り場側を横スワイプで切り替える配置 */
+export function isMobileLayout(): boolean {
+  return typeof matchMedia === "function" && matchMedia(MOBILE).matches;
+}
+
 /** スプラッシュに出す使い方（user 2026-11-22 の二手順、シミュレーターまわりの文言なので英訳しない、文末の「。」は付けない）。
-    マウスの端末には右クリック、タッチの端末には長押しだけを書く */
-export function howToSteps(touch: boolean): readonly string[] {
+    マウスの端末には右クリック、タッチの端末には長押しだけを書く。
+    モバイルの配置では三つ目に面の切り替えを足す（user 2026-11-22：二つの画面が同時に見えないので） */
+export function howToSteps(touch: boolean, mobile = false): readonly string[] {
   const press = touch ? "長押し" : "右クリック";
   return [
     `レジ画面、スキャナを${press}で商品登録またはポイント読み取り`,
     `決済手段に応じ、入金、スキャナ、決済端末のいずれかを${press}`,
+    ...(mobile ? ["横スワイプで二つの画面を行き来出来ます"] : []),
   ];
 }
 
@@ -60,7 +68,7 @@ function build(): HTMLElement {
       <section class="splash-howto" aria-label="使い方">
         <h2 class="splash-howto-head">使い方</h2>
         <ol class="splash-steps">
-          ${howToSteps(touch).map(
+          ${howToSteps(touch, isMobileLayout()).map(
             (s, i) => `<li class="splash-step"><span class="splash-step-no" aria-hidden="true">${i + 1}</span><span class="splash-step-text"><strong>${esc(s)}</strong></span></li>`,
           ).join("")}
         </ol>

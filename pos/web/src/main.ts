@@ -4,6 +4,7 @@ import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, Register
 import type { CancelStage, GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
+import { initSplash, openSplash } from "./splash";
 import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
 import {
   couponCancel,
@@ -163,10 +164,6 @@ function fitRegisters(): void {
   root.style.setProperty("--W-max", `${Math.max(160, Math.min(512, W))}px`);
 }
 
-/** ページ上部の「使い方」 */
-const HOW_TO =
-  "Item（売り場の商品）と Wallet（お金・カード）は、レジの画面・入金ボックス・決済端末・スキャナを右クリック（タッチは長押し）して選びます。選んだものは、その機器で読んだことになります";
-
 function forget(): void {
   try {
     localStorage.removeItem(SAVE_KEY);
@@ -204,6 +201,7 @@ function start(): void {
     forget();
     location.reload();
   });
+  app.querySelector("[data-how-to]")?.addEventListener("click", openSplash);
   app.querySelector("[data-reset]")?.addEventListener("click", () => {
     if (!confirm("保存されている状態を消して、最初からやり直しますか")) return;
     discarding = true;
@@ -284,7 +282,7 @@ function buildSkeleton(): void {
       <h1>Janus POS</h1>
       <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
       <div class="top-tools">
-      <span class="tip how-to" tabindex="0" data-tip="${esc(HOW_TO)}" aria-label="使い方：${esc(HOW_TO)}"><span class="how-to-label">使い方</span> <span class="info-icon" aria-hidden="true">i</span></span>
+      <button type="button" class="how-to" data-how-to aria-label="使い方を見る"><span class="how-to-label">使い方</span> <span class="info-icon" aria-hidden="true">i</span></button>
       <label class="reg-count">レジ
         <select data-reg-count aria-label="レジの台数（変えると最初からやり直します）">${Array.from({ length: Math.max(maxRegisters(), snap.registers.length) }, (_, i) => i + 1)
           .filter((n) => n >= minRegisters() || n === snap.registers.length)
@@ -1619,6 +1617,7 @@ function wireSwipe(): void {
   });
 }
 
+initSplash();
 boot().catch((e) => {
   app.innerHTML = `<p class="error">読み込みに失敗しました：${esc(e)}</p>`;
 });

@@ -1,6 +1,7 @@
 // 起動時のスプラッシュ画面（user 2026-11-22）。Ajisai のスプラッシュ（initSplashScreen）を流用し、
 // ロゴ・名前のあとにシミュレーターの使い方を出す。上部の「使い方 i」に気づかないとデモが成り立たないので、
 // 初めて開いたときは必ず目に入る形にした。クリック・タップ・キー入力で閉じ、待たせない。
+// 案内はマウスかタッチかを見分けて、その端末の操作だけを書く（user 2026-11-22）。
 // 一つのタブで一度だけ（作業中の再読み込みでは出さない）。「使い方 i」を押すといつでも出し直せる。
 // wasm の読み込みを待たない（DOM だけで動く）
 import logoUrl from "./logo.jpg";
@@ -9,21 +10,29 @@ import { esc } from "./view";
 const SESSION_KEY = "janus-splash-seen";
 const STEPS_REVEAL_DELAY_MS = 600;
 
-/** スプラッシュに出す使い方（シミュレーターまわりの文言なので英訳しない、文末の「。」は付けない） */
-export const HOW_TO_STEPS: readonly { head: string; body: string }[] = [
-  {
-    head: "機器を右クリック（タッチは長押し）",
-    body: "レジの画面・入金ボックス・決済端末・スキャナ",
-  },
-  {
-    head: "Item か Wallet から選ぶ",
-    body: "Item＝売り場の商品、Wallet＝お金・カード",
-  },
-  {
-    head: "その機器で読んだことになる",
-    body: "商品をスキャン・お金を投入・カードをかざす など",
-  },
-];
+/** タッチ操作の端末か（指が主な入力）。案内の言い回しをその端末の操作だけに絞る（user 2026-11-22） */
+export function isTouchDevice(): boolean {
+  return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+}
+
+/** スプラッシュに出す使い方（シミュレーターまわりの文言なので英訳しない、文末の「。」は付けない）。
+    マウスの端末には右クリック、タッチの端末には長押しだけを書く */
+export function howToSteps(touch: boolean): readonly { head: string; body: string }[] {
+  return [
+    {
+      head: touch ? "機器を長押し" : "機器を右クリック",
+      body: "レジの画面・入金ボックス・決済端末・スキャナ",
+    },
+    {
+      head: "Item か Wallet から選ぶ",
+      body: "Item＝売り場の商品、Wallet＝お金・カード",
+    },
+    {
+      head: "その機器で読んだことになる",
+      body: "商品をスキャン・お金を投入・カードをかざす など",
+    },
+  ];
+}
 
 function markSeen(): void {
   try {
@@ -42,6 +51,7 @@ function seen(): boolean {
 }
 
 function build(): HTMLElement {
+  const touch = isTouchDevice();
   const el = document.createElement("div");
   el.className = "splash-screen";
   el.setAttribute("role", "dialog");
@@ -59,12 +69,12 @@ function build(): HTMLElement {
       <section class="splash-howto" aria-label="使い方">
         <h2 class="splash-howto-head">使い方</h2>
         <ol class="splash-steps">
-          ${HOW_TO_STEPS.map(
+          ${howToSteps(touch).map(
             (s, i) => `<li class="splash-step"><span class="splash-step-no" aria-hidden="true">${i + 1}</span><span class="splash-step-text"><strong>${esc(s.head)}</strong><span>${esc(s.body)}</span></span></li>`,
           ).join("")}
         </ol>
       </section>
-      <p class="splash-hint">クリック・タップ・キー入力ではじめる<br />上部の <span class="info-icon" aria-label="使い方">i</span> でいつでも見直せます</p>
+      <p class="splash-hint">${touch ? "タップ" : "クリック"}ではじめる<br />上部の <span class="info-icon" aria-label="使い方">i</span> でいつでも見直せます</p>
     </div>`;
   return el;
 }

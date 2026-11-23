@@ -599,7 +599,7 @@ function render(): void {
     }
   }
   // 販売規則の設定の歯車はストアコンピューターのすぐ右（user 2026-11-24）。端末と同じ並びに入れ、モバイルで折り返しても離れない
-  setRegion("bells", bellPanel(snap) + RULES_GEAR);
+  setRegion("bells", bellPanel(snap, RULES_GEAR));
   setRegion("owner-auth", ownerAuth ? "" : ownerAuthForm());
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("rules-pad", rulesPadPopup(snap));

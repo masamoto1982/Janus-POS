@@ -1911,12 +1911,13 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
 
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
 
-export function bellPanel(s: Snapshot): string {
+/** storeExtra：ストアコンピューターの端末の中に足す部品（販売規則の設定の歯車＝ストアコンピューターから使う機能、user 2026-11-24） */
+export function bellPanel(s: Snapshot, storeExtra = ""): string {
   return s.bells
     .map(
       // 呼び鈴機能が OFF、または不通の端末は鳴らない＝操作不可の部品と同じグレーアウト
       (m) => `<div class="bell-unit ${m.buzzing ? "buzz" : ""} ${m.bell_on && !m.offline ? "" : "off"}">
-        <span class="bell-icon">${BELL_ICON[m.kind]}</span><span class="bell-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="bell-state">呼び鈴OFF</span>` : m.offline ? `<span class="bell-state">不通</span>` : m.buzzing ? `<span class="bell-state">鳴動中</span>` : ""}
+        <span class="bell-icon">${BELL_ICON[m.kind]}</span><span class="bell-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="bell-state">呼び鈴OFF</span>` : m.offline ? `<span class="bell-state">不通</span>` : m.buzzing ? `<span class="bell-state">鳴動中</span>` : ""}${m.kind === "store_computer" ? storeExtra : ""}
       </div>`,
     )
     .join("");

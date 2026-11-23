@@ -878,6 +878,29 @@ const HTML_RULES: HtmlRule[] = [
   ],
 ];
 
+/** 案内文の下線つき機器名（view.ts の device()）の英訳。訳文の中でこの語に下線を引き直す */
+const DEVICE_EN: Record<string, string> = { 決済端末: "payment terminal", スキャナ: "scanner", 入金ボックス: "inlet" };
+
+/** 下線の機器名で分かれた一文（前のテキスト＋<u class="device">＋後のテキスト）をつないで訳し、訳文の機器名に下線を戻す */
+function localizeDevices(root: DocumentFragment): void {
+  for (const u of [...root.querySelectorAll<HTMLElement>("u.device")]) {
+    if (u.closest(SKIP)) continue;
+    const prev = u.previousSibling?.nodeType === Node.TEXT_NODE ? (u.previousSibling as Text) : null;
+    const next = u.nextSibling?.nodeType === Node.TEXT_NODE ? (u.nextSibling as Text) : null;
+    const name = u.textContent ?? "";
+    const en = trCore(`${prev?.data ?? ""}${name}${next?.data ?? ""}`);
+    const word = DEVICE_EN[name];
+    if (en === null || !word) continue;
+    const at = en.toLowerCase().lastIndexOf(word);
+    if (at < 0) continue;
+    prev?.remove();
+    next?.remove();
+    u.textContent = en.slice(at, at + word.length);
+    u.before(en.slice(0, at));
+    u.after(en.slice(at + word.length));
+  }
+}
+
 const SKIP = "[data-i18n-skip]";
 const ATTRS = ["title", "aria-label", "placeholder"];
 
@@ -885,6 +908,7 @@ function localizeEn(html: string): string {
   const tpl = document.createElement("template");
   tpl.innerHTML = html;
   const root = tpl.content;
+  localizeDevices(root);
   for (const el of root.querySelectorAll<HTMLElement>("*")) {
     if (!root.contains(el) || el.closest(SKIP)) continue;
     for (const a of ATTRS) {

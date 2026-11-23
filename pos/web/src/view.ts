@@ -575,8 +575,10 @@ const INSERT_DONE_MS = 30_000;
 
 /** お客様がかざすもの（レジ画面にデモ用の「Wallet」という言葉は出さない） */
 const TAP_THING: Record<string, string> = { emoney: "電子マネー", qr: "決済用バーコード", credit: "クレジットカード", points: "ポイントカード" };
+/** 案内文の中の機器名（決済端末・スキャナ・入金ボックス）に下線を引き、かざす・入れる先を取り違えないようにする（user 2026-11-23） */
+const device = (name: string): string => `<u class="device">${name}</u>`;
 /** かざす機器：電子マネー・クレジットカードは決済端末、バーコード・ポイントカードはスキャナ（同じボックスの表示が切り替わる） */
-const TAP_DEVICE = (method: string): string => (method === "emoney" || method === "credit" ? "決済端末" : "スキャナ");
+const TAP_DEVICE = (method: string): string => device(method === "emoney" || method === "credit" ? "決済端末" : "スキャナ");
 
 /** 現金のみの商品があるとき：キャッシュレスで払う分と、そのあと現金で払う分 */
 const splitNote = (method: string, cashlessDue: number, due: number): string =>
@@ -597,9 +599,9 @@ function payHint(method: string | null, blocker: string | null, inserted: number
   if (inserted && due > 0) return `<div class="big">不足額 ${yen(due)}</div>`;
   const sec = Math.ceil((settleIn ?? INSERT_DONE_MS) / 1000);
   if (inserted) return counter ? `<div class="big">${sec}秒の無操作で、お支払いを確定します</div>` : `<div class="big">追加投入の受付 残り${sec}秒</div>`;
-  if (method === "cash" && counter) return `${guide}お預かりした現金を入金ボックスに入れ、「投入おわり」を押してください</p>`;
+  if (method === "cash" && counter) return `${guide}お預かりした現金を${device("入金ボックス")}に入れ、「投入おわり」を押してください</p>`;
   if (method === "cash") return `${guide}スタッフが現金をお預かりします</p>`;
-  return counter ? `<p>お預かりした現金を入金ボックスに入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
+  return counter ? `<p>お預かりした現金を${device("入金ボックス")}に入れるか、支払方法を選んでください</p>` : `<p>お支払い方法をお申しつけください</p>`;
 }
 
 /** スタッフ操作モードの売り場側：スタッフが支払方法を選んだら、その決済の操作を案内する。
@@ -1399,7 +1401,7 @@ function emoneyScreen(r: RegisterView, side: Side): string {
           ${ro ? "" : `<div class="point-choices">${go("確認しました", "cash_confirmed", "primary")}</div>`}
         </div>${other}`;
     return `<div class="point-screen emoney-screen">
-        ${msg("電子マネーを決済端末にかざしてください", note)}
+        ${msg(`電子マネーを${device("決済端末")}にかざしてください`, note)}
       </div>${other}`;
   }
   if (r.emoney_short !== null) {
@@ -1436,10 +1438,10 @@ function emoneyScreen(r: RegisterView, side: Side): string {
   }
   if (e.kind === "inquiry")
     return e.balance === null
-      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを決済端末にかざしてください</div></div>${close("バック")}`
+      ? `<div class="point-screen emoney-screen"><div class="big">電子マネーを${device("決済端末")}にかざしてください</div></div>${close("バック")}`
       : `<div class="point-screen emoney-screen">${msg(`電子マネーの残高<span class="emoney-balance">${yen(e.balance)}</span>`)}</div>${close("閉じる")}`;
   return `<div class="point-screen emoney-screen">
-      ${msg("チャージする紙幣を入れてください", e.inserted ? "入れおわったら、電子マネーを決済端末にかざしてください" : "入金ボックスに入れます<br>1,000円札から使えます（残高は 20,000円まで）")}
+      ${msg("チャージする紙幣を入れてください", e.inserted ? `入れおわったら、電子マネーを${device("決済端末")}にかざしてください` : `${device("入金ボックス")}に入れます<br>1,000円札から使えます（残高は 20,000円まで）`)}
     </div>${close("バック")}`;
 }
 

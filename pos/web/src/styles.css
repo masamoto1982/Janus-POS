@@ -162,6 +162,8 @@ button { touch-action: manipulation; }
    大テキストは必ず小テキストより上に、4px 空けて置く（web の msg()） */
 .screen { --muted: var(--msg-weak); }
 .screen .big { color: var(--msg-strong); font-size: var(--text-lg); font-weight: 700; line-height: 1.35; margin-bottom: 0; }
+/* 案内文の機器名（決済端末・スキャナ・入金ボックス）に下線：かざす・入れる先を取り違えないように（user 2026-11-23）。色は文の色のまま */
+.screen u.device { text-decoration: underline; text-decoration-thickness: 0.1em; text-underline-offset: 0.18em; }
 .screen .guide { color: var(--msg-strong); font-size: var(--text-sm); }
 .screen .msg { display: flex; flex-direction: column; align-items: center; gap: var(--s13, 4px); max-width: 100%; text-align: center; }
 .screen .msg > p.small { margin: 0; }

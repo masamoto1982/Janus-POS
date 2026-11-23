@@ -161,6 +161,10 @@ struct SavedRegister {
     outlet_since: Option<u64>,
     #[serde(default)]
     idle_hold: Option<u64>,
+    #[serde(default)]
+    last_counter_op: Option<u64>,
+    #[serde(default)]
+    counter_in_txn: bool,
     menu: Option<Menu>,
     paused: bool,
     touch: Option<(Side, u64)>,
@@ -474,6 +478,8 @@ impl SavedRegister {
             outlet: r.outlet.clone(),
             outlet_since: r.outlet_since,
             idle_hold: r.idle_hold,
+            last_counter_op: Some(r.last_counter_op),
+            counter_in_txn: r.counter_in_txn,
             menu: r.menu,
             paused: r.paused,
             touch: r.touch,
@@ -555,9 +561,8 @@ impl SavedRegister {
             outlet: self.outlet,
             outlet_since: self.outlet_since,
             idle_hold: self.idle_hold,
-            last_counter_op: self.last_op,
-            counter_in_txn: false,
-            staffed_busy: 0.0,
+            last_counter_op: self.last_counter_op.unwrap_or(self.last_op),
+            counter_in_txn: self.counter_in_txn,
             menu: self.menu,
             paused: self.paused,
             touch: self.touch,
@@ -789,8 +794,6 @@ impl Store {
                 .point_balances
                 .unwrap_or_else(super::initial_point_balances),
             ticket_queue: s.ticket_queue.into_iter().collect(),
-            revert_rule: super::RevertRule::Fixed,
-            sales_log: std::collections::VecDeque::new(),
         };
         store.issue_next_tickets();
         Ok(store)

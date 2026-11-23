@@ -19,7 +19,6 @@ use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 
 mod persist;
-pub mod rush;
 
 /// 作れるレジの台数の上限
 pub const MAX_REGISTERS: u8 = 10;
@@ -198,24 +197,6 @@ pub enum CallTopic {
     Tobacco,
     Emoney,
     Sos,
-}
-
-/// スタッフ操作モードからセルフ操作モードに戻す規則（混雑シミュレーションで比べる候補。仕様 15.10）
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-#[serde(rename_all = "snake_case")]
-pub enum RevertRule {
-    /// 現行：どちらの側の操作も無操作の時計を戻し、5 分で戻す
-    #[default]
-    Fixed,
-    /// スタッフ操作モードでは売り場側の操作で時計を戻さない（5 分のまま）
-    FloorIgnored,
-    /// 時計を戻さない＋直近 10 分の店の売上（客数×客単価）が多いほど短く
-    Load,
-    /// 時計を戻さない＋そのレジが直近に有人の取引を続けていた時間が短いほど短く
-    Streak,
-    /// 時計を戻さない＋ログインしているスタッフが別のレジで取引中なら短く
-    Presence,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -1407,8 +1388,6 @@ struct Register {
     last_counter_op: u64,
     /// 今の取引にレジカウンター側の操作があった（スタッフが手を付けた）
     counter_in_txn: bool,
-    /// 有人の取引を続けていた時間（ミリ秒、10 分で 1/e に減る）
-    staffed_busy: f64,
     menu: Option<Menu>,
     paused: bool,
     touch: Option<(Side, u64)>,
@@ -1533,17 +1512,17 @@ impl Register {
         }
     }
 
-    /// 無操作の時計の起点。売り場側の操作を数えない規則では、スタッフ操作モードはレジカウンター側の操作だけ
-    fn idle_since(&self, rule: RevertRule) -> u64 {
-        if rule != RevertRule::Fixed && self.mode == Mode::StaffOperated {
+    /// 無操作の時計の起点。スタッフ操作モードはレジカウンター側の操作だけを数える（仕様 12.2）
+    fn idle_since(&self) -> u64 {
+        if self.mode == Mode::StaffOperated {
             self.last_counter_op
         } else {
             self.last_op
         }
     }
 
-    fn idle_revert_in(&self, now: u64, rule: RevertRule, limit: u64) -> u64 {
-        let since = self.idle_since(rule);
+    fn idle_revert_in(&self, now: u64, limit: u64) -> u64 {
+        let since = self.idle_since();
         let counted_until = self.idle_hold.unwrap_or(now).max(since);
         limit.saturating_sub(counted_until - since)
     }
@@ -1735,10 +1714,6 @@ pub struct Store {
     /// チケットの発券の列（先入れ先出し）。決済が済んだ順にレジ番号が並び、先頭のレジだけが発券する。
     /// 複数のレジで同時・僅差に申し込まれても、先のチケットの発券とお渡しが済むまで次は発券しない
     ticket_queue: VecDeque<u8>,
-    /// セルフ操作モードに戻す規則（シミュレーターの設定）
-    revert_rule: RevertRule,
-    /// 決済の時刻と金額（直近の売上で混雑をはかる規則のため）
-    sales_log: VecDeque<(u64, u32)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -1842,12 +1817,8 @@ pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
 /// 無操作で取引を中止し、セルフ操作モードに戻る
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
-/// 規則で短くするときの下限（仕様 15.10）
-pub const REVERT_MIN_MS: u64 = 30 * 1000;
-/// 混雑・持続時間をはかる時間幅
-pub const REVERT_WINDOW_MS: u64 = 10 * 60 * 1000;
-/// 客数×客単価の規則：直近 10 分の売上がこの額までなら 5 分のまま、それを超えると反比例で短くする
-pub const REVERT_LOAD_YEN: u32 = 5000;
+/// ログインしているスタッフが別のレジで取引中のとき、手を付けていないスタッフ操作モードのレジをセルフ操作モードに戻すまでの無操作
+pub const AWAY_REVERT_MS: u64 = 30 * 1000;
 /// 非常事態モード：セルフ操作モードでスタッフがログインしないまま、呼び鈴をこの時間以上鳴らしっぱなし（押しっ放し）にするか、
 /// この時間以内に EMERGENCY_PRESSES 回以上鳴らす（連打）。常軌を逸した押し方で、悪戯であっても発動したこと自体が抑止力になる。
 /// 実機もシミュレーターも同じ 3 分（連打なら待たずに確かめられる）
@@ -1908,7 +1879,6 @@ impl Register {
             idle_hold: None,
             last_counter_op: 0,
             counter_in_txn: false,
-            staffed_busy: 0.0,
             menu: None,
             paused: false,
             touch: None,
@@ -1962,8 +1932,6 @@ impl Store {
             emoney_balance: EMONEY_INITIAL,
             point_balances: initial_point_balances(),
             ticket_queue: VecDeque::new(),
-            revert_rule: RevertRule::Fixed,
-            sales_log: VecDeque::new(),
         }
     }
 
@@ -1972,23 +1940,12 @@ impl Store {
     }
 
     pub fn tick(&mut self, now: u64) {
-        let dt = now.saturating_sub(self.now);
         self.now = self.now.max(now);
         let now = self.now;
-        let decay = (-(dt as f64) / REVERT_WINDOW_MS as f64).exp();
         for r in &mut self.registers {
-            let working = r.mode == Mode::StaffOperated && r.busy() && r.counter_in_txn;
-            r.staffed_busy = r.staffed_busy * decay + if working { dt as f64 } else { 0.0 };
             if !r.busy() {
                 r.counter_in_txn = false;
             }
-        }
-        while self
-            .sales_log
-            .front()
-            .is_some_and(|&(t, _)| t + REVERT_WINDOW_MS <= now)
-        {
-            self.sales_log.pop_front();
         }
         for r in &mut self.registers {
             if r.touch.is_some_and(|(_, until)| until <= now) {
@@ -2088,7 +2045,7 @@ impl Store {
             .filter(|r| {
                 (r.mode != Mode::SelfOperated || !r.idle())
                     && r.idle_hold.is_none()
-                    && now.saturating_sub(r.idle_since(self.revert_rule)) >= self.revert_ms(r)
+                    && now.saturating_sub(r.idle_since()) >= self.revert_ms(r)
             })
             .map(|r| r.id)
             .collect();
@@ -2121,40 +2078,23 @@ impl Store {
         }
     }
 
-    pub fn set_revert_rule(&mut self, rule: RevertRule) {
-        self.revert_rule = rule;
-    }
-
-    /// スタッフ操作モードからセルフ操作モードに戻すまでの無操作の時間（仕様 12.2・15.10）。
-    /// 短くするのは、スタッフがまだ手を付けていない（レジカウンター側の操作のない）スタッフ操作モードのレジだけ。
-    /// 接客中の取引は今までどおり 5 分待つ
+    /// スタッフ操作モードからセルフ操作モードに戻すまでの無操作の時間（仕様 12.2）。
+    /// スタッフがまだ手を付けていない（取引にレジカウンター側の操作がない）スタッフ操作モードのレジで、
+    /// ログインしているスタッフが別のレジで取引中なら、そのスタッフはこのレジに来られないので短くする
     fn revert_ms(&self, r: &Register) -> u64 {
         if r.mode != Mode::StaffOperated || r.counter_in_txn {
             return IDLE_REVERT_MS;
         }
-        match self.revert_rule {
-            RevertRule::Fixed | RevertRule::FloorIgnored => IDLE_REVERT_MS,
-            RevertRule::Load => {
-                let sales: u32 = self.sales_log.iter().map(|&(_, y)| y).sum();
-                let ms = IDLE_REVERT_MS * u64::from(REVERT_LOAD_YEN) / u64::from(sales.max(REVERT_LOAD_YEN));
-                ms.max(REVERT_MIN_MS)
-            }
-            RevertRule::Streak => (r.staffed_busy as u64).clamp(REVERT_MIN_MS, IDLE_REVERT_MS),
-            RevertRule::Presence => {
-                let Some(me) = r.staff.as_ref().map(|s| s.account.id) else {
-                    return IDLE_REVERT_MS;
-                };
-                let elsewhere = self.registers.iter().any(|o| {
-                    o.id != r.id
-                        && o.staff.as_ref().is_some_and(|s| s.account.id == me)
-                        && o.busy()
-                });
-                if elsewhere {
-                    REVERT_MIN_MS
-                } else {
-                    IDLE_REVERT_MS
-                }
-            }
+        let Some(me) = r.staff.as_ref().map(|s| s.account.id) else {
+            return IDLE_REVERT_MS;
+        };
+        let away = self.registers.iter().any(|o| {
+            o.id != r.id && o.staff.as_ref().is_some_and(|s| s.account.id == me) && o.busy()
+        });
+        if away {
+            AWAY_REVERT_MS
+        } else {
+            IDLE_REVERT_MS
         }
     }
 
@@ -4725,10 +4665,7 @@ impl Store {
             "お支払いが完了しました".to_string()
         };
         let card = receipt.point_card.clone();
-        let total_for_log = receipt.total;
         r.last_receipt = Some(receipt);
-        let now = self.now;
-        self.sales_log.push_back((now, total_for_log));
         if let Some(no) = card {
             self.add_points(&no, earned);
         }
@@ -5127,7 +5064,7 @@ impl Store {
             idle_voids: !r.idle() || r.on_hold.is_some(),
             held: r.on_hold.is_some(),
             idle_revert_in: (r.mode != Mode::SelfOperated || !r.idle())
-                .then(|| r.idle_revert_in(self.now, self.revert_rule, self.revert_ms(r))),
+                .then(|| r.idle_revert_in(self.now, self.revert_ms(r))),
             change_left: r
                 .outlet_since
                 .is_some_and(|t| self.now.saturating_sub(t) >= r.change_timers().0),

@@ -1029,7 +1029,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
    高さは段の小（W=400 のレジ画面で W÷16＝25px）、文字は高さの半分、左右の余白は高さの 1/4、幅は文字なり、弱い角丸、行の高さは文字の高さ。
    歯車は同じ高さの円 */
 :root { --chrome-b: 25px; }
-:is(.how-to, .reset-btn, .rush-open, .rules-dlg .dlg-head button, [data-owner-submit], [data-add-tax], [data-save-invoice]) {
+:is(.how-to, .reset-btn, .rules-dlg .dlg-head button, [data-owner-submit], [data-add-tax], [data-save-invoice]) {
   box-sizing: border-box; height: var(--chrome-b); width: auto; min-width: 0; padding: 0 calc(var(--chrome-b) / 4);
   font-size: calc(var(--chrome-b) / 2); font-weight: 400; line-height: 1; white-space: nowrap; flex: none;
   border-width: var(--frame-w); border-radius: calc(400px / 45.255);
@@ -1100,37 +1100,3 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .splash-howto { transition: none; opacity: 1; transform: none; }
 }
 
-/* 混雑シミュレーション（仕様 15.10）。レジ画面の外の道具なので、四の体系の外 */
-.rush-panel { margin: 0 16px 16px; padding: 8px 12px; background: var(--panel); font-size: 13px; }
-.rush-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.rush-head h2 { margin: 0; font-size: 16px; flex: 1; }
-.rush-ctl { display: flex; gap: 6px; flex-wrap: wrap; }
-.rush-btn.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); }
-.rush-sum { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0; }
-.rush-sum div { display: flex; gap: 6px; }
-.rush-sum dt { color: var(--muted); }
-.rush-sum dd { margin: 0; font-weight: 600; }
-:is(.rush-sum dd, .rush-log li, .rush-badge).bad { color: var(--danger); }
-.rush-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
-.rush-staff, .rush-log { margin: 0; padding: 0; list-style: none; }
-.rush-log li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rush-log .t { display: inline-block; min-width: 3.5em; color: var(--muted); }
-.rush-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 4px 0; }
-.rush-table :is(th, td) { border-bottom: 1px solid var(--line); padding: 3px 6px; text-align: left; vertical-align: top; }
-.rush-table td.num { text-align: right; white-space: nowrap; }
-.rush-ok { color: var(--ok); margin: 4px 0; }
-.register > h2:has(.rush-badge) { position: relative; }
-.rush-badge { position: absolute; right: 0; top: 100%; margin-top: 2px; font-size: 12px; font-weight: 400; white-space: nowrap; }
-.rush-badge.bad { font-weight: 700; }
-.rush-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px 16px; margin: 10px 0; }
-.rush-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
-.rush-field input[type="number"] { width: 6em; height: 26px; border: 1px solid var(--border); border-radius: 0; background: transparent; text-align: right; font: inherit; }
-.rush-check { justify-content: flex-start; grid-column: 1 / -1; }
-.rush-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.rush-actions .rush-field { flex: none; }
-.rush-result h3 { font-size: 15px; margin: 14px 0 4px; }
-.rush-result h4 { font-size: 13px; margin: 10px 0 4px; }
-.rush-open { white-space: nowrap; flex: none; }
-@media (max-width: 760px) { .rush-open { display: none; } }
-.rush-rule { grid-column: 1 / -1; justify-content: flex-start; }
-.rush-rule select { height: 26px; font: inherit; }

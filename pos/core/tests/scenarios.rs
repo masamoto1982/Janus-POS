@@ -5826,138 +5826,53 @@ fn touching_the_screen_restarts_the_idle_countdown() {
     assert_eq!(after, janus_pos_core::store::IDLE_REVERT_MS);
 }
 
-/// 仕様 15.10：混雑シミュレーションは全員が帰るまで流す。スタッフの要らないお客様だけなら、スタッフ 0 人でも全員がセルフで買い終える
+/// 仕様 12.2：スタッフ操作モードでは売り場側の操作（スキャン・画面に触れる）で無操作の時計を戻さない。
+/// スタッフがいないままお客様が触れ続けても、5 分でセルフ操作モードに戻る
 #[test]
-fn rush_serves_simple_customers_without_staff() {
-    use janus_pos_core::store::rush::{Rush, RushParams};
-    let v = Rush::run(RushParams {
-        staff: 0,
-        cash_pct: 0,
-        trouble_pct: 0,
-        ..Default::default()
-    });
-    assert!(v.finished);
-    assert_eq!(v.served, v.params.customers);
-    assert_eq!(v.gave_up, 0);
-    assert!(v.incidents.is_empty());
-}
-
-/// 仕様 15.10：先にログインして開けた有人レジをスタッフが呼び出しで離れると、次のお客様は立ち往生する。
-/// お客様がスキャンし画面に触れるたびに無操作の時計が戻るので、スタッフが戻るまでセルフ操作モードに戻らない
-#[test]
-fn rush_finds_customers_stranded_at_an_unattended_staffed_register() {
-    use janus_pos_core::store::rush::{Rush, RushParams};
-    let worst = (1..=20)
-        .flat_map(|seed| {
-            Rush::run(RushParams {
-                customers: 90,
-                seed,
-                ..Default::default()
-            })
-            .incidents
-        })
-        .max_by_key(|i| i.duration_ms)
-        .expect("立ち往生が起きる");
-    assert!(worst.duration_ms > 60_000, "{worst:?}");
-    assert!(worst.resets > 0, "{worst:?}");
-    assert!(worst.cause.contains("ログインしたまま"), "{worst:?}");
-    assert_eq!(worst.ended_by.as_deref(), Some("スタッフが来た"));
-}
-
-/// 仕様 15.10：有人レジを開けるときに先にログインしなければ、立ち往生はずっと少ない
-#[test]
-fn rush_strands_less_without_logging_in_ahead() {
-    use janus_pos_core::store::rush::{Rush, RushParams};
-    let count = |pre_login: bool| -> usize {
-        (1..=20)
-            .map(|seed| {
-                Rush::run(RushParams {
-                    customers: 90,
-                    seed,
-                    pre_login,
-                    ..Default::default()
-                })
-                .incidents
-                .iter()
-                .filter(|i| i.duration_ms >= 10_000)
-                .count()
-            })
-            .sum()
-    };
-    assert!(count(false) < count(true));
-}
-
-/// 仕様 12.2：スタッフ操作モードの売り場側の操作（スキャン・画面に触れる）も無操作の時計を戻す。
-/// スタッフがいないまま触れ続けると、セルフ操作モードに戻らない（混雑シミュレーションで見つけた立ち往生の仕組み）
-#[test]
-fn touching_an_unattended_staffed_register_keeps_it_staff_operated() {
+fn floor_touches_do_not_hold_a_staffed_register() {
+    use janus_pos_core::store::IDLE_REVERT_MS;
     let mut s = Store::new(1, 3, 1);
     login_as(&mut s, 1, "ST001");
-    scan(&mut s, 2, "floor", BREAD);
-    login_as(&mut s, 2, "ST001");
     scan(&mut s, 1, "floor", TEA);
-    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
-    for _ in 0..30 {
+    for _ in 0..(IDLE_REVERT_MS / 20_000 - 1) {
         advance(&mut s, 20_000);
-        ok(&mut s, json!({"type":"touch","register":1}));
+        ok(&mut s, json!({"type":"touch","register":1,"side":"floor"}));
+        assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     }
-    let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::StaffOperated, "10 分触れ続けてもセルフ操作モードに戻らない");
-    assert_eq!(v.floor.lines.len(), 1);
-    advance(&mut s, 5 * 60_000 + 1_000);
+    advance(&mut s, 21_000);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
     assert!(v.floor.lines.is_empty(), "戻るときに読んだ商品は取引中止で消える");
 }
 
-/// 仕様 15.10：規則「時計を戻さない」では、スタッフ操作モードの売り場側の操作で無操作の時計が戻らないので、触れ続けても 5 分でセルフ操作モードに戻る
-#[test]
-fn floor_touches_do_not_hold_a_staffed_register_under_floor_ignored_rule() {
-    use janus_pos_core::store::RevertRule;
-    let mut s = Store::new(1, 3, 1);
-    s.set_revert_rule(RevertRule::FloorIgnored);
-    login_as(&mut s, 1, "ST001");
-    scan(&mut s, 1, "floor", TEA);
-    for _ in 0..16 {
-        advance(&mut s, 20_000);
-        ok(&mut s, json!({"type":"touch","register":1,"side":"floor"}));
-    }
-    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
-}
-
-/// 仕様 15.10：規則「スタッフの居場所」では、ログインしているスタッフが別のレジで取引中なら、手を付けていないスタッフ操作モードのレジは 30 秒でセルフ操作モードに戻る
+/// 仕様 12.2：ログインしているスタッフが別のレジで取引中なら、手を付けていないスタッフ操作モードのレジはレジカウンター側の最後の操作から 30 秒でセルフ操作モードに戻る
 #[test]
 fn staffed_register_reverts_quickly_when_its_staff_works_elsewhere() {
-    use janus_pos_core::store::{RevertRule, REVERT_MIN_MS};
     let mut s = Store::new(1, 3, 1);
-    s.set_revert_rule(RevertRule::Presence);
     login_as(&mut s, 1, "ST001");
     advance(&mut s, 60_000);
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated, "手が空いていれば 5 分のまま");
     scan(&mut s, 2, "floor", BREAD);
     login_as(&mut s, 2, "ST001");
     scan(&mut s, 1, "floor", TEA);
-    advance(&mut s, REVERT_MIN_MS + 1_000);
+    advance(&mut s, 1_000);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
     assert!(v.floor.lines.is_empty());
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated, "接客中のレジはそのまま");
 }
 
-/// 仕様 15.10：規則「スタッフの居場所」なら、混雑シミュレーションの立ち往生は 30 秒ほどで終わる
+/// 仕様 12.2：スタッフが手を付けた取引は、そのスタッフが別のレジで取引中でも 5 分待つ
 #[test]
-fn rush_strandings_stay_short_under_presence_rule() {
-    use janus_pos_core::store::rush::{Rush, RushParams};
-    use janus_pos_core::store::RevertRule;
-    for seed in 1..=20 {
-        let v = Rush::run(RushParams {
-            customers: 90,
-            seed,
-            rule: RevertRule::Presence,
-            ..Default::default()
-        });
-        for i in &v.incidents {
-            assert!(i.duration_ms <= 40_000, "{i:?}");
-        }
-    }
+fn staff_touched_transaction_keeps_the_full_idle_time() {
+    use janus_pos_core::store::AWAY_REVERT_MS;
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    scan(&mut s, 1, "counter", TEA);
+    scan(&mut s, 2, "floor", BREAD);
+    login_as(&mut s, 2, "ST001");
+    advance(&mut s, AWAY_REVERT_MS * 4);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::StaffOperated);
+    assert_eq!(v.counter.lines.len(), 1);
 }

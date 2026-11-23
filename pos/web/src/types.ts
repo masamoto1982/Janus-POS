@@ -297,6 +297,82 @@ export type RuleChange = { at: number, by: string, change: string, };
 
 export type RuleTarget = { "kind": "category", category: Category, } | { "kind": "product", code: string, };
 
+export type RushIncident = { customer: number, kind: string, register: number, 
+/**
+ * 始まり（シミュレーション開始からの経過）
+ */
+start_ms: number, duration_ms: number, 
+/**
+ * 立ち往生のあいだ、お客様の操作（スキャン・画面に触れる）で無操作の時計が戻った回数
+ */
+resets: number, cause: string, ended_by: string | null, };
+
+export type RushLog = { at_ms: number, text: string, };
+
+export type RushParams = { 
+/**
+ * レジの台数
+ */
+registers: number, 
+/**
+ * スタッフの人数（0〜3）
+ */
+staff: number, 
+/**
+ * 来店するお客様の人数
+ */
+customers: number, 
+/**
+ * お客様が来店する時間帯の長さ（分）
+ */
+minutes: number, 
+/**
+ * 客単価（円）。飲み物ひとつのお客様を除く
+ */
+spend: number, 
+/**
+ * 飲み物ひとつだけのお客様の割合（%）
+ */
+drink_only_pct: number, 
+/**
+ * 現金で払うお客様の割合（%）。セルフ操作モードは現金を扱わないのでスタッフを呼ぶ
+ */
+cash_pct: number, 
+/**
+ * 手のかかるお客様（トラブル）の割合（%）。商品を読んだあとスタッフを呼ぶ
+ */
+trouble_pct: number, 
+/**
+ * 手のかかるお客様の対応にかかる時間（秒）
+ */
+trouble_secs: number, 
+/**
+ * 列がこの人数以上になったら、手の空いたスタッフが空いたレジを有人レジとして開ける（0＝開けない）
+ */
+open_at_queue: number, 
+/**
+ * 有人レジを開けるとき、お客様が来る前にログインして待つ
+ */
+pre_login: boolean, 
+/**
+ * スタッフのいない有人レジで、お客様が画面に触れる間隔（秒、0＝触れない）
+ */
+touch_secs: number, 
+/**
+ * お客様が待てる時間（秒）。来店からこの時間を過ぎたら買わずに帰る
+ */
+patience_secs: number, seed: number, };
+
+export type RushRegisterView = { register: number, customer: number | null, kind: string, waited_ms: number, 
+/**
+ * スタッフも呼び出しもなく、セルフにもなっていない（立ち往生）
+ */
+stranded: boolean, staff_here: Array<string>, };
+
+export type RushStaffView = { name: string, at: number | null, post: number | null, doing: string, };
+
+export type RushView = { params: RushParams, elapsed_ms: number, finished: boolean, arrived: number, served: number, gave_up: number, queue: number, max_queue: number, avg_wait_ms: number, max_wait_ms: number, avg_spend: number, stranded_customers: number, stranded_total_ms: number, max_stranded_ms: number, incidents: Array<RushIncident>, staff: Array<RushStaffView>, registers: Array<RushRegisterView>, log: Array<RushLog>, };
+
 export type ShortChoice = "cancel" | "cash" | "cash_confirmed" | "charge" | "staff";
 
 export type Side = "counter" | "floor";

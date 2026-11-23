@@ -4,6 +4,7 @@ use std::any::TypeId;
 use std::collections::{BTreeMap, HashSet};
 use std::path::PathBuf;
 
+use janus_pos_core::store::rush::{RushParams, RushView};
 use janus_pos_core::{Command, Snapshot};
 use ts_rs::{Config, TypeVisitor, TS};
 
@@ -38,6 +39,8 @@ fn render() -> String {
     };
     c.visit::<Snapshot>();
     c.visit::<Command>();
+    c.visit::<RushParams>();
+    c.visit::<RushView>();
     let mut out = String::from(HEADER);
     for decl in c.decls.values() {
         out.push('\n');

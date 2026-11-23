@@ -5,6 +5,8 @@ import type { CancelStage, GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
 import { initSplash, openSplash } from "./splash";
+import { DEFAULT_RUSH, readRushForm, RUSH_BATCH, RUSH_PENDING_KEY, rushBadge, rushBatch, rushForm, rushPanel, rushResult } from "./rush";
+import type { RushParams, RushView } from "./types";
 import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
 import {
   couponCancel,
@@ -65,6 +67,8 @@ const app = document.getElementById("app")!;
 let sim: PosSimulator;
 let t0 = performance.now();
 let snap: Snapshot;
+/** 再生中の混雑シミュレーション（仕様 15.10）。速さは店の時計の倍率 */
+let rush: { speed: number; paused: boolean; last: number; view: RushView | null } | null = null;
 const cache = new WeakMap<Element, string>();
 const toastTimers = new Map<string, number>();
 
@@ -169,7 +173,15 @@ function start(): void {
     forget();
     restored = null;
   }
-  sim = restored ?? new PosSimulator(Date.now() & 0xffff, DEFAULT_REGISTERS, 3);
+  const pending = takeRushPending();
+  if (pending) {
+    // 混雑シミュレーションは、取引のない新しい店で始める
+    sim = new PosSimulator(pending.params.seed & 0xffff, pending.params.registers, 3);
+    sim.rush_start(JSON.stringify(pending.params));
+    rush = { speed: pending.speed, paused: false, last: performance.now(), view: null };
+  } else {
+    sim = restored ?? new PosSimulator(Date.now() & 0xffff, DEFAULT_REGISTERS, 3);
+  }
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
@@ -194,6 +206,7 @@ function start(): void {
   app.addEventListener("pointerdown", touchRegister, true);
   app.addEventListener("keydown", touchRegister, true);
   app.querySelector("[data-how-to]")?.addEventListener("click", openSplash);
+  wireRush();
   app.querySelector("[data-reset]")?.addEventListener("click", () => {
     if (!confirm("保存されている状態を消して、最初からやり直しますか")) return;
     discarding = true;
@@ -225,6 +238,7 @@ function buildSkeleton(): void {
             ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.name)}${a.role === "owner" ? "（オーナー）" : ""}</option>`).join("")}
           </select>
         </label>
+        <span data-region="rush-reg-${r.id}"></span>
       </h2>
       <div class="tabs swipe-tabs" role="tablist" aria-label="表示する画面">
         <button type="button" role="tab" class="tab on" aria-selected="true" data-swipe-to="${r.id}:counter">レジカウンター側</button>
@@ -274,10 +288,12 @@ function buildSkeleton(): void {
       <h1>Janus POS</h1>
       <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
       <div class="top-tools">
+      <button type="button" class="neg small rush-open" data-open-rush aria-haspopup="dialog" title="お客様とスタッフを自動で動かし、レジの立ち往生が起きないか確かめる">混雑シミュレーション</button>
       <button type="button" class="neg small how-to" data-how-to title="使用方法のスプラッシュ画面を出す">使用方法</button>
       <button type="button" class="neg small reset-btn" data-reset title="保存されている状態を消して最初からやり直す">リセット</button>
       </div>
     </header>
+    <div data-region="rush"></div>
     <article class="floor">
         <section class="bell-area" aria-label="Bell（呼び鈴）">
           <h2>Bell</h2>
@@ -305,6 +321,18 @@ function buildSkeleton(): void {
       <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
       <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます<br>OFF の端末は鳴らず、不通かどうかの判定にも含めません<br>据え付け端末は常に ON です</p>
       <div class="bell-settings" data-region="bell-settings"></div>
+    </dialog>
+    <dialog class="rules-dlg rush-dlg" id="rush-dlg" aria-labelledby="rush-title">
+      <div class="dlg-head"><h2 id="rush-title">混雑シミュレーション</h2><button class="small ghost" data-close-rush>閉じる</button></div>
+      <p class="muted">お客様とスタッフを自動で動かし、スタッフ操作モードのレジでお客様が誰にも気づかれずに待たされる「立ち往生」が起きないかを確かめます<br>スタッフは呼び出しに応えることを優先し、列が伸びると空いたレジを有人レジとして開けます</p>
+      <div data-rush-form>${rushForm(DEFAULT_RUSH)}</div>
+      <div class="rush-actions">
+        <label class="rush-field"><span>再生の速さ</span><select data-rush-speed-sel>${[1, 10, 30, 60].map((s) => `<option value="${s}"${s === 10 ? " selected" : ""}>${s}×</option>`).join("")}</select></label>
+        <button type="button" class="small" data-rush-play title="いまの店の状態を消して、レジの画面の上で再生する">画面で再生</button>
+        <button type="button" class="small ghost" data-rush-instant>一気に結果を出す</button>
+        <button type="button" class="small ghost" data-rush-batch>${RUSH_BATCH}回まとめて試す</button>
+      </div>
+      <div class="rush-result" id="rush-result"></div>
     </dialog>
     <dialog class="rules-dlg picker-dlg" id="picker-dlg" aria-label="読ませるものを選ぶ">
       <div class="dlg-head"><button class="small ghost" data-close-picker>閉じる</button></div>
@@ -610,6 +638,8 @@ function render(): void {
   setRegion("owner-auth", ownerAuth ? "" : ownerAuthForm());
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("rules-pad", rulesPadPopup(snap));
+  setRegion("rush", rush ? rushPanel(rush.view, rush.speed, rush.paused) : "");
+  snap.registers.forEach((r) => setRegion(`rush-reg-${r.id}`, rush ? rushBadge(rush.view, r.id) : ""));
   app.querySelectorAll<HTMLElement>(".screen-main").forEach((m) => paginate(m));
 }
 
@@ -618,8 +648,18 @@ const ffTabs = new Map<number, FfUi>();
 const ffUi = (reg: number): FfUi => ffTabs.get(reg) ?? { tab: FF_TABS[0][0], page: 0 };
 
 function frame(): void {
+  if (rush) {
+    const now = performance.now();
+    if (!rush.paused) sim.rush_advance((now - rush.last) * rush.speed);
+    rush.last = now;
+  }
   sim.tick(performance.now() - t0);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
+  if (rush) {
+    // 店の時計を早回ししたので、画面の時計をそれに合わせる
+    t0 = performance.now() - snap.now;
+    rush.view = JSON.parse(sim.rush_view()) as RushView | null;
+  }
   setBellRinging(
     snap.bells.some((m) => m.buzzing),
     Math.max(0, ...snap.registers.map((r) => r.ring_volume)),
@@ -1618,3 +1658,54 @@ initSplash();
 boot().catch((e) => {
   app.innerHTML = `<p class="error">読み込みに失敗しました：${esc(e)}</p>`;
 });
+
+function takeRushPending(): { params: RushParams; speed: number } | null {
+  try {
+    const raw = localStorage.getItem(RUSH_PENDING_KEY);
+    if (!raw) return null;
+    localStorage.removeItem(RUSH_PENDING_KEY);
+    return JSON.parse(raw) as { params: RushParams; speed: number };
+  } catch {
+    return null;
+  }
+}
+
+function wireRush(): void {
+  const dlg = document.getElementById("rush-dlg") as HTMLDialogElement;
+  const result = document.getElementById("rush-result")!;
+  const params = (): RushParams => readRushForm(dlg);
+  app.querySelector("[data-open-rush]")?.addEventListener("click", () => dlg.showModal());
+  dlg.querySelector("[data-close-rush]")?.addEventListener("click", () => dlg.close());
+  dlg.querySelector("[data-rush-play]")?.addEventListener("click", () => {
+    const p = params();
+    if (!confirm(`いまの店の状態を消して、レジ${p.registers}台・スタッフ${p.staff}人で再生しますか`)) return;
+    const speed = Number(dlg.querySelector<HTMLSelectElement>("[data-rush-speed-sel]")!.value) || 10;
+    try {
+      localStorage.setItem(RUSH_PENDING_KEY, JSON.stringify({ params: p, speed }));
+    } catch {
+      return;
+    }
+    discarding = true;
+    forget();
+    location.reload();
+  });
+  dlg.querySelector("[data-rush-instant]")?.addEventListener("click", () => {
+    result.innerHTML = rushResult(JSON.parse(PosSimulator.rush_run(JSON.stringify(params()))) as RushView);
+  });
+  dlg.querySelector("[data-rush-batch]")?.addEventListener("click", () => {
+    const p = params();
+    const views = Array.from({ length: RUSH_BATCH }, (_, i) => JSON.parse(PosSimulator.rush_run(JSON.stringify({ ...p, seed: p.seed + i }))) as RushView);
+    result.innerHTML = rushBatch(views);
+  });
+  app.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest<HTMLElement>("[data-rush-speed], [data-rush-pause], [data-rush-close]");
+    if (!b || !rush) return;
+    if (b.dataset.rushSpeed) rush.speed = Number(b.dataset.rushSpeed);
+    else if (b.hasAttribute("data-rush-pause")) rush.paused = !rush.paused;
+    else {
+      sim.rush_stop();
+      rush = null;
+    }
+    render();
+  });
+}

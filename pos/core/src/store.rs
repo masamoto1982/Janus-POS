@@ -19,6 +19,7 @@ use crate::rng::Rng;
 use crate::tax::{self, Rounding, TaxKind, TaxSettings};
 
 mod persist;
+pub mod rush;
 
 /// 作れるレジの台数の上限
 pub const MAX_REGISTERS: u8 = 10;

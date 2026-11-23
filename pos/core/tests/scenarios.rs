@@ -5825,3 +5825,87 @@ fn touching_the_screen_restarts_the_idle_countdown() {
     assert!(after > before);
     assert_eq!(after, janus_pos_core::store::IDLE_REVERT_MS);
 }
+
+/// 仕様 15.10：混雑シミュレーションは全員が帰るまで流す。スタッフの要らないお客様だけなら、スタッフ 0 人でも全員がセルフで買い終える
+#[test]
+fn rush_serves_simple_customers_without_staff() {
+    use janus_pos_core::store::rush::{Rush, RushParams};
+    let v = Rush::run(RushParams {
+        staff: 0,
+        cash_pct: 0,
+        trouble_pct: 0,
+        ..Default::default()
+    });
+    assert!(v.finished);
+    assert_eq!(v.served, v.params.customers);
+    assert_eq!(v.gave_up, 0);
+    assert!(v.incidents.is_empty());
+}
+
+/// 仕様 15.10：先にログインして開けた有人レジをスタッフが呼び出しで離れると、次のお客様は立ち往生する。
+/// お客様がスキャンし画面に触れるたびに無操作の時計が戻るので、スタッフが戻るまでセルフ操作モードに戻らない
+#[test]
+fn rush_finds_customers_stranded_at_an_unattended_staffed_register() {
+    use janus_pos_core::store::rush::{Rush, RushParams};
+    let worst = (1..=20)
+        .flat_map(|seed| {
+            Rush::run(RushParams {
+                customers: 90,
+                seed,
+                ..Default::default()
+            })
+            .incidents
+        })
+        .max_by_key(|i| i.duration_ms)
+        .expect("立ち往生が起きる");
+    assert!(worst.duration_ms > 60_000, "{worst:?}");
+    assert!(worst.resets > 0, "{worst:?}");
+    assert!(worst.cause.contains("ログインしたまま"), "{worst:?}");
+    assert_eq!(worst.ended_by.as_deref(), Some("スタッフが来た"));
+}
+
+/// 仕様 15.10：有人レジを開けるときに先にログインしなければ、立ち往生はずっと少ない
+#[test]
+fn rush_strands_less_without_logging_in_ahead() {
+    use janus_pos_core::store::rush::{Rush, RushParams};
+    let count = |pre_login: bool| -> usize {
+        (1..=20)
+            .map(|seed| {
+                Rush::run(RushParams {
+                    customers: 90,
+                    seed,
+                    pre_login,
+                    ..Default::default()
+                })
+                .incidents
+                .iter()
+                .filter(|i| i.duration_ms >= 10_000)
+                .count()
+            })
+            .sum()
+    };
+    assert!(count(false) < count(true));
+}
+
+/// 仕様 12.2：スタッフ操作モードの売り場側の操作（スキャン・画面に触れる）も無操作の時計を戻す。
+/// スタッフがいないまま触れ続けると、セルフ操作モードに戻らない（混雑シミュレーションで見つけた立ち往生の仕組み）
+#[test]
+fn touching_an_unattended_staffed_register_keeps_it_staff_operated() {
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    scan(&mut s, 2, "floor", BREAD);
+    login_as(&mut s, 2, "ST001");
+    scan(&mut s, 1, "floor", TEA);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+    for _ in 0..30 {
+        advance(&mut s, 20_000);
+        ok(&mut s, json!({"type":"touch","register":1}));
+    }
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::StaffOperated, "10 分触れ続けてもセルフ操作モードに戻らない");
+    assert_eq!(v.floor.lines.len(), 1);
+    advance(&mut s, 5 * 60_000 + 1_000);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert!(v.floor.lines.is_empty(), "戻るときに読んだ商品は取引中止で消える");
+}

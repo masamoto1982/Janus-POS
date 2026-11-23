@@ -5825,3 +5825,54 @@ fn touching_the_screen_restarts_the_idle_countdown() {
     assert!(after > before);
     assert_eq!(after, janus_pos_core::store::IDLE_REVERT_MS);
 }
+
+/// 仕様 12.2：スタッフ操作モードでは売り場側の操作（スキャン・画面に触れる）で無操作の時計を戻さない。
+/// スタッフがいないままお客様が触れ続けても、5 分でセルフ操作モードに戻る
+#[test]
+fn floor_touches_do_not_hold_a_staffed_register() {
+    use janus_pos_core::store::IDLE_REVERT_MS;
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    scan(&mut s, 1, "floor", TEA);
+    for _ in 0..(IDLE_REVERT_MS / 20_000 - 1) {
+        advance(&mut s, 20_000);
+        ok(&mut s, json!({"type":"touch","register":1,"side":"floor"}));
+        assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+    }
+    advance(&mut s, 21_000);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert!(v.floor.lines.is_empty(), "戻るときに読んだ商品は取引中止で消える");
+}
+
+/// 仕様 12.2：ログインしているスタッフが別のレジで取引中なら、手を付けていないスタッフ操作モードのレジはレジカウンター側の最後の操作から 30 秒でセルフ操作モードに戻る
+#[test]
+fn staffed_register_reverts_quickly_when_its_staff_works_elsewhere() {
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    advance(&mut s, 60_000);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated, "手が空いていれば 5 分のまま");
+    scan(&mut s, 2, "floor", BREAD);
+    login_as(&mut s, 2, "ST001");
+    scan(&mut s, 1, "floor", TEA);
+    advance(&mut s, 1_000);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert!(v.floor.lines.is_empty());
+    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated, "接客中のレジはそのまま");
+}
+
+/// 仕様 12.2：スタッフが手を付けた取引は、そのスタッフが別のレジで取引中でも 5 分待つ
+#[test]
+fn staff_touched_transaction_keeps_the_full_idle_time() {
+    use janus_pos_core::store::AWAY_REVERT_MS;
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    scan(&mut s, 1, "counter", TEA);
+    scan(&mut s, 2, "floor", BREAD);
+    login_as(&mut s, 2, "ST001");
+    advance(&mut s, AWAY_REVERT_MS * 4);
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::StaffOperated);
+    assert_eq!(v.counter.lines.len(), 1);
+}

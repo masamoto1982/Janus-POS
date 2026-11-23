@@ -188,7 +188,8 @@ function start(): void {
     const id = Number(screen?.getAttribute("data-screen")?.split(":")[0]);
     if (!id) return;
     sim.tick(performance.now() - t0);
-    sim.dispatch(JSON.stringify({ type: "touch", register: id } satisfies Command));
+    const side = screen?.getAttribute("data-screen")?.split(":")[1] as Side | undefined;
+    sim.dispatch(JSON.stringify({ type: "touch", register: id, side } satisfies Command));
   };
   app.addEventListener("pointerdown", touchRegister, true);
   app.addEventListener("keydown", touchRegister, true);

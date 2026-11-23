@@ -296,7 +296,12 @@ pub enum Command {
     DismissReturned { register: u8 },
     /// レジの画面に触れた（Page 送り・FF のタブ・テンキーの打鍵など、ほかのコマンドを伴わない操作）。
     /// 無操作の時計を戻すだけ
-    Touch { register: u8 },
+    Touch {
+        register: u8,
+        #[serde(default)]
+        #[cfg_attr(feature = "ts", ts(optional))]
+        side: Option<Side>,
+    },
     /// 会計に進む
     Checkout { register: u8, side: Side },
     /// 会計から登録画面に戻る
@@ -575,7 +580,7 @@ impl Command {
             | C::SetQty { register, .. }
             | C::RemoveCoupon { register, .. }
             | C::DismissReturned { register }
-            | C::Touch { register }
+            | C::Touch { register, .. }
             | C::Checkout { register, .. }
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
@@ -1379,6 +1384,10 @@ struct Register {
     /// 無操作のカウントダウンを止めた時刻。出金ボックスにお金があるあいだと、そのレジに呼び出しがあるあいだは数えない。
     /// 止めた理由がすべてなくなったら、止まっていた時間だけ last_op を進めて続きから数える（B-5）
     idle_hold: Option<u64>,
+    /// レジカウンター側の最後の操作（スタッフ操作モードで売り場側の操作を数えない規則の時計）
+    last_counter_op: u64,
+    /// 今の取引にレジカウンター側の操作があった（スタッフが手を付けた）
+    counter_in_txn: bool,
     menu: Option<Menu>,
     paused: bool,
     touch: Option<(Side, u64)>,
@@ -1499,12 +1508,23 @@ impl Register {
             self.idle_hold.get_or_insert(now);
         } else if let Some(since) = self.idle_hold.take() {
             self.last_op = (self.last_op + now.saturating_sub(since)).min(now);
+            self.last_counter_op = (self.last_counter_op + now.saturating_sub(since)).min(now);
         }
     }
 
-    fn idle_revert_in(&self, now: u64) -> u64 {
-        let counted_until = self.idle_hold.unwrap_or(now).max(self.last_op);
-        IDLE_REVERT_MS.saturating_sub(counted_until - self.last_op)
+    /// 無操作の時計の起点。スタッフ操作モードはレジカウンター側の操作だけを数える（仕様 12.2）
+    fn idle_since(&self) -> u64 {
+        if self.mode == Mode::StaffOperated {
+            self.last_counter_op
+        } else {
+            self.last_op
+        }
+    }
+
+    fn idle_revert_in(&self, now: u64, limit: u64) -> u64 {
+        let since = self.idle_since();
+        let counted_until = self.idle_hold.unwrap_or(now).max(since);
+        limit.saturating_sub(counted_until - since)
     }
 
     /// 取引の中身がある（明細・クーポン・会計中・電子マネーの手続き・ポイントカード）
@@ -1797,6 +1817,8 @@ pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
 /// 無操作で取引を中止し、セルフ操作モードに戻る
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
+/// ログインしているスタッフが別のレジで取引中のとき、手を付けていないスタッフ操作モードのレジをセルフ操作モードに戻すまでの無操作
+pub const AWAY_REVERT_MS: u64 = 30 * 1000;
 /// 非常事態モード：セルフ操作モードでスタッフがログインしないまま、呼び鈴をこの時間以上鳴らしっぱなし（押しっ放し）にするか、
 /// この時間以内に EMERGENCY_PRESSES 回以上鳴らす（連打）。常軌を逸した押し方で、悪戯であっても発動したこと自体が抑止力になる。
 /// 実機もシミュレーターも同じ 3 分（連打なら待たずに確かめられる）
@@ -1855,6 +1877,8 @@ impl Register {
             outlet: Cash::default(),
             outlet_since: None,
             idle_hold: None,
+            last_counter_op: 0,
+            counter_in_txn: false,
             menu: None,
             paused: false,
             touch: None,
@@ -1918,6 +1942,11 @@ impl Store {
     pub fn tick(&mut self, now: u64) {
         self.now = self.now.max(now);
         let now = self.now;
+        for r in &mut self.registers {
+            if !r.busy() {
+                r.counter_in_txn = false;
+            }
+        }
         for r in &mut self.registers {
             if r.touch.is_some_and(|(_, until)| until <= now) {
                 r.touch = None;
@@ -2016,7 +2045,7 @@ impl Store {
             .filter(|r| {
                 (r.mode != Mode::SelfOperated || !r.idle())
                     && r.idle_hold.is_none()
-                    && now.saturating_sub(r.last_op) >= IDLE_REVERT_MS
+                    && now.saturating_sub(r.idle_since()) >= self.revert_ms(r)
             })
             .map(|r| r.id)
             .collect();
@@ -2044,7 +2073,28 @@ impl Store {
                 r.pickup_handover = None;
                 r.receipt_stamp = None;
                 r.last_op = now;
+                r.last_counter_op = now;
             }
+        }
+    }
+
+    /// スタッフ操作モードからセルフ操作モードに戻すまでの無操作の時間（仕様 12.2）。
+    /// スタッフがまだ手を付けていない（取引にレジカウンター側の操作がない）スタッフ操作モードのレジで、
+    /// ログインしているスタッフが別のレジで取引中なら、そのスタッフはこのレジに来られないので短くする
+    fn revert_ms(&self, r: &Register) -> u64 {
+        if r.mode != Mode::StaffOperated || r.counter_in_txn {
+            return IDLE_REVERT_MS;
+        }
+        let Some(me) = r.staff.as_ref().map(|s| s.account.id) else {
+            return IDLE_REVERT_MS;
+        };
+        let away = self.registers.iter().any(|o| {
+            o.id != r.id && o.staff.as_ref().is_some_and(|s| s.account.id == me) && o.busy()
+        });
+        if away {
+            AWAY_REVERT_MS
+        } else {
+            IDLE_REVERT_MS
         }
     }
 
@@ -2206,8 +2256,17 @@ impl Store {
                 cmd,
                 Command::EndEmergency { .. } | Command::ReleaseCall { .. }
             );
+            let floor_op = match &cmd {
+                Command::Scan { side, .. } => *side == Side::Floor,
+                Command::Touch { side, .. } => *side == Some(Side::Floor),
+                Command::TapEmoney { .. } => true,
+                c => c.screen() == Some(Side::Floor),
+            };
             if let Ok(r) = self.reg_mut(id) {
                 r.last_op = now;
+                if !floor_op {
+                    r.last_counter_op = now;
+                }
                 if !keep_log {
                     r.emergency_log = None;
                 }
@@ -2228,7 +2287,20 @@ impl Store {
         }
         let screen = cmd.screen().zip(cmd.register());
         let reg_id = cmd.register();
+        let counter_op = cmd.register().filter(|_| match &cmd {
+            Command::Scan { side, .. } => *side == Side::Counter,
+            Command::Touch { side, .. } => *side == Some(Side::Counter),
+            Command::TapEmoney { .. } => false,
+            c => c.screen() != Some(Side::Floor),
+        });
         let mut res = self.apply(cmd);
+        if let (Ok(_), Some(id)) = (&res, counter_op) {
+            if let Ok(r) = self.reg_mut(id) {
+                if r.mode == Mode::StaffOperated && r.busy() {
+                    r.counter_in_txn = true;
+                }
+            }
+        }
         // 取引金額が0円なら、会計に進んだ（年齢確認なども済んだ）時点で決済手段を選ばずに取引を終える
         if let (Ok(_), Some(id)) = (&res, reg_id) {
             if self.reg(id).is_some_and(|r| r.txn.free_settle_ready()) {
@@ -4992,7 +5064,7 @@ impl Store {
             idle_voids: !r.idle() || r.on_hold.is_some(),
             held: r.on_hold.is_some(),
             idle_revert_in: (r.mode != Mode::SelfOperated || !r.idle())
-                .then(|| r.idle_revert_in(self.now)),
+                .then(|| r.idle_revert_in(self.now, self.revert_ms(r))),
             change_left: r
                 .outlet_since
                 .is_some_and(|t| self.now.saturating_sub(t) >= r.change_timers().0),

@@ -294,6 +294,9 @@ pub enum Command {
     },
     /// 取り消したクーポンの返却の案内を閉じる
     DismissReturned { register: u8 },
+    /// レジの画面に触れた（Page 送り・FF のタブ・テンキーの打鍵など、ほかのコマンドを伴わない操作）。
+    /// 無操作の時計を戻すだけ
+    Touch { register: u8 },
     /// 会計に進む
     Checkout { register: u8, side: Side },
     /// 会計から登録画面に戻る
@@ -572,6 +575,7 @@ impl Command {
             | C::SetQty { register, .. }
             | C::RemoveCoupon { register, .. }
             | C::DismissReturned { register }
+            | C::Touch { register }
             | C::Checkout { register, .. }
             | C::BackToRegistering { register, .. }
             | C::SelectPayment { register, .. }
@@ -2780,6 +2784,7 @@ impl Store {
                     c.name
                 ))
             }
+            C::Touch { .. } => Ok(Outcome { message: None }),
             C::DismissReturned { register } => {
                 let r = self.reg_mut(register)?;
                 r.txn.returned.clear();

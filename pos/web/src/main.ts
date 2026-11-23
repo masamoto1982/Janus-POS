@@ -182,6 +182,17 @@ function start(): void {
     save();
     location.reload();
   });
+  // レジの画面に触れたら、ほかのコマンドを伴わない操作（Page 送り・FF のタブ・テンキーの打鍵など）でも無操作の時計を戻す
+  // （user 2026-11-23：操作しているあいだにカウントダウンが進むのはおかしい）。理由を画面に出す操作ではないので send を通さない
+  const touchRegister = (e: Event): void => {
+    const screen = (e.target as Element | null)?.closest?.("[data-screen]");
+    const id = Number(screen?.getAttribute("data-screen")?.split(":")[0]);
+    if (!id) return;
+    sim.tick(performance.now() - t0);
+    sim.dispatch(JSON.stringify({ type: "touch", register: id } satisfies Command));
+  };
+  app.addEventListener("pointerdown", touchRegister, true);
+  app.addEventListener("keydown", touchRegister, true);
   app.querySelector("[data-how-to]")?.addEventListener("click", openSplash);
   app.querySelector("[data-reset]")?.addEventListener("click", () => {
     if (!confirm("保存されている状態を消して、最初からやり直しますか")) return;

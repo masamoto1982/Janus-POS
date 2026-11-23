@@ -5,7 +5,7 @@ import type { CancelStage, GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
 import { initSplash, openSplash } from "./splash";
-import { DEFAULT_RUSH, readRushForm, RUSH_BATCH, RUSH_PENDING_KEY, rushBadge, rushBatch, rushForm, rushPanel, rushResult } from "./rush";
+import { DEFAULT_RUSH, readRushForm, RUSH_BATCH, RUSH_PENDING_KEY, RUSH_RULES, rushBadge, rushBatch, rushCompare, rushForm, rushPanel, rushResult } from "./rush";
 import type { RushParams, RushView } from "./types";
 import { type Lang, langOf, localize, resetLangs, toggleLang, trText } from "./i18n";
 import {
@@ -200,7 +200,8 @@ function start(): void {
     const id = Number(screen?.getAttribute("data-screen")?.split(":")[0]);
     if (!id) return;
     sim.tick(performance.now() - t0);
-    sim.dispatch(JSON.stringify({ type: "touch", register: id } satisfies Command));
+    const side = screen?.getAttribute("data-screen")?.split(":")[1] as Side | undefined;
+    sim.dispatch(JSON.stringify({ type: "touch", register: id, side } satisfies Command));
   };
   app.addEventListener("pointerdown", touchRegister, true);
   app.addEventListener("keydown", touchRegister, true);
@@ -324,6 +325,7 @@ function buildSkeleton(): void {
         <button type="button" class="small" data-rush-play title="いまの店の状態を消して、レジの画面の上で再生する">画面で再生</button>
         <button type="button" class="small ghost" data-rush-instant>一気に結果を出す</button>
         <button type="button" class="small ghost" data-rush-batch>${RUSH_BATCH}回まとめて試す</button>
+        <button type="button" class="small ghost" data-rush-compare title="同じ条件・同じ乱数の種で、セルフ操作モードに戻す規則を一つずつ試す">規則を比べる</button>
       </div>
       <div class="rush-result" id="rush-result"></div>
     </dialog>
@@ -1686,6 +1688,13 @@ function wireRush(): void {
     const p = params();
     const views = Array.from({ length: RUSH_BATCH }, (_, i) => JSON.parse(PosSimulator.rush_run(JSON.stringify({ ...p, seed: p.seed + i }))) as RushView);
     result.innerHTML = rushBatch(views);
+  });
+  dlg.querySelector("[data-rush-compare]")?.addEventListener("click", () => {
+    const p = params();
+    const rows = RUSH_RULES.map(([rule]) =>
+      Array.from({ length: RUSH_BATCH }, (_, i) => JSON.parse(PosSimulator.rush_run(JSON.stringify({ ...p, rule, seed: p.seed + i }))) as RushView),
+    );
+    result.innerHTML = rushCompare(rows);
   });
   app.addEventListener("click", (e) => {
     const b = (e.target as Element).closest<HTMLElement>("[data-rush-speed], [data-rush-pause], [data-rush-close]");

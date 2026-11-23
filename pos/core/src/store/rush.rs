@@ -3,7 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{CallTopic, Command, Register, Store};
+use super::{CallTopic, Command, Register, RevertRule, Store};
 use crate::authority::{Mode, PaymentMethod, Side};
 use crate::rng::Rng;
 
@@ -78,6 +78,8 @@ pub struct RushParams {
     /// お客様が待てる時間（秒）。来店からこの時間を過ぎたら買わずに帰る
     pub patience_secs: u32,
     pub seed: u64,
+    /// セルフ操作モードに戻す規則
+    pub rule: RevertRule,
 }
 
 impl Default for RushParams {
@@ -97,6 +99,7 @@ impl Default for RushParams {
             touch_secs: 20,
             patience_secs: 600,
             seed: 1,
+            rule: RevertRule::Fixed,
         }
     }
 }
@@ -142,6 +145,8 @@ struct Customer {
     scanned: usize,
     called: bool,
     trouble_done: bool,
+    /// 手のかかる用件の対応が終わる時刻
+    trouble_until: u64,
     touched_at: u64,
     incident: Option<usize>,
     left_at: u64,
@@ -268,9 +273,10 @@ pub struct Rush {
 }
 
 impl Rush {
-    /// `store` は params.registers 台の、取引のない店。開始時刻は store の今
-    pub fn new(params: RushParams, store: &Store) -> Rush {
+    /// `store` は params.registers 台の、取引のない店。開始時刻は store の今。店の復帰規則を params.rule にする
+    pub fn new(params: RushParams, store: &mut Store) -> Rush {
         let params = params.clamp();
+        store.set_revert_rule(params.rule);
         let start = store.now();
         let mut rng = Rng::new(params.seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0x5bd1_e995);
         let window = u64::from(params.minutes) * 60_000;
@@ -311,6 +317,7 @@ impl Rush {
                 scanned: 0,
                 called: false,
                 trouble_done: false,
+                trouble_until: 0,
                 touched_at: t,
                 incident: None,
                 left_at: 0,
@@ -365,7 +372,7 @@ impl Rush {
     pub fn run(params: RushParams) -> RushView {
         let params = params.clamp();
         let mut store = Store::new(params.seed, params.registers, 1);
-        let mut rush = Rush::new(params, &store);
+        let mut rush = Rush::new(params, &mut store);
         while !rush.finished {
             rush.advance(&mut store, 60_000);
         }
@@ -563,7 +570,7 @@ impl Rush {
                 && now >= c.touched_at + u64::from(self.params.touch_secs) * 1000
             {
                 c.touched_at = now;
-                Self::send(store, Command::Touch { register: reg });
+                Self::send(store, Command::Touch { register: reg, side: Some(Side::Floor) });
                 self.count_reset(i);
                 self.customers[i].next_at = now + 1_000;
             } else {
@@ -776,9 +783,16 @@ impl Rush {
         let c = &mut self.customers[i];
         if c.trouble && !c.trouble_done {
             c.trouble_done = true;
+            c.trouble_until = now + u64::from(self.params.trouble_secs) * 1000;
             let no = c.no;
-            self.staff[k].busy_until = now + u64::from(self.params.trouble_secs) * 1000;
             self.note(format!("{name} がレジ{reg}で客#{no}の手のかかる用件に対応中（{}）", mmss(u64::from(self.params.trouble_secs) * 1000)));
+        }
+        let c = &mut self.customers[i];
+        if c.trouble_until > now {
+            // 対応のあいだもスタッフはレジカウンター側の画面を操作している
+            let until = c.trouble_until;
+            Self::send(store, Command::Touch { register: reg, side: Some(Side::Counter) });
+            self.staff[k].busy_until = until.min(now + 30_000);
             return;
         }
         if c.scanned > 0 && lines == 0 && !paying {

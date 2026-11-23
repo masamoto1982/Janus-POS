@@ -52,7 +52,7 @@ impl PosSimulator {
     pub fn rush_start(&mut self, params_json: &str) -> Result<(), JsValue> {
         let params: RushParams =
             serde_json::from_str(params_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
-        self.rush = Some(Rush::new(params, &self.store));
+        self.rush = Some(Rush::new(params, &mut self.store));
         Ok(())
     }
 

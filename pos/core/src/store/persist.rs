@@ -555,6 +555,9 @@ impl SavedRegister {
             outlet: self.outlet,
             outlet_since: self.outlet_since,
             idle_hold: self.idle_hold,
+            last_counter_op: self.last_op,
+            counter_in_txn: false,
+            staffed_busy: 0.0,
             menu: self.menu,
             paused: self.paused,
             touch: self.touch,
@@ -786,6 +789,8 @@ impl Store {
                 .point_balances
                 .unwrap_or_else(super::initial_point_balances),
             ticket_queue: s.ticket_queue.into_iter().collect(),
+            revert_rule: super::RevertRule::Fixed,
+            sales_log: std::collections::VecDeque::new(),
         };
         store.issue_next_tickets();
         Ok(store)

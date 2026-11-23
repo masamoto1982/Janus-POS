@@ -1,5 +1,5 @@
 // 混雑シミュレーション（仕様 15.10）：お客様とスタッフを自動で動かし、レジのハングアップ（立ち往生）が起きないかを確かめる
-import type { RushIncident, RushParams, RushView } from "./types";
+import type { RevertRule, RushIncident, RushParams, RushView } from "./types";
 import { esc } from "./view";
 
 /** 「画面で再生」は店を作り直して読み直すので、条件をここに預けて起動時に始める */
@@ -25,9 +25,20 @@ export const DEFAULT_RUSH: RushParams = {
   touch_secs: 20,
   patience_secs: 600,
   seed: 1,
+  rule: "fixed",
 };
 
-type NumKey = Exclude<keyof RushParams, "pre_login">;
+/** セルフ操作モードに戻す規則（仕様 15.10）。「時計を戻さない」は売り場側の操作で無操作の時計を戻さないこと。
+ *  短くするのは、スタッフがまだ手を付けていないスタッフ操作モードのレジだけで、下限は 30 秒 */
+export const RUSH_RULES: [RevertRule, string, string][] = [
+  ["fixed", "現行", "どちらの側の操作も時計を戻し、5分で戻す"],
+  ["floor_ignored", "時計を戻さない", "売り場側の操作で時計を戻さない（5分のまま）"],
+  ["load", "客数×客単価", "時計を戻さない＋直近10分の店の売上が5,000円を超えると、売上に反比例して短く"],
+  ["streak", "持続時間の反比例", "時計を戻さない＋そのレジが直近に有人の取引を続けていた時間まで（短いほど早く戻る）"],
+  ["presence", "スタッフの居場所", "時計を戻さない＋ログインしているスタッフが別のレジで取引中なら30秒"],
+];
+
+type NumKey = Exclude<keyof RushParams, "pre_login" | "rule">;
 const FIELDS: [NumKey, string, number, number][] = [
   ["registers", "レジ台数（台）", 2, 5],
   ["staff", "スタッフ（人）", 0, 3],
@@ -50,6 +61,7 @@ export function rushForm(p: RushParams): string {
       `<label class="rush-field"><span>${label}</span><input type="number" data-rush-key="${k}" min="${min}" max="${max}" value="${p[k]}" /></label>`,
   ).join("");
   return `<div class="rush-form">${fields}
+    <label class="rush-field rush-rule"><span>セルフ操作モードに戻す規則</span><select data-rush-key="rule">${RUSH_RULES.map(([v, label, tip]) => `<option value="${v}" title="${esc(tip)}"${p.rule === v ? " selected" : ""}>${label}</option>`).join("")}</select></label>
     <label class="rush-field rush-check"><input type="checkbox" data-rush-key="pre_login"${p.pre_login ? " checked" : ""} /><span>有人レジはお客様が来る前にログインして待つ</span></label>
   </div>`;
 }
@@ -59,6 +71,7 @@ export function readRushForm(root: ParentNode): RushParams {
   root.querySelectorAll<HTMLInputElement>("[data-rush-key]").forEach((i) => {
     const k = i.dataset.rushKey as keyof RushParams;
     if (k === "pre_login") p.pre_login = i.checked;
+    else if (k === "rule") p.rule = i.value as RevertRule;
     else {
       const f = FIELDS.find((x) => x[0] === k)!;
       const n = Math.round(Number(i.value));
@@ -123,7 +136,27 @@ export function rushBatch(views: RushView[]): string {
     <h4>長かった立ち往生</h4>${incidentRows(worst)}`;
 }
 
-/** 再生中の帯（ヘッダーの下） */
+/** 規則ごとにまとめて試した結果を一つの表に */
+export function rushCompare(rows: RushView[][]): string {
+  const p = rows[0][0].params;
+  const body = rows
+    .map((views, k) => {
+      const [, label, tip] = RUSH_RULES[k];
+      const all = views.flatMap(counted);
+      const hit = views.filter((v) => counted(v).length > 0).length;
+      const max = Math.max(0, ...all.map((i) => i.duration_ms));
+      const avg = all.length ? all.reduce((s, i) => s + i.duration_ms, 0) / all.length : 0;
+      const gave = views.reduce((s, v) => s + v.gave_up, 0);
+      const wait = views.reduce((s, v) => s + v.avg_wait_ms, 0) / views.length;
+      return `<tr><td title="${esc(tip)}">${label}</td><td class="num">${hit}／${views.length}</td><td class="num">${all.length}</td><td class="num">${mmss(avg)}</td><td class="num">${mmss(max)}</td><td class="num">${gave}</td><td class="num">${mmss(wait)}</td></tr>`;
+    })
+    .join("");
+  return `<h3>規則を比べた結果（各${rows[0].length}回、乱数の種 ${p.seed}〜${p.seed + rows[0].length - 1}）</h3>
+    <table class="rush-table"><thead><tr><th>規則</th><th>立ち往生が起きた回</th><th>件数</th><th>平均</th><th>最長</th><th>諦めて帰った客</th><th>来店から帰るまで（平均）</th></tr></thead><tbody>${body}</tbody></table>
+    <p class="muted">短くするのは、スタッフがまだ手を付けていないスタッフ操作モードのレジだけ（接客中の取引は5分のまま）。規則の名前にカーソルを重ねると中身が出ます</p>`;
+}
+
+/** 再生中の帯（レジの下） */
 export function rushPanel(v: RushView | null, speed: number, paused: boolean): string {
   if (!v) return "";
   const speeds = RUSH_SPEEDS.map(

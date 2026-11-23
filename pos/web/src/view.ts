@@ -1238,11 +1238,12 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   stampVerifying.delete(`${reg}:${side}`);
   return `${top}
     <div class="staff-head">
-      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}${holdBtn(r, side)}</span>
+      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
     </div>
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th>${qtyHead(v.lines)}</th><th class="num">小計</th></tr></thead>
       <tbody>${rows || `<tr><td colspan="3" class="muted empty">明細はありません<br>どのバーコードからでも読めます</td></tr>`}</tbody></table>
+    ${linesFoot(r, side)}
 `;
 }
 
@@ -1519,41 +1520,52 @@ function bellBtn(r: RegisterView, side: Side): string {
 
 /** スタッフ操作モードのレジカウンター側の操作（user 2026-11-20：スワイプをやめ、とりあえずボタンを置く）。
  *  ヘッダー中央＝店舗メニュー（開けるとき＝取引がないときだけ。取引中はヘッダー中央に呼び鈴が来る。閉じるのはメニューのバック）。
- *  待ち受けの左下＝保留した取引に戻る（割り込む前だけ）。
- *  登録画面のスタッフ名の右＝保留（保留できない取引で押すと理由を出す） */
+ *  待ち受けの左下＝保留した取引に戻る（割り込む前だけ）、右下＝無操作の残り時間。
+ *  登録画面の明細の左下＝保留（保留できない取引で押すと理由を出す） */
 const staffBtn = (label: string, cmd: Command) => `<button type="button" class="staff-btn neg" data-cmd="${esc(JSON.stringify(cmd))}">${label}</button>`;
 const staffCounter = (r: RegisterView, side: Side): boolean => side === "counter" && r.mode === "staff_operated" && !r.paused && !r.emergency && !r.menu;
 function welcomeFoot(r: RegisterView, side: Side): string {
-  if (!staffCounter(r, side)) return "";
-  const back = r.held && !inTransaction(r) ? staffBtn("保留に戻る", { type: "resume_held", register: r.id }) : "";
-  return back ? `<div class="welcome-foot"><span>${back}</span><span></span></div>` : "";
+  const back = staffCounter(r, side) && r.held && !inTransaction(r) ? staffBtn("保留に戻る", { type: "resume_held", register: r.id }) : "";
+  const idle = side === "counter" ? idleSlot(r) : "";
+  return back || idle ? `<div class="welcome-foot"><span>${back}</span><span>${idle}</span></div>` : "";
 }
 const holdBtn = (r: RegisterView, side: Side): string =>
   staffCounter(r, side) && !r.held && r.counter.lines.length > 0 ? staffBtn("保留", { type: "hold_transaction", register: r.id }) : "";
+
+/// 仕様 12.2：明細の最下行は左端＝保留・中央＝Page（明細が入りきらないときだけ）・右端＝無操作の残り時間（user 2026-11-23）。
+/// 保留と残り時間はページを送っても出し続ける。待ち時間をお客様に見せないため売り場側には出さない
+function linesFoot(r: RegisterView, side: Side): string {
+  const hold = holdBtn(r, side);
+  const idle = side === "counter" ? idleSlot(r) : "";
+  if (!hold && !idle) return "";
+  return `<div class="lines-foot"><span class="foot-l">${hold}</span><span class="foot-c"></span><span class="foot-r">${idle}</span></div>`;
+}
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
   const menu = staffCounter(r, side) && storeMenuUsable(r) ? staffBtn("店舗メニュー", { type: "open_menu", register: r.id, screen: "top" }) : "";
   const bell = menu + bellBtn(r, side);
   const mode = r.emergency ? `<span class="mode-title emergency">非常事態モード</span>` : r.paused ? "" : r.menu ? `<span class="mode-title store-menu">店舗処理モード</span>` : modeTitle(r.mode === "staff_operated");
-  // 無操作の残り時間はレジカウンター側のヘッダーの右に出す（user 2026-11-21：レジの見出しから画面の中へ）。
-  // 待ち時間をお客様に見せないため売り場側には出さない
   // 日時は時刻だけ（user 2026-11-21：シミュレーターはデスクトップ・モバイルとも省略する。実機では年月日・曜日も出すのが望ましい）
-  const idle = side === "counter" ? idleLeft(r) : "";
-  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><span class="head-time">${idle}<time class="clock" title="${esc(dateText(now))}">${timeText(now)}</time></span></span>`;
+  return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock" title="${esc(dateText(now))}">${timeText(now)}</time></span>`;
 }
 
-/** 無操作で取引を中止する（またはセルフ操作モードに戻る）までの残り時間 */
-function idleLeft(r: RegisterView): string {
+/** 無操作で取引を中止する（またはスタッフがログアウトする）までの残り時間の文。「04:58の無操作で取引を中止」 */
+export function idleText(r: RegisterView): string {
   const ms = r.idle_revert_in;
   if (ms === null) return "";
-  const left = `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
-  const what = r.idle_voids ? "取引の中止" : "自動ログアウト";
+  const left = `${String(Math.floor(ms / 60000)).padStart(2, "0")}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+  return `${left}の無操作で${r.idle_voids ? "取引を中止" : "自動ログアウト"}`;
+}
+
+/** 残り時間の入れ物。文は毎秒変わるので、画面を描き直さず main.ts が中身だけ書き換える（明細の表を毎秒作り直さない） */
+function idleSlot(r: RegisterView): string {
+  if (r.idle_revert_in === null) return "";
   const title = r.idle_voids
     ? r.mode === "self_operated"
       ? "5分間操作がないと、取引を中止します"
       : "5分間操作がないと、取引を中止してセルフ操作モードに戻ります"
     : "5分間操作がないと、スタッフをログアウトしてセルフ操作モードに戻ります";
-  return `<span class="idle-left" title="${title}">${what}まで あと${left}</span>`;
+  return `<span class="idle-left" data-idle="${r.id}" title="${title}"></span>`;
 }
 
 export const FF_TABS = [

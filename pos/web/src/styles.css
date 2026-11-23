@@ -120,9 +120,6 @@ button { touch-action: manipulation; }
 .screen-head .head-l { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s15, 2px); min-width: 0; }
 .screen-head .head-c { justify-self: center; display: flex; align-items: center; gap: var(--s11, 8px); }
 .screen-head .head-r { justify-self: end; display: flex; align-items: center; gap: var(--s11, 8px); }
-/* 無操作の残り時間（レジカウンター側だけ）。時刻の上に同じ小テキストで、強い色にはしない */
-.screen-head .head-time { display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
-.screen-head .idle-left { font-size: var(--text-sm); line-height: 1.2; color: var(--msg-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .screen-head .clock { font-size: var(--text-sm); line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
 .screen-body { position: relative; flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .screen-body:has(> .slide-from-right, > .slide-from-left) { overflow: hidden; }
@@ -140,9 +137,18 @@ button { touch-action: manipulation; }
 .lines-scroll .lines thead th { position: sticky; top: 0; z-index: 1; background: var(--screen-bg, white); }
 .lines-scroll .lines tr.page-pad td { padding: 0; border: 0; }
 .lines-scroll .lines tr.off-page { visibility: hidden; }
-.screen-main > .page-more { margin: var(--s13, 4px) 0 0; display: flex; justify-content: center; align-items: center; gap: var(--gap, 8px); font-size: var(--text-sm); color: var(--msg-strong); line-height: 1.6; }
-.screen-main > .page-more .page-turn.off { visibility: hidden; }
-.screen-main > .page-more .page-no { font-variant-numeric: tabular-nums; }
+.screen-main .page-more { margin: var(--s13, 4px) 0 0; display: flex; justify-content: center; align-items: center; gap: var(--gap, 8px); font-size: var(--text-sm); color: var(--msg-strong); line-height: 1.6; }
+.screen-main .page-more .page-turn.off { visibility: hidden; }
+.screen-main .page-more .page-no { font-variant-numeric: tabular-nums; }
+/* 明細の最下行（user 2026-11-23）：左端＝保留・中央＝Page（入りきらないときだけ）・右端＝無操作の残り時間。
+   左右を同じ幅にして Page を真ん中に保つ。保留と残り時間はページを送っても動かない */
+.lines-foot { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: var(--gap, 8px); margin-top: var(--s13, 4px); min-height: var(--btn-sm-h); }
+.lines-foot > .foot-l { justify-self: start; }
+.lines-foot > .foot-r { justify-self: end; }
+.lines-foot .page-more { margin: 0; }
+.lines-foot .staff-btn { height: var(--btn-sm-h); }
+/* 無操作の残り時間（レジカウンター側だけ）。小テキストで、強い色にはしない */
+.idle-left { font-size: var(--text-sm); line-height: 1.2; color: var(--msg-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }
 /* FF の段は三つの余白をそろえる（user 2026-11-20）：段の上端〜タブ、タブの線〜単品ボタン、単品ボタン〜段の下端。
@@ -1034,11 +1040,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .wallet-cards .item, .item.bill { padding: calc(var(--btn-h) / 8); }
 
 /* スタッフ操作モードのレジカウンター側の操作（user 2026-11-20：スワイプをやめ、とりあえずボタン）。中の高さ・幅は文字なり。
-   ヘッダー中央＝店舗メニュー（取引がないとき）、待ち受けの左下＝保留に戻る（戻る部品は左）、登録画面のスタッフ名の右＝保留 */
+   ヘッダー中央＝店舗メニュー（取引がないとき）、待ち受けの左下＝保留に戻る（戻る部品は左）・右下＝無操作の残り時間、登録画面の明細の左下＝保留 */
 .screen button.staff-btn { width: auto; height: var(--btn-md-h); padding: 0 var(--s11, 8px); font-size: var(--text-sm); white-space: nowrap; }
 .staff-operated-welcome { position: relative; }
-.welcome-foot { position: absolute; left: var(--gap); right: var(--gap); bottom: var(--gap); display: flex; justify-content: space-between; }
-.staff-head .staff-btn { margin-left: var(--s11, 8px); height: var(--btn-sm-h); vertical-align: middle; }
+.welcome-foot { position: absolute; left: var(--gap); right: var(--gap); bottom: var(--gap); display: flex; justify-content: space-between; align-items: center; }
 
 /* 起動時のスプラッシュ画面（user 2026-11-22、Ajisai のスプラッシュを流用）。src/splash.ts 参照。
    ロゴ→名前→使い方の順に現れ、クリック・タップ・キー入力で薄れて消える。

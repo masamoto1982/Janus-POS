@@ -1527,8 +1527,9 @@ const staffBtn = (label: string, cmd: Command) => `<button type="button" class="
 const staffCounter = (r: RegisterView, side: Side): boolean => side === "counter" && r.mode === "staff_operated" && !r.paused && !r.emergency && !r.menu;
 function welcomeFoot(r: RegisterView, side: Side): string {
   const back = staffCounter(r, side) && r.held && !inTransaction(r) ? staffBtn("保留に戻る", { type: "resume_held", register: r.id }) : "";
+  // 無操作の残り時間は明細と同じく三段目の最上部の中央（user 2026-11-24）
   const idle = side === "counter" ? idleSlot(r) : "";
-  return back || idle ? `<div class="welcome-foot"><span>${back}</span><span>${idle}</span></div>` : "";
+  return (back ? `<div class="welcome-foot"><span>${back}</span><span></span></div>` : "") + (idle ? `<div class="welcome-idle">${idle}</div>` : "");
 }
 const holdBtn = (r: RegisterView, side: Side): string =>
   staffCounter(r, side) && !r.held && r.counter.lines.length > 0 ? staffBtn("保留", { type: "hold_transaction", register: r.id }) : "";
@@ -2010,7 +2011,7 @@ export function ownerAuthForm(): string {
     </div>`;
 }
 
-export type RulesTab = "age" | "limit" | "tax" | "fftab";
+export type RulesTab = "age" | "limit" | "tax" | "fftab" | "bell";
 
 const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   {
@@ -2028,6 +2029,12 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
     id: "fftab",
     label: "FFタブ表示",
     note: "FFのタブごとに、どちらの画面に出すかを決めます<br>「両側」にしたタブは、セルフ操作モードの売り場側の最下段に出て、お客様がご自分で登録できます<br>コーヒーなど作り置きのない品はお客様がご自分でお取りになり、揚げ物など作り置きの品はスタッフがお渡しします",
+  },
+  // Bell の鳴動は独立した「Bell の設定」から販売規則の設定のタブに移した（user 2026-11-24）
+  {
+    id: "bell",
+    label: "Bellの鳴動",
+    note: "可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます<br>OFF の端末は鳴らず、不通かどうかの判定にも含めません<br>据え付け端末は常に ON です",
   },
 ];
 
@@ -2130,7 +2137,9 @@ export function ownerPanel(s: Snapshot, tab: RulesTab): string {
         ? `<table class="lines rules"><thead><tr><th>商品</th><th>販売個数</th></tr></thead><tbody>${shelfRows(s, 2, (p) => `<tr><td>${esc(p.name)}</td><td>${limitSelect(p)}</td></tr>`)}</tbody></table>`
         : cur.id === "fftab"
           ? `<table class="lines rules"><thead><tr><th>タブ</th><th>表示する画面</th></tr></thead><tbody>${ffTabRows(s)}</tbody></table>`
-          : taxPanel(s);
+          : cur.id === "bell"
+            ? `<div class="bell-settings">${bellSettings(s)}</div>`
+            : taxPanel(s);
   const hist = s.age_rules.history.length
     ? s.age_rules.history.map((h) => `<li>${esc(h.by)}：${esc(h.change)}</li>`).join("")
     : `<li class="muted">変更はまだありません</li>`;

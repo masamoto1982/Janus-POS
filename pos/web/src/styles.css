@@ -148,6 +148,8 @@ button { touch-action: manipulation; }
 .lines-foot .page-more { margin: 0; }
 .lines-foot .staff-btn { height: var(--btn-sm-h); }
 /* 無操作の残り時間（レジカウンター側だけ）。小テキストで、強い色にはしない */
+/* 無操作の残り時間は明細の一番上の中央（user 2026-11-23） */
+.idle-top { text-align: center; margin-bottom: var(--s13, 4px); }
 .idle-left { font-size: var(--text-sm); line-height: 1.2; color: var(--msg-strong); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .screen-items { flex: none; height: var(--items-h); overflow: hidden; padding: var(--s14, 3px) var(--s11, 8px); border-top: var(--s17, 1px) solid var(--border); background: var(--tier-deep); display: flex; flex-direction: column; gap: var(--gap); }
 .screen.no-items .screen-items { display: none; }

@@ -1237,6 +1237,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     return screen(stampVerifyScreen(reg, side, v.bills, a("affix_stamp"), true));
   stampVerifying.delete(`${reg}:${side}`);
   return `${top}
+    ${idleTop(r, side)}
     <div class="staff-head">
       <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
@@ -1532,13 +1533,18 @@ function welcomeFoot(r: RegisterView, side: Side): string {
 const holdBtn = (r: RegisterView, side: Side): string =>
   staffCounter(r, side) && !r.held && r.counter.lines.length > 0 ? staffBtn("保留", { type: "hold_transaction", register: r.id }) : "";
 
-/// 仕様 12.2：明細の最下行は左端＝保留・中央＝Page（明細が入りきらないときだけ）・右端＝無操作の残り時間（user 2026-11-23）。
-/// 保留と残り時間はページを送っても出し続ける。待ち時間をお客様に見せないため売り場側には出さない
+/// 仕様 12.2：明細の最下行は左端＝保留・中央＝Page（明細が入りきらないときだけ）。保留はページを送っても出し続ける
 function linesFoot(r: RegisterView, side: Side): string {
   const hold = holdBtn(r, side);
+  if (!hold) return "";
+  return `<div class="lines-foot"><span class="foot-l">${hold}</span><span class="foot-c"></span><span class="foot-r"></span></div>`;
+}
+
+/// 仕様 12.2：無操作の残り時間は明細の一番上（スタッフ・内税の行の上）の中央（user 2026-11-23）。
+/// 待ち時間をお客様に見せないため売り場側には出さない
+function idleTop(r: RegisterView, side: Side): string {
   const idle = side === "counter" ? idleSlot(r) : "";
-  if (!hold && !idle) return "";
-  return `<div class="lines-foot"><span class="foot-l">${hold}</span><span class="foot-c"></span><span class="foot-r">${idle}</span></div>`;
+  return idle ? `<div class="idle-top">${idle}</div>` : "";
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {

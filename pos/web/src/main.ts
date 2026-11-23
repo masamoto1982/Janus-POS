@@ -44,7 +44,6 @@ import {
   ffOpenFoot,
   parcelError,
   bellPanel,
-  bellSettings,
   ownerPanel,
   shelfPanel,
   walletPanel,
@@ -128,7 +127,7 @@ function save(): void {
 
 /** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
  *  2 台で起動し、デスクトップは最後のレジの横の「⊕」で一台ずつ足す（user 2026-11-22：ヘッダーのセレクタで指定する形から変更）。
- *  足しても店の状態はそのまま。減らすには「リセット」で 2 台からやり直す。
+ *  足しても店の状態はそのまま。減らすには「初期化」で 2 台からやり直す。
  *  2 台から始めるのは、1 台では呼び出しの通知が発生したレジにだけ出ることや、チケットの取引が僅差で重なるケースのデモができないため（user 2026-11-21）。
  *  モバイルは 2 台ちょうどで「⊕」を出さない（3 台以上のデモは現実的でない、user 2026-11-20） */
 const DEFAULT_REGISTERS = 2;
@@ -270,19 +269,18 @@ function buildSkeleton(): void {
 
   app.innerHTML = `
     <header class="top">
-      <img class="logo" src="${logoUrl}" width="73" height="73" alt="Janus POS ロゴ" />
+      <img class="logo" src="${logoUrl}" width="36" height="36" alt="Janus POS ロゴ" />
       <h1>Janus POS</h1>
       <span class="build-badge" title="ビルド番号">${esc(String(import.meta.env.VITE_BUILD))}</span>
       <div class="top-tools">
       <button type="button" class="neg small how-to" data-how-to title="使用方法のスプラッシュ画面を出す">使用方法</button>
-      <button type="button" class="neg small reset-btn" data-reset title="保存されている状態を消して最初からやり直す">リセット</button>
+      <button type="button" class="neg small reset-btn" data-reset title="保存されている状態を消して最初からやり直す">初期化</button>
       </div>
     </header>
     <article class="floor">
         <section class="bell-area" aria-label="Bell（呼び鈴）">
           <h2>Bell</h2>
           <div class="bells" data-region="bells"></div>
-          <button type="button" class="icon-btn bell-open" data-open-bell aria-haspopup="dialog" aria-label="Bell の設定" title="Bell の設定">⚙</button>
           <div class="toast" id="toast-store"></div>
         </section>
         <div class="registers" style="--n: ${snap.registers.length}">${regs}${
@@ -300,11 +298,6 @@ function buildSkeleton(): void {
       <div class="toast" id="toast-rules"></div>
       <div data-region="owner"></div>
       <div data-region="rules-pad"></div>
-    </dialog>
-    <dialog class="rules-dlg bell-dlg" id="bell-dlg" aria-labelledby="bell-title">
-      <div class="dlg-head"><h2 id="bell-title">Bell の設定</h2><button class="small ghost" data-close-bell>閉じる</button></div>
-      <p class="muted">可搬性端末とストアコンピューターは、呼び鈴機能を OFF にできます<br>OFF の端末は鳴らず、不通かどうかの判定にも含めません<br>据え付け端末は常に ON です</p>
-      <div class="bell-settings" data-region="bell-settings"></div>
     </dialog>
     <dialog class="rules-dlg picker-dlg" id="picker-dlg" aria-label="読ませるものを選ぶ">
       <div class="dlg-head"><button class="small ghost" data-close-picker>閉じる</button></div>
@@ -605,8 +598,8 @@ function render(): void {
       terminal.classList.toggle("reader", reader);
     }
   }
-  setRegion("bells", bellPanel(snap));
-  setRegion("bell-settings", bellSettings(snap));
+  // 販売規則の設定の歯車はストアコンピューターのすぐ右（user 2026-11-24）。端末と同じ並びに入れ、モバイルで折り返しても離れない
+  setRegion("bells", bellPanel(snap, RULES_GEAR));
   setRegion("owner-auth", ownerAuth ? "" : ownerAuthForm());
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
   setRegion("rules-pad", rulesPadPopup(snap));
@@ -1133,8 +1126,6 @@ app.addEventListener("click", (e) => {
     render();
     return;
   }
-  if (b.hasAttribute("data-open-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).showModal();
-  if (b.hasAttribute("data-close-bell")) return (document.getElementById("bell-dlg") as HTMLDialogElement).close();
   if (b.dataset.ffopen) {
     const reg = Number(b.dataset.ffopen);
     const first = FF_TABS.find(([k]) => snap.ff_tabs.some((t) => t.tab === k && t.display === "both"));
@@ -1329,8 +1320,7 @@ function openPicker(dest: Dest): void {
   pickFor = dest;
   const { device, cashBox } = dest;
   const area = (label: string, html: string) => `<section class="picker-area"><h3 class="picker-area-head">${label}</h3>${html}</section>`;
-  // Item・Wallet の欄はないので、販売規則の設定の歯車はピッカーの Item の見出しの横に置く（user 2026-11-20）
-  const items = area(`Item ${RULES_GEAR}`, shelfPanel(snap));
+  const items = area("Item", shelfPanel(snap));
   const wallet = area("Wallet", walletPanel(snap.emoney_balance));
   document.getElementById("picker-body")!.innerHTML = cashBox || device === "terminal" ? wallet : device === "scanner" ? wallet + items : items + wallet;
   pickerDlg().showModal();

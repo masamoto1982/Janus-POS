@@ -1549,12 +1549,13 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock" title="${esc(dateText(now))}">${timeText(now)}</time></span>`;
 }
 
-/** 無操作で取引を中止する（またはスタッフがログアウトする）までの残り時間の文。「04:58の無操作で取引を中止」 */
+/** 無操作で取引を中止する（またはスタッフがログアウトする）までの残り時間の文。「04:58でタイムアウト」「04:58でログアウト」
+ *  （user 2026-11-23：「04:58の無操作で取引を中止」は長く、明細の最下行の Page が左に寄った） */
 export function idleText(r: RegisterView): string {
   const ms = r.idle_revert_in;
   if (ms === null) return "";
   const left = `${String(Math.floor(ms / 60000)).padStart(2, "0")}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
-  return `${left}の無操作で${r.idle_voids ? "取引を中止" : "自動ログアウト"}`;
+  return `${left}で${r.idle_voids ? "タイムアウト" : "ログアウト"}`;
 }
 
 /** 残り時間の入れ物。文は毎秒変わるので、画面を描き直さず main.ts が中身だけ書き換える（明細の表を毎秒作り直さない） */

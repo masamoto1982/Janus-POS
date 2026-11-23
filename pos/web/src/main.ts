@@ -36,6 +36,7 @@ import {
   padValueKey,
   type PadTarget,
   screenHead,
+  idleText,
   isoDate,
   scanGuide,
   cancelAsk,
@@ -560,6 +561,12 @@ function render(): void {
     }
     setRegion(`counter-${r.id}`, counterMain, langOf(r.id, "counter"));
     setRegion(`floor-${r.id}`, floorMain, langOf(r.id, "floor"));
+    // 無操作の残り時間は毎秒変わるので、明細を描き直さずに文だけ書き換える
+    const idle = idleText(r);
+    app.querySelectorAll<HTMLElement>(`[data-screen^="${r.id}:"] [data-idle="${r.id}"]`).forEach((el) => {
+      const text = langOf(r.id, "counter") === "en" ? trText(idle) : idle;
+      if (el.textContent !== text) el.textContent = text;
+    });
     slideOnHold(r);
     setRegion(
       `outlet-${r.id}`,
@@ -1406,7 +1413,7 @@ function wireForceRegister(): void {
  *  明細がスクロールすると、モバイルでページの縦スクロールと取り合いになる）。
  *  登録画面（明細の表 .lines.cols3）：内税の行と見出し（品目・数量・小計）は動かず、明細の行だけが .lines-scroll の中で送られる。
  *  見えている高さに入りきる行を一ページとし、ページの一行目を見出しの下に合わせる。最後のページの一行目まで上げられるよう下に余白を足す。
- *  複数ページのときは下に「&lt; Page:1/3 &gt;」（円形のボタンは FF のページ送りと同じ、端のページでは出さない）。明細の数が変わったら一ページ目に戻す。
+ *  複数ページのときは下に「&lt; Page:1/3 &gt;」（明細の最下行の中央、左右の保留・残り時間と一行）（円形のボタンは FF のページ送りと同じ、端のページでは出さない）。明細の数が変わったら一ページ目に戻す。
  *  「レジ袋を登録したか」のように、ページごとに見落としなく確かめられるようにするため */
 const mainPage = new Map<string, { page: number; count: number; starts: number[] }>();
 const pageKey = (main: HTMLElement): string => main.dataset.region ?? "";
@@ -1418,7 +1425,7 @@ function paginate(main: HTMLElement, force = false): void {
   let box = table.parentElement as HTMLElement;
   // 中身を描き直していなければ、スクロールの位置もページもそのまま
   if (box.classList.contains("lines-scroll") && !force) return;
-  main.querySelector(":scope > .page-more")?.remove();
+  main.querySelector(".page-more")?.remove();
   if (!box.classList.contains("lines-scroll")) {
     box = document.createElement("div");
     box.className = "lines-scroll";
@@ -1438,7 +1445,8 @@ function paginate(main: HTMLElement, force = false): void {
   const more = document.createElement("p");
   more.className = "page-more";
   more.innerHTML = `<button type="button" class="ff-arrow page-turn prev" data-linepage="-1" aria-label="${lang === "en" ? trText("前のページ") : "前のページ"}">&lt;</button><span class="page-no">Page:1/1</span><button type="button" class="ff-arrow page-turn next" data-linepage="1" aria-label="${lang === "en" ? trText("次のページ") : "次のページ"}">&gt;</button>`;
-  main.append(more);
+  // 明細の最下行（左端＝保留・右端＝無操作の残り時間）があれば、その中央に置く
+  (main.querySelector(".lines-foot > .foot-c") ?? main).append(more);
   const head = table.querySelector("thead")?.getBoundingClientRect().height ?? 0;
   const view = box.clientHeight - head;
   const heights = rows.map((r) => r.getBoundingClientRect().height);
@@ -1478,7 +1486,7 @@ const pageTop = (box: HTMLElement, rows: HTMLElement[], i: number, head: number)
 function showPage(main: HTMLElement, lang = langOf(Number(pageKey(main).split("-")[1]), pageKey(main).split("-")[0] as Side)): void {
   const st = mainPage.get(pageKey(main));
   const box = main.querySelector<HTMLElement>(":scope > .lines-scroll");
-  const more = main.querySelector<HTMLElement>(":scope > .page-more");
+  const more = main.querySelector<HTMLElement>(".page-more");
   if (!st || !box || !more) return;
   const rows = [...box.querySelectorAll<HTMLElement>("tbody > tr")].filter((r) => !r.querySelector("td.empty") && !r.classList.contains("page-pad"));
   const head = box.querySelector("thead")?.getBoundingClientRect().height ?? 0;

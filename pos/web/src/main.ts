@@ -292,7 +292,6 @@ function buildSkeleton(): void {
       <button type="button" class="neg small reset-btn" data-reset title="保存されている状態を消して最初からやり直す">初期化</button>
       </div>
     </header>
-    <div data-region="rush"></div>
     <article class="floor">
         <section class="bell-area" aria-label="Bell（呼び鈴）">
           <h2>Bell</h2>
@@ -305,6 +304,7 @@ function buildSkeleton(): void {
             : ""
         }</div>
     </article>
+    <div data-region="rush"></div>
     <footer class="bottom">
       <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>
     </footer>

@@ -152,6 +152,8 @@ export function rushPanel(v: RushView | null, speed: number, paused: boolean): s
 export function rushBadge(v: RushView | null, id: number): string {
   const r = v?.registers.find((x) => x.register === id);
   if (!r || r.customer === null) return "";
-  const who = `客#${r.customer}（${esc(r.kind)}）${mmss(r.waited_ms)}`;
-  return r.stranded ? `<span class="rush-badge bad">⚠ 立ち往生 ${who}</span>` : `<span class="rush-badge">${who}</span>`;
+  // 見出しの下の「売り場側」の右に収まるよう、お客様の様子（点数・現金など）はカーソルを重ねたときだけ出す
+  const who = `客#${r.customer} ${mmss(r.waited_ms)}`;
+  const tip = `title="${esc(r.kind)}"`;
+  return r.stranded ? `<span class="rush-badge bad" ${tip}>⚠ 立ち往生 ${who}</span>` : `<span class="rush-badge" ${tip}>${who}</span>`;
 }

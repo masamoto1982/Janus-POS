@@ -166,6 +166,8 @@ const DICT: Record<string, string> = {
   "取引を取り消しますか？": "Cancel this transaction?",
   取引の取り消しを確認しています: "Confirming the cancellation",
   スタッフが取り消しの操作をしています: "Staff are cancelling",
+  このままお進みいただけます: "Please carry on yourself",
+  スタッフが別のレジへ移りました: "Staff have moved to another register",
   "商品のバーコードではありません": "That is not an item barcode",
   取り消せるのは登録した商品だけです: "Only registered items can be cancelled",
   "登録するときは、もう一度スキャンしてください": "To register it, scan it again",

@@ -24,7 +24,7 @@ export function isMobileLayout(): boolean {
 /** スプラッシュに出す使い方（user 2026-11-22 の二手順、シミュレーターまわりの文言なので英訳しない、文末の「。」は付けない）。
     マウスの端末には右クリック、タッチの端末には長押しだけを書く。
     モバイルの配置では三つ目に面の切り替えを足す（user 2026-11-22：二つの画面が同時に見えないので）。
-    右クリック（長押し）する先と操作には下線を引く（user 2026-11-23：右クリック・長押しが要だと伝える）。
+    右クリック（長押し）する先と操作、横スワイプには下線を引く（user 2026-11-23〜24：長押しと横スワイプという最も基本の操作に着目させる）。
     一つの手順は [文, 下線か] の並び */
 export type HowToStep = readonly (readonly [string, boolean])[];
 export function howToSteps(touch: boolean, mobile = false): readonly HowToStep[] {
@@ -32,7 +32,7 @@ export function howToSteps(touch: boolean, mobile = false): readonly HowToStep[]
   return [
     [[`レジ画面、スキャナを${press}`, true], ["で商品登録またはポイント読み取り", false]],
     [["決済手段に応じ、", false], [`入金、スキャナ、決済端末のいずれかを${press}`, true]],
-    ...(mobile ? [[["横スワイプで二つの画面を行き来出来ます", false]] as HowToStep] : []),
+    ...(mobile ? [[["横スワイプ", true], ["で二つの画面を行き来出来ます", false]] as HowToStep] : []),
   ];
 }
 

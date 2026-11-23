@@ -66,7 +66,7 @@ button { touch-action: manipulation; }
 .top {
   display: flex; align-items: center; gap: 12px;
   padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  border-bottom: 1px solid var(--border); background: var(--panel);
+  background: var(--panel);
 }
 
 
@@ -487,7 +487,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 
 
 
-.bells { display: flex; gap: var(--gap); flex-wrap: wrap; }
+.bells { display: flex; gap: var(--gap); flex-wrap: wrap; align-items: center; }
 .bell-unit { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 4px 12px; border: 2px solid var(--border); }
 .bell-unit .bell-icon { font-size: var(--text-lg); display: inline-block; }
 .bell-id { font-weight: 600; }
@@ -497,7 +497,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .bell-unit.off { background: var(--off-bg); color: var(--off-ink); border-color: var(--line); }
 .bell-unit.off .bell-icon { filter: grayscale(1); opacity: .6; }
 .bell-unit.off .bell-state { color: var(--off-ink); }
-.bell-area .bell-open { margin-left: auto; }
 .bell-settings { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .bell-setting { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; }
 .bell-setting > span:first-child { flex: 1; font-weight: 600; }
@@ -513,7 +512,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
    その中の項目の見出し（日配食品・税区分 など）＝大（--text-lg）、項目・本文・ボタン＝小（--text-sm）。特大（--text-xl）はレジ画面の中だけ。
    見出しは必ず中の項目より大きく。モバイルでも段を変えない */
 .top h1 { font-size: var(--text-num); margin: 0; white-space: nowrap; }
-.top .logo { width: 73px; height: 73px; flex: none; }
+/* ロゴの縦幅はタイトル「Janus POS」の頭文字 J の倍ほど（user 2026-11-24：以前の 73px の半分） */
+.top .logo { width: 36px; height: 36px; flex: none; }
 .build-badge { font-size: var(--text-sm); font-weight: 600; color: var(--white); background: var(--grey-4); padding: 3px 10px; border-radius: 999px; letter-spacing: .02em; }
 .top-tools { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 /* ヘッダーの「使用方法」はスプラッシュ（使い方）を出し直すボタン（user 2026-11-22）。リセットと同じ小さな消極ボタン */
@@ -535,7 +535,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .add-register { flex: none; align-self: center; }
 .register { container: reg / inline-size; flex: 1 1 0; min-width: 0; max-width: calc(2 * (var(--W-max, 512px) + 2 * var(--frame-w)) + 12px + 26px); }
 .register, .bell-area {
-  background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 0;
+  background: var(--panel); border-radius: 12px; padding: 12px; min-width: 0;
 }
 .register h2, .bell-area h2 { margin: 0 0 8px; font-size: var(--text-num); display: flex; gap: 8px; align-items: center; }
 .register h2 { flex-wrap: wrap; row-gap: 4px; }
@@ -609,7 +609,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .items.uniform .item-name, .items.uniform .item-sub, .wallet-cards .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 
-.bottom { border-top: 1px solid var(--border); background: var(--panel); padding-block: 8px; }
+.bottom { background: var(--panel); padding-block: 8px; }
 
 .floor { user-select: none; -webkit-user-select: none; }
 .floor input, .floor select { user-select: text; -webkit-user-select: text; }
@@ -669,7 +669,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 /* シミュレーターまわりのセレクタは一行のボタンと同じ高さ（--chrome-b）。文字・幅は law.ts fitForms */
 .login-sel select { height: var(--chrome-b); filter: url(#ramp); }
 
-.rules-open { margin-left: auto; }
+/* 販売規則の設定の歯車は Bell のストアコンピューターのすぐ右（user 2026-11-24：以前はピッカーの Item の見出しの横） */
+.rules-open { flex: none; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
 .rules-dlg::backdrop { background: color-mix(in oklch, var(--black) 45%, transparent); }
 .rules-dlg .dlg-head { display: flex; align-items: center; gap: 8px; }
@@ -863,7 +864,6 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .top { padding-block: 6px; gap: 8px; padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
   /* 見出しを強調の段のまま収めるため、ビルド番号は入りきらない分を省く */
   .build-badge { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .top .logo { width: 36px; height: 36px; }
   /* 上部は狭いので、使用方法・リセットは入りきらなければ二行目へ回す */
   .top { flex-wrap: wrap; row-gap: 4px; }
   .floor { padding-block: 8px; gap: 8px; }
@@ -876,8 +876,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .register:nth-child(n + 3) { display: none; }
   /* 最下段の添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す。帯の言語・電子マネーは余裕があるので出す */
   .call-btn small { display: none; }
-  .bell-area { gap: 6px 8px; padding: 8px 44px 8px 10px; }
-  .bell-area .bell-open { position: absolute; top: 6px; right: 6px; margin: 0; }
+  .bell-area { gap: 6px 8px; padding: 8px 10px; }
   .bells { gap: 6px; }
   .bell-unit { gap: 4px; padding: 3px 8px; font-size: var(--text-sm); }
   .bell-unit .bell-icon { font-size: var(--text-sm); }
@@ -1045,9 +1044,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .wallet-cards .item, .item.bill { padding: calc(var(--btn-h) / 8); }
 
 /* スタッフ操作モードのレジカウンター側の操作（user 2026-11-20：スワイプをやめ、とりあえずボタン）。中の高さ・幅は文字なり。
-   ヘッダー中央＝店舗メニュー（取引がないとき）、待ち受けの左下＝保留に戻る（戻る部品は左）・右下＝無操作の残り時間、登録画面の明細の左下＝保留 */
+   ヘッダー中央＝店舗メニュー（取引がないとき）、待ち受けの左下＝保留に戻る（戻る部品は左）・最上部の中央＝無操作の残り時間、登録画面の明細の左下＝保留 */
 .screen button.staff-btn { width: auto; height: var(--btn-md-h); padding: 0 var(--s11, 8px); font-size: var(--text-sm); white-space: nowrap; }
 .staff-operated-welcome { position: relative; }
+.welcome-idle { position: absolute; left: var(--gap); right: var(--gap); top: var(--s13, 4px); text-align: center; pointer-events: none; }
 .welcome-foot { position: absolute; left: var(--gap); right: var(--gap); bottom: var(--gap); display: flex; justify-content: space-between; align-items: center; }
 
 /* 起動時のスプラッシュ画面（user 2026-11-22、Ajisai のスプラッシュを流用）。src/splash.ts 参照。

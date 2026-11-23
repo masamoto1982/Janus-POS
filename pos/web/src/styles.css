@@ -248,6 +248,9 @@ button { touch-action: manipulation; }
 .reg-top .info .tender-cell b { font-variant-numeric: tabular-nums; }
 .reg-top .info .tender-cell.short { color: var(--alert-ink); }
 .screen-main .lines td { font-size: var(--text-sm); padding: var(--s14, 3px) var(--s13, 4px); }
+/* 明細の行の高さは両画面でそろえる（user 2026-11-23）：レジカウンター側の行（削除・数量フォーム・＋の中ボタン）の高さを、
+   ボタンのない売り場側にも当てる。フラグも両画面とも品目の横に並べ、売り場側だけ二行に折り返さない */
+.screen-main .lines.cols3 tbody tr:not(.page-pad) > td { height: var(--btn-md-h); box-sizing: content-box; }
 .screen-main .lines button { font-size: var(--text-sm); padding: var(--s17, 1px) var(--s11, 8px); }
 .totals { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; margin-bottom: 8px; }
 

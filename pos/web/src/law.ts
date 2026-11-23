@@ -288,7 +288,8 @@ function rowsOf(buttons: HTMLElement[]): HTMLElement[][] {
 const RIGID = ".ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
 
 export function fitText(root: ParentNode): void {
-  const buttons = [...root.querySelectorAll<HTMLElement>(".screen button, .screen .method-list .seg")].filter(
+  // 押せないフラグ（span）もボタンと同じ決まりで幅と文字を決める：両画面のフラグを同じ大きさにし、行の高さをそろえる（user 2026-11-23）
+  const buttons = [...root.querySelectorAll<HTMLElement>(".screen button, .screen .method-list .seg, .screen span.flag")].filter(
     (b) => !b.matches(".pad-field, .birth-field, .ffv-input") && b.getClientRects().length > 0,
   );
   const parts = (b: HTMLElement) => {

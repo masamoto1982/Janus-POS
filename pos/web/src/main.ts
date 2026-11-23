@@ -444,12 +444,15 @@ function inTransaction(r: RegisterView): boolean {
 /** レジ前に人がいるか（第一待ち受けの解除）。現物はレジ画面のカメラで人を認識する。
  *  シミュレーターでは、マウスならカーソルがレジ画面に重なっている間、タッチなら最後に触れてから PRESENCE_TOUCH_MS の間 */
 const PRESENCE_TOUCH_MS = 30_000;
-/** 第一待ち受けへ戻るまでの猶予。取引が始まってから完了するまでは決して戻らず、
- *  人がいなくなった（取引が完了した）あとも、この時間だれも来なければ戻る（棚へ商品を取りに行く・連れを待つ間に切り替わらないように） */
-const FIRST_WAIT_AFTER_MS = 30_000;
+/** 第一待ち受けへ戻るまでの猶予。取引が始まってから完了するまでは決して戻らない。
+ *  取引のない待ち受けでレジ前に人がいなければ、この短い猶予ののちに第一待ち受けへ（行列のお客様にレジの稼働モードを見せる） */
+const FIRST_WAIT_AFTER_MS = 3_000;
 const lastBusy = new Map<number, number>();
 const hovering = new Set<number>();
 const touchedAt = new Map<number, number>();
+/** 取引を終えたお客様はレジを離れる：取引の完了から猶予のあいだは人の検知を受け付けない（シミュレーターではカーソルが残っていても離れたとみなす） */
+const leftAt = new Map<number, number>();
+const leaving = (reg: number): boolean => Date.now() - (leftAt.get(reg) ?? -Infinity) < FIRST_WAIT_AFTER_MS;
 const present = (reg: number): boolean => hovering.has(reg) || Date.now() - (touchedAt.get(reg) ?? -Infinity) < PRESENCE_TOUCH_MS;
 const regOf = (t: EventTarget | null): number | null => {
   const el = t instanceof Element ? t.closest<HTMLElement>("[data-swipe]") : null;
@@ -458,15 +461,15 @@ const regOf = (t: EventTarget | null): number | null => {
 document.addEventListener("pointerover", (e) => {
   const reg = regOf(e.target);
   hovering.clear();
-  if (reg !== null && e.pointerType === "mouse") hovering.add(reg);
+  if (reg !== null && e.pointerType === "mouse" && !leaving(reg)) hovering.add(reg);
 });
 document.addEventListener("pointerdown", (e) => {
   const reg = regOf(e.target);
-  if (reg !== null && e.pointerType !== "mouse") touchedAt.set(reg, Date.now());
+  if (reg !== null && e.pointerType !== "mouse" && !leaving(reg)) touchedAt.set(reg, Date.now());
 }, true);
 document.addEventListener("dragenter", (e) => {
   const reg = regOf(e.target);
-  if (reg !== null) touchedAt.set(reg, Date.now());
+  if (reg !== null && !leaving(reg)) touchedAt.set(reg, Date.now());
 });
 document.documentElement.addEventListener("pointerleave", () => hovering.clear());
 
@@ -483,7 +486,12 @@ function render(): void {
   movedRegs.clear();
   for (const r of snap.registers) {
     const busy = inTransaction(r);
-    if (busyRegs.has(r.id) && !busy) resetLangs(r.id);
+    if (busyRegs.has(r.id) && !busy) {
+      resetLangs(r.id);
+      hovering.delete(r.id);
+      touchedAt.delete(r.id);
+      leftAt.set(r.id, Date.now());
+    }
     if (busy) busyRegs.add(r.id);
     else busyRegs.delete(r.id);
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);
@@ -504,7 +512,7 @@ function render(): void {
         head.removeAttribute("title");
       }
     }
-    // 第一待ち受け：取引のない待ち受けで、レジ前に人がいない（カーソルが重なっていない）状態が FIRST_WAIT_AFTER_MS 続いたとき
+    // 第一待ち受け：取引のない待ち受けで、レジ前に人がいない（カーソルが重なっていない・取引を終えて離れた）状態が FIRST_WAIT_AFTER_MS 続いたとき
     let counterMain = sharedScreen(r, snap, "counter");
     let floorMain = sharedScreen(r, snap, "floor");
     const vacant = isWelcome(counterMain) && isWelcome(floorMain) && !busy && !r.counter.point_card && !r.floor.point_card;

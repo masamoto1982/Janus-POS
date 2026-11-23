@@ -5845,7 +5845,7 @@ fn floor_touches_do_not_hold_a_staffed_register() {
     assert!(v.floor.lines.is_empty(), "戻るときに読んだ商品は取引中止で消える");
 }
 
-/// 仕様 12.2：ログインしているスタッフが別のレジで取引中なら、手を付けていないスタッフ操作モードのレジはレジカウンター側の最後の操作から 30 秒でセルフ操作モードに戻る
+/// 仕様 12.2：ログインしているスタッフが別のレジで取引していれば、手を付けていないスタッフ操作モードのレジはレジカウンター側の最後の操作から 30 秒でセルフ操作モードに戻る
 #[test]
 fn staffed_register_reverts_quickly_when_its_staff_works_elsewhere() {
     let mut s = Store::new(1, 3, 1);
@@ -5862,7 +5862,39 @@ fn staffed_register_reverts_quickly_when_its_staff_works_elsewhere() {
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated, "接客中のレジはそのまま");
 }
 
-/// 仕様 12.2：スタッフが手を付けた取引は、そのスタッフが別のレジで取引中でも 5 分待つ
+/// 仕様 12.2：取引を始めていなくても、同じスタッフが別のレジにログインした時点でこのレジを離れたとみなし、30 秒で戻す
+#[test]
+fn staffed_register_reverts_quickly_when_its_staff_logs_in_elsewhere() {
+    use janus_pos_core::store::AWAY_REVERT_MS;
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    advance(&mut s, 5_000);
+    login_as(&mut s, 2, "ST001");
+    // 時計の起点はレジ1 での最後の操作：ログインから 30 秒で戻る
+    advance(&mut s, AWAY_REVERT_MS - 6_000);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+    assert_eq!(reg(&s, 1).idle_revert_in, Some(1_000), "カウントダウンが 30 秒に縮む");
+    advance(&mut s, 1_000);
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated, "レジ1 に戻らなければ 30 秒でセルフ操作モード");
+    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated, "ログインしたばかりのレジは 5 分のまま");
+}
+
+/// 仕様 12.2：スタッフがレジに戻ってレジカウンター側を操作すれば、そのレジは 5 分に戻る
+#[test]
+fn staff_returning_restores_the_full_idle_time() {
+    use janus_pos_core::store::AWAY_REVERT_MS;
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    advance(&mut s, 5_000);
+    login_as(&mut s, 2, "ST001");
+    advance(&mut s, 5_000);
+    run(&mut s, json!({"type":"touch","register":1,"side":"counter"})).unwrap();
+    advance(&mut s, AWAY_REVERT_MS * 2);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated, "いま居るレジは 5 分");
+    assert_eq!(reg(&s, 2).mode, Mode::SelfOperated, "離れたレジ2 が 30 秒で戻る");
+}
+
+/// 仕様 12.2：スタッフが手を付けた取引は、そのスタッフが別のレジに移っても 5 分待つ
 #[test]
 fn staff_touched_transaction_keeps_the_full_idle_time() {
     use janus_pos_core::store::AWAY_REVERT_MS;

@@ -1817,7 +1817,7 @@ pub const INSERT_DONE_MS: u64 = 30 * 1000;
 
 /// 無操作で取引を中止し、セルフ操作モードに戻る
 pub const IDLE_REVERT_MS: u64 = 5 * 60 * 1000;
-/// ログインしているスタッフが別のレジで取引中のとき、手を付けていないスタッフ操作モードのレジをセルフ操作モードに戻すまでの無操作
+/// ログインしているスタッフが別のレジに移ったとき、手を付けていないスタッフ操作モードのレジをセルフ操作モードに戻すまでの無操作
 pub const AWAY_REVERT_MS: u64 = 30 * 1000;
 /// 非常事態モード：セルフ操作モードでスタッフがログインしないまま、呼び鈴をこの時間以上鳴らしっぱなし（押しっ放し）にするか、
 /// この時間以内に EMERGENCY_PRESSES 回以上鳴らす（連打）。常軌を逸した押し方で、悪戯であっても発動したこと自体が抑止力になる。
@@ -2080,7 +2080,7 @@ impl Store {
 
     /// スタッフ操作モードからセルフ操作モードに戻すまでの無操作の時間（仕様 12.2）。
     /// スタッフがまだ手を付けていない（取引にレジカウンター側の操作がない）スタッフ操作モードのレジで、
-    /// ログインしているスタッフが別のレジで取引中なら、そのスタッフはこのレジに来られないので短くする
+    /// ログインしているスタッフが別のレジに移っていれば、このレジにはいないので短くする
     fn revert_ms(&self, r: &Register) -> u64 {
         if r.mode != Mode::StaffOperated || r.counter_in_txn {
             return IDLE_REVERT_MS;
@@ -2088,8 +2088,11 @@ impl Store {
         let Some(me) = r.staff.as_ref().map(|s| s.account.id) else {
             return IDLE_REVERT_MS;
         };
+        // スタッフはレジカウンター側の操作をした場所にいる：同じスタッフが別のレジで、このレジより後に操作（ログインを含む）していれば離れている
         let away = self.registers.iter().any(|o| {
-            o.id != r.id && o.staff.as_ref().is_some_and(|s| s.account.id == me) && o.busy()
+            o.id != r.id
+                && o.staff.as_ref().is_some_and(|s| s.account.id == me)
+                && o.last_counter_op > r.last_counter_op
         });
         if away {
             AWAY_REVERT_MS

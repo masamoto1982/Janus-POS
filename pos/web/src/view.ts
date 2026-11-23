@@ -1541,10 +1541,11 @@ function linesFoot(r: RegisterView, side: Side): string {
 }
 
 /// 仕様 12.2：無操作の残り時間は明細の一番上（スタッフ・内税の行の上）の中央（user 2026-11-23）。
-/// 待ち時間をお客様に見せないため売り場側には出さない
+/// 待ち時間をお客様に見せないため売り場側には出さず、同じ高さを空けて両画面の明細の行をそろえる
 function idleTop(r: RegisterView, side: Side): string {
-  const idle = side === "counter" ? idleSlot(r) : "";
-  return idle ? `<div class="idle-top">${idle}</div>` : "";
+  if (r.idle_revert_in === null) return "";
+  const idle = side === "counter" ? idleSlot(r) : `<span class="idle-left">&nbsp;</span>`;
+  return `<div class="idle-top"${side === "counter" ? "" : ` aria-hidden="true"`}>${idle}</div>`;
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {

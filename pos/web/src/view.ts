@@ -1237,6 +1237,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     return screen(stampVerifyScreen(reg, side, v.bills, a("affix_stamp"), true));
   stampVerifying.delete(`${reg}:${side}`);
   return `${top}
+    ${idleTop(r, side)}
     <div class="staff-head">
       <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
@@ -1532,13 +1533,19 @@ function welcomeFoot(r: RegisterView, side: Side): string {
 const holdBtn = (r: RegisterView, side: Side): string =>
   staffCounter(r, side) && !r.held && r.counter.lines.length > 0 ? staffBtn("保留", { type: "hold_transaction", register: r.id }) : "";
 
-/// 仕様 12.2：明細の最下行は左端＝保留・中央＝Page（明細が入りきらないときだけ）・右端＝無操作の残り時間（user 2026-11-23）。
-/// 保留と残り時間はページを送っても出し続ける。待ち時間をお客様に見せないため売り場側には出さない
+/// 仕様 12.2：明細の最下行は左端＝保留・中央＝Page（明細が入りきらないときだけ）。保留はページを送っても出し続ける
 function linesFoot(r: RegisterView, side: Side): string {
   const hold = holdBtn(r, side);
-  const idle = side === "counter" ? idleSlot(r) : "";
-  if (!hold && !idle) return "";
-  return `<div class="lines-foot"><span class="foot-l">${hold}</span><span class="foot-c"></span><span class="foot-r">${idle}</span></div>`;
+  if (!hold) return "";
+  return `<div class="lines-foot"><span class="foot-l">${hold}</span><span class="foot-c"></span><span class="foot-r"></span></div>`;
+}
+
+/// 仕様 12.2：無操作の残り時間は明細の一番上（スタッフ・内税の行の上）の中央（user 2026-11-23）。
+/// 待ち時間をお客様に見せないため売り場側には出さず、同じ高さを空けて両画面の明細の行をそろえる
+function idleTop(r: RegisterView, side: Side): string {
+  if (r.idle_revert_in === null) return "";
+  const idle = side === "counter" ? idleSlot(r) : `<span class="idle-left">&nbsp;</span>`;
+  return `<div class="idle-top"${side === "counter" ? "" : ` aria-hidden="true"`}>${idle}</div>`;
 }
 
 export function screenHead(r: RegisterView, now: Date, side: Side): string {
@@ -1549,12 +1556,13 @@ export function screenHead(r: RegisterView, now: Date, side: Side): string {
   return `<span class="head-l">${mode}</span><span class="head-c">${bell}</span><span class="head-r"><time class="clock" title="${esc(dateText(now))}">${timeText(now)}</time></span>`;
 }
 
-/** 無操作で取引を中止する（またはスタッフがログアウトする）までの残り時間の文。「04:58の無操作で取引を中止」 */
+/** 無操作で取引を中止する（またはスタッフがログアウトする）までの残り時間の文。「04:58でタイムアウト」「04:58でログアウト」
+ *  （user 2026-11-23：「04:58の無操作で取引を中止」は長く、明細の最下行の Page が左に寄った） */
 export function idleText(r: RegisterView): string {
   const ms = r.idle_revert_in;
   if (ms === null) return "";
   const left = `${String(Math.floor(ms / 60000)).padStart(2, "0")}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
-  return `${left}の無操作で${r.idle_voids ? "取引を中止" : "自動ログアウト"}`;
+  return `${left}で${r.idle_voids ? "タイムアウト" : "ログアウト"}`;
 }
 
 /** 残り時間の入れ物。文は毎秒変わるので、画面を描き直さず main.ts が中身だけ書き換える（明細の表を毎秒作り直さない） */

@@ -5811,3 +5811,17 @@ fn add_register_keeps_state_and_stops_at_max() {
     assert_eq!(s.snapshot().registers.len(), usize::from(janus_pos_core::store::MAX_REGISTERS));
     assert!(!s.add_register());
 }
+
+/// 仕様 12：レジの画面に触れると、ほかの操作を伴わなくても無操作の時計が戻る
+#[test]
+fn touching_the_screen_restarts_the_idle_countdown() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", BREAD);
+    s.tick(s.now() + 60_000);
+    let before = reg(&s, 1).idle_revert_in.unwrap();
+    run(&mut s, json!({"type":"touch","register":1})).unwrap();
+    let after = reg(&s, 1).idle_revert_in.unwrap();
+    assert!(after > before);
+    assert_eq!(after, janus_pos_core::store::IDLE_REVERT_MS);
+}

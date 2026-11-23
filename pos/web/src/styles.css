@@ -1081,6 +1081,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .splash-step-no { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--grey-4); color: var(--white); font-size: var(--text-lg); font-weight: 700; }
 .splash-step-text { display: grid; gap: 2px; min-width: 0; }
 .splash-step-text strong { font-size: var(--text-lg); }
+/* 右クリック（長押し）する先と操作に下線（user 2026-11-23）。決済の案内の機器名と同じ引き方 */
+.splash-step-text u { text-decoration: underline; text-decoration-thickness: 0.1em; text-underline-offset: 0.18em; }
 .splash-hint { margin: 0; font-size: var(--text-sm); color: var(--muted); line-height: 1.7; }
 .splash-lead { text-wrap: pretty; word-break: keep-all; overflow-wrap: anywhere; }
 .splash-step-text { text-wrap: pretty; }

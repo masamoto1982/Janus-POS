@@ -23,13 +23,16 @@ export function isMobileLayout(): boolean {
 
 /** スプラッシュに出す使い方（user 2026-11-22 の二手順、シミュレーターまわりの文言なので英訳しない、文末の「。」は付けない）。
     マウスの端末には右クリック、タッチの端末には長押しだけを書く。
-    モバイルの配置では三つ目に面の切り替えを足す（user 2026-11-22：二つの画面が同時に見えないので） */
-export function howToSteps(touch: boolean, mobile = false): readonly string[] {
+    モバイルの配置では三つ目に面の切り替えを足す（user 2026-11-22：二つの画面が同時に見えないので）。
+    右クリック（長押し）する先と操作には下線を引く（user 2026-11-23：右クリック・長押しが要だと伝える）。
+    一つの手順は [文, 下線か] の並び */
+export type HowToStep = readonly (readonly [string, boolean])[];
+export function howToSteps(touch: boolean, mobile = false): readonly HowToStep[] {
   const press = touch ? "長押し" : "右クリック";
   return [
-    `レジ画面、スキャナを${press}で商品登録またはポイント読み取り`,
-    `決済手段に応じ、入金、スキャナ、決済端末のいずれかを${press}`,
-    ...(mobile ? ["横スワイプで二つの画面を行き来出来ます"] : []),
+    [[`レジ画面、スキャナを${press}`, true], ["で商品登録またはポイント読み取り", false]],
+    [["決済手段に応じ、", false], [`入金、スキャナ、決済端末のいずれかを${press}`, true]],
+    ...(mobile ? [[["横スワイプで二つの画面を行き来出来ます", false]] as HowToStep] : []),
   ];
 }
 
@@ -69,7 +72,7 @@ function build(): HTMLElement {
         <h2 class="splash-howto-head">使い方</h2>
         <ol class="splash-steps">
           ${howToSteps(touch, isMobileLayout()).map(
-            (s, i) => `<li class="splash-step"><span class="splash-step-no" aria-hidden="true">${i + 1}</span><span class="splash-step-text"><strong>${esc(s)}</strong></span></li>`,
+            (s, i) => `<li class="splash-step"><span class="splash-step-no" aria-hidden="true">${i + 1}</span><span class="splash-step-text"><strong>${s.map(([t, u]) => (u ? `<u>${esc(t)}</u>` : esc(t))).join("")}</strong></span></li>`,
           ).join("")}
         </ol>
       </section>

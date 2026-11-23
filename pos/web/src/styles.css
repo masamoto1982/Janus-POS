@@ -1099,4 +1099,3 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .splash-logo, .splash-heading, .splash-lead { animation: none; opacity: 1; transform: none; }
   .splash-howto { transition: none; opacity: 1; transform: none; }
 }
-

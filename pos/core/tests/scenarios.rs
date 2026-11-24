@@ -5847,7 +5847,7 @@ fn floor_touches_do_not_hold_a_staffed_register() {
 
 /// 仕様 12.2：同じスタッフが別のレジにログインしたら、取引のない有人レジはすぐセルフ操作モードに戻る
 #[test]
-fn staffed_register_hands_back_when_its_staff_logs_in_elsewhere() {
+fn empty_staffed_register_returns_to_self_when_its_staff_logs_in_elsewhere() {
     let mut s = Store::new(1, 3, 1);
     login_as(&mut s, 1, "ST001");
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
@@ -5856,77 +5856,36 @@ fn staffed_register_hands_back_when_its_staff_logs_in_elsewhere() {
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
 }
 
-/// 仕様 12.2：年確だけスタッフが対応した取引は、スタッフが別のレジにログインすると取引ごとセルフ操作モードに立ち戻り、
-/// お客様が自分で会計を済ませられる（取引は消さない）
+
+/// 仕様 12.2：取引のある有人レジは、スタッフ操作モードで始めた取引でも呼び出しで入った取引でも、
+/// スタッフが別のレジにログインしてもスタッフ操作モードのまま（スタッフが最後まで受け持つ。5 分の規則）
 #[test]
-fn transaction_is_handed_back_to_the_customer_when_staff_moves() {
+fn staffed_register_with_a_transaction_stays_staffed_when_staff_logs_in_elsewhere() {
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    scan(&mut s, 1, "counter", BREAD);
+    login_as(&mut s, 2, "ST001");
+    let v = reg(&s, 1);
+    assert_eq!(v.mode, Mode::StaffOperated);
+    assert_eq!(v.counter.lines.len(), 1);
+
     let mut s = Store::new(1, 3, 1);
     scan(&mut s, 1, "floor", BEER);
-    scan(&mut s, 1, "floor", BREAD);
     ok(&mut s, json!({"type":"checkout","register":1,"side":"floor"}));
-    assert!(s.snapshot().calls.iter().any(|c| c.register == 1 && c.kind == CallKind::AgeCheck));
     login_as(&mut s, 1, "ST001");
     ok(&mut s, json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}));
     ok(&mut s, json!({"type":"check_id","register":1,"birth":"19900101","today":"2026-11-24"}));
     login_as(&mut s, 2, "ST001");
-    let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SelfOperated);
-    assert_eq!(v.floor.lines.len(), 2, "取引は消さない");
-    advance(&mut s, 1_000);
-    assert!(!s.snapshot().calls.iter().any(|c| c.register == 1), "済んだ年確で呼び直さない");
-    confirm_point(&mut s, 1);
-    ok(&mut s, json!({"type":"select_payment","register":1,"side":"floor","method":"qr"}));
-    ok(&mut s, json!({"type":"tap_emoney","register":1,"method":"qr"}));
-    assert!(reg(&s, 1).last_receipt.is_some(), "お客様が自分で会計を済ませる");
-}
-
-/// 仕様 12.2：立ち戻った取引に残っているスタッフの用件は呼び出しになり、担当を外すのでほかのスタッフも応えられる
-#[test]
-fn handed_back_transaction_calls_any_staff_for_what_is_left() {
-    let mut s = Store::new(1, 3, 1);
-    scan(&mut s, 1, "floor", BEER);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"floor"}));
-    login_as(&mut s, 1, "ST001");
-    login_as(&mut s, 2, "ST001");
-    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
-    advance(&mut s, 1_000);
-    assert!(s.snapshot().calls.iter().any(|c| c.register == 1 && c.kind == CallKind::AgeCheck));
-    login_as(&mut s, 1, "ST002");
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
 }
 
-/// 仕様 12.2：スタッフが現金を預かっている途中と、保留した取引があるときは立ち戻らない（5 分の規則のまま）
+/// 仕様 12.2：保留した取引がある有人レジも、スタッフが別のレジにログインしてもスタッフ操作モードのまま
 #[test]
-fn cash_in_hand_or_held_transaction_keeps_the_staffed_register() {
-    let mut s = Store::new(1, 3, 1);
-    login_as(&mut s, 1, "ST001");
-    scan(&mut s, 1, "counter", BREAD);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
-    confirm_point(&mut s, 1);
-    ok(&mut s, json!({"type":"insert_cash","register":1,"denomination":100,"count":1}));
-    login_as(&mut s, 2, "ST001");
-    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
-
+fn staffed_register_with_a_held_transaction_stays_staffed() {
     let mut s = Store::new(1, 3, 1);
     login_as(&mut s, 1, "ST001");
     scan(&mut s, 1, "counter", BREAD);
     hold(&mut s, 1).unwrap();
     login_as(&mut s, 2, "ST001");
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
-}
-
-/// 仕様 12.2：現金を選んだだけ（投入前）なら立ち戻り、お客様に支払方法を選び直してもらう
-#[test]
-fn handing_back_clears_a_cash_choice_without_money() {
-    let mut s = Store::new(1, 3, 1);
-    login_as(&mut s, 1, "ST001");
-    scan(&mut s, 1, "counter", BREAD);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
-    confirm_point(&mut s, 1);
-    ok(&mut s, json!({"type":"select_payment","register":1,"side":"counter","method":"cash"}));
-    login_as(&mut s, 2, "ST001");
-    let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::SelfOperated);
-    assert_eq!(v.floor.lines.len(), 1);
-    ok(&mut s, json!({"type":"select_payment","register":1,"side":"floor","method":"qr"}));
 }

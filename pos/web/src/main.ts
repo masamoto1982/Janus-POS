@@ -804,32 +804,18 @@ const OWN_ERROR = new Set(["parcel_length", "parcel_size", "parcel_postal", "par
 /** レジが受け付けなかった理由を、操作した側の登録画面の中央に一瞬だけ重ねる（user 2026-11-18〜19）。
  *  登録画面の最上部に赤褐色の一行を出す形（旧 B-2）は全廃した。背後の登録画面はぼかして読めなくする。
  *  案内は画面の描き直しの外に置くので、表示中に画面が変わっても最後まで出る。ポインターは素通しにし、表示中もすべての操作を受け付ける */
-function flashRejection(reg: number, side: Side, reason: string, done = false, ms = REJECT_SHOW_MS): void {
+function flashRejection(reg: number, side: Side, reason: string, done = false): void {
   const body = app.querySelector(`[data-region="${side}-${reg}"]`)?.parentElement;
   if (!body) return;
   body.querySelector(".reject-flash")?.remove();
   const el = document.createElement("div");
   el.className = done ? "reject-flash done" : "reject-flash";
   el.setAttribute("role", "alert");
-  el.style.setProperty("--flash-ms", `${ms}ms`);
+  el.style.setProperty("--flash-ms", `${REJECT_SHOW_MS}ms`);
   el.innerHTML = rejectFlash(langOf(reg, side) === "ja" ? reason : trText(reason));
   body.append(el);
   el.addEventListener("animationend", () => el.remove());
-  window.setTimeout(() => el.remove(), ms + 200);
-}
-
-/** 売り場側に「このままお進みいただけます」を出す時間（お客様が気づけるよう、受け付けなかった理由より長く） */
-const HAND_BACK_SHOW_MS = 4000;
-/** スタッフが別のレジにログインして、取引ごとセルフ操作モードに立ち戻ったレジ（仕様 12.2）の売り場側に、
- *  お客様が自分で続けられることを知らせる */
-function noticeHandBack(before: Snapshot): void {
-  const after = JSON.parse(sim.snapshot()) as Snapshot;
-  for (const r of after.registers) {
-    const was = before.registers.find((b) => b.id === r.id);
-    if (was?.mode === "staff_operated" && r.mode === "self_operated" && inTransaction(r)) {
-      flashRejection(r.id, "floor", "このままお進みいただけます", true, HAND_BACK_SHOW_MS);
-    }
-  }
+  window.setTimeout(() => el.remove(), REJECT_SHOW_MS + 200);
 }
 
 /** quiet：理由をテンキーの中など呼び出し元で出すときは、登録画面に重ねない */
@@ -844,10 +830,8 @@ function send(cmd: Command, quiet = false): boolean {
   // 最下段の FF ボタンで取り消したときも一度きり（user 2026-11-21）
   if (cmd.type === "cancel_item") cancelAsk.delete(cmd.register);
   sim.tick(performance.now() - t0);
-  const before = snap;
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   lastError = res.ok ? undefined : res.error;
-  if (res.ok && cmd.type === "scan" && cmd.code.startsWith(STAFF_BARCODE_PREFIX)) noticeHandBack(before);
   // 取引を取り消して保留した取引に戻ったときも、取消しの画面は閉じる（戻った取引に持ち越さない）
   if (res.ok && cmd.type === "void_transaction") cancelAsk.delete(cmd.register);
   // 取り消せたら、登録済みだったことを操作した側の登録画面の中央に一瞬だけ知らせる

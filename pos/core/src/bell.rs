@@ -28,10 +28,40 @@ pub(crate) struct Packet {
     lost_up: bool,
 }
 
+/// Bell の端末の種類。据え付け端末と可搬性端末はシミュレーターの「+」で足せる（user 2026-11-24）、ストアコンピューターは一台だけ
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+#[serde(rename_all = "snake_case")]
+pub enum BellKind {
+    Fixed,
+    Handheld,
+    StoreComputer,
+}
+
+impl BellKind {
+    fn label(self) -> &'static str {
+        match self {
+            BellKind::Fixed => "据え付け端末",
+            BellKind::Handheld => "可搬性端末",
+            BellKind::StoreComputer => "ストアコンピューター",
+        }
+    }
+
+    /// 同じ種類の n 台目（1 から）の名前。1 台目は番号なし、2 台目から「据え付け端末2」
+    pub fn name(self, nth: usize) -> String {
+        if nth <= 1 {
+            self.label().into()
+        } else {
+            format!("{}{}", self.label(), nth)
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct Bell {
     pub id: String,
+    pub kind: BellKind,
     pub received: BellSignal,
     pub acked_seq: u64,
     pub last_rx_at: u64,
@@ -51,9 +81,10 @@ pub struct Bell {
 }
 
 impl Bell {
-    pub fn new(id: &str) -> Bell {
+    pub fn new(kind: BellKind, id: &str) -> Bell {
         Bell {
             id: id.into(),
+            kind,
             received: BellSignal::default(),
             acked_seq: 0,
             last_rx_at: 0,

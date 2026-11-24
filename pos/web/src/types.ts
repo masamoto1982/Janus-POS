@@ -12,6 +12,9 @@ export type AgeRulesView = { rules: Array<AgeRule>, history: Array<RuleChange>, 
 
 export type AuditEntry = { at: number, register: number, staff: string, operation: string, amount: number, result: string, };
 
+/**
+ * Bell の端末の種類。据え付け端末と可搬性端末はシミュレーターの「+」で足せる（user 2026-11-24）、ストアコンピューターは一台だけ
+ */
 export type BellKind = "fixed" | "handheld" | "store_computer";
 
 export type BellLink = { id: string, link_ok: boolean, acked_seq: number, sent: number, retries: number, };

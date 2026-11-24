@@ -1898,6 +1898,30 @@ impl Store {
         self.registers.push(Register::new(n + 1));
         true
     }
+
+    /// Bell の端末を一台足す（シミュレーターの「+」、user 2026-11-24）。据え付け端末・可搬性端末だけ、
+    /// 同じ種類の最後の端末の後ろに並べる。新しい端末は今までの呼び出しでは鳴らない。
+    /// ストアコンピューター、または MAX_BELLS に達していれば足さずに false
+    pub fn add_bell(&mut self, kind: BellKind) -> bool {
+        if kind == BellKind::StoreComputer || self.bells.len() >= MAX_BELLS as usize {
+            return false;
+        }
+        let nth = self.bells.iter().filter(|m| m.kind == kind).count() + 1;
+        let mut bell = Bell::new(kind, &kind.name(nth));
+        bell.received.presses = self.signal.presses;
+        bell.last_rx_at = self.now;
+        bell.last_ack_at = self.now;
+        let at = self
+            .bells
+            .iter()
+            .rposition(|m| m.kind == kind)
+            .map_or_else(
+                || self.bells.iter().position(|m| m.kind == BellKind::StoreComputer).unwrap_or(self.bells.len()),
+                |i| i + 1,
+            );
+        self.bells.insert(at, bell);
+        true
+    }
 }
 
 impl Store {
@@ -1909,7 +1933,15 @@ impl Store {
             now: 0,
             rng: Rng::new(seed),
             registers: regs,
-            bells: (0..bells).map(|i| Bell::new(&bell_name(i))).collect(),
+            bells: {
+                let mut v: Vec<Bell> = vec![];
+                for i in 0..bells {
+                    let kind = initial_bell(i);
+                    let nth = v.iter().filter(|m| m.kind == kind).count() + 1;
+                    v.push(Bell::new(kind, &kind.name(nth)));
+                }
+                v
+            },
             calls: Calls::default(),
             age_rules: AgeRules::default(),
             tax: TaxSettings::default(),
@@ -3483,7 +3515,7 @@ impl Store {
             C::SetBellOn { bell, on } => {
                 let signal = self.signal;
                 let m = self.bells.get_mut(bell).ok_or("Bell が見つかりません")?;
-                if bell_kind(bell as u8) == BellKind::Fixed {
+                if m.kind == BellKind::Fixed {
                     return Err("据え付け端末は OFF にできません".into());
                 }
                 if on && !m.bell_on {
@@ -4795,10 +4827,9 @@ impl Store {
             bells: self
                 .bells
                 .iter()
-                .enumerate()
-                .map(|(i, m)| BellView {
+                .map(|m| BellView {
                     id: m.id.clone(),
-                    kind: bell_kind(i as u8),
+                    kind: m.kind,
                     // 非常事態モードのあいだは、届く呼び鈴が解除まで鳴り続ける（警報音は画面側）
                     buzzing: m.buzzing(now) || (sos && m.bell_on && !m.offline),
                     link_ok: m.rx_ok(now),
@@ -5407,29 +5438,14 @@ pub struct EmoneyView {
     pub balance: Option<u32>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-#[serde(rename_all = "snake_case")]
-pub enum BellKind {
-    Fixed,
-    Handheld,
-    StoreComputer,
-}
+pub use crate::bell::BellKind;
 
-fn bell_kind(i: u8) -> BellKind {
+/// 起動時の i 台目（0 から）の種類：据え付け端末・可搬性端末・ストアコンピューター、それより多ければ可搬性端末
+fn initial_bell(i: u8) -> BellKind {
     match i {
         0 => BellKind::Fixed,
         2 => BellKind::StoreComputer,
         _ => BellKind::Handheld,
-    }
-}
-
-fn bell_name(i: u8) -> String {
-    match i {
-        0 => "据え付け端末".into(),
-        1 => "可搬性端末".into(),
-        2 => "ストアコンピューター".into(),
-        n => format!("可搬性端末{}", n - 1),
     }
 }
 

@@ -827,7 +827,7 @@ function noticeHandBack(before: Snapshot): void {
   for (const r of after.registers) {
     const was = before.registers.find((b) => b.id === r.id);
     if (was?.mode === "staff_operated" && r.mode === "self_operated" && inTransaction(r)) {
-      flashRejection(r.id, "floor", "このままお進みいただけます\nスタッフが別のレジへ移りました", true, HAND_BACK_SHOW_MS);
+      flashRejection(r.id, "floor", "このままお進みいただけます", true, HAND_BACK_SHOW_MS);
     }
   }
 }

@@ -5044,7 +5044,7 @@ impl Store {
                 .is_some_and(|t| self.now.saturating_sub(t) >= r.change_timers().0),
             counter: CounterView {
                 state: c.staff,
-                name: staff.map(|a| a.name),
+                staff: staff.map(|a| a.id),
                 role: staff.map(|a| a.role),
                 phase: c.phase,
                 lines,
@@ -5245,7 +5245,8 @@ pub struct FloorLine {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CounterView {
     pub state: StaffState,
-    pub name: Option<&'static str>,
+    /// 担当スタッフの番号（「001」）。見出しが「スタッフ」なので名前（スタッフ001）は重ねない（user 2026-11-24）
+    pub staff: Option<&'static str>,
     pub role: Option<Role>,
     pub phase: Phase,
     pub lines: Vec<CounterLine>,

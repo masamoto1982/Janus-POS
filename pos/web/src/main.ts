@@ -215,7 +215,7 @@ function buildSkeleton(): void {
         <label class="login-sel">スタッフ
           <select data-login="${r.id}" aria-label="レジ${r.id}のスタッフログイン">
             <option value="">未ログイン</option>
-            ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.name)}${a.role === "owner" ? "（オーナー）" : ""}</option>`).join("")}
+            ${snap.accounts.map((a) => `<option value="${esc(a.barcode)}">${esc(a.id)}${a.role === "owner" ? "（オーナー）" : ""}</option>`).join("")}
           </select>
         </label>
       </h2>
@@ -485,7 +485,7 @@ function render(): void {
     else busyRegs.delete(r.id);
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);
     if (sel && document.activeElement !== sel) {
-      const acc = r.counter.state === "absent" ? undefined : snap.accounts.find((a) => a.name === r.counter.name);
+      const acc = r.counter.state === "absent" ? undefined : snap.accounts.find((a) => a.id === r.counter.staff);
       sel.value = acc?.barcode ?? "";
     }
     for (const side of ["counter", "floor"] as const) {

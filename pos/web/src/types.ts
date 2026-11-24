@@ -95,7 +95,11 @@ dates: Dates | null,
  */
 tickets: number, id: number, touched: number, code: string, name: string, unit_price: number, qty: number, ff_base: number, tax: string, rate_bp: number, category: Category, cash_only: boolean, parcel?: Parcel, pickup?: Pickup, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, });
 
-export type CounterView = { state: StaffState, name: string | null, role: Role | null, phase: Phase, lines: Array<CounterLine>, total: number, taxes: Array<TaxTotal>, coupons: Array<CouponView>, point_card: string | null, required_age: number | null, 
+export type CounterView = { state: StaffState, 
+/**
+ * 担当スタッフの番号（「001」）。見出しが「スタッフ」なので名前（スタッフ001）は重ねない（user 2026-11-24）
+ */
+staff: string | null, role: Role | null, phase: Phase, lines: Array<CounterLine>, total: number, taxes: Array<TaxTotal>, coupons: Array<CouponView>, point_card: string | null, required_age: number | null, 
 /**
  * 年確に免許証・マイナンバーカードが要る（法令の年齢制限）。false なら顔写真付きの身分証も可
  */

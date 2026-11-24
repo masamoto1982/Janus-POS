@@ -1101,8 +1101,8 @@ fn staff_cannot_be_switched_during_a_transaction() {
     login(&mut s, 1);
     login_as(&mut s, 1, "ST002");
     assert_eq!(
-        reg(&s, 1).counter.name,
-        Some("スタッフ002"),
+        reg(&s, 1).counter.staff,
+        Some("002"),
         "取引の前なら切り替えられる"
     );
     scan(&mut s, 1, "counter", BREAD);
@@ -1112,7 +1112,7 @@ fn staff_cannot_be_switched_during_a_transaction() {
     )
     .unwrap_err();
     assert!(e.contains("担当スタッフを切り替えられません"), "{e}");
-    assert_eq!(reg(&s, 1).counter.name, Some("スタッフ002"));
+    assert_eq!(reg(&s, 1).counter.staff, Some("002"));
     ok(&mut s, json!({"type":"end_staff_mode","register":1}));
     assert!(run(
         &mut s,
@@ -1139,8 +1139,8 @@ fn staff_who_answers_a_self_transaction_becomes_its_owner() {
     ok(&mut s, json!({"type":"void_transaction","register":1}));
     login(&mut s, 1);
     assert_eq!(
-        reg(&s, 1).counter.name,
-        Some("スタッフ001"),
+        reg(&s, 1).counter.staff,
+        Some("001"),
         "取引が終われば誰でもログインできる"
     );
 }
@@ -5604,7 +5604,7 @@ fn held_transaction_comes_back_after_the_interrupting_one() {
     assert!(!v.held);
     assert_eq!(line_codes(&v), vec![BREAD]);
     assert_eq!(v.mode, Mode::StaffOperated, "担当はログインしたまま保留した取引に戻る");
-    assert_eq!(v.counter.name, Some("スタッフ001"));
+    assert_eq!(v.counter.staff, Some("001"));
 
     hold(&mut s, 1).unwrap();
     assert!(reg(&s, 1).held, "戻った取引は再び保留できる");

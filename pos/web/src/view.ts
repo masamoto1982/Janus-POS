@@ -1241,7 +1241,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   return `${top}
     ${idleTop(r, side)}
     <div class="staff-head">
-      <span>スタッフ：<b>${esc(v.name)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
+      <span>スタッフ：<b>${esc(v.staff)}</b>${v.role === "owner" ? "（オーナー）" : ""}</span>
       ${taxNote(v)}
     </div>
     <table class="lines cols3">${LINE_COLS}<thead><tr><th>品目</th><th>${qtyHead(v.lines)}</th><th class="num">小計</th></tr></thead>
@@ -1788,7 +1788,7 @@ export function storeMenu(r: RegisterView): string {
   const screen = (body: string) => `<div class="menu-screen"><div class="menu-body">${body}</div>${backFootRow(go("top"))}</div>`;
   switch (m.screen) {
     case "top":
-      return `<div class="menu-screen"><div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：${esc(v.name ?? "")}</span></div>
+      return `<div class="menu-screen"><div class="menu-head"><span></span><b class="big">店舗メニュー</b><span class="muted">担当：スタッフ${esc(v.staff ?? "")}</span></div>
         <div class="menu-list" data-law>${MENU_ITEMS
           .map((k) => btn(MENU_LABEL[k], go(k), undefined, "menu-item"))
           .join("")}</div>

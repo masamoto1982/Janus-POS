@@ -330,8 +330,9 @@ button.pad-field .placeholder { color: var(--input-hint); font-size: min(1em, va
 /* 入力例は欄の中央（user 2026-11-20）。打ち込んだ数字は右寄せのまま */
 button.pad-field:has(> .placeholder) { justify-content: center; }
 /* セレクタ：開く印（▼）は濃いグレーで、操作できるところでは青のランプ（#ramp）で操作の青になる。文字のあとに 高さ÷4 の間・高さ÷4 の印・高さ÷4 の余白（em＝高さ÷2） */
+/* セレクタの文字はアプリ中のどれも枠の中央（user 2026-11-24）。左右の余白は fitForms が印の分だけ対称に空ける */
 select {
-  appearance: none; -webkit-appearance: none; cursor: pointer;
+  appearance: none; -webkit-appearance: none; cursor: pointer; text-align: center; text-align-last: center;
   background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23535353'/%3E%3C/svg%3E") no-repeat right 0.5em center / 0.5em auto;
 }
 button.pad-field.typing { outline: var(--s15, 2px) solid var(--accent); outline-offset: var(--s17, 1px); }

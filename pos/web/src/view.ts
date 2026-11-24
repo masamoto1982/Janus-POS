@@ -678,6 +678,32 @@ const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolea
 
 export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
+/** 数量 0 の確認（user 2026-11-25）。テンキーで 0 を決定したら、すぐには取り除かず年確と同じ形の確認の画面を出す。
+ *  同じ商品の行が複数あると（ソフトドリンク×3・サンドイッチ×1・ソフトドリンク×24）どの行が消えたかわかりにくく、
+ *  とくにセルフ操作モードで困るので、「はい」で取り除いたら回収イベントと同じ形で、取り除いた品名と点数を見せてから明細に戻る。
+ *  received：お渡し済みの FF（取り除くと回収の案内が出るので、取り除いた案内は出さない） */
+export const zeroAsk = new Map<string, { id: number; name: string; qty: number; received: boolean }>();
+export const zeroDone = new Map<string, { name: string; qty: number }>();
+/** 取り除いた案内を出しておく時間 */
+export const ZERO_DONE_MS = 2500;
+
+function zeroAskScreen(reg: number, side: Side, id: number, st: Gate): string {
+  return `<div class="point-screen">
+      <div class="big">数量が0の行を明細から削除しますか？</div>
+      <div class="point-choices">${btn("はい", { type: "set_qty", register: reg, side, line_id: id, qty: 0 }, st, "primary")}</div>
+    </div><div class="back-foot"><button type="button" class="md ghost back-btn" data-zero-back="${reg}:${side}">バック</button></div>`;
+}
+
+/** 数量 0 の確認と取り除いた案内。どちらもなければ "" */
+function zeroScreen(reg: number, side: Side, lines: { id: number }[], st: Gate): string {
+  const key = `${reg}:${side}`;
+  const done = zeroDone.get(key);
+  if (done) return collectScreen("数量が0の行を明細から取り除きました", [done], "");
+  const ask = zeroAsk.get(key);
+  if (ask && !lines.some((l) => l.id === ask.id)) zeroAsk.delete(key);
+  return zeroAsk.has(key) ? zeroAskScreen(reg, side, ask!.id, st) : "";
+}
+
 /** 日配食品は数量を増やせない。同じ商品でも一点ずつ販売期限が違うので、一つを読んで数量を増やすと
  *  期限切れの品がお客様に渡ってしまう（ポカヨケ）。続けて読んでも一点ずつ別の行になるので、
  *  数量の欄は「削除」と数字だけ（サービス商品と同じ固定の形）。数字の枠は数量フォームと同じ幅にして、
@@ -1136,7 +1162,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet, r.last_receipt.method.includes("現金") ? r.last_receipt.paid : 0) : thanks(r.last_receipt)));
   if (!v.lines.length && !v.coupons.length && !v.point_card) cancelAsk.delete(reg);
   // ポイントカード（アプリ）だけ読んだときも取引は始まっているので、登録画面に進む
-  if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length) return staffOperatedWelcome(r, side);
+  if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length && !zeroDone.has(`${reg}:${side}`)) return staffOperatedWelcome(r, side);
   const ro = side === "floor";
   const rows = newestFirst([...couponRows(reg, side, v.coupons, a("remove_coupon"), ro), ...v.lines.map((l): Row => [l.touched, counterLine(reg, l, v, side)])]);
   const paying = v.phase === "paying";
@@ -1191,6 +1217,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
         : "";
   const screen = (body: string) => `${top}${confirm(body + (cancelAsk.has(reg) ? "" : back))}`;
   if (cancelAsk.has(reg)) return screen(cancelScreen(r, side, v));
+  const zero = ro ? "" : zeroScreen(reg, side, v.lines, a("remove_line"));
+  if (zero) return `${top}${confirm(zero)}`;
   const pickup = v.lines.find((l) => l.pickup)?.pickup;
   if (!paying && pickup && !pickup.matched)
     return screen(
@@ -1874,10 +1902,12 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   );
 
   if (!c.lines.length && !c.coupons.length && !c.point_card) cancelAsk.delete(reg);
-  if (!c.lines.length && !c.coupons.length && !c.point_card && !c.returned.length) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
+  if (!c.lines.length && !c.coupons.length && !c.point_card && !c.returned.length && !zeroDone.has(`${reg}:${side}`)) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${confirm(body + (cancelAsk.has(reg) ? "" : back))}`;
   if (cancelAsk.has(reg)) return screen(cancelScreen(r, side, c));
+  const zero = zeroScreen(reg, side, c.lines, a("remove_line"));
+  if (zero) return `${top}${confirm(zero)}`;
   const slips = c.bills.length;
   if (c.phase === "paying" && slips) return screen(c.bill_unchecked ? billNote(slips, "払込票の内容を確認いたします") : c.stamp_pending ? billNote(slips, "スタッフが領収証に収入印紙を貼り付けます") : billPayCard(slips, true));
   if (c.phase === "paying" && c.age_wait) return screen(ageWait(c.age_wait));

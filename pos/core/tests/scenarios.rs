@@ -5795,43 +5795,28 @@ fn ff_tab_shown_on_both_sides_can_be_bought_in_self_operated_mode() {
     .is_err());
 }
 
-/// 仕様 3：レジは店の状態を保ったまま一台ずつ足せ、MAX_REGISTERS で止まる
+/// 仕様 3：店はレジ・Bell とも 10 台まで作れる（実機のソリューションが想定する構成）。超える指定は 10 台に切り詰める
 #[test]
-fn add_register_keeps_state_and_stops_at_max() {
-    let mut s = Store::new(1, 2, 1);
-    login(&mut s, 1);
-    scan(&mut s, 1, "counter", BREAD);
-    assert!(s.add_register());
-    assert_eq!(reg(&s, 1).counter.lines.len(), 1);
-    assert_eq!(reg(&s, 3).id, 3);
-    assert!(reg(&s, 3).counter.lines.is_empty());
+fn store_supports_up_to_ten_registers_and_bells() {
+    use janus_pos_core::store::{BellKind, MAX_BELLS, MAX_REGISTERS};
+    assert_eq!((MAX_REGISTERS, MAX_BELLS), (10, 10));
+    let s = Store::new(1, 10, 10);
+    let snap = s.snapshot();
+    assert_eq!(snap.registers.len(), 10);
+    assert_eq!(snap.bells.len(), 10);
+    assert_eq!(snap.bells.iter().filter(|m| m.kind == BellKind::StoreComputer).count(), 1);
     let back = Store::load_json(&s.save_json()).unwrap_or_else(|e| panic!("load failed: {e}"));
-    assert_eq!(reg(&back, 3).id, 3);
-    while s.add_register() {}
-    assert_eq!(s.snapshot().registers.len(), usize::from(janus_pos_core::store::MAX_REGISTERS));
-    assert!(!s.add_register());
+    assert_eq!(back.snapshot().registers.len(), 10);
+    let over = Store::new(1, 20, 20).snapshot();
+    assert_eq!((over.registers.len(), over.bells.len()), (10, 10));
 }
 
-/// 仕様 11.3：Bell は据え付け端末・可搬性端末を同じ種類の後ろへ一台ずつ足せ、MAX_BELLS で止まる。
-/// ストアコンピューターは足せない。足した端末はそれまでの呼び出しでは鳴らない
+/// 仕様 11.3：シミュレーターの Bell は据え付け端末・可搬性端末・ストアコンピューターの 3 台
 #[test]
-fn add_bell_by_kind_until_max() {
-    use janus_pos_core::store::{BellKind, MAX_BELLS};
-    let mut s = Store::new(1, 2, 3);
-    let ids = |s: &Store| s.snapshot().bells.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
-    assert!(!s.add_bell(BellKind::StoreComputer));
-    assert!(s.add_bell(BellKind::Fixed));
-    assert_eq!(ids(&s), ["据え付け端末", "据え付け端末2", "可搬性端末", "ストアコンピューター"]);
-    assert!(s.add_bell(BellKind::Handheld));
-    assert_eq!(ids(&s), ["据え付け端末", "据え付け端末2", "可搬性端末", "可搬性端末2", "ストアコンピューター"]);
-    assert_eq!(s.snapshot().bells.len(), usize::from(MAX_BELLS));
-    assert!(!s.add_bell(BellKind::Fixed));
-    assert!(!s.add_bell(BellKind::Handheld));
-    // 足した据え付け端末は OFF にできない、保存して読み直しても種類と名前が残る
-    assert!(run(&mut s, json!({"type":"set_bell_on","bell":1,"on":false})).is_err());
-    let back = Store::load_json(&s.save_json()).unwrap_or_else(|e| panic!("load failed: {e}"));
-    assert_eq!(ids(&back), ids(&s));
-    assert!(back.snapshot().bells.iter().all(|m| !m.buzzing));
+fn simulator_bells_are_fixed_handheld_and_store_computer() {
+    let s = Store::new(1, 2, 3);
+    let ids = s.snapshot().bells.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
+    assert_eq!(ids, ["据え付け端末", "可搬性端末", "ストアコンピューター"]);
 }
 
 /// 仕様 12：レジの画面に触れると、ほかの操作を伴わなくても無操作の時計が戻る

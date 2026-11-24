@@ -492,10 +492,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 
 
 .bells { display: flex; gap: var(--gap); flex-wrap: wrap; align-items: center; }
-/* Bell の端末は枠線を持たない（user 2026-11-24）。鳴動中・OFF・不通は背景の色だけで示す。
-   据え付け端末・可搬性端末の右隣に一台足す丸い「+」（レジの「⊕」と同じ円の消極ボタン） */
+/* Bell の端末は枠線を持たない（user 2026-11-24）。鳴動中・OFF・不通は背景の色だけで示す */
 .bell-unit { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 4px 12px; }
-.add-bell { flex: none; }
 .bell-unit .bell-icon { font-size: var(--text-lg); display: inline-block; }
 .bell-id { font-weight: 600; }
 .bell-state { font-size: var(--text-sm); color: var(--muted); }
@@ -534,12 +532,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .floor { display: grid; gap: 16px; padding-block: 16px; align-items: start; }
-/* デスクトップはすべてのレジを横一列に並べ、画面の横幅を台数で等分する（user 2026-11-21：折り返すとレジ一台すら画面に収まらず、デモにならない）。
+/* デスクトップはレジ（2 台）を横一列に並べ、画面の横幅を等分する。
    どのレジも常に二つの面を並べる。画面の W は等分した幅に合わせて縮み（下限なし）、さらにレジ全体が画面の高さに収まるよう
-   --W-max（main.ts fitRegisters）で止める。止まったときはレジの幅も二つの面の分だけにして中央に置く。
-   最後のレジのすぐ右に、レジを一台足す「⊕」（円の消極ボタン、5 台で消える、user 2026-11-22）。レジと一緒に中央に寄せる */
+   --W-max（main.ts fitRegisters）で止める。止まったときはレジの幅も二つの面の分だけにして中央に置く */
 .registers { --n: 2; display: flex; gap: 16px; align-items: start; justify-content: center; }
-.add-register { flex: none; align-self: center; }
 .register { container: reg / inline-size; flex: 1 1 0; min-width: 0; max-width: calc(2 * (var(--W-max, 512px) + 2 * var(--frame-w)) + 12px + 26px); }
 .register, .bell-area {
   background: var(--panel); border-radius: 12px; padding: 12px; min-width: 0;
@@ -879,12 +875,9 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .top { flex-wrap: wrap; row-gap: 4px; }
   .floor { padding-block: 8px; gap: 8px; }
   .floor, .bottom { padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
-  /* モバイルは縦に並べ、2 台まで（複数台運用の最低台数。3 台以上のデモは現実的でない、user 2026-11-21） */
+  /* モバイルは縦に並べる（レジはデスクトップと同じ 2 台） */
   .registers { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
   .register { max-width: none; }
-  /* モバイルは 2 台ちょうどなので「⊕」を出さない */
-  .add-register { display: none; }
-  .register:nth-child(n + 3) { display: none; }
   /* 最下段の添え字（揚げ物・中華まん など）は表示エリアが狭いので出さない。実機では出す。帯の言語・電子マネーは余裕があるので出す */
   .call-btn small { display: none; }
   .bell-area { gap: 6px 8px; padding: 8px 10px; }

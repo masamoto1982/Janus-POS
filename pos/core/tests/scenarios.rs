@@ -2735,9 +2735,10 @@ fn staff_or_customer_changes_a_line_quantity() {
     assert_eq!(v.floor.total, 150 * 3 + 320);
     ok(&mut s, set(99));
     assert!(run(&mut s, set(100)).is_err(), "over the 100-item limit");
-    assert!(run(&mut s, set(0)).is_err(), "cancel is a separate button");
     ok(&mut s, set(1));
     assert_eq!(reg(&s, 1).floor.total, 150 + 320);
+    ok(&mut s, set(0));
+    assert_eq!(reg(&s, 1).floor.total, 320, "quantity 0 removes the line");
 }
 
 /// 仕様 5.1：クーポンと明細は同じ通し番号を使う
@@ -5895,4 +5896,24 @@ fn staffed_register_with_a_held_transaction_stays_staffed() {
     hold(&mut s, 1).unwrap();
     login_as(&mut s, 2, "ST001");
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+}
+
+/// 仕様 5.1：テンキーで数量 0 を決定すると、数量の多い明細も一度で取り除く
+#[test]
+fn setting_the_quantity_to_zero_removes_the_line() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    scan(&mut s, 1, "counter", "4900000000158");
+    let id = reg(&s, 1).counter.lines[0].line.id;
+    ok(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":9}),
+    );
+    assert_eq!(reg(&s, 1).counter.lines[0].line.qty, 9);
+    let res = run(
+        &mut s,
+        json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":0}),
+    );
+    assert!(res.is_ok());
+    assert!(reg(&s, 1).counter.lines.is_empty());
 }

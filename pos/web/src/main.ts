@@ -742,7 +742,8 @@ function qtyKey(key: string, k: string): void {
   if (k === "cancel") qtyEntry.delete(key);
   else if (k === "back") e.digits = e.digits.slice(0, -1);
   else if (k === "ok") {
-    if (!e.digits || Number(e.digits) <= 0) return;
+    if (!e.digits) return;
+    // 数量 0 は明細から取り除く（取り除いたことは薄い黄色の一瞬の表示で知らせる、send の中）
     const [register, side] = key.split(":");
     send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
     qtyEntry.delete(key);
@@ -753,7 +754,8 @@ function qtyKey(key: string, k: string): void {
     const lines = side === "counter" ? r?.counter.lines ?? [] : r?.floor.lines ?? [];
     const l = lines.find((x) => x.id === e.id);
     const max = l ? lineMax(l, lines) : undefined;
-    const next = (e.digits + k).replace(/^0+/, "");
+    // 先頭の 0 は落とす（「0」だけは数量 0＝取り除く、として残す）
+    const next = (e.digits + k).replace(/^0+(?=\d)/, "");
     if (max === undefined || Number(next) <= max) e.digits = next;
   }
   frame();
@@ -784,6 +786,9 @@ function deviceFx(cmd: Command): (() => void) | null {
     el.dataset.fxTimer = String(window.setTimeout(() => el.classList.remove(cls), 1000));
   };
 }
+
+/** core QTY_ZERO_REMOVED と同じ（数量 0 で明細を取り除いた知らせの末尾） */
+const QTY_ZERO_REMOVED = "を明細から取り除きました";
 
 /** 直前の send が受け付けられなかった理由 */
 let lastError: string | undefined;
@@ -825,6 +830,8 @@ function send(cmd: Command, quiet = false): boolean {
   if (res.ok && cmd.type === "void_transaction") cancelAsk.delete(cmd.register);
   // 取り消せたら、登録済みだったことを操作した側の登録画面の中央に一瞬だけ知らせる
   if (res.ok && cmd.type === "cancel_item" && res.message) flashRejection(cmd.register, cmd.side, res.message, true);
+  // 数量 0 で明細から取り除いたら、打ち間違いに気づけるよう、受け付けなかった理由と同じ薄い黄色で一瞬知らせる（user 2026-11-25）
+  if (res.ok && cmd.type === "set_qty" && cmd.qty === 0 && res.message?.endsWith(QTY_ZERO_REMOVED)) flashRejection(cmd.register, cmd.side, res.message);
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {

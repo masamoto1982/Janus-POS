@@ -707,7 +707,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
   const l = e && r.counter.lines.find((x) => x.id === e.id);
   if (!e || !l) return "";
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-qtypad="${reg}:${side}:${key}">${label}</button>`;
-  const ok = e.digits !== "" && Number(e.digits) > 0;
+  const ok = e.digits !== "";
   return `<div class="qty-pop" data-qtypad-backdrop="${reg}:${side}">
       <div class="qty-pop-box" role="dialog" aria-label="${esc(l.name)}の数量">
         <div class="qty-pop-name">${esc(l.name)}</div>

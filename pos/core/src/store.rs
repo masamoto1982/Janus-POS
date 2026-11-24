@@ -2068,27 +2068,22 @@ impl Store {
         }
     }
 
-    /// スタッフは最後にログインしたレジにいる（仕様 12.2）。同じスタッフがログインしたままのほかのレジは、
-    /// 取引を消さずに取引ごとセルフ操作モードへ立ち戻らせ、お客様が自分で続けられるようにする。
-    /// 担当を外すので、そのレジの呼び出しにはどのスタッフも応えられる。
-    /// 立ち戻らないのは、スタッフが現金を預かっている途中（入金ボックス・電子マネーの手続き）、
-    /// 保留した取引があるとき、決済後のお渡しが残っているとき：スタッフにしかできない後始末なので 5 分の規則のまま
-    fn hand_back_others(&mut self, here: u8, staff: &str, now: u64) {
+    /// スタッフは最後にログインしたレジにいる（仕様 12.2）。同じスタッフがログインしたままのほかのレジのうち、
+    /// 取引のない有人レジはすぐセルフ操作モードに戻す（誰もいない有人レジでお客様が立ち往生しないように）。
+    /// 取引のある有人レジは、どう始まった取引でもスタッフ操作モードのまま：スタッフ操作モードが主役で、
+    /// 取引の途中でお客様に押し戻すと、現金などで呼び直されてかえってスタッフの手間が増える
+    fn release_empty_registers(&mut self, here: u8, staff: &str, now: u64) {
         for r in self.registers.iter_mut() {
             if r.id == here || r.mode != Mode::StaffOperated || !r.staff.as_ref().is_some_and(|s| s.account.id == staff) {
                 continue;
             }
-            if r.txn.inserted.total() > 0 || r.emoney.is_some() || r.on_hold.is_some() || r.handover_pending() {
+            if r.busy() || r.emoney.is_some() || r.on_hold.is_some() || r.handover_pending() {
                 continue;
             }
             r.staff = None;
             r.menu = None;
             r.owner = None;
             r.closing = false;
-            // セルフ操作モードは現金を扱わない：現金を選んだだけ（投入前）なら選び直してもらう
-            if r.txn.method == Some(PaymentMethod::Cash) {
-                r.txn.method = None;
-            }
             r.sync_mode();
             r.last_op = now;
             r.last_counter_op = now;
@@ -3857,7 +3852,7 @@ impl Store {
             ] {
                 self.calls.resolve(register, k, now);
             }
-            self.hand_back_others(register, acc.id, now);
+            self.release_empty_registers(register, acc.id, now);
             return done(match was {
                 _ if resumed => {
                     format!("{}さんがレジを再開しました（スタッフ操作モード）", acc.name)

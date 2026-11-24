@@ -23,7 +23,7 @@ mod persist;
 /// 作れるレジの台数の上限
 pub const MAX_REGISTERS: u8 = 10;
 /// 作れる Bell の台数の上限
-pub const MAX_BELLS: u8 = 5;
+pub const MAX_BELLS: u8 = 10;
 
 const FF_RECEIVED_SELF: &str =
     "お渡し済みの FF の数量はスタッフが変更します\nスタッフをお呼びください";
@@ -1884,43 +1884,6 @@ impl Register {
             emergency: None,
             emergency_log: None,
         }
-    }
-}
-
-impl Store {
-    /// レジを一台足す（シミュレーターの「⊕」、user 2026-11-22）。今の店の状態はそのまま、新しいレジは待ち受けから始まる。
-    /// MAX_REGISTERS に達していれば足さずに false
-    pub fn add_register(&mut self) -> bool {
-        let n = self.registers.len() as u8;
-        if n >= MAX_REGISTERS {
-            return false;
-        }
-        self.registers.push(Register::new(n + 1));
-        true
-    }
-
-    /// Bell の端末を一台足す（シミュレーターの「+」、user 2026-11-24）。据え付け端末・可搬性端末だけ、
-    /// 同じ種類の最後の端末の後ろに並べる。新しい端末は今までの呼び出しでは鳴らない。
-    /// ストアコンピューター、または MAX_BELLS に達していれば足さずに false
-    pub fn add_bell(&mut self, kind: BellKind) -> bool {
-        if kind == BellKind::StoreComputer || self.bells.len() >= MAX_BELLS as usize {
-            return false;
-        }
-        let nth = self.bells.iter().filter(|m| m.kind == kind).count() + 1;
-        let mut bell = Bell::new(kind, &kind.name(nth));
-        bell.received.presses = self.signal.presses;
-        bell.last_rx_at = self.now;
-        bell.last_ack_at = self.now;
-        let at = self
-            .bells
-            .iter()
-            .rposition(|m| m.kind == kind)
-            .map_or_else(
-                || self.bells.iter().position(|m| m.kind == BellKind::StoreComputer).unwrap_or(self.bells.len()),
-                |i| i + 1,
-            );
-        self.bells.insert(at, bell);
-        true
     }
 }
 

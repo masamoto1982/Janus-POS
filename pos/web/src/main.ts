@@ -125,14 +125,12 @@ function save(): void {
   }
 }
 
-/** レジの台数（シミュレーターの設定）。複数台運用は最大 5 台（user 2026-11-20）。
- *  2 台で起動し、デスクトップは最後のレジの横の「⊕」で一台ずつ足す（user 2026-11-22：ヘッダーのセレクタで指定する形から変更）。
- *  足しても店の状態はそのまま。減らすには「初期化」で 2 台からやり直す。
- *  2 台から始めるのは、1 台では呼び出しの通知が発生したレジにだけ出ることや、チケットの取引が僅差で重なるケースのデモができないため（user 2026-11-21）。
- *  モバイルは 2 台ちょうどで「⊕」を出さない（3 台以上のデモは現実的でない、user 2026-11-20） */
-const DEFAULT_REGISTERS = 2;
-const MAX_REGISTERS = 5;
-const minRegisters = (): number => 2;
+/** シミュレーターの機器の台数は固定（user 2026-11-24：台数を増やせてもデモ性は変わらない）。
+ *  デスクトップ・モバイルともレジ 2 台、Bell は据え付け端末・可搬性端末・ストアコンピューターの 3 台。
+ *  レジを 2 台にするのは、1 台では呼び出しの通知が発生したレジにだけ出ることや、チケットの取引が僅差で重なるケースのデモができないため（user 2026-11-21）。
+ *  実機のソリューションはレジ 10 台・Bell 10 台まで（core MAX_REGISTERS・MAX_BELLS） */
+const REGISTERS = 2;
+const BELLS = 3;
 
 /** デスクトップは、レジ全体（見出し・画面・入出金ボックス）が画面の高さに収まるよう、レジ画面の W の上限 --W-max を決める。
  *  画面の高さは W×√2（styles.css）。画面より上（見出し）と下（入出金ボックス）の高さは W によらないので、いまの配置から測る。
@@ -163,24 +161,19 @@ function forget(): void {
 
 function start(): void {
   let restored = restore();
-  // 最低台数に足りない保存状態（以前の 1 台）は捨てて、既定の台数で作り直す
-  if (restored && (JSON.parse(restored.snapshot()) as Snapshot).registers.length < minRegisters()) {
+  // 台数の違う保存状態（以前の「+」で足した店など）は捨てて、決まった台数で作り直す
+  const saved = restored && (JSON.parse(restored.snapshot()) as Snapshot);
+  if (saved && (saved.registers.length !== REGISTERS || saved.bells.length !== BELLS)) {
     forget();
     restored = null;
   }
-  sim = restored ?? new PosSimulator(Date.now() & 0xffff, DEFAULT_REGISTERS, 3);
+  sim = restored ?? new PosSimulator(Date.now() & 0xffff, REGISTERS, BELLS);
   snap = JSON.parse(sim.snapshot()) as Snapshot;
   t0 = performance.now() - snap.now;
   buildSkeleton();
   fitRegisters();
   window.addEventListener("resize", fitRegisters);
   fitForms(app);
-  // 「⊕」でレジを一台足す。今の状態を保存して読み直す（足したレジの分の骨組みを作り直す）
-  app.querySelector("[data-add-register]")?.addEventListener("click", () => {
-    if (!sim.add_register()) return;
-    save();
-    location.reload();
-  });
   // レジの画面に触れたら、ほかのコマンドを伴わない操作（Page 送り・FF のタブ・テンキーの打鍵など）でも無操作の時計を戻す
   // （user 2026-11-23：操作しているあいだにカウントダウンが進むのはおかしい）。理由を画面に出す操作ではないので send を通さない
   const touchRegister = (e: Event): void => {
@@ -284,11 +277,7 @@ function buildSkeleton(): void {
           <div class="bells" data-region="bells"></div>
           <div class="toast" id="toast-store"></div>
         </section>
-        <div class="registers" style="--n: ${snap.registers.length}">${regs}${
-          snap.registers.length < MAX_REGISTERS
-            ? `<button type="button" class="icon-btn add-register" data-add-register aria-label="レジを1台足す" title="レジを1台足す">+</button>`
-            : ""
-        }</div>
+        <div class="registers" style="--n: ${snap.registers.length}">${regs}</div>
     </article>
     <footer class="bottom">
       <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>
@@ -1104,15 +1093,6 @@ app.addEventListener("click", (e) => {
     }
     rulesDlg().showModal();
     return fitForms(rulesDlg());
-  }
-  // Bell の「+」：据え付け端末・可搬性端末を一台足す（user 2026-11-24）。Bell の欄は毎回描き直すので読み直しは要らない
-  if (b.dataset.addBell) {
-    if (sim.add_bell(b.dataset.addBell)) {
-      snap = JSON.parse(sim.snapshot()) as Snapshot;
-      save();
-      render();
-    }
-    return;
   }
   if (b.hasAttribute("data-owner-submit")) return verifyOwner();
   if (b.dataset.rpadopen !== undefined) {

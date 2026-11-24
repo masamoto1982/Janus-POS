@@ -1913,24 +1913,13 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
 
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
 
-/** Bell の端末の上限（core MAX_BELLS）。据え付け端末・可搬性端末の「+」はここで消える */
-const MAX_BELLS = 5;
-const ADD_BELL_LABEL = { fixed: "据え付け端末を1台足す", handheld: "可搬性端末を1台足す", store_computer: "" } as const;
-
-/** storeExtra：ストアコンピューターの端末の中に足す部品（設定の歯車＝ストアコンピューターから使う機能、user 2026-11-24）。
- *  据え付け端末・可搬性端末は、その種類の最後の端末のすぐ右に一台足す丸い「+」（user 2026-11-24、ストアコンピューターは足せない） */
+/** storeExtra：ストアコンピューターの端末の中に足す部品（設定の歯車＝ストアコンピューターから使う機能、user 2026-11-24） */
 export function bellPanel(s: Snapshot, storeExtra = ""): string {
-  const canAdd = s.bells.length < MAX_BELLS;
   return s.bells
-    .map((m, i) => {
+    .map((m) => {
       // 呼び鈴機能が OFF、または不通の端末は鳴らない＝操作不可の部品と同じグレーアウト
-      // 「+」は歯車と同じく端末の中、名前のすぐ右に置く（離すとどの端末を足すのか曖昧になる）
-      const last = m.kind !== "store_computer" && s.bells[i + 1]?.kind !== m.kind;
-      const add = canAdd && last
-        ? `<button type="button" class="icon-btn add-bell" data-add-bell="${m.kind}" aria-label="${ADD_BELL_LABEL[m.kind]}" title="${ADD_BELL_LABEL[m.kind]}">+</button>`
-        : "";
       return `<div class="bell-unit ${m.buzzing ? "buzz" : ""} ${m.bell_on && !m.offline ? "" : "off"}">
-        <span class="bell-icon">${BELL_ICON[m.kind]}</span><span class="bell-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="bell-state">呼び鈴OFF</span>` : m.offline ? `<span class="bell-state">不通</span>` : m.buzzing ? `<span class="bell-state">鳴動中</span>` : ""}${m.kind === "store_computer" ? storeExtra : add}
+        <span class="bell-icon">${BELL_ICON[m.kind]}</span><span class="bell-id">${esc(m.id)}</span>${!m.bell_on ? `<span class="bell-state">呼び鈴OFF</span>` : m.offline ? `<span class="bell-state">不通</span>` : m.buzzing ? `<span class="bell-state">鳴動中</span>` : ""}${m.kind === "store_computer" ? storeExtra : ""}
       </div>`;
     })
     .join("");

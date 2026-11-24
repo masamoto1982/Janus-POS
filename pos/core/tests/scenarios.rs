@@ -5910,9 +5910,10 @@ fn setting_the_quantity_to_zero_removes_the_line() {
         json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":9}),
     );
     assert_eq!(reg(&s, 1).counter.lines[0].line.qty, 9);
-    ok(
+    let res = run(
         &mut s,
         json!({"type":"set_qty","register":1,"side":"counter","line_id":id,"qty":0}),
     );
+    assert!(res.is_ok());
     assert!(reg(&s, 1).counter.lines.is_empty());
 }

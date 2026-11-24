@@ -133,7 +133,6 @@ const DICT: Record<string, string> = {
   "同じお届け先の荷物：取り扱いサイズを決定してください": "Parcel to the same address: decide the size",
   "ポイント：未読取": "Points: not read",
   新しい数量: "New quantity",
-  取り除く: "Remove",
 
   // FF
   フライヤー: "Fryer",
@@ -722,7 +721,7 @@ const RULES: Rule[] = [
   [/^数量 (\d+)、押すとテンキーで数量を入力$/, (m) => `Quantity ${m[1]}, press to enter with the keypad`],
   [/^(.+)（押すとテンキーで入力）$/, (m) => `${t(m[1])} (press to use the keypad)`],
   [/^いまの数量 (\d+)$/, (m) => `Current ${m[1]}`],
-  [/^(.+)を明細から取り除きます$/, (m) => `Remove ${t(m[1])} from the list`],
+  [/^(.+)を明細から取り除きました$/, (m) => `${t(m[1])} removed from the list`],
   [/^入金済み (.+)$/, (m) => `Inserted ${yenify(m[1])}`],
   [/^お釣り (.+) をお返ししてください$/, (m) => `Return ${yenify(m[1])} in change`],
   [/^お釣り (.+) と$/, (m) => `Please take your change of ${yenify(m[1])}`],

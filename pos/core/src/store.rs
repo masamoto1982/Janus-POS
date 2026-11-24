@@ -54,6 +54,8 @@ const CANCEL_STAFF_ONLY: &str = "商品の取り消しはスタッフ操作モ�
 const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引を取り消してください";
 const PARCEL_SLIP_TO_REMOVE: &str =
     "宅配便を取り消すときは、取り消す荷物の伝票のバーコードを読み取ってください";
+/// 数量 0 で明細を取り除いた知らせ（品名のあと）。web はこれを薄い黄色の一瞬の表示で出す
+pub const QTY_ZERO_REMOVED: &str = "を明細から取り除きました";
 const BILL_NO_REMOVE: &str =
     "公共料金の払込票は取り消せません\nお支払いをやめるときは取引を取り消してください";
 const NO_POINTS: &str =
@@ -3678,13 +3680,31 @@ impl Store {
         qty: u32,
     ) -> Result<Outcome, String> {
         self.check(register, side, Action::RemoveLine)?;
-        // 仕様 5.1：数量 0 は明細から取り除く（「削除」と同じ。お渡し済み FF の回収の案内もそちらで出る）
+        // 仕様 5.1：数量 0 は明細から取り除く（「削除」と同じ。お渡し済み FF は回収の案内が出るので、そちらを優先する）
         if qty == 0 {
-            return self.apply(Command::RemoveLine {
+            let r = self.reg(register).ok_or("レジがありません")?;
+            let l = r
+                .txn
+                .lines
+                .iter()
+                .find(|l| l.id == line_id)
+                .ok_or("明細が見つかりません")?;
+            let (name, received) = (
+                l.name,
+                l.kind
+                    == LineKind::Ff {
+                        state: FfState::Received,
+                    },
+            );
+            let res = self.apply(Command::RemoveLine {
                 register,
                 side,
                 line_id,
-            });
+            })?;
+            if received {
+                return Ok(res);
+            }
+            return done(format!("{name}{QTY_ZERO_REMOVED}"));
         }
         let r = self.reg(register).ok_or("レジがありません")?;
         let l = r

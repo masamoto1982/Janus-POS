@@ -676,8 +676,7 @@ const qtyHead = (lines: { tickets: number }[]): string => (lines.some((l) => l.t
 
 const isBill = (l: { kind: string; done?: boolean; cash_only: boolean }): boolean => l.kind === "service" && !!l.done && l.cash_only;
 
-/** confirm：数量 0 の決定を受けて、明細から取り除く前に薄い黄色のアラートで確かめているところ（ミスタイプ防止、user 2026-11-24） */
-export const qtyEntry = new Map<string, { id: number; digits: string; confirm?: boolean }>();
+export const qtyEntry = new Map<string, { id: number; digits: string }>();
 
 /** 日配食品は数量を増やせない。同じ商品でも一点ずつ販売期限が違うので、一つを読んで数量を増やすと
  *  期限切れの品がお客様に渡ってしまう（ポカヨケ）。続けて読んでも一点ずつ別の行になるので、
@@ -708,15 +707,6 @@ export function qtyPopup(r: RegisterView, side: Side): string {
   const l = e && r.counter.lines.find((x) => x.id === e.id);
   if (!e || !l) return "";
   const k = (key: string, label = key, cls = "pad-key") => `<button type="button" class="${cls}" data-qtypad="${reg}:${side}:${key}">${label}</button>`;
-  // 数量 0＝明細から取り除く。打ち間違いで消えないよう、テンキーを薄い黄色のアラートに替えてもう一度確かめる
-  if (e.confirm)
-    return `<div class="qty-pop" data-qtypad-backdrop="${reg}:${side}">
-      <div class="qty-pop-box qty-zero" role="alertdialog" aria-label="${esc(l.name)}を明細から取り除きます">
-        <div class="qty-pop-name">${esc(l.name)}を明細から取り除きます</div>
-        <div class="qty-pop-note">いまの数量 ${l.qty}</div>
-        <div class="qty-pop-keys">${k("cancel", "バック", "pad-key pad-fn ghost back-btn")}${PAD_GAP}${k("ok", "取り除く", "pad-key pad-fn primary")}</div>
-      </div>
-    </div>`;
   const ok = e.digits !== "";
   return `<div class="qty-pop" data-qtypad-backdrop="${reg}:${side}">
       <div class="qty-pop-box" role="dialog" aria-label="${esc(l.name)}の数量">

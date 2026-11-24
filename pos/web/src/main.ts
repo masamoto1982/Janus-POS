@@ -739,30 +739,14 @@ function padKey(key: string, k: string): void {
 function qtyKey(key: string, k: string): void {
   const e = qtyEntry.get(key);
   if (!e) return;
-  if (e.confirm) {
-    // 数量 0 のアラート：バック（Esc・外側）はテンキーに戻って打ち直す、取り除く（Enter）で明細から取り除く
-    if (k === "cancel") {
-      e.confirm = false;
-      e.digits = "";
-    } else if (k === "ok") {
-      const [register, side] = key.split(":");
-      send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: 0 });
-      qtyEntry.delete(key);
-    }
-    frame();
-    return;
-  }
   if (k === "cancel") qtyEntry.delete(key);
   else if (k === "back") e.digits = e.digits.slice(0, -1);
   else if (k === "ok") {
     if (!e.digits) return;
-    // 数量 0 は明細から取り除く。すぐには送らず、薄い黄色のアラートで確かめる
-    if (Number(e.digits) === 0) e.confirm = true;
-    else {
-      const [register, side] = key.split(":");
-      send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
-      qtyEntry.delete(key);
-    }
+    // 数量 0 は明細から取り除く（取り除いたことは薄い黄色の一瞬の表示で知らせる、send の中）
+    const [register, side] = key.split(":");
+    send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
+    qtyEntry.delete(key);
   } else if (/^[0-9]$/.test(k) && e.digits.length < 2) {
     // 販売個数の上限を超える数はテンキーでも打てない
     const [register, side] = key.split(":");
@@ -802,6 +786,9 @@ function deviceFx(cmd: Command): (() => void) | null {
     el.dataset.fxTimer = String(window.setTimeout(() => el.classList.remove(cls), 1000));
   };
 }
+
+/** core QTY_ZERO_REMOVED と同じ（数量 0 で明細を取り除いた知らせの末尾） */
+const QTY_ZERO_REMOVED = "を明細から取り除きました";
 
 /** 直前の send が受け付けられなかった理由 */
 let lastError: string | undefined;
@@ -843,6 +830,8 @@ function send(cmd: Command, quiet = false): boolean {
   if (res.ok && cmd.type === "void_transaction") cancelAsk.delete(cmd.register);
   // 取り消せたら、登録済みだったことを操作した側の登録画面の中央に一瞬だけ知らせる
   if (res.ok && cmd.type === "cancel_item" && res.message) flashRejection(cmd.register, cmd.side, res.message, true);
+  // 数量 0 で明細から取り除いたら、打ち間違いに気づけるよう、受け付けなかった理由と同じ薄い黄色で一瞬知らせる（user 2026-11-25）
+  if (res.ok && cmd.type === "set_qty" && cmd.qty === 0 && res.message?.endsWith(QTY_ZERO_REMOVED)) flashRejection(cmd.register, cmd.side, res.message);
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {

@@ -1669,7 +1669,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const a = (n: Action) => find(r.floor.actions, n);
     const callBtn = (main: string, sub: string, cmd: Command, st: Gate, cls: string) =>
       `<button class="call-btn ${cls}" data-hold="${esc(JSON.stringify(cmd))}"${st.allowed ? "" : ` disabled title="${esc(st.reason ?? "")}"`}><b>${esc(main)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
-    // 販売規則の FF タブ表示で「両側」にしたタブがあるときは、「FF」を押すと最下段にレジカウンター側と同じすべての FF タブを開く（user 2026-11-20）。
+    // 設定の FF タブ表示で「両側」にしたタブがあるときは、「FF」を押すと最下段にレジカウンター側と同じすべての FF タブを開く（user 2026-11-20）。
     // 「両側」のタブはお客様が登録でき、それ以外のタブに触れるとスタッフの呼び出し（「FF」の呼び出しと同じ）。
     // 開いているあいだ、「金券」「たばこ」「その他」は最下段の上の段（ffOpenFoot）。取引が終わると四つのボタンに戻る
     const floorTabs = new Set(snap.ff_tabs.filter((t) => t.display === "both").map((t) => t.tab as string));
@@ -1913,7 +1913,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
 
 const BELL_ICON = { fixed: "🔔", handheld: "📱", store_computer: "🖥️" } as const;
 
-/** storeExtra：ストアコンピューターの端末の中に足す部品（販売規則の設定の歯車＝ストアコンピューターから使う機能、user 2026-11-24） */
+/** storeExtra：ストアコンピューターの端末の中に足す部品（設定の歯車＝ストアコンピューターから使う機能、user 2026-11-24） */
 export function bellPanel(s: Snapshot, storeExtra = ""): string {
   return s.bells
     .map(
@@ -1952,7 +1952,7 @@ function limitSelect(p: Snapshot["catalog"][number]): string {
   return `<select data-limit="${esc(p.code)}" aria-label="${esc(p.name)}の販売個数の上限">${opts}</select>`;
 }
 
-/** 販売規則の設定のテンキー（user 2026-11-20）：レジ画面と同じテンキーを、数を打つ欄（オーナーの番号・パスワード・税率・登録番号）にだけ付ける。
+/** 設定のテンキー（user 2026-11-20）：レジ画面と同じテンキーを、数を打つ欄（オーナーの番号・パスワード・税率・登録番号）にだけ付ける。
  *  区分名のような文字の欄・プルダウンには付けない */
 export type RulesPadTarget = "oid" | "opw" | "rate" | "newrate" | "inv";
 export type RulesPadEntry = { target: RulesPadTarget; id?: string; digits: string; error?: string };
@@ -2006,7 +2006,7 @@ export function rulesPadPopup(s: Snapshot): string {
 
 /** オーナー認証：従業員番号とパスワードをテンキーで打ち、「認証」で送る（欄が二つなので、テンキーの決定は欄を埋めるだけ） */
 export function ownerAuthForm(): string {
-  return `<p class="muted">販売規則を変えられるのはオーナーだけです<br>オーナーの従業員番号とパスワードを入れてください<br>閉じると認証は解除されます</p>
+  return `<p class="muted">設定を変えられるのはオーナーだけです<br>オーナーの従業員番号とパスワードを入れてください<br>閉じると認証は解除されます</p>
     <div class="field-row">
       <span class="field-label">従業員番号${rulesPadField("oid", rulesValue.get("oid") ?? "000", "例 000", "オーナーの従業員番号")}</span>
       <span class="field-label">パスワード${rulesPadField("opw", rulesValue.get("opw") ?? "", "", "オーナーのパスワード")}</span>
@@ -2033,7 +2033,7 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
     label: "FFタブ表示",
     note: "FFのタブごとに、どちらの画面に出すかを決めます<br>「両側」にしたタブは、セルフ操作モードの売り場側の最下段に出て、お客様がご自分で登録できます<br>コーヒーなど作り置きのない品はお客様がご自分でお取りになり、揚げ物など作り置きの品はスタッフがお渡しします",
   },
-  // Bell の鳴動は独立した「Bell の設定」から販売規則の設定のタブに移した（user 2026-11-24）
+  // Bell の鳴動は独立した「Bell の設定」から設定のタブに移した（user 2026-11-24）
   {
     id: "bell",
     label: "Bellの鳴動",
@@ -2182,9 +2182,9 @@ const PURPOSE: Record<string, string> = {
   "4900000000035": "引換券（1個無料）の対象商品、クーポンの読み取りと引き換えを試す",
   "4900000000103": "法令による年齢確認（20歳）、標準税率10%なので、食品と一緒に買うと税率ごとの内税表示も確かめられる",
   "4900000000080": "販売期限が切れた日配食品、期限切れの商品を登録したときの警告と取り替えを試す",
-  "4900000000073": "規則のない軽減税率8%の加工食品、数量の変更や販売規則の個数制限を試す",
+  "4900000000073": "規則のない軽減税率8%の加工食品、数量の変更や設定の個数制限を試す",
   "4910000000014": "店頭で買う新聞は軽減税率の対象外（標準税率10%）、税区分の違いを確かめる",
-  "4910000000038": "標準税率10%の非食品、販売規則で店舗独自の年齢確認を付けるなどの設定を試す",
+  "4910000000038": "標準税率10%の非食品、設定で店舗独自の年齢確認を付けるなどの設定を試す",
   "4900000000127": "法令による年齢確認（20歳）、スタッフがログインしているレジでのみ扱える",
   "4900000000158": "コンビニでは高額な品、まとめ買いで税抜5万円を超え、レシートの収入印紙の確認を再現する",
   "4910000000076": "年齢確認（18歳）、20歳の年齢確認を済ませたあとに登録すると、18歳の確認をやり直すことを確かめる",

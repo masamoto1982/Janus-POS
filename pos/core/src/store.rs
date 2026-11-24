@@ -484,20 +484,20 @@ pub enum Command {
     TakeOutlet { register: u8 },
     /// その側の画面が操作できるか確かめる（操作側でなければ理由を返す。状態は変えない）
     Claim { register: u8, side: Side },
-    /// 販売規則：分類単位の年確ルールを足す（オーナー）
+    /// 設定：分類単位の年確ルールを足す（オーナー）
     AddAgeRule {
         owner_id: String,
         password: String,
         target: RuleTarget,
         min_age: u8,
     },
-    /// 販売規則：年確ルールを外す（オーナー）
+    /// 設定：年確ルールを外す（オーナー）
     RemoveAgeRule {
         owner_id: String,
         password: String,
         rule_id: u32,
     },
-    /// 販売規則：商品ごとの年確の年齢を決める（オーナー）
+    /// 設定：商品ごとの年確の年齢を決める（オーナー）
     SetProductAge {
         owner_id: String,
         password: String,
@@ -505,7 +505,7 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         min_age: Option<u8>,
     },
-    /// 販売規則：商品ごとの販売個数の上限を決める（オーナー）
+    /// 設定：商品ごとの販売個数の上限を決める（オーナー）
     SetSaleLimit {
         owner_id: String,
         password: String,
@@ -513,23 +513,23 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         limit: Option<u32>,
     },
-    /// 販売規則：FF タブをどちらの画面に出すか（オーナー）
+    /// 設定：FF タブをどちらの画面に出すか（オーナー）
     SetFfTabDisplay {
         owner_id: String,
         password: String,
         tab: FfTab,
         display: FfTabDisplay,
     },
-    /// 販売規則の設定を開くときのオーナー認証
+    /// 設定を開くときのオーナー認証
     VerifyOwner { owner_id: String, password: String },
-    /// 販売規則：税区分の税率を変える（オーナー）
+    /// 設定：税区分の税率を変える（オーナー）
     SetTaxRate {
         owner_id: String,
         password: String,
         class_id: String,
         rate_bp: u32,
     },
-    /// 販売規則：税区分を足す（オーナー）
+    /// 設定：税区分を足す（オーナー）
     AddTaxClass {
         owner_id: String,
         password: String,
@@ -537,14 +537,14 @@ pub enum Command {
         kind: TaxKind,
         rate_bp: u32,
     },
-    /// 販売規則：商品の税区分を付け替える（オーナー）
+    /// 設定：商品の税区分を付け替える（オーナー）
     SetProductTax {
         owner_id: String,
         password: String,
         code: String,
         class_id: String,
     },
-    /// 販売規則：インボイスの登録番号と端数処理（オーナー）
+    /// 設定：インボイスの登録番号と端数処理（オーナー）
     SetInvoice {
         owner_id: String,
         password: String,
@@ -5498,7 +5498,7 @@ pub struct FfMenuItem {
     pub tab_label: &'static str,
 }
 
-/// FF タブ表示の設定（販売規則）
+/// FF タブ表示の設定
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct FfTabView {

@@ -90,7 +90,7 @@ button { touch-action: manipulation; }
 @property --W { syntax: "<length>"; inherits: true; initial-value: 400px; }
 /* 最小間隔も長さとして登録する：law.ts が getComputedStyle で px の値として読むため（登録しないと calc の式のまま返り、8px で計算していた） */
 @property --gap { syntax: "<length>"; inherits: true; initial-value: 6px; }
-/* 販売規則の設定のダイアログも同じ段を持つ：入力フォームとテンキーをレジ画面の中と同じ形・大きさにする（user 2026-11-20）。W は 400px に固定 */
+/* 設定のダイアログも同じ段を持つ：入力フォームとテンキーをレジ画面の中と同じ形・大きさにする（user 2026-11-20）。W は 400px に固定 */
 .screen, #rules-dlg {
   --W: min(100cqi - 2 * var(--frame-w), 512px, var(--W-max, 512px));
   /* 白銀比の階段 --sN＝W÷√2ⁿ（W=400 で s11≒8.8・s13≒4.4・s15≒2.2・s17≒1.1）。レジ画面の中の大きさはすべてこの段から選ぶ。
@@ -673,7 +673,7 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 /* シミュレーターまわりのセレクタは一行のボタンと同じ高さ（--chrome-b）。文字・幅は law.ts fitForms */
 .login-sel select { height: var(--chrome-b); filter: url(#ramp); }
 
-/* 販売規則の設定の歯車は Bell のストアコンピューターのすぐ右（user 2026-11-24：以前はピッカーの Item の見出しの横） */
+/* 設定の歯車は Bell のストアコンピューターのすぐ右（user 2026-11-24：以前はピッカーの Item の見出しの横） */
 .rules-open { flex: none; }
 .rules-dlg { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--border); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 16px; }
 .rules-dlg::backdrop { background: color-mix(in oklch, var(--black) 45%, transparent); }
@@ -687,7 +687,11 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .icon-btn:hover { color: var(--ink); }
 .rules-dlg :is(h3, h4) { font-size: var(--text-lg); margin: 14px 0 6px; }
 .rules-dlg .rules-tabs { margin-top: 12px; }
-/* 販売規則の設定の入力フォーム・セレクタはレジ画面の中と同じ仕組み（user 2026-11-20）：角丸なし・背景なし・操作の青の枠、
+/* 設定のタブは五つあり、モバイルの狭い幅では均等割りだと長い名前（FFタブ表示・Bellの鳴動）がはみ出して重なった。
+   幅は均等を基本に、名前が収まらないタブだけ名前なりに広げる。左右の余白は FF のタブと同じく詰め、モバイルはタブの間隔を半分にする（幅 320px まで収まる） */
+.rules-dlg .rules-tabs button.tab { min-width: max-content; padding-inline: var(--s15); }
+@media (max-width: 760px) { .rules-dlg .rules-tabs { gap: var(--s13); } }
+/* 設定の入力フォーム・セレクタはレジ画面の中と同じ仕組み（user 2026-11-20）：角丸なし・背景なし・操作の青の枠、
    高さはダイアログの一行のボタンと同じ小（W/16）、文字・幅は law.ts fitForms。数を打つ欄は押すとレジ画面と同じテンキーが開く。
    青はレジ画面と同じく濃いグレーを青のランプ（#ramp）に通して出す */
 #rules-dlg :is(button.pad-field, select, input:not([type="checkbox"])) { height: var(--btn-md-h); vertical-align: middle; filter: url(#ramp); }

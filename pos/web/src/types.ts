@@ -141,7 +141,7 @@ export type FfTab = "fried" | "drink" | "cold" | "bun" | "oden";
 export type FfTabDisplay = "counter" | "both";
 
 /**
- * FF タブ表示の設定（販売規則）
+ * FF タブ表示の設定
  */
 export type FfTabView = { tab: FfTab, label: string, display: FfTabDisplay, };
 

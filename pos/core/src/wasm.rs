@@ -29,6 +29,16 @@ impl PosSimulator {
         self.store.add_register()
     }
 
+    /// Bell の端末を一台足す（"fixed" か "handheld"）。足せたら true
+    pub fn add_bell(&mut self, kind: &str) -> bool {
+        let kind = match kind {
+            "fixed" => crate::store::BellKind::Fixed,
+            "handheld" => crate::store::BellKind::Handheld,
+            _ => return false,
+        };
+        self.store.add_bell(kind)
+    }
+
     pub fn save(&self) -> String {
         self.store.save_json()
     }

@@ -1105,6 +1105,15 @@ app.addEventListener("click", (e) => {
     rulesDlg().showModal();
     return fitForms(rulesDlg());
   }
+  // Bell の「+」：据え付け端末・可搬性端末を一台足す（user 2026-11-24）。Bell の欄は毎回描き直すので読み直しは要らない
+  if (b.dataset.addBell) {
+    if (sim.add_bell(b.dataset.addBell)) {
+      snap = JSON.parse(sim.snapshot()) as Snapshot;
+      save();
+      render();
+    }
+    return;
+  }
   if (b.hasAttribute("data-owner-submit")) return verifyOwner();
   if (b.dataset.rpadopen !== undefined) {
     const [target, id] = b.dataset.rpadopen.split(":") as [RulesPadTarget, string];

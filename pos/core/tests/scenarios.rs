@@ -5812,6 +5812,28 @@ fn add_register_keeps_state_and_stops_at_max() {
     assert!(!s.add_register());
 }
 
+/// 仕様 11.3：Bell は据え付け端末・可搬性端末を同じ種類の後ろへ一台ずつ足せ、MAX_BELLS で止まる。
+/// ストアコンピューターは足せない。足した端末はそれまでの呼び出しでは鳴らない
+#[test]
+fn add_bell_by_kind_until_max() {
+    use janus_pos_core::store::{BellKind, MAX_BELLS};
+    let mut s = Store::new(1, 2, 3);
+    let ids = |s: &Store| s.snapshot().bells.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
+    assert!(!s.add_bell(BellKind::StoreComputer));
+    assert!(s.add_bell(BellKind::Fixed));
+    assert_eq!(ids(&s), ["据え付け端末", "据え付け端末2", "可搬性端末", "ストアコンピューター"]);
+    assert!(s.add_bell(BellKind::Handheld));
+    assert_eq!(ids(&s), ["据え付け端末", "据え付け端末2", "可搬性端末", "可搬性端末2", "ストアコンピューター"]);
+    assert_eq!(s.snapshot().bells.len(), usize::from(MAX_BELLS));
+    assert!(!s.add_bell(BellKind::Fixed));
+    assert!(!s.add_bell(BellKind::Handheld));
+    // 足した据え付け端末は OFF にできない、保存して読み直しても種類と名前が残る
+    assert!(run(&mut s, json!({"type":"set_bell_on","bell":1,"on":false})).is_err());
+    let back = Store::load_json(&s.save_json()).unwrap_or_else(|e| panic!("load failed: {e}"));
+    assert_eq!(ids(&back), ids(&s));
+    assert!(back.snapshot().bells.iter().all(|m| !m.buzzing));
+}
+
 /// 仕様 12：レジの画面に触れると、ほかの操作を伴わなくても無操作の時計が戻る
 #[test]
 fn touching_the_screen_restarts_the_idle_countdown() {

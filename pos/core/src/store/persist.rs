@@ -3,13 +3,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    bell_name, AgeMethod, OnHold, AuditEntry, EmoneyTask, Line, LineKind, Menu, Passed, Receipt,
+    AgeMethod, OnHold, AuditEntry, EmoneyTask, Line, LineKind, Menu, Passed, Receipt,
     ReceiptStamp, Register, StaffSession, Store, TicketRow, Txn,
 };
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
 use crate::auth::{self, Authenticator, Guard};
 use crate::authority::{Mode, PaymentMethod, Side};
-use crate::bell::{Bell, BellSignal, Packet};
+use crate::bell::{Bell, BellKind, BellSignal, Packet};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{Cash, Drawer};
 use crate::catalog::{self, FfTab, COUPONS};
@@ -18,7 +18,7 @@ use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
 
 /// 保存の形式。既定の販売規則（年齢制限・個数制限）や商品を変えたら上げ、古い保存を捨てて新しい既定値で始める
-pub const SCHEMA: u32 = 5;
+pub const SCHEMA: u32 = 6;
 
 fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
@@ -57,6 +57,8 @@ struct Saved {
 
 #[derive(Serialize, Deserialize)]
 struct SavedBell {
+    kind: BellKind,
+    id: String,
     received: BellSignal,
     acked_seq: u64,
     last_rx_at: u64,
@@ -585,6 +587,8 @@ impl Store {
                 .bells
                 .iter()
                 .map(|m| SavedBell {
+                    kind: m.kind,
+                    id: m.id.clone(),
                     received: m.received,
                     acked_seq: m.acked_seq,
                     last_rx_at: m.last_rx_at,
@@ -690,9 +694,8 @@ impl Store {
         let bells = s
             .bells
             .iter()
-            .enumerate()
-            .map(|(i, m)| {
-                let mut bell = Bell::new(&bell_name(i as u8));
+            .map(|m| {
+                let mut bell = Bell::new(m.kind, &m.id);
                 bell.received = m.received;
                 bell.acked_seq = m.acked_seq;
                 bell.last_rx_at = m.last_rx_at;

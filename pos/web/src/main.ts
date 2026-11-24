@@ -739,13 +739,30 @@ function padKey(key: string, k: string): void {
 function qtyKey(key: string, k: string): void {
   const e = qtyEntry.get(key);
   if (!e) return;
+  if (e.confirm) {
+    // 数量 0 のアラート：バック（Esc・外側）はテンキーに戻って打ち直す、取り除く（Enter）で明細から取り除く
+    if (k === "cancel") {
+      e.confirm = false;
+      e.digits = "";
+    } else if (k === "ok") {
+      const [register, side] = key.split(":");
+      send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: 0 });
+      qtyEntry.delete(key);
+    }
+    frame();
+    return;
+  }
   if (k === "cancel") qtyEntry.delete(key);
   else if (k === "back") e.digits = e.digits.slice(0, -1);
   else if (k === "ok") {
-    if (!e.digits || Number(e.digits) <= 0) return;
-    const [register, side] = key.split(":");
-    send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
-    qtyEntry.delete(key);
+    if (!e.digits) return;
+    // 数量 0 は明細から取り除く。すぐには送らず、薄い黄色のアラートで確かめる
+    if (Number(e.digits) === 0) e.confirm = true;
+    else {
+      const [register, side] = key.split(":");
+      send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
+      qtyEntry.delete(key);
+    }
   } else if (/^[0-9]$/.test(k) && e.digits.length < 2) {
     // 販売個数の上限を超える数はテンキーでも打てない
     const [register, side] = key.split(":");
@@ -753,7 +770,8 @@ function qtyKey(key: string, k: string): void {
     const lines = side === "counter" ? r?.counter.lines ?? [] : r?.floor.lines ?? [];
     const l = lines.find((x) => x.id === e.id);
     const max = l ? lineMax(l, lines) : undefined;
-    const next = (e.digits + k).replace(/^0+/, "");
+    // 先頭の 0 は落とす（「0」だけは数量 0＝取り除く、として残す）
+    const next = (e.digits + k).replace(/^0+(?=\d)/, "");
     if (max === undefined || Number(next) <= max) e.digits = next;
   }
   frame();

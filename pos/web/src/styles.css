@@ -839,6 +839,10 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .qty-pop-note { text-align: center; font-size: var(--text-sm); }
 .qty-pop-value { border: var(--s16, 1.5px) solid var(--msg-strong); border-radius: 0; padding: var(--s15, 2px) var(--s11, 8px); text-align: center; font-size: var(--text-lg); font-weight: 700; min-height: 1.5em; color: var(--msg-strong); }
 .qty-pop-value .muted { font-size: var(--text-sm); font-weight: 400; }
+/* 数量 0 のアラート：明細から取り除く前の確かめ。背景は注意喚起の薄い黄色、大テキストは赤褐色、添え書きはオレンジ（釣り銭の警告と同じ組み） */
+.qty-pop-box.qty-zero { background: var(--alert-bg); }
+.qty-zero .qty-pop-name { color: var(--alert-ink); }
+.qty-zero .qty-pop-note { color: var(--alert-note); }
 .qty-pop .pad-error { color: var(--alert-ink); font-size: var(--text-sm); line-height: 1.4; }
 /* テンキーのキーは大の白銀比を 3 列に（user 2026-11-17）。下のバック・決定は小ボタン（白銀比の 2 倍） */
 .qty-pop-keys { display: grid; grid-template-columns: repeat(3, var(--btn-w)); gap: var(--gap); justify-content: center; flex: 1 1 auto; min-height: 0; }

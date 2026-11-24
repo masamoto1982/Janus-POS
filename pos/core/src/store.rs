@@ -3678,8 +3678,13 @@ impl Store {
         qty: u32,
     ) -> Result<Outcome, String> {
         self.check(register, side, Action::RemoveLine)?;
+        // 仕様 5.1：数量 0 は明細から取り除く（「削除」と同じ。お渡し済み FF の回収の案内もそちらで出る）
         if qty == 0 {
-            return Err("取り消すときは「取り消し」を押してください".into());
+            return self.apply(Command::RemoveLine {
+                register,
+                side,
+                line_id,
+            });
         }
         let r = self.reg(register).ok_or("レジがありません")?;
         let l = r

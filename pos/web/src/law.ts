@@ -385,7 +385,7 @@ function shrinkToFit(b: HTMLElement, rigid: boolean): void {
  *   高さ B＝ボタンと同じ四段（特大 W/8・大 W/11.3・小 W/16・極小 W/22.6）から CSS が選ぶ
  *   文字＝B÷2（一行のボタンの特大と同じ）。入力例は小テキスト（打ち込む文字より大きくはしない）
  *   幅＝文字＋左右の余白 B÷4＋枠。文字はいちばん長く打ち込んだときの見本（data-fit）か入力例の長い方。
- *     セレクタはいちばん長い選択肢＋開く印（B÷2）。文字は枠の中央（user 2026-11-24）なので、印の分を左にも空けて左右対称にする
+ *     セレクタはいちばん長い選択肢＋開く印（B÷2）。文字は左寄せ（user 2026-11-25：中央揃えは幅の狭いセレクタで文字が右の▼に寄って見えた）
  *   一文字差の幅そろえも同じ：同じ並びの同じ高さのフォーム・セレクタで、文字数が一文字しか違わなければ広い方の幅に
  * レジ画面の外（シミュレーターまわり・設定）も同じ仕組み。B はそこで決めた段の高さ
  */
@@ -458,9 +458,9 @@ export function fitForms(root: ParentNode): void {
       f.style.paddingTop = `${Math.max(0, 2 * lift)}px`;
       f.style.paddingBottom = "0";
     }
-    f.style.paddingLeft = `${Math.max(0, B / 4 + mark - border)}px`;
+    f.style.paddingLeft = `${Math.max(0, B / 4 - border)}px`;
     f.style.paddingRight = `${Math.max(0, B / 4 + mark - border)}px`;
-    f.style.width = `${Math.ceil(Math.max(main, hint) + B / 2 + 2 * mark + 2 * border)}px`;
+    f.style.width = `${Math.ceil(Math.max(main, hint) + B / 2 + mark + 2 * border)}px`;
     // 文字数は一文字ずつ数える（数字も一文字：「二文字のフォームと三文字のフォーム」）
     chars.set(f, Math.max(...samples.map((t) => [...t].length)));
   }

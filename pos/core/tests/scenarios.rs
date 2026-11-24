@@ -5845,66 +5845,88 @@ fn floor_touches_do_not_hold_a_staffed_register() {
     assert!(v.floor.lines.is_empty(), "戻るときに読んだ商品は取引中止で消える");
 }
 
-/// 仕様 12.2：ログインしているスタッフが別のレジで取引していれば、手を付けていないスタッフ操作モードのレジはレジカウンター側の最後の操作から 30 秒でセルフ操作モードに戻る
+/// 仕様 12.2：同じスタッフが別のレジにログインしたら、取引のない有人レジはすぐセルフ操作モードに戻る
 #[test]
-fn staffed_register_reverts_quickly_when_its_staff_works_elsewhere() {
+fn staffed_register_hands_back_when_its_staff_logs_in_elsewhere() {
     let mut s = Store::new(1, 3, 1);
     login_as(&mut s, 1, "ST001");
-    advance(&mut s, 60_000);
-    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated, "手が空いていれば 5 分のまま");
-    scan(&mut s, 2, "floor", BREAD);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
     login_as(&mut s, 2, "ST001");
-    scan(&mut s, 1, "floor", TEA);
-    advance(&mut s, 1_000);
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
+    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
+}
+
+/// 仕様 12.2：年確だけスタッフが対応した取引は、スタッフが別のレジにログインすると取引ごとセルフ操作モードに立ち戻り、
+/// お客様が自分で会計を済ませられる（取引は消さない）
+#[test]
+fn transaction_is_handed_back_to_the_customer_when_staff_moves() {
+    let mut s = Store::new(1, 3, 1);
+    scan(&mut s, 1, "floor", BEER);
+    scan(&mut s, 1, "floor", BREAD);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"floor"}));
+    assert!(s.snapshot().calls.iter().any(|c| c.register == 1 && c.kind == CallKind::AgeCheck));
+    login_as(&mut s, 1, "ST001");
+    ok(&mut s, json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}));
+    ok(&mut s, json!({"type":"check_id","register":1,"birth":"19900101","today":"2026-11-24"}));
+    login_as(&mut s, 2, "ST001");
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
-    assert!(v.floor.lines.is_empty());
-    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated, "接客中のレジはそのまま");
-}
-
-/// 仕様 12.2：取引を始めていなくても、同じスタッフが別のレジにログインした時点でこのレジを離れたとみなし、30 秒で戻す
-#[test]
-fn staffed_register_reverts_quickly_when_its_staff_logs_in_elsewhere() {
-    use janus_pos_core::store::AWAY_REVERT_MS;
-    let mut s = Store::new(1, 3, 1);
-    login_as(&mut s, 1, "ST001");
-    advance(&mut s, 5_000);
-    login_as(&mut s, 2, "ST001");
-    // 時計の起点はレジ1 での最後の操作：ログインから 30 秒で戻る
-    advance(&mut s, AWAY_REVERT_MS - 6_000);
-    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
-    assert_eq!(reg(&s, 1).idle_revert_in, Some(1_000), "カウントダウンが 30 秒に縮む");
+    assert_eq!(v.floor.lines.len(), 2, "取引は消さない");
     advance(&mut s, 1_000);
-    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated, "レジ1 に戻らなければ 30 秒でセルフ操作モード");
-    assert_eq!(reg(&s, 2).mode, Mode::StaffOperated, "ログインしたばかりのレジは 5 分のまま");
+    assert!(!s.snapshot().calls.iter().any(|c| c.register == 1), "済んだ年確で呼び直さない");
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"select_payment","register":1,"side":"floor","method":"qr"}));
+    ok(&mut s, json!({"type":"tap_emoney","register":1,"method":"qr"}));
+    assert!(reg(&s, 1).last_receipt.is_some(), "お客様が自分で会計を済ませる");
 }
 
-/// 仕様 12.2：スタッフがレジに戻ってレジカウンター側を操作すれば、そのレジは 5 分に戻る
+/// 仕様 12.2：立ち戻った取引に残っているスタッフの用件は呼び出しになり、担当を外すのでほかのスタッフも応えられる
 #[test]
-fn staff_returning_restores_the_full_idle_time() {
-    use janus_pos_core::store::AWAY_REVERT_MS;
+fn handed_back_transaction_calls_any_staff_for_what_is_left() {
     let mut s = Store::new(1, 3, 1);
+    scan(&mut s, 1, "floor", BEER);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"floor"}));
     login_as(&mut s, 1, "ST001");
-    advance(&mut s, 5_000);
     login_as(&mut s, 2, "ST001");
-    advance(&mut s, 5_000);
-    run(&mut s, json!({"type":"touch","register":1,"side":"counter"})).unwrap();
-    advance(&mut s, AWAY_REVERT_MS * 2);
-    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated, "いま居るレジは 5 分");
-    assert_eq!(reg(&s, 2).mode, Mode::SelfOperated, "離れたレジ2 が 30 秒で戻る");
+    assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
+    advance(&mut s, 1_000);
+    assert!(s.snapshot().calls.iter().any(|c| c.register == 1 && c.kind == CallKind::AgeCheck));
+    login_as(&mut s, 1, "ST002");
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
 }
 
-/// 仕様 12.2：スタッフが手を付けた取引は、そのスタッフが別のレジに移っても 5 分待つ
+/// 仕様 12.2：スタッフが現金を預かっている途中と、保留した取引があるときは立ち戻らない（5 分の規則のまま）
 #[test]
-fn staff_touched_transaction_keeps_the_full_idle_time() {
-    use janus_pos_core::store::AWAY_REVERT_MS;
+fn cash_in_hand_or_held_transaction_keeps_the_staffed_register() {
     let mut s = Store::new(1, 3, 1);
     login_as(&mut s, 1, "ST001");
-    scan(&mut s, 1, "counter", TEA);
-    scan(&mut s, 2, "floor", BREAD);
+    scan(&mut s, 1, "counter", BREAD);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"insert_cash","register":1,"denomination":100,"count":1}));
     login_as(&mut s, 2, "ST001");
-    advance(&mut s, AWAY_REVERT_MS * 4);
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    scan(&mut s, 1, "counter", BREAD);
+    hold(&mut s, 1).unwrap();
+    login_as(&mut s, 2, "ST001");
+    assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
+}
+
+/// 仕様 12.2：現金を選んだだけ（投入前）なら立ち戻り、お客様に支払方法を選び直してもらう
+#[test]
+fn handing_back_clears_a_cash_choice_without_money() {
+    let mut s = Store::new(1, 3, 1);
+    login_as(&mut s, 1, "ST001");
+    scan(&mut s, 1, "counter", BREAD);
+    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    confirm_point(&mut s, 1);
+    ok(&mut s, json!({"type":"select_payment","register":1,"side":"counter","method":"cash"}));
+    login_as(&mut s, 2, "ST001");
     let v = reg(&s, 1);
-    assert_eq!(v.mode, Mode::StaffOperated);
-    assert_eq!(v.counter.lines.len(), 1);
+    assert_eq!(v.mode, Mode::SelfOperated);
+    assert_eq!(v.floor.lines.len(), 1);
+    ok(&mut s, json!({"type":"select_payment","register":1,"side":"floor","method":"qr"}));
 }

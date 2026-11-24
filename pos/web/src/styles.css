@@ -128,6 +128,8 @@ button { touch-action: manipulation; }
 @keyframes slide-from-right { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes slide-from-left { from { transform: translateX(-100%); } to { transform: none; } }
 .screen-main { flex: 1 1 0; min-height: 0; overflow: hidden auto; padding: var(--s11, 8px) var(--s10, 12px); overscroll-behavior-y: contain; }
+/* 保留した取引があるあいだ、レジカウンター側の明細は注意喚起の薄い黄色（user 2026-11-24） */
+.screen.has-held .screen-main { background: var(--alert-bg); --screen-bg: var(--alert-bg); }
 /* 明細はボタンでページを送る（user 2026-11-20：スクロールバー・スワイプでは送らない。明細がスクロールすると
    モバイルでページの縦スクロールと取り合いになる）。ページの考え方（main.ts paginate）：内税の行と見出しは動かず、
    明細の行だけが .lines-scroll の中で送られる。下に「< Page:1/3 >」 */

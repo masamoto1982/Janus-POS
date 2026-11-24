@@ -163,8 +163,6 @@ struct SavedRegister {
     idle_hold: Option<u64>,
     #[serde(default)]
     last_counter_op: Option<u64>,
-    #[serde(default)]
-    counter_in_txn: bool,
     menu: Option<Menu>,
     paused: bool,
     touch: Option<(Side, u64)>,
@@ -479,7 +477,6 @@ impl SavedRegister {
             outlet_since: r.outlet_since,
             idle_hold: r.idle_hold,
             last_counter_op: Some(r.last_counter_op),
-            counter_in_txn: r.counter_in_txn,
             menu: r.menu,
             paused: r.paused,
             touch: r.touch,
@@ -562,7 +559,6 @@ impl SavedRegister {
             outlet_since: self.outlet_since,
             idle_hold: self.idle_hold,
             last_counter_op: self.last_counter_op.unwrap_or(self.last_op),
-            counter_in_txn: self.counter_in_txn,
             menu: self.menu,
             paused: self.paused,
             touch: self.touch,

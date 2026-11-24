@@ -196,9 +196,9 @@ const fn bill(code: &'static str, name: &'static str, price: u32) -> Product {
 use Category::*;
 use TaxRate::*;
 
-/// トレカ。1回のお会計で買えるのは既定で3パックまで（販売規則の設定 → 個数制限で変えられる）
+/// トレカ。1回のお会計で買えるのは既定で3パックまで（設定 → 個数制限で変えられる）
 pub const TRADING_CARD: &str = "4910000000090";
-/// トレカの 1 回のお会計の販売個数の上限（既定値。販売規則の設定で変えられる）
+/// トレカの 1 回のお会計の販売個数の上限（既定値。設定で変えられる）
 pub const TRADING_CARD_LIMIT: u32 = 3;
 
 pub const CATALOG: &[Product] = &[

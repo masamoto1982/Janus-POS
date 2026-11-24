@@ -294,7 +294,7 @@ function buildSkeleton(): void {
       <p class="copyright"><a href="https://github.com/masamoto1982" target="_blank" rel="noopener">© 2026 masamoto yamashiro</a></p>
     </footer>
     <dialog class="rules-dlg" id="rules-dlg" aria-labelledby="rules-title">
-      <div class="dlg-head"><h2 id="rules-title">販売規則の設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
+      <div class="dlg-head"><h2 id="rules-title">設定</h2><button class="small ghost" data-close-rules>閉じる</button></div>
       <div class="owner-auth" data-region="owner-auth"></div>
       <div class="toast" id="toast-rules"></div>
       <div data-region="owner"></div>
@@ -609,7 +609,7 @@ function render(): void {
       terminal.classList.toggle("reader", reader);
     }
   }
-  // 販売規則の設定の歯車はストアコンピューターのすぐ右（user 2026-11-24）。端末と同じ並びに入れ、モバイルで折り返しても離れない
+  // 設定の歯車はストアコンピューターのすぐ右（user 2026-11-24）。端末と同じ並びに入れ、モバイルで折り返しても離れない
   setRegion("bells", bellPanel(snap, RULES_GEAR));
   setRegion("owner-auth", ownerAuth ? "" : ownerAuthForm());
   setRegion("owner", ownerAuth ? ownerPanel(snap, rulesTab) : "");
@@ -1009,7 +1009,7 @@ app.addEventListener("change", (e) => {
   sel.blur();
 });
 
-const RULES_GEAR = `<button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="販売規則の設定" title="販売規則の設定">⚙</button>`;
+const RULES_GEAR = `<button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="設定" title="設定">⚙</button>`;
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
 const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_ff_tab_display", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
@@ -1033,7 +1033,7 @@ function verifyOwner(): void {
   render();
 }
 
-/** 販売規則の設定のテンキー。打ち方はレジ画面のテンキーと同じ（小数は税率だけ、0.01% 単位） */
+/** 設定のテンキー。打ち方はレジ画面のテンキーと同じ（小数は税率だけ、0.01% 単位） */
 function rulesPadKey(k: string): void {
   const e = rulesPad.entry;
   if (!e) return;

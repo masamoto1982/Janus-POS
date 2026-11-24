@@ -174,7 +174,7 @@ pub struct Context {
     pub cash_only_goods: bool,
     /// 販売期限切れの明細がある
     pub expired: bool,
-    /// 売り場側にも出す FF タブがある（販売規則の FF タブ表示で「両側」にしたタブ）
+    /// 売り場側にも出す FF タブがある（設定の FF タブ表示で「両側」にしたタブ）
     pub ff_floor: bool,
 }
 

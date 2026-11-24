@@ -16,6 +16,9 @@ import {
   expiredClosed,
   ffvInput,
   qtyEntry,
+  zeroAsk,
+  zeroDone,
+  ZERO_DONE_MS,
   lineMax,
   flashing,
   type FfUi,
@@ -743,9 +746,13 @@ function qtyKey(key: string, k: string): void {
   else if (k === "back") e.digits = e.digits.slice(0, -1);
   else if (k === "ok") {
     if (!e.digits) return;
-    // 数量 0 は明細から取り除く（取り除いたことは薄い黄色の一瞬の表示で知らせる、send の中）
     const [register, side] = key.split(":");
-    send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
+    // 数量 0 は明細から取り除く。すぐには送らず、確認の画面（「はい」・バック）を出す
+    if (Number(e.digits) === 0) {
+      const r = snap.registers.find((x) => x.id === Number(register));
+      const l = (side === "counter" ? r?.counter.lines : r?.floor.lines)?.find((x) => x.id === e.id);
+      if (l) zeroAsk.set(key, { id: l.id, name: l.name, qty: l.qty, received: l.kind === "ff" && l.state === "received" });
+    } else send({ type: "set_qty", register: Number(register), side: side as Side, line_id: e.id, qty: Number(e.digits) });
     qtyEntry.delete(key);
   } else if (/^[0-9]$/.test(k) && e.digits.length < 2) {
     // 販売個数の上限を超える数はテンキーでも打てない
@@ -787,8 +794,8 @@ function deviceFx(cmd: Command): (() => void) | null {
   };
 }
 
-/** core QTY_ZERO_REMOVED と同じ（数量 0 で明細を取り除いた知らせの末尾） */
-const QTY_ZERO_REMOVED = "を明細から取り除きました";
+/** 数量 0 を取り除いた案内を閉じるタイマー */
+const zeroTimers = new Map<string, number>();
 
 /** 直前の send が受け付けられなかった理由 */
 let lastError: string | undefined;
@@ -830,8 +837,20 @@ function send(cmd: Command, quiet = false): boolean {
   if (res.ok && cmd.type === "void_transaction") cancelAsk.delete(cmd.register);
   // 取り消せたら、登録済みだったことを操作した側の登録画面の中央に一瞬だけ知らせる
   if (res.ok && cmd.type === "cancel_item" && res.message) flashRejection(cmd.register, cmd.side, res.message, true);
-  // 数量 0 で明細から取り除いたら、打ち間違いに気づけるよう、受け付けなかった理由と同じ薄い黄色で一瞬知らせる（user 2026-11-25）
-  if (res.ok && cmd.type === "set_qty" && cmd.qty === 0 && res.message?.endsWith(QTY_ZERO_REMOVED)) flashRejection(cmd.register, cmd.side, res.message);
+  // 数量 0 の確認で「はい」：取り除いた品名と点数をしばらく見せてから明細に戻る（お渡し済みの FF は回収の案内に任せる）
+  if (cmd.type === "set_qty" && cmd.qty === 0) {
+    const key = `${cmd.register}:${cmd.side}`;
+    const z = zeroAsk.get(key);
+    zeroAsk.delete(key);
+    if (res.ok && z && !z.received) {
+      zeroDone.set(key, { name: z.name, qty: z.qty });
+      window.clearTimeout(zeroTimers.get(key));
+      zeroTimers.set(key, window.setTimeout(() => {
+        zeroDone.delete(key);
+        frame();
+      }, ZERO_DONE_MS));
+    }
+  }
   const where = RULE_CMDS.includes(cmd.type) ? "toast-rules" : sideOf(cmd) === "store" ? "toast-store" : null;
   if (where) {
     if (res.ok) {
@@ -1214,6 +1233,11 @@ app.addEventListener("click", (e) => {
   if (b.dataset.ffverifyClose) {
     ffVerifying.delete(b.dataset.ffverifyClose);
     for (const k of [...ffvInput.keys()]) if (k.startsWith(`${b.dataset.ffverifyClose}:`)) ffvInput.delete(k);
+    frame();
+    return;
+  }
+  if (b.dataset.zeroBack) {
+    zeroAsk.delete(b.dataset.zeroBack);
     frame();
     return;
   }

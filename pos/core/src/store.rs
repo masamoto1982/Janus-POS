@@ -5024,7 +5024,6 @@ impl Store {
                 ended_at,
             }),
             active_side: active_side(&c),
-            max_items: MAX_ITEMS,
             lamp: waiting.is_some(),
             call_waiting_ms: waiting,
             ring_volume: waiting.map_or(0.0, ring_volume),
@@ -5344,7 +5343,6 @@ pub struct RegisterView {
     /// 直前に解除した非常事態モードの発動・解除時刻（解除のレシートの中身、しばらくのあいだだけ）
     pub emergency_log: Option<EmergencyLog>,
     pub active_side: Option<Side>,
-    pub max_items: u32,
     pub lamp: bool,
     pub call_waiting_ms: Option<u64>,
     pub ring_volume: f32,

@@ -1198,7 +1198,6 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
         : ffFirst && !expiredAny
           ? `<button type="button" class="primary" data-ffverify="${reg}:${side}">お会計</button>`
           : btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
-    r.max_items,
     r.points,
     ro || cancelAsk.has(reg) ? "" : cancelBtn(r, side, a("void_transaction")),
     "",
@@ -1380,16 +1379,15 @@ export function tenderSum(total: number, inserted: number): string {
 const bandSlot = (label: string) => `<button type="button" class="band-slot" aria-hidden="true" tabindex="-1" disabled>${label}</button>`;
 
 /** slots＝この面が取消し・お会計を持つ（操作できる側）。持つ面では、ボタンが消えても席を残す */
-export function regTop(total: number, count: number, action: string, max = Infinity, points?: PointsView, voidHtml = "", infoHtml = "", tender = "", slots = false, voidLabel = "取消し"): string {
+export function regTop(total: number, count: number, action: string, points?: PointsView, voidHtml = "", infoHtml = "", tender = "", slots = false, voidLabel = "取消し"): string {
   // ポイントカードだけ読んだときも、取消しと読んだポイントを出す
   if (count === 0 && (points?.balance ?? null) === null) return "";
   if (slots && !voidHtml) voidHtml = bandSlot(voidLabel);
   if (slots && !action) action = bandSlot("お会計");
-  const full = count >= max ? `<small class="full">上限</small>` : "";
   const point = tender || pointInfo(points);
   const info = point ? `<small class="info">${point}</small>` : "";
   const below = infoHtml ? `<small class="info below">${infoHtml}</small>` : "";
-  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点${full}</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>`;
+  return `<div class="reg-top"><span class="void">${voidHtml}</span><span class="mid"><span class="sum">合計 <span class="count"><b>${count}</b>点</span> <b class="total">${total.toLocaleString("ja-JP")}</b><span class="yen">円</span></span>${info}${below}</span><span class="action">${action}</span></div>`;
 }
 
 export function itemCount(lines: { qty: number }[]): number {
@@ -1892,7 +1890,6 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
     (c.phase === "registering"
       ? btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")
       : ""),
-    r.max_items,
     r.points,
     cancelAsk.has(reg) ? "" : cancelBtn(r, side, a("void_transaction")),
     "",

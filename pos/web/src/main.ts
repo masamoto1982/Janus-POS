@@ -797,6 +797,9 @@ function deviceFx(cmd: Command): (() => void) | null {
 /** 数量 0 を取り除いた案内を閉じるタイマー */
 const zeroTimers = new Map<string, number>();
 
+/** 買い物点数の上限に達して登録を受け付けなかった理由（コアの ITEMS_FULL と同じ文） */
+const ITEMS_FULL = "買い物点数の上限（100点）に達しています";
+
 /** 直前の send が受け付けられなかった理由 */
 let lastError: string | undefined;
 /** 理由をほかの場所で出すコマンド（荷物の入力欄）は、登録画面に重ねない */
@@ -857,7 +860,14 @@ function send(cmd: Command, quiet = false): boolean {
       if (res.message) toast(where, res.message, false);
     } else toast(where, res.error ?? "操作できません", true);
   }
-  if (!res.ok && !where && !quiet && "register" in cmd) {
+  // 買い物点数の上限（100点）はデモアプリとしての制限で実機には関係がないので、ブラウザのアラートで知らせるだけにする
+  // （帯の点数に「上限」を添える表示は廃止、user 2026-11-25）
+  const itemsFull = !res.ok && res.error === ITEMS_FULL;
+  if (itemsFull && "register" in cmd) {
+    const side = sideOf(cmd);
+    window.alert(side !== "store" && langOf(cmd.register, side) !== "ja" ? trText(ITEMS_FULL) : ITEMS_FULL);
+  }
+  if (!res.ok && !itemsFull && !where && !quiet && "register" in cmd) {
     const side = sideOf(cmd);
     const reason = res.error ?? "操作できません";
     if (side !== "store" && !OWN_ERROR.has(cmd.type) && !shownOnScreen(reason)) flashRejection(cmd.register, side, reason);

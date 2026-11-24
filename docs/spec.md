@@ -1004,6 +1004,7 @@ npm run build
   - スタッフもお客様も明細の数量を変えられる（`staff_or_customer_changes_a_line_quantity`）
   - クーポンと明細は同じ通し番号を使う（`coupon_and_line_ids_never_collide`）
   - 日配食品は数量を増やせない（`fresh_food_quantity_cannot_be_raised_on_screen`）
+  - テンキーで数量 0 を決定すると、数量の多い明細も一度で取り除く（`setting_the_quantity_to_zero_removes_the_line`）
 - **5.2 一緒に登録できないもの**
   - 荷物を送るはほかの商品と一緒にできない（`parcel_cannot_be_mixed_with_other_goods`）
   - 払込票はほかの商品と同じ取引にできない（`utility_bills_cannot_share_a_transaction_with_other_goods`）

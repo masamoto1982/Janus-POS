@@ -258,7 +258,7 @@ emergency_since: number | null,
 /**
  * 直前に解除した非常事態モードの発動・解除時刻（解除のレシートの中身、しばらくのあいだだけ）
  */
-emergency_log: EmergencyLog | null, active_side: Side | null, max_items: number, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, 
+emergency_log: EmergencyLog | null, active_side: Side | null, lamp: boolean, call_waiting_ms: number | null, ring_volume: number, tobacco_asked: boolean, 
 /**
  * まだ応答のない呼び出し（セルフ操作モード）。種類を問わず、最下段に呼び出し中の案内を出す
  */

@@ -42,7 +42,6 @@ const DICT: Record<string, string> = {
   削除: "Del",
   取消: "Cancel",
   "＋": "+",
-  上限: "Max",
   確認: "Check",
   照合: "Match",
   品目: "Item",
@@ -833,9 +832,9 @@ type HtmlRule = [RegExp, (m: RegExpExecArray) => string];
 
 const HTML_RULES: HtmlRule[] = [
   [
-    /^合計 <span class="count"><b>(\d+)<\/b>点(<small class="full">上限<\/small>)?<\/span> <b class="total">([\d,]+)<\/b><span class="yen">円<\/span>$/,
+    /^合計 <span class="count"><b>(\d+)<\/b>点<\/span> <b class="total">([\d,]+)<\/b><span class="yen">円<\/span>$/,
     (m) =>
-      `Total <span class="count"><b>${m[1]}</b> ${Number(m[1]) === 1 ? "item" : "items"}${m[2] ? `<small class="full">Max</small>` : ""}</span> <span class="yen">¥</span><b class="total">${m[3]}</b>`,
+      `Total <span class="count"><b>${m[1]}</b> ${Number(m[1]) === 1 ? "item" : "items"}</span> <span class="yen">¥</span><b class="total">${m[2]}</b>`,
   ],
   [/^チケット(<span class="bill-n">)(\d+)枚(<\/span>)を発券しました$/, (m) => `${m[1]}${plural(m[2], "ticket")}${m[3]} issued`],
   [/^(.+)は現金のみのお取り扱いです$/, (m) => `${m[1].split("・").map((x) => t(x)).join(", ")} can only be paid in cash`],

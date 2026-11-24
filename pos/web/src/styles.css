@@ -246,7 +246,6 @@ button { touch-action: manipulation; }
 .reg-top .band-slot { visibility: hidden; }
 /* 二段目（合計の帯）は取消し・合計・お会計を均等配置する（user 2026-11-20）。第一待ち受けの帯は寄り添ったまま */
 .reg-top:not(.welcome-band) { justify-content: space-evenly; }
-.reg-top .count .full { margin-left: var(--s11, 8px); font-weight: 700; }
 /* 現金の投入中：合計の下（ポイントの行）にお預かり・お釣り（不足）を出す（B-4）。両画面同じ形 */
 .reg-top .info:has(.tender-cell) { gap: 0 var(--s11, 8px); }
 .reg-top .info .tender-cell b { font-variant-numeric: tabular-nums; }

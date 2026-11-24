@@ -148,9 +148,8 @@ describe("view helpers", () => {
     expect(counter).not.toContain("現金");
   });
 
-  it("marks the item count when the limit is reached", () => {
-    expect(regTop(100, 9, "", 10)).not.toContain("上限");
-    expect(regTop(100, 10, "", 10)).toContain("上限");
+  it("does not mark the item count when the demo item limit is reached (browser alert instead)", () => {
+    expect(regTop(100, 100, "")).not.toContain("上限");
   });
 
   it("rotates the signage on the attended floor-side screen's bottom tier", () => {
@@ -189,7 +188,7 @@ describe("view helpers", () => {
     const short = tenderSum(640, 500);
     expect(short).toContain('class="tender-cell short">不足 <b>140</b>円');
     // 合計の行は投入前と同じ形のまま、その下に出す
-    const band = regTop(1200, 3, "", Infinity, undefined, "", "", tenderSum(1200, 2000));
+    const band = regTop(1200, 3, "", undefined, "", "", tenderSum(1200, 2000));
     expect(band).toContain('<b class="total">1,200</b>');
     expect(band).toContain("お釣り <b>800</b>円");
   });

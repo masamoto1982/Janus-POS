@@ -2416,31 +2416,31 @@ fn stamps_are_paid_in_cash_even_with_other_items() {
     assert_eq!(emoney_balance(&s), 1_000);
 }
 
-/// 仕様 5.1：買い物点数は 100 点まで
+/// 仕様 5.1：買い物点数は 99 点まで
 #[test]
-fn shopping_is_limited_to_100_items() {
+fn shopping_is_limited_to_99_items() {
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "floor", SNACK);
     let id = reg(&s, 1).floor.lines[0].id;
     ok(
         &mut s,
-        json!({"type":"set_qty","register":1,"side":"floor","line_id":id,"qty":99}),
+        json!({"type":"set_qty","register":1,"side":"floor","line_id":id,"qty":98}),
     );
     login(&mut s, 1);
     advance(&mut s, 1_000);
     let ff = |qty: u32| json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":qty});
     let e = run(&mut s, ff(2)).unwrap_err();
-    assert!(e.contains("100点"), "{e}");
+    assert!(e.contains("99点"), "{e}");
     ok(&mut s, ff(1));
     let v = reg(&s, 1);
-    assert_eq!(v.counter.lines.iter().map(|l| l.line.qty).sum::<u32>(), 100);
+    assert_eq!(v.counter.lines.iter().map(|l| l.line.qty).sum::<u32>(), 99);
     assert!(!allowed(&v, Side::Counter, Action::RegisterFf));
     let e = run(
         &mut s,
         json!({"type":"scan","register":1,"side":"floor","code":SNACK}),
     )
     .unwrap_err();
-    assert!(e.contains("100点"), "{e}");
+    assert!(e.contains("99点"), "{e}");
     let ffid = reg(&s, 1)
         .counter
         .lines
@@ -2733,8 +2733,8 @@ fn staff_or_customer_changes_a_line_quantity() {
     let bread = v.floor.lines.iter().find(|l| l.id == id).unwrap();
     assert_eq!(bread.qty, 3);
     assert_eq!(v.floor.total, 150 * 3 + 320);
-    ok(&mut s, set(99));
-    assert!(run(&mut s, set(100)).is_err(), "over the 100-item limit");
+    ok(&mut s, set(98));
+    assert!(run(&mut s, set(99)).is_err(), "over the 99-item limit");
     ok(&mut s, set(1));
     assert_eq!(reg(&s, 1).floor.total, 150 + 320);
     ok(&mut s, set(0));

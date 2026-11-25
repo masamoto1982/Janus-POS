@@ -798,7 +798,7 @@ function deviceFx(cmd: Command): (() => void) | null {
 const zeroTimers = new Map<string, number>();
 
 /** 買い物点数の上限に達して登録を受け付けなかった理由（コアの ITEMS_FULL と同じ文） */
-const ITEMS_FULL = "買い物点数の上限（100点）に達しています";
+const ITEMS_FULL = "買い物点数の上限（99点）に達しています";
 
 /** 直前の send が受け付けられなかった理由 */
 let lastError: string | undefined;
@@ -860,7 +860,7 @@ function send(cmd: Command, quiet = false): boolean {
       if (res.message) toast(where, res.message, false);
     } else toast(where, res.error ?? "操作できません", true);
   }
-  // 買い物点数の上限（100点）はデモアプリとしての制限で実機には関係がないので、ブラウザのアラートで知らせるだけにする
+  // 買い物点数の上限（99点）はデモアプリとしての制限で実機には関係がないので、ブラウザのアラートで知らせるだけにする
   // （帯の点数に「上限」を添える表示は廃止、user 2026-11-25）
   const itemsFull = !res.ok && res.error === ITEMS_FULL;
   if (itemsFull && "register" in cmd) {

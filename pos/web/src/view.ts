@@ -18,7 +18,6 @@ import type {
   FfState,
   NavButtonView,
   NavTabView,
-  ShelfEntry,
   MenuScreen,
   RegisterView,
   Snapshot,
@@ -114,36 +113,26 @@ const flagSpan = (label: string): string => `<span class="flag">${esc(label)}</s
 /** 仮登録のたばこ（棚番号だけで、まだどの商品か決まっていない明細） */
 type ShelfLike = { kind: string; shelf?: number; carton?: boolean };
 const isShelf = (l: ShelfLike): boolean => l.kind === "shelf";
-/** たばこの仮登録の入力（user 2026-11-26）。「たばこ」の銘柄タブを選ぶと三段目がこの入力になる。キーは `${reg}:${side}`。
- *  entries＝入力済みの棚番号と個数（何件でも）、carton＝入力中の一件の単位。棚番号・個数の欄は padValue（shf・shq）に持つ */
-export type ShelfForm = { entries: ShelfEntry[]; carton: boolean };
+/** たばこの仮登録の入力（user 2026-11-26）。「たばこ」の銘柄タブを選ぶと五段目がこの入力になる。キーは `${reg}:${side}`。
+ *  carton＝入力中の一件の単位。棚番号・個数の欄は padValue（shf・shq）に持つ */
+export type ShelfForm = { carton: boolean };
 export const shelfForm = new Map<string, ShelfForm>();
 
-/** 三段目：棚番号とお求めの個数の入力。棚番号をテンキーで決定すると個数のテンキーが開き、個数を決定すると一件が下の一覧に加わる。
- *  「仮登録」で一覧をまとめて明細に仮登録する（入力途中の一件も加える）。案内の一行は五段目のタブの下に出すので、ここには繰り返さない */
-function shelfFormScreen(reg: number, side: Side, f: ShelfForm, st: Gate): string {
+/** 五段目：棚番号と個数の入力欄、単位（個・カートン）、「次の製品」。一つの製品を指定して「次の製品」を押すと、
+ *  その一件を明細に仮登録して欄を空け、続けて次の製品を入力できる（宅配便の複数口と同じ考え方、user 2026-11-26）。
+ *  仮登録した行は三段目の明細ですぐに確かめられる */
+function shelfRow(reg: number, side: Side, st: Gate): string {
+  const f = shelfForm.get(`${reg}:${side}`) ?? { carton: false };
   const shelf = padValue.get(padValueKey(reg, "shf")) ?? "";
   const qty = padValue.get(padValueKey(reg, "shq")) ?? "";
-  const unit = (carton: boolean) => (carton ? "カートン" : "個");
-  const rows = f.entries
-    .map((e, i) => `<tr><td class="num">${e.shelf}</td><td class="num">${e.qty}</td><td>${unit(e.carton)}</td><td class="num"><button type="button" class="small neg" data-shelf-del="${reg}:${side}:${i}">削除</button></td></tr>`)
-    .join("");
   const choice = (carton: boolean) =>
-    `<button type="button" class="seg${f.carton === carton ? " on" : ""}" data-shelf-unit="${reg}:${side}:${carton ? 1 : 0}" aria-pressed="${f.carton === carton}">${unit(carton)}</button>`;
-  const input = `<tr class="shelf-input"><td class="num">${padField(reg, side, "shf", shelf, "棚番号", "棚番号")}</td><td class="num">${padField(reg, side, "shq", qty, "個数", "お求めの個数")}</td><td><span class="row shelf-unit">${choice(false)}${choice(true)}</span></td><td></td></tr>`;
-  const ready = f.entries.length > 0 || (shelf !== "" && qty !== "");
-  const hold = `<button type="button" class="primary" data-shelf-hold="${reg}:${side}"${ready && st.allowed ? "" : ` disabled${st.reason ? ` title="${esc(st.reason)}"` : ""}`}>仮登録</button>`;
-  return `<div class="ffv-screen shelf-form">
-      <table class="lines ffv"><thead><tr><th class="num">棚番号</th><th class="num">個数</th><th>単位</th><th></th></tr></thead><tbody>${rows}${input}</tbody></table>
-      <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-shelf-close="${reg}:${side}">バック</button>${hold}</div>
+    `<button type="button" class="seg${f.carton === carton ? " on" : ""}" data-shelf-unit="${reg}:${side}:${carton ? 1 : 0}" aria-pressed="${f.carton === carton}">${carton ? "カートン" : "個"}</button>`;
+  const ready = shelf !== "" && qty !== "" && st.allowed;
+  const next = `<button type="button" class="primary" data-shelf-next="${reg}:${side}"${ready ? "" : ` disabled${st.reason ? ` title="${esc(st.reason)}"` : ""}`}>次の製品</button>`;
+  return `<div class="shelf-row">
+      <p class="shelf-guide">棚番号とお求めの個数をご入力ください</p>
+      <div class="shelf-inputs">${padField(reg, side, "shf", shelf, "棚番号", "棚番号", undefined, "", st)}${padField(reg, side, "shq", qty, "個数", "お求めの個数", undefined, "", st)}<span class="shelf-unit">${choice(false)}${choice(true)}</span>${next}</div>
     </div>`;
-}
-
-/** 入力済みの一覧と入力途中の一件（棚番号と個数がそろっていれば）を合わせた、仮登録する件 */
-export function shelfEntries(reg: number, f: ShelfForm): ShelfEntry[] {
-  const shelf = padValue.get(padValueKey(reg, "shf")) ?? "";
-  const qty = padValue.get(padValueKey(reg, "shq")) ?? "";
-  return shelf && qty ? [...f.entries, { shelf: Number(shelf), qty: Number(qty), carton: f.carton }] : f.entries;
 }
 
 /** 明細の品目名。仮登録のたばこは「たばこ 棚番号」（カートンなら「たばこ 棚番号 カートン」） */
@@ -1232,8 +1221,6 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet, r.last_receipt.method.includes("現金") ? r.last_receipt.paid : 0) : thanks(r.last_receipt)));
   if (!v.lines.length && !v.coupons.length && !v.point_card) cancelAsk.delete(reg);
-  const sf = side === "counter" && v.phase === "registering" ? shelfForm.get(`${reg}:${side}`) : undefined;
-  if (sf) return confirm(shelfFormScreen(reg, side, sf, a("hold_shelf")));
   // ポイントカード（アプリ）だけ読んだときも取引は始まっているので、登録画面に進む
   if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length && !zeroDone.has(`${reg}:${side}`)) return staffOperatedWelcome(r, side);
   const ro = side === "floor";
@@ -1784,7 +1771,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     // 公開したタブがないボタン（たばこ・その他など）は、タブがすべて呼び出しになり、単品の代わりに添え書きを出す
     if (!tab) return `${row}${callNote([], now)}`;
     if (button.key === "ff") return `${row}${ffPage(reg, side, snap, tab.key, ui.page, a("register_ff"), r.floor.lines)}`;
-    if (button.key === "tobacco") return `${row}${SHELF_NOTE}`;
+    if (button.key === "tobacco") return `${row}${shelfRow(reg, "floor", a("hold_shelf"))}`;
     return `${row}${goodsPage(reg, snap, button, tab, ui.page, side, a("scan"), r.floor.lines)}`;
   }
   if (r.mode === "staff_operated" && side === "floor") return signage(now);
@@ -1793,7 +1780,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
   const goods = goodsAt(snap, ui.tab);
-  if (goods?.button.key === "tobacco") return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${SHELF_NOTE}`;
+  if (goods?.button.key === "tobacco") return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${shelfRow(reg, "counter", find(r.counter.actions, "hold_shelf"))}`;
   if (goods) return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "scan"), r.counter.lines)}`;
   const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
@@ -1835,9 +1822,6 @@ function selfNavAt(snap: Snapshot, key: string): { button: NavButtonView; tab: N
   if (!button) return null;
   return { button, tab: button.tabs.find((t) => t.key === key && t.public) ?? button.tabs.find((t) => t.public) };
 }
-
-/** たばこの銘柄タブの中身：単品ボタンは置かず、棚番号と個数の入力（三段目）を案内する一行 */
-const SHELF_NOTE = `<p class="call-note shelf-note"><span>棚番号とお求めの個数をご入力ください</span></p>`;
 
 /** 公開していないボタン・タブを売り場側で押したときの呼び出し */
 function navCall(reg: number, button: string): Command {
@@ -2042,8 +2026,6 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   );
 
   if (!c.lines.length && !c.coupons.length && !c.point_card) cancelAsk.delete(reg);
-  const sf = c.phase === "registering" ? shelfForm.get(`${reg}:${side}`) : undefined;
-  if (sf) return confirm(shelfFormScreen(reg, side, sf, a("hold_shelf")));
   if (!c.lines.length && !c.coupons.length && !c.point_card && !c.returned.length && !zeroDone.has(`${reg}:${side}`)) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${confirm(body + (cancelAsk.has(reg) ? "" : back))}`;

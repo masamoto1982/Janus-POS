@@ -245,6 +245,7 @@ const DICT: Record<string, string> = {
   "お渡し数を入力し、たばこを読み取ってください": "Enter the counts handed over and scan the tobacco",
   棚のたばこを読み取ってください: "Scan the tobacco from the shelf",
   読み取り待ち: "Scan next",
+  次の製品: "Next item",
   仮登録: "Held",
   "押して、仮登録のたばこを読み取る": "Press to scan the held tobacco",
   銘柄1: "Brand 1",

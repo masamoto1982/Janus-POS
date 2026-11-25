@@ -14,7 +14,6 @@ import {
   ffVerifying,
   shelfTarget,
   shelfForm,
-  shelfEntries,
   stampVerifying,
   expiredClosed,
   ffvInput,
@@ -736,18 +735,10 @@ function padKey(key: string, k: string): void {
       couponCancel.delete(`${register}:${side}`);
       padValue.delete(padValueKey(register, "cpn"));
     } else if (e.target === "shf" || e.target === "shq") {
-      // たばこの仮登録：棚番号を決めたら個数のテンキーを開き、両方そろったら一件として一覧に加え、欄を空ける
+      // たばこの仮登録：棚番号を決めたら、個数がまだなら個数のテンキーを続けて開く（「次の製品」で一件を仮登録する）
       if (e.digits === "" || value <= 0) return;
       padValue.set(padValueKey(register, e.target), String(value));
-      const f = shelfForm.get(`${register}:${side}`);
-      const shelf = padValue.get(padValueKey(register, "shf"));
-      const qty = padValue.get(padValueKey(register, "shq"));
-      if (f && shelf && qty) {
-        f.entries.push({ shelf: Number(shelf), qty: Number(qty), carton: f.carton });
-        f.carton = false;
-        padValue.delete(padValueKey(register, "shf"));
-        padValue.delete(padValueKey(register, "shq"));
-      } else if (e.target === "shf" && !qty) {
+      if (e.target === "shf" && !padValue.get(padValueKey(register, "shq"))) {
         padEntry.set(key, { target: "shq", digits: "" });
         return frame();
       }
@@ -1209,10 +1200,10 @@ app.addEventListener("click", (e) => {
     const [reg, tab] = b.dataset.fftab.split(":");
     const register = Number(reg);
     ffTabs.set(register, { tab, page: 0 });
-    // たばこの銘柄タブ：三段目を棚番号と個数の入力にする（セルフは売り場側、スタッフ操作モードはレジカウンター側）。ほかのタブに移ったら閉じる
+    // たばこの銘柄タブ：五段目を棚番号と個数の入力にする（セルフは売り場側、スタッフ操作モードはレジカウンター側）。ほかのタブに移ったら閉じる
     if (tab.startsWith("tobacco_")) {
       const side = snap.registers.find((x) => x.id === register)?.mode === "self_operated" ? "floor" : "counter";
-      if (!shelfForm.has(`${register}:${side}`)) shelfForm.set(`${register}:${side}`, { entries: [], carton: false });
+      if (!shelfForm.has(`${register}:${side}`)) shelfForm.set(`${register}:${side}`, { carton: false });
     } else closeShelfForm(register);
     // セルフで公開した「たばこ」は、押した時点でたばこの呼び出しも立てる
     if (b.dataset.navcall) {
@@ -1227,25 +1218,18 @@ app.addEventListener("click", (e) => {
     if (f) f.carton = carton === "1";
     return frame();
   }
-  if (b.dataset.shelfDel) {
-    const [reg, side, i] = b.dataset.shelfDel.split(":");
-    shelfForm.get(`${reg}:${side}`)?.entries.splice(Number(i), 1);
-    return frame();
-  }
-  if (b.dataset.shelfClose) {
-    const register = Number(b.dataset.shelfClose.split(":")[0]);
-    closeShelfForm(register);
-    ffTabs.delete(register);
-    return frame();
-  }
-  if (b.dataset.shelfHold) {
-    const [reg, side] = b.dataset.shelfHold.split(":");
+  if (b.dataset.shelfNext) {
+    // 一つの製品（棚番号と個数）をその場で仮登録し、欄を空けて次の製品の入力に移る
+    const [reg, side] = b.dataset.shelfNext.split(":");
     const register = Number(reg);
+    const shelf = padValue.get(padValueKey(register, "shf"));
+    const qty = padValue.get(padValueKey(register, "shq"));
     const f = shelfForm.get(`${reg}:${side}`);
-    if (!f) return;
-    if (send({ type: "hold_shelf", register, side: side as Side, entries: shelfEntries(register, f) })) {
-      closeShelfForm(register);
-      ffTabs.delete(register);
+    if (!shelf || !qty) return;
+    if (send({ type: "hold_shelf", register, side: side as Side, entries: [{ shelf: Number(shelf), qty: Number(qty), carton: !!f?.carton }] })) {
+      padValue.delete(padValueKey(register, "shf"));
+      padValue.delete(padValueKey(register, "shq"));
+      if (f) f.carton = false;
     }
     return frame();
   }

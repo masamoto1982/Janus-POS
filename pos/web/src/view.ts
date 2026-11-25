@@ -1707,7 +1707,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
         ? `<button type="button" role="tab" class="tab ff-tab ${t === tab ? "on" : ""}" data-fftab="${reg}:${t.key}" aria-selected="${t === tab}">${esc(t.label)}</button>`
         : `<button type="button" role="tab" class="tab ff-tab call-tab" aria-selected="false" data-hold="${esc(JSON.stringify(call))}"${gate.allowed ? "" : ` disabled title="${esc(gate.reason ?? "")}"`} title="スタッフを呼び出します">${esc(t.label)}</button>`;
     const row = `<div class="tabs ff-tabs self-nav" role="tablist" aria-label="${esc(button.label)}">${button.tabs.map(tabBtn).join("")}</div>`;
-    // 公開したタブがないボタン（拡張用など）は、タブがすべて呼び出しになり、単品の代わりに添え書きを出す
+    // 公開したタブがないボタン（たばこ・その他など）は、タブがすべて呼び出しになり、単品の代わりに添え書きを出す
     if (!tab) return `${row}${callNote([], now)}`;
     if (button.key === "ff") return `${row}${ffPage(reg, side, snap, tab.key, ui.page, a("register_ff"), r.floor.lines)}`;
     return `${row}${goodsPage(reg, snap, button, tab, ui.page, side, a("scan"), r.floor.lines)}`;
@@ -1724,10 +1724,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
 }
 
 /** 四段目・五段目のナビゲーション（user 2026-11-25・26）。ボタン・タブの並びと売り場側の公開はコア（snap.floor_nav）が持つ。
- *  四段目＝「FF」「金券」「拡張用」「拡張用」、押すと五段目のタブがそのボタンのタブに変わる。
+ *  四段目＝「FF」「金券」「たばこ」「その他」（セルフの売り場側にあった四つをレジカウンター側にも、user 2026-11-26）、押すと五段目のタブがそのボタンのタブに変わる。
  *  スタッフ操作モードのレジカウンター側はすべて使え、セルフ操作モードの売り場側は公開したボタン・タブだけ使え、
- *  公開していないものを押すとそのボタンの用件の呼び出し（FF＝FF、金券＝金券、拡張用＝その他）。
- *  カウンター内のバーコードのない商品は今のところ金券だけなので、拡張用には商品を置かない */
+ *  公開していないものを押すとそのボタンの用件の呼び出し（ボタンの名前のとおり）。
+ *  カウンター内のバーコードのない商品は今のところ金券だけなので、たばこ・その他のタブは「拡張用」で商品を置かない */
 /// 仕様 8：四段目・五段目のナビゲーション
 
 /** 金券の単品ボタンの表記 [一行目, 添え字]。タブの名前で何の商品かは自明なので「切手」「はがき」の添え字は付けない（user 2026-11-26）。
@@ -1741,7 +1741,7 @@ const GOODS_LABEL: Record<string, readonly [string, string]> = {
   "4900000000196": ["300円", "東京都"],
 };
 
-/** FF 以外のボタンのタブ（金券・拡張用）なら、そのボタンとタブ */
+/** FF 以外のボタンのタブ（金券・たばこ・その他）なら、そのボタンとタブ */
 function goodsAt(snap: Snapshot, key: string): { button: NavButtonView; tab: NavTabView } | null {
   for (const button of snap.floor_nav) {
     if (button.key === "ff") continue;
@@ -1763,7 +1763,7 @@ function selfNavAt(snap: Snapshot, key: string): { button: NavButtonView; tab: N
 /** 公開していないボタン・タブを売り場側で押したときの呼び出し */
 function navCall(reg: number, button: string): Command {
   if (button === "ff") return { type: "ff_button", register: reg };
-  return { type: "call_staff", register: reg, topic: button === "voucher" ? "voucher" : "other" };
+  return { type: "call_staff", register: reg, topic: button === "voucher" ? "voucher" : button === "tobacco" ? "tobacco" : "other" };
 }
 
 /** 四段目。スタッフ操作モードのレジカウンター側は四つから一つを選ぶ切り替え（既定は「FF」、もう一度押しても戻らない）。
@@ -2120,7 +2120,7 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   {
     id: "floor",
     label: "売り場側の公開",
-    note: "四段目のボタンと五段目のタブごとに、セルフ操作モードの売り場側でお客様が使えるようにするかを決めます<br>公開していないボタン・タブを押すと、そのボタンの用件でスタッフを呼び出します（拡張用は「その他」）<br>タブを公開しても、そのボタンが非公開ならお客様は開けません<br>コーヒーなど作り置きのない FF はお客様がご自分でお取りになり、揚げ物など作り置きの FF はスタッフがお渡しします",
+    note: "四段目のボタンと五段目のタブごとに、セルフ操作モードの売り場側でお客様が使えるようにするかを決めます<br>公開していないボタン・タブを押すと、そのボタンの用件でスタッフを呼び出します<br>タブを公開しても、そのボタンが非公開ならお客様は開けません<br>コーヒーなど作り置きのない FF はお客様がご自分でお取りになり、揚げ物など作り置きの FF はスタッフがお渡しします",
   },
   // Bell の鳴動は独立した「Bell の設定」から設定のタブに移した（user 2026-11-24）
   {

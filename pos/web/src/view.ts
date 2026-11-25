@@ -1686,6 +1686,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   // FF はスキャンできないので、取り消したい FF のボタンを押すと取り消しが成立する（user 2026-11-21）
   const asked = cancelAsk.get(reg);
   if (r.mode === "staff_operated" && side === "counter" && asked?.stage === "item" && !r.paused && !r.menu) {
+    if (isGoodsTab(ui.tab)) return `${ffTabRow(reg, FF_TABS, "")}${goodsPage(reg, snap, ui.tab, ui.page, find(r.counter.actions, "remove_line"), r.counter.lines, true)}`;
     const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
     return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "remove_line"), r.counter.lines, true)}`;
   }
@@ -1725,8 +1726,47 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && (r.counter.returned.length || r.counter.confiscated.length || r.counter.ff_collect.length)) return "";
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
+  if (isGoodsTab(ui.tab)) return `${ffTabRow(reg, FF_TABS, "")}${goodsPage(reg, snap, ui.tab, ui.page, find(r.counter.actions, "scan"), r.counter.lines)}`;
   const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
+}
+
+/** スタッフ操作モードのレジカウンター側で、FF タブの上に常に置く段（四段目）：「金券」「たばこ」「その他」（user 2026-11-25）。
+ *  セルフ操作モードで FF タブを開いたときの段（ffOpenFoot）と同じ形・同じ位置。スタッフにとっては呼び出しではなく、
+ *  バーコードのない FF 以外の商品（切手・印紙・たばこ・レジ袋など）を出す切り替えで、押すと最下段がその商品の単品ボタンに変わる。
+ *  選んでいるものは積極（濃い背景）、もう一度押すか FF のタブを押すと FF に戻る */
+/// 仕様 8：スタッフ操作モードのレジカウンター側の金券・たばこ・その他の段
+export const GOODS_TABS = [
+  ["goods_voucher", "金券", ["stamp", "voucher"]],
+  ["goods_tobacco", "たばこ", ["tobacco"]],
+  ["goods_other", "その他", ["bag"]],
+] as const;
+const isGoodsTab = (tab: string): boolean => GOODS_TABS.some(([k]) => k === tab);
+
+export function goodsFoot(r: RegisterView, tab: string): string {
+  const reg = r.id;
+  const b = ([k, label]: (typeof GOODS_TABS)[number]) =>
+    `<button type="button" class="${k === tab ? "on" : "ghost"}" data-fftab="${reg}:${k === tab ? FF_TABS[0][0] : k}" aria-pressed="${k === tab}">${label}</button>`;
+  return `<div class="ff-open-foot goods-foot">${GOODS_TABS.map(b).join("")}</div>`;
+}
+
+/** 金券・たばこ・その他の単品ボタン。FF の単品ボタンと同じ形・同じページ送りで、押すとその商品のバーコードを読んだのと同じ登録（取消しの場面では取り消し） */
+function goodsPage(reg: number, snap: Snapshot, tab: string, wantPage: number, can: Gate, lines: readonly { name: string; qty: number }[], cancel = false): string {
+  const cats: readonly string[] = GOODS_TABS.find(([k]) => k === tab)![2];
+  const items = snap.catalog.filter((p) => cats.includes(p.category));
+  const ordered = (name: string) => lines.reduce((n, l) => n + (l.name === name ? l.qty : 0), 0);
+  const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
+  const page = Math.min(wantPage, pages - 1);
+  const grid = items
+    .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
+    .map((p) => {
+      const cmd: Command = cancel ? { type: "cancel_item", register: reg, side: "counter", code: p.code } : { type: "scan", register: reg, side: "counter", code: p.code };
+      return withBadge(btn(`${p.name}\n${yen(p.price)}`, cmd, can, "ff-item plenty"), ffBadge(ordered(p.name)));
+    })
+    .join("");
+  const arrow = (dir: -1 | 1) =>
+    `<button type="button" class="ff-arrow ${dir < 0 ? "prev" : "next"}" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "&lt;" : "&gt;"}</button>`;
+  return `<div class="ff-page">${page > 0 ? arrow(-1) : ""}<div class="ff-grid" style="--cols: ${Math.min(FF_PER_PAGE, items.length - page * FF_PER_PAGE)}">${grid}</div>${page < pages - 1 ? arrow(1) : ""}</div>`;
 }
 
 /** セルフ操作モードで「FF」を押して FF タブを開いているレジ */

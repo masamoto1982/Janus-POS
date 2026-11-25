@@ -532,12 +532,12 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         limit: Option<u32>,
     },
-    /// 設定：売り場側の公開（四段目のボタン・五段目のタブごと、オーナー）
-    SetFloorPublic {
+    /// 設定：呼出し（セルフ操作モードの売り場側で押すと呼び出しにする四段目のボタン・五段目のタブ、オーナー）
+    SetFloorCall {
         owner_id: String,
         password: String,
         key: String,
-        public: bool,
+        call: bool,
     },
     /// 設定を開くときのオーナー認証
     VerifyOwner { owner_id: String, password: String },
@@ -3480,22 +3480,20 @@ impl Store {
                 self.age_rules.set_limit(&code, limit, by, self.now)?;
                 done("販売個数の上限を変更しました")
             }
-            C::SetFloorPublic {
+            C::SetFloorCall {
                 owner_id,
                 password,
                 key,
-                public,
+                call,
             } => {
                 let by = self.owner(&owner_id, &password)?;
-                let label = self
-                    .age_rules
-                    .set_floor_public(&key, public, by, self.now)?;
+                let label = self.age_rules.set_floor_call(&key, call, by, self.now)?;
                 done(format!(
-                    "「{label}」を売り場側に{}",
-                    if public {
-                        "公開しました"
+                    "「{label}」{}",
+                    if call {
+                        "を押すと呼び出すようにしました"
                     } else {
-                        "公開しないようにしました"
+                        "はお客様が操作できるようにしました"
                     }
                 ))
             }
@@ -5025,14 +5023,14 @@ impl Store {
                 .map(|b| NavButtonView {
                     key: b.key,
                     label: b.label,
-                    public: self.age_rules.floor_public(b.key),
+                    call: self.age_rules.floor_calls(b.key),
                     tabs: b
                         .tabs
                         .iter()
                         .map(|t| NavTabView {
                             key: t.key,
                             label: t.label,
-                            public: self.age_rules.floor_public(t.key),
+                            call: self.age_rules.floor_calls(t.key),
                             codes: t.codes.to_vec(),
                         })
                         .collect(),
@@ -5685,13 +5683,14 @@ pub struct FfMenuItem {
     pub tab_label: &'static str,
 }
 
-/// 四段目のボタン（売り場側の公開つき）
+/// 四段目のボタン（セルフ操作モードの売り場側で押すと呼び出しになるかつき）
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct NavButtonView {
     pub key: &'static str,
     pub label: &'static str,
-    pub public: bool,
+    /// セルフ操作モードの売り場側で押すと呼び出し（設定の「呼出し」）
+    pub call: bool,
     pub tabs: Vec<NavTabView>,
 }
 
@@ -5700,7 +5699,8 @@ pub struct NavButtonView {
 pub struct NavTabView {
     pub key: &'static str,
     pub label: &'static str,
-    pub public: bool,
+    /// セルフ操作モードの売り場側で押すと呼び出し（設定の「呼出し」）
+    pub call: bool,
     pub codes: Vec<&'static str>,
 }
 

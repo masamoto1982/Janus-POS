@@ -5799,14 +5799,14 @@ fn idle_revert_voids_the_held_transaction_too() {
     assert_eq!(v.mode, Mode::SelfOperated);
 }
 
-/// 仕様 14.4：売り場側に「FF」のボタンとそのタブを公開すると、セルフ操作モードの売り場側でその FF を登録できる
+/// 仕様 14.4：設定の「呼出し」で「FF」のボタンとそのタブを呼び出しにしないと、セルフ操作モードの売り場側でその FF を登録できる
 #[test]
 fn ff_published_on_the_floor_can_be_bought_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);
-    let publish = |pw: &str, key: &str, public: bool| json!({"type":"set_floor_public","owner_id":"000","password":pw,"key":key,"public":public});
+    let publish = |pw: &str, key: &str, public: bool| json!({"type":"set_floor_call","owner_id":"000","password":pw,"key":key,"call":!public});
     let coffee = json!({"type":"register_ff","register":1,"side":"floor","code":"FF32","qty":1});
     let chicken = json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1});
-    assert!(run(&mut s, coffee.clone()).is_err(), "既定はすべて非公開");
+    assert!(run(&mut s, coffee.clone()).is_err(), "既定はすべて呼び出し");
     assert!(
         run(&mut s, publish("0000", "drink", true)).is_err(),
         "オーナーだけ"
@@ -5818,19 +5818,21 @@ fn ff_published_on_the_floor_can_be_bought_in_self_operated_mode() {
     ok(&mut s, publish("9999", "drink", true));
     assert!(
         run(&mut s, coffee.clone()).is_err(),
-        "タブだけ公開しても、「FF」のボタンが非公開なら登録できない"
+        "タブだけ呼び出しをやめても、「FF」のボタンが呼び出しなら登録できない"
     );
     ok(&mut s, publish("9999", "ff", true));
     let snap = s.snapshot();
     let ff = snap.floor_nav.iter().find(|b| b.key == "ff").unwrap();
-    assert!(ff.public);
-    assert!(ff.tabs.iter().any(|t| t.label == "ドリンク" && t.public));
-    assert!(ff.tabs.iter().any(|t| t.label == "フライヤー" && !t.public));
+    assert!(!ff.call);
+    assert!(ff.tabs.iter().any(|t| t.label == "ドリンク" && !t.call));
+    assert!(ff.tabs.iter().any(|t| t.label == "フライヤー" && t.call));
     assert!(snap
         .age_rules
         .history
         .iter()
-        .any(|h| h.change.contains("FF／ドリンク") && h.change.contains("非公開 → 公開")));
+        .any(|h| h.change.contains("FF／ドリンク")
+            && h.change.contains("呼出し")
+            && h.change.contains("する → しない")));
     assert!(
         run(
             &mut s,

@@ -36,8 +36,9 @@ pub struct AgeRules {
     pub rules: Vec<AgeRule>,
     pub history: Vec<RuleChange>,
     pub limits: BTreeMap<String, u32>,
-    /// 売り場側に公開した四段目のボタン・五段目のタブのキー（catalog::NAV）。既定は空＝すべて非公開（押すと呼び出し）
-    pub floor_public: BTreeSet<String>,
+    /// セルフ操作モードの売り場側で、押しても呼び出しにしない（お客様が操作できる）四段目のボタン・五段目のタブのキー（catalog::NAV）。
+    /// 設定の「呼出し」で「しない」にしたもの。既定は空＝すべて押すと呼び出し
+    pub floor_open: BTreeSet<String>,
     #[serde(skip)]
     pub(crate) next_id: u32,
 }
@@ -61,7 +62,7 @@ impl Default for AgeRules {
                 catalog::TRADING_CARD.to_string(),
                 catalog::TRADING_CARD_LIMIT,
             )]),
-            floor_public: BTreeSet::new(),
+            floor_open: BTreeSet::new(),
             next_id: 1,
         };
         r.push(
@@ -177,50 +178,47 @@ impl AgeRules {
         Ok(())
     }
 
-    /// 売り場側に公開しているか（ボタンまたはタブのキー）
-    pub fn floor_public(&self, key: &str) -> bool {
-        self.floor_public.contains(key)
+    /// セルフ操作モードの売り場側で押すと呼び出しになるか（ボタンまたはタブのキー）
+    pub fn floor_calls(&self, key: &str) -> bool {
+        !self.floor_open.contains(key)
     }
 
-    /// その FF を売り場側の画面からも登録できるか（「FF」のボタンとその FF のタブがどちらも公開）
+    /// その FF を売り場側の画面からも登録できるか（「FF」のボタンとその FF のタブがどちらも呼び出しでない）
     pub fn ff_on_floor(&self, code: &str) -> bool {
-        self.floor_public("ff")
-            && catalog::ff_tab(code).is_some_and(|t| self.floor_public(catalog::ff_tab_key(t)))
+        !self.floor_calls("ff")
+            && catalog::ff_tab(code).is_some_and(|t| !self.floor_calls(catalog::ff_tab_key(t)))
     }
 
     /// 売り場側で登録できる FF のタブがあるか
     pub fn any_ff_on_floor(&self) -> bool {
-        self.floor_public("ff")
+        !self.floor_calls("ff")
             && FfTab::ALL
                 .iter()
-                .any(|&t| self.floor_public(catalog::ff_tab_key(t)))
+                .any(|&t| !self.floor_calls(catalog::ff_tab_key(t)))
     }
 
-    pub fn set_floor_public(
+    /// 設定の「呼出し」：売り場側で押すと呼び出しにするか
+    pub fn set_floor_call(
         &mut self,
         key: &str,
-        public: bool,
+        call: bool,
         by: &str,
         now: u64,
     ) -> Result<String, String> {
         let label = catalog::nav_label(key).ok_or("ボタン・タブがありません")?;
-        if self.floor_public(key) == public {
+        if self.floor_calls(key) == call {
             return Ok(label);
         }
-        if public {
-            self.floor_public.insert(key.to_string());
+        if call {
+            self.floor_open.remove(key);
         } else {
-            self.floor_public.remove(key);
+            self.floor_open.insert(key.to_string());
         }
-        let word = |p: bool| if p { "公開" } else { "非公開" };
+        let word = |c: bool| if c { "する" } else { "しない" };
         self.history.push(RuleChange {
             at: now,
             by: by.into(),
-            change: format!(
-                "売り場側の公開「{label}」：{} → {}",
-                word(!public),
-                word(public)
-            ),
+            change: format!("呼出し「{label}」：{} → {}", word(!call), word(call)),
         });
         Ok(label)
     }

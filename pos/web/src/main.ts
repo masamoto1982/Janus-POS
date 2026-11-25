@@ -1046,8 +1046,8 @@ app.addEventListener("change", (e) => {
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
-  if (sel.dataset.floorPublic && ownerAuth) {
-    const ok = send({ type: "set_floor_public", ...ownerAuth, key: sel.dataset.floorPublic, public: sel.value === "1" });
+  if (sel.dataset.floorCall && ownerAuth) {
+    const ok = send({ type: "set_floor_call", ...ownerAuth, key: sel.dataset.floorCall, call: sel.value === "1" });
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
@@ -1071,7 +1071,7 @@ app.addEventListener("change", (e) => {
 const RULES_GEAR = `<button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="設定" title="設定">⚙</button>`;
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
-const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_floor_public", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
+const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_floor_call", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
 let ownerAuth: { owner_id: string; password: string } | null = null;
 let rulesTab: RulesTab = "tax";
 
@@ -1205,7 +1205,7 @@ app.addEventListener("click", (e) => {
       const side = snap.registers.find((x) => x.id === register)?.mode === "self_operated" ? "floor" : "counter";
       if (!shelfForm.has(`${register}:${side}`)) shelfForm.set(`${register}:${side}`, { carton: false });
     } else closeShelfForm(register);
-    // セルフで公開した「たばこ」は、押した時点でたばこの呼び出しも立てる
+    // セルフで呼び出しでない「たばこ」も、押した時点でたばこの呼び出しも立てる
     if (b.dataset.navcall) {
       if (send(JSON.parse(b.dataset.navcall) as Command)) send({ type: "release_call", register });
       return;

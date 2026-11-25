@@ -109,7 +109,7 @@ struct SavedAgeRules {
     history: Vec<RuleChange>,
     limits: BTreeMap<String, u32>,
     #[serde(default)]
-    floor_public: BTreeSet<String>,
+    floor_open: BTreeSet<String>,
     next_id: u32,
 }
 
@@ -644,7 +644,7 @@ impl Store {
                 rules: self.age_rules.rules.clone(),
                 history: self.age_rules.history.clone(),
                 limits: self.age_rules.limits.clone(),
-                floor_public: self.age_rules.floor_public.clone(),
+                floor_open: self.age_rules.floor_open.clone(),
                 next_id: self.age_rules.next_id,
             },
             tax: SavedTax {
@@ -757,7 +757,7 @@ impl Store {
                 rules: s.age_rules.rules,
                 history: s.age_rules.history,
                 limits: s.age_rules.limits,
-                floor_public: s.age_rules.floor_public,
+                floor_open: s.age_rules.floor_open,
                 next_id: s.age_rules.next_id,
             },
             tax: TaxSettings {

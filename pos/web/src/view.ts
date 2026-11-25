@@ -1755,8 +1755,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || cancelAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {
-    // 売り場側にもレジカウンター側と同じ四段目・五段目のナビゲーション（user 2026-11-26）。公開したボタン・タブはお客様が使え、
-    // 公開していないボタン・タブを押すとそのボタンの用件の呼び出し（押している間 Bell が鳴る）。レジカウンター側は同じものを表示だけ
+    // 売り場側にもレジカウンター側と同じ四段目・五段目のナビゲーション（user 2026-11-26）。設定の「呼出し」で「する」のボタン・タブ（既定）は
+    // 押すとそのボタンの用件の呼び出し（押している間 Bell が鳴る）、「しない」にしたものはお客様が使える。レジカウンター側は同じものを表示だけ
     const a = (n: Action) => find(r.floor.actions, n);
     const at = selfNavAt(snap, ui.tab);
     if (!at) return `<div class="self-nav nav-note">${callNote([], now)}</div>`;
@@ -1764,11 +1764,11 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const call = navCall(reg, button.key);
     const gate = a(call.type === "ff_button" ? "ff_button" : "call_staff");
     const tabBtn = (t: NavTabView) =>
-      t.public
+      !t.call
         ? `<button type="button" role="tab" class="tab ff-tab ${t === tab ? "on" : ""}" data-fftab="${reg}:${t.key}" aria-selected="${t === tab}">${esc(t.label)}</button>`
         : `<button type="button" role="tab" class="tab ff-tab call-tab" aria-selected="false" data-hold="${esc(JSON.stringify(call))}"${gate.allowed ? "" : ` disabled title="${esc(gate.reason ?? "")}"`} title="スタッフを呼び出します">${esc(t.label)}</button>`;
     const row = `<div class="tabs ff-tabs self-nav" role="tablist" aria-label="${esc(button.label)}">${button.tabs.map(tabBtn).join("")}</div>`;
-    // 公開したタブがないボタン（たばこ・その他など）は、タブがすべて呼び出しになり、単品の代わりに添え書きを出す
+    // タブがすべて呼び出しのボタンは、単品の代わりに添え書きを出す
     if (!tab) return `${row}${callNote([], now)}`;
     if (button.key === "ff") return `${row}${ffPage(reg, side, snap, tab.key, ui.page, a("register_ff"), r.floor.lines)}`;
     if (button.key === "tobacco") return `${row}${shelfRow(reg, "floor", a("hold_shelf"))}`;
@@ -1786,10 +1786,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
 }
 
-/** 四段目・五段目のナビゲーション（user 2026-11-25・26）。ボタン・タブの並びと売り場側の公開はコア（snap.floor_nav）が持つ。
+/** 四段目・五段目のナビゲーション（user 2026-11-25・26）。ボタン・タブの並びと設定の「呼出し」はコア（snap.floor_nav）が持つ。
  *  四段目＝「FF」「金券」「たばこ」「その他」（セルフの売り場側にあった四つをレジカウンター側にも、user 2026-11-26）、押すと五段目のタブがそのボタンのタブに変わる。
- *  スタッフ操作モードのレジカウンター側はすべて使え、セルフ操作モードの売り場側は公開したボタン・タブだけ使え、
- *  公開していないものを押すとそのボタンの用件の呼び出し（ボタンの名前のとおり）。
+ *  スタッフ操作モードのレジカウンター側はすべて使え、セルフ操作モードの売り場側は「呼出し」を「しない」にしたボタン・タブだけ使え、
+ *  ほかを押すとそのボタンの用件の呼び出し（ボタンの名前のとおり）。
  *  カウンター内のバーコードのない商品は今のところ金券だけなので、たばこ・その他のタブは「拡張用」で商品を置かない */
 /// 仕様 8：四段目・五段目のナビゲーション
 
@@ -1814,32 +1814,32 @@ function goodsAt(snap: Snapshot, key: string): { button: NavButtonView; tab: Nav
   return null;
 }
 
-/** 売り場側（セルフ操作モード）で開いているボタンとタブ。選んだタブが公開でなければ、そのボタンの最初の公開タブ。
- *  ボタンが公開でなければ、最初の公開ボタン（既定は「FF」を公開していれば「FF」）。公開ボタンがなければ null（タブは出さない） */
+/** 売り場側（セルフ操作モード）で開いているボタンとタブ。選んだタブが呼び出しなら、そのボタンの最初の呼び出しでないタブ。
+ *  ボタンが呼び出しなら、最初の呼び出しでないボタン。そのボタンがなければ null（タブは出さない） */
 function selfNavAt(snap: Snapshot, key: string): { button: NavButtonView; tab: NavTabView | undefined } | null {
-  const chosen = snap.floor_nav.find((b) => b.public && b.tabs.some((t) => t.key === key));
-  const button = chosen ?? snap.floor_nav.find((b) => b.public);
+  const chosen = snap.floor_nav.find((b) => !b.call && b.tabs.some((t) => t.key === key));
+  const button = chosen ?? snap.floor_nav.find((b) => !b.call);
   if (!button) return null;
-  return { button, tab: button.tabs.find((t) => t.key === key && t.public) ?? button.tabs.find((t) => t.public) };
+  return { button, tab: button.tabs.find((t) => t.key === key && !t.call) ?? button.tabs.find((t) => !t.call) };
 }
 
-/** 公開していないボタン・タブを売り場側で押したときの呼び出し */
+/** 呼び出しのボタン・タブ（設定の「呼出し」で「する」）を売り場側で押したときの呼び出し */
 function navCall(reg: number, button: string): Command {
   if (button === "ff") return { type: "ff_button", register: reg };
   return { type: "call_staff", register: reg, topic: button === "voucher" ? "voucher" : button === "tobacco" ? "tobacco" : "other" };
 }
 
 /** 四段目。スタッフ操作モードのレジカウンター側は四つから一つを選ぶ切り替え（既定は「FF」、もう一度押しても戻らない）。
- *  セルフ操作モードは公開したボタンが切り替え、公開していないボタンは押している間の呼び出し（両画面同じ、レジカウンター側は表示だけ） */
+ *  セルフ操作モードは呼び出しでないボタンが切り替え、呼び出しのボタンは押している間の呼び出し（両画面同じ、レジカウンター側は表示だけ） */
 export function navFoot(r: RegisterView, snap: Snapshot, tab: string): string {
   const reg = r.id;
   const self = r.mode === "self_operated";
   const cur = self ? selfNavAt(snap, tab)?.button : (goodsAt(snap, tab)?.button ?? snap.floor_nav.find((b) => b.key === "ff"));
   const one = (b: NavButtonView) => {
     const on = b === cur;
-    // セルフで公開した「たばこ」は、押した時点でたばこの呼び出しも立てる（棚のたばこはスタッフが取ってお渡しする）
+    // セルフで呼び出しでない「たばこ」も、押した時点でたばこの呼び出しも立てる（棚のたばこはスタッフが取ってお渡しする）
     const also = self && b.key === "tobacco" && !on ? ` data-navcall="${esc(JSON.stringify(navCall(reg, b.key)))}"` : "";
-    if (!self || b.public)
+    if (!self || !b.call)
       return `<button type="button" class="${on ? "on" : "ghost"}" data-fftab="${reg}:${on ? tab : b.tabs[0].key}"${also} aria-pressed="${on}">${esc(b.label)}</button>`;
     const call = navCall(reg, b.key);
     const gate = find(r.floor.actions, call.type === "ff_button" ? "ff_button" : "call_staff");
@@ -2184,8 +2184,8 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   { id: "limit", label: "個数制限", note: "1回のお会計で売れる販売個数の上限です<br>超える分はスキャンしても登録されません" },
   {
     id: "floor",
-    label: "売り場側の公開",
-    note: "四段目のボタンと五段目のタブごとに、セルフ操作モードの売り場側でお客様が使えるようにするかを決めます<br>公開していないボタン・タブを押すと、そのボタンの用件でスタッフを呼び出します<br>タブを公開しても、そのボタンが非公開ならお客様は開けません<br>コーヒーなど作り置きのない FF はお客様がご自分でお取りになり、揚げ物など作り置きの FF はスタッフがお渡しします",
+    label: "呼出し",
+    note: "セルフ操作モードの売り場側で、押すとスタッフを呼び出すボタン・タブを決めます（既定はすべて呼び出し）<br>呼び出しを「しない」にしたボタン・タブは、お客様が自分で使えます<br>タブを「しない」にしても、そのボタンが呼び出しならお客様は開けません<br>コーヒーなど作り置きのない FF はお客様がご自分でお取りになり、揚げ物など作り置きの FF はスタッフがお渡しします",
   },
   // Bell の鳴動は独立した「Bell の設定」から設定のタブに移した（user 2026-11-24）
   {
@@ -2196,14 +2196,14 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
 ];
 
 
-function floorPublicRows(s: Snapshot): string {
-  const sel = (key: string, label: string, pub: boolean) =>
-    `<select data-floor-public="${key}" aria-label="${esc(label)}を売り場側に公開するか"><option value="1" ${pub ? "selected" : ""}>公開</option><option value="0" ${pub ? "" : "selected"}>非公開</option></select>`;
+function floorCallRows(s: Snapshot): string {
+  const sel = (key: string, label: string, call: boolean) =>
+    `<select data-floor-call="${key}" aria-label="${esc(label)}を押すと呼び出すか"><option value="1" ${call ? "selected" : ""}>する</option><option value="0" ${call ? "" : "selected"}>しない</option></select>`;
   return s.floor_nav
     .map(
       (b) =>
-        `<tr class="nav-button-row"><td><b>${esc(b.label)}</b></td><td></td><td>${sel(b.key, b.label, b.public)}</td></tr>` +
-        b.tabs.map((t) => `<tr><td></td><td>${esc(t.label)}</td><td>${sel(t.key, `${b.label}の${t.label}`, t.public)}</td></tr>`).join(""),
+        `<tr class="nav-button-row"><td><b>${esc(b.label)}</b></td><td></td><td>${sel(b.key, b.label, b.call)}</td></tr>` +
+        b.tabs.map((t) => `<tr><td></td><td>${esc(t.label)}</td><td>${sel(t.key, `${b.label}の${t.label}`, t.call)}</td></tr>`).join(""),
     )
     .join("");
 }
@@ -2292,7 +2292,7 @@ export function ownerPanel(s: Snapshot, tab: RulesTab): string {
       : cur.id === "limit"
         ? `<table class="lines rules"><thead><tr><th>商品</th><th>販売個数</th></tr></thead><tbody>${shelfRows(s, 2, (p) => `<tr><td>${esc(p.name)}</td><td>${limitSelect(p)}</td></tr>`)}</tbody></table>`
         : cur.id === "floor"
-          ? `<table class="lines rules"><thead><tr><th>四段目のボタン</th><th>五段目のタブ</th><th>売り場側</th></tr></thead><tbody>${floorPublicRows(s)}</tbody></table>`
+          ? `<table class="lines rules"><thead><tr><th>四段目のボタン</th><th>五段目のタブ</th><th>呼出し</th></tr></thead><tbody>${floorCallRows(s)}</tbody></table>`
           : cur.id === "bell"
             ? `<div class="bell-settings">${bellSettings(s)}</div>`
             : taxPanel(s);

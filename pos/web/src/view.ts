@@ -1737,15 +1737,18 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
  *  選んでいるものは積極、もう一度押すと FF に戻る。カウンター内のバーコードのない商品は今のところ金券だけなので、
  *  ほかの二つのボタンとその下のタブは「拡張用」と出し、商品は置かない */
 /// 仕様 8：スタッフ操作モードのレジカウンター側の金券・拡張用の段
-export const GOODS_GROUPS: readonly { key: string; label: string; tabs: readonly (readonly [string, string, readonly string[]])[] }[] = [
+/** タブの中身は [商品コード, 一行目, 添え字]。タブの名前で何の商品かは自明なので「切手」「はがき」の添え字は付けない（user 2026-11-26）。
+ *  はがきは通常・インクジェットとも 85 円なので、額面を一行目に、種類を添え字に（「インクジェット」を一行目にすると狭くて読めないほど縮む） */
+type GoodsItem = readonly [string, string, string];
+export const GOODS_GROUPS: readonly { key: string; label: string; tabs: readonly (readonly [string, string, readonly GoodsItem[]])[] }[] = [
   {
     key: "voucher",
     label: "金券",
     tabs: [
-      ["g_stamp", "切手", ["4900000000141"]],
-      ["g_postcard", "はがき", ["4900000000165", "4900000000219"]],
-      ["g_revenue", "印紙", ["4900000000172", "4900000000189"]],
-      ["g_garbage", "ゴミ処理券", ["4900000000196", "4900000000202"]],
+      ["g_stamp", "切手", [["4900000000189", "85円", ""], ["4900000000141", "110円", ""]]],
+      ["g_postcard", "はがき", [["4900000000165", "85円", "通常"], ["4900000000219", "85円", "インクジェット"]]],
+      ["g_revenue", "印紙", [["4900000000172", "200円", ""]]],
+      ["g_garbage", "ゴミ処理券", [["4900000000196", "300円", "東京都"]]],
     ],
   },
   { key: "ext1", label: "拡張用", tabs: [["g_ext1a", "拡張用", []], ["g_ext1b", "拡張用", []], ["g_ext1c", "拡張用", []]] },
@@ -1764,23 +1767,23 @@ export function goodsFoot(r: RegisterView, tab: string): string {
 
 /** 金券・たばこ・その他の単品ボタン。FF の単品ボタンと同じ形・同じページ送りで、押すとその商品のバーコードを読んだのと同じ登録（取消しの場面では取り消し） */
 function goodsPage(reg: number, snap: Snapshot, tab: string, wantPage: number, can: Gate, lines: readonly { name: string; qty: number }[], cancel = false): string {
-  const codes: readonly string[] = groupOf(tab)!.tabs.find(([k]) => k === tab)![2];
-  const items = codes.map((c) => snap.catalog.find((p) => p.code === c)).filter((p) => !!p);
+  const items = groupOf(tab)!.tabs.find(([k]) => k === tab)![2].flatMap(([code, main, sub]) => {
+    const p = snap.catalog.find((c) => c.code === code);
+    return p ? [{ p, label: sub ? `${main}\n${sub}` : main }] : [];
+  });
   const ordered = (name: string) => lines.reduce((n, l) => n + (l.name === name ? l.qty : 0), 0);
   const pages = Math.max(1, Math.ceil(items.length / FF_PER_PAGE));
   const page = Math.min(wantPage, pages - 1);
   const grid = items
     .slice(page * FF_PER_PAGE, (page + 1) * FF_PER_PAGE)
-    .map((p) => {
+    .map(({ p, label }) => {
       const cmd: Command = cancel ? { type: "cancel_item", register: reg, side: "counter", code: p.code } : { type: "scan", register: reg, side: "counter", code: p.code };
-      // 一行目に額面（FF の絵文字の位置、登録数量のバッジが名前に重ならない）、二行目に名前（「収入印紙 200円」は額面を外して「収入印紙」）
-      const label = `${yen(p.price)}\n${p.name.replace(/ [\d,]+円$/, "")}`;
       return withBadge(btn(label, cmd, can, "ff-item plenty"), ffBadge(ordered(p.name)));
     })
     .join("");
   const arrow = (dir: -1 | 1) =>
     `<button type="button" class="ff-arrow ${dir < 0 ? "prev" : "next"}" data-ffpage="${reg}:${dir}" aria-label="${dir < 0 ? "前のページ" : "次のページ"}">${dir < 0 ? "&lt;" : "&gt;"}</button>`;
-  return `<div class="ff-page">${page > 0 ? arrow(-1) : ""}<div class="ff-grid" style="--cols: ${Math.min(FF_PER_PAGE, items.length - page * FF_PER_PAGE)}">${grid}</div>${page < pages - 1 ? arrow(1) : ""}</div>`;
+  return `<div class="ff-page">${page > 0 ? arrow(-1) : ""}<div class="ff-grid goods-grid" style="--cols: ${Math.min(FF_PER_PAGE, items.length - page * FF_PER_PAGE)}">${grid}</div>${page < pages - 1 ? arrow(1) : ""}</div>`;
 }
 
 /** セルフ操作モードで「FF」を押して FF タブを開いているレジ */

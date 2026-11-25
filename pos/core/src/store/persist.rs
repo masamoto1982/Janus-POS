@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AgeMethod, OnHold, AuditEntry, EmoneyTask, Line, LineKind, Menu, Passed, Receipt,
-    ReceiptStamp, Register, StaffSession, Store, TicketRow, Txn,
+    AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, OnHold, Passed, Receipt, ReceiptStamp,
+    Register, StaffSession, Store, TicketRow, Txn,
 };
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
 use crate::auth::{self, Authenticator, Guard};
@@ -25,6 +25,9 @@ fn leak(s: String) -> &'static str {
 }
 
 fn product(code: &str) -> Result<&'static catalog::Product, String> {
+    if code == catalog::TOBACCO_SHELF.code {
+        return Ok(&catalog::TOBACCO_SHELF);
+    }
     catalog::find(code).ok_or_else(|| format!("商品 {code} がありません"))
 }
 
@@ -512,7 +515,8 @@ impl SavedRegister {
                     txn: h.txn.restore()?,
                     owner: match h.owner {
                         Some(id) => Some(
-                            auth::account(&id).ok_or_else(|| format!("スタッフ {id} がいません"))?,
+                            auth::account(&id)
+                                .ok_or_else(|| format!("スタッフ {id} がいません"))?,
                         ),
                         None => None,
                     },

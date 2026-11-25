@@ -184,15 +184,25 @@ impl AgeRules {
 
     /// その FF を売り場側の画面からも登録できるか（「FF」のボタンとその FF のタブがどちらも公開）
     pub fn ff_on_floor(&self, code: &str) -> bool {
-        self.floor_public("ff") && catalog::ff_tab(code).is_some_and(|t| self.floor_public(catalog::ff_tab_key(t)))
+        self.floor_public("ff")
+            && catalog::ff_tab(code).is_some_and(|t| self.floor_public(catalog::ff_tab_key(t)))
     }
 
     /// 売り場側で登録できる FF のタブがあるか
     pub fn any_ff_on_floor(&self) -> bool {
-        self.floor_public("ff") && FfTab::ALL.iter().any(|&t| self.floor_public(catalog::ff_tab_key(t)))
+        self.floor_public("ff")
+            && FfTab::ALL
+                .iter()
+                .any(|&t| self.floor_public(catalog::ff_tab_key(t)))
     }
 
-    pub fn set_floor_public(&mut self, key: &str, public: bool, by: &str, now: u64) -> Result<String, String> {
+    pub fn set_floor_public(
+        &mut self,
+        key: &str,
+        public: bool,
+        by: &str,
+        now: u64,
+    ) -> Result<String, String> {
         let label = catalog::nav_label(key).ok_or("ボタン・タブがありません")?;
         if self.floor_public(key) == public {
             return Ok(label);
@@ -206,7 +216,11 @@ impl AgeRules {
         self.history.push(RuleChange {
             at: now,
             by: by.into(),
-            change: format!("売り場側の公開「{label}」：{} → {}", word(!public), word(public)),
+            change: format!(
+                "売り場側の公開「{label}」：{} → {}",
+                word(!public),
+                word(public)
+            ),
         });
         Ok(label)
     }

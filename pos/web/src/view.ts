@@ -18,6 +18,7 @@ import type {
   FfState,
   NavButtonView,
   NavTabView,
+  ShelfEntry,
   MenuScreen,
   RegisterView,
   Snapshot,
@@ -110,7 +111,54 @@ const skipCorner = (cmd: Command, a?: Gate): string => `<div class="skip-foot">$
 
 const flagSpan = (label: string): string => `<span class="flag">${esc(label)}</span>`;
 
+/** 仮登録のたばこ（棚番号だけで、まだどの商品か決まっていない明細） */
+type ShelfLike = { kind: string; shelf?: number; carton?: boolean };
+const isShelf = (l: ShelfLike): boolean => l.kind === "shelf";
+/** たばこの仮登録の入力（user 2026-11-26）。「たばこ」の銘柄タブを選ぶと三段目がこの入力になる。キーは `${reg}:${side}`。
+ *  entries＝入力済みの棚番号と個数（何件でも）、carton＝入力中の一件の単位。棚番号・個数の欄は padValue（shf・shq）に持つ */
+export type ShelfForm = { entries: ShelfEntry[]; carton: boolean };
+export const shelfForm = new Map<string, ShelfForm>();
+
+/** 三段目：棚番号とお求めの個数の入力。棚番号をテンキーで決定すると個数のテンキーが開き、個数を決定すると一件が下の一覧に加わる。
+ *  「仮登録」で一覧をまとめて明細に仮登録する（入力途中の一件も加える）。案内の一行は五段目のタブの下に出すので、ここには繰り返さない */
+function shelfFormScreen(reg: number, side: Side, f: ShelfForm, st: Gate): string {
+  const shelf = padValue.get(padValueKey(reg, "shf")) ?? "";
+  const qty = padValue.get(padValueKey(reg, "shq")) ?? "";
+  const unit = (carton: boolean) => (carton ? "カートン" : "個");
+  const rows = f.entries
+    .map((e, i) => `<tr><td class="num">${e.shelf}</td><td class="num">${e.qty}</td><td>${unit(e.carton)}</td><td class="num"><button type="button" class="small neg" data-shelf-del="${reg}:${side}:${i}">削除</button></td></tr>`)
+    .join("");
+  const choice = (carton: boolean) =>
+    `<button type="button" class="seg${f.carton === carton ? " on" : ""}" data-shelf-unit="${reg}:${side}:${carton ? 1 : 0}" aria-pressed="${f.carton === carton}">${unit(carton)}</button>`;
+  const input = `<tr class="shelf-input"><td class="num">${padField(reg, side, "shf", shelf, "棚番号", "棚番号")}</td><td class="num">${padField(reg, side, "shq", qty, "個数", "お求めの個数")}</td><td><span class="row shelf-unit">${choice(false)}${choice(true)}</span></td><td></td></tr>`;
+  const ready = f.entries.length > 0 || (shelf !== "" && qty !== "");
+  const hold = `<button type="button" class="primary" data-shelf-hold="${reg}:${side}"${ready && st.allowed ? "" : ` disabled${st.reason ? ` title="${esc(st.reason)}"` : ""}`}>仮登録</button>`;
+  return `<div class="ffv-screen shelf-form">
+      <table class="lines ffv"><thead><tr><th class="num">棚番号</th><th class="num">個数</th><th>単位</th><th></th></tr></thead><tbody>${rows}${input}</tbody></table>
+      <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-shelf-close="${reg}:${side}">バック</button>${hold}</div>
+    </div>`;
+}
+
+/** 入力済みの一覧と入力途中の一件（棚番号と個数がそろっていれば）を合わせた、仮登録する件 */
+export function shelfEntries(reg: number, f: ShelfForm): ShelfEntry[] {
+  const shelf = padValue.get(padValueKey(reg, "shf")) ?? "";
+  const qty = padValue.get(padValueKey(reg, "shq")) ?? "";
+  return shelf && qty ? [...f.entries, { shelf: Number(shelf), qty: Number(qty), carton: f.carton }] : f.entries;
+}
+
+/** 明細の品目名。仮登録のたばこは「たばこ 棚番号」（カートンなら「たばこ 棚番号 カートン」） */
+export function lineName(l: ShelfLike & { name: string }): string {
+  return isShelf(l) ? `${l.name} ${l.shelf}${l.carton ? " カートン" : ""}` : l.name;
+}
+
+/** お渡し照合を待つ明細のフラグ：FF の「お渡し前」と仮登録のたばこの「仮登録」。どちらも押すと同じお渡し照合の画面を開く。
+ *  「お渡し前」はお客様側に出さない、「仮登録」はお客様が入力したものなので売り場側にも（押せない札で）出す */
 function ffFlag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: Gate, ro: boolean): string {
+  if (isShelf(l)) {
+    if (ro) return flagSpan("仮登録");
+    const title = a.allowed ? "押して、仮登録のたばこを読み取る" : (a.reason ?? "");
+    return `<button type="button" class="flag ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>仮登録</button>`;
+  }
   if (l.kind !== "ff" || l.state !== "waiting" || ro) return "";
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
   return `<button type="button" class="flag ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>お渡し前</button>`;
@@ -124,8 +172,14 @@ function closeFfVerify(reg: number, side: Side): void {
   for (const k of [...ffvInput.keys()]) if (k.startsWith(`${reg}:${side}:`)) ffvInput.delete(k);
 }
 
+/** お渡し照合の行：お渡し前の FF（照合した行も入力が残るあいだ）と、レジカウンター側では仮登録のたばこ */
 function ffVerifyRows<L extends { id: number; kind: string; state?: FfState }>(reg: number, side: Side, lines: L[]): L[] {
-  return lines.filter((l) => l.kind === "ff" && (l.state === "waiting" || ffvInput.has(`${reg}:${side}:${l.id}`)));
+  return lines.filter((l) => (l.kind === "ff" && (l.state === "waiting" || ffvInput.has(`${reg}:${side}:${l.id}`))) || (side === "counter" && isShelf(l)));
+}
+
+/** お渡し照合の画面で、次に読み取ったたばこを充てる仮登録の明細（入力した順に一つずつ） */
+export function shelfTarget<L extends { id: number; kind: string }>(lines: L[]): L | undefined {
+  return lines.filter(isShelf).sort((a, b) => a.id - b.id)[0];
 }
 
 function ffVerifyOpen<L extends { id: number; kind: string; state?: FfState }>(reg: number, side: Side, lines: L[]): boolean {
@@ -134,8 +188,15 @@ function ffVerifyOpen<L extends { id: number; kind: string; state?: FfState }>(r
   return rows.length > 0 && !rows.every((l) => l.state === "received");
 }
 
-function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number; ff_base?: number }[], floor: boolean): string {
-  const ff = ffVerifyRows(reg, side, lines).sort((a, b) => b.touched - a.touched);
+function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number; ff_base?: number; shelf?: number; carton?: boolean }[], floor: boolean): string {
+  const all = ffVerifyRows(reg, side, lines);
+  const ff = all.filter((l) => !isShelf(l)).sort((a, b) => b.touched - a.touched);
+  const shelves = all.filter(isShelf).sort((a, b) => a.id - b.id);
+  const target = shelfTarget(shelves);
+  // 仮登録のたばこ：お渡し数の入力の代わりに、棚から取ったたばこを読み取る（上の行から順に充てる）
+  const shelfRows = shelves
+    .map((l) => `<tr${l === target ? ` class="shelf-target"` : ""}><td>${esc(lineName(l))}</td><td class="num">${l.qty}</td><td class="num">—</td><td class="ffv-judge">${l === target ? `<span class="ffv-wait">読み取り待ち</span>` : ""}</td></tr>`)
+    .join("");
   const rows = ff
     .map((l) => {
       const key = `${reg}:${side}:${l.id}`;
@@ -151,9 +212,16 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
       return `<tr><td>${esc(name)}</td><td class="num">${need}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${floor ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
+  const head = floor
+    ? "お受け取りした数を入力してください"
+    : !shelves.length
+      ? "お渡しした数を入力してください"
+      : ff.some((l) => l.state !== "received")
+        ? "お渡し数を入力し、たばこを読み取ってください"
+        : "棚のたばこを読み取ってください";
   return `<div class="ffv-screen">
-      <div class="big">${floor ? "お受け取りした数を入力してください" : "お渡しした数を入力してください"}</div>
-      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${floor ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="big">${head}</div>
+      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${floor ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}${shelfRows}</tbody></table>
       <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-ffverify-close="${reg}:${side}" >バック</button></div>
     </div>`;
 }
@@ -333,7 +401,7 @@ function passedCard(reg: number, side: Side, v: CounterView): string {
       ? `<div class="point-screen passed">${mark}${msg(`${p.age}歳以上であることを確認しました`, "身分証をお返しください")}${next}</div>`
       : `<div class="point-screen passed">${mark}${msg("年齢確認が完了しました", "ご協力ありがとうございました")}</div>`;
   // FF はスタッフが取り仕切るので、スタッフ操作モードの売り場側には出さない
-  return side === "counter" ? `<div class="point-screen passed">${mark}${msg("FFのお渡しを確認しました", "お渡し数がすべて注文数と一致しています")}${next}</div>` : "";
+  return side === "counter" ? `<div class="point-screen passed">${mark}${msg("お渡しを確認しました", "お渡し照合がすべて済みました")}${next}</div>` : "";
 }
 
 export function pendingParcel(lines: CounterLine[]): CounterLine | undefined {
@@ -643,7 +711,7 @@ function counterLine(reg: number, l: CounterLine, v: CounterView, side: Side): s
   const ro = side === "floor";
   const tags = [
     expiredFlag(reg, side, l, !ro),
-    ffFlag(reg, side, l, find(v.actions, "check_ff"), ro),
+    ffFlag(reg, side, l, find(v.actions, "check_handover"), ro),
     stampFlag(reg, side, v.bills.find((b) => b.line_id === l.id), find(v.actions, "affix_stamp"), ro),
     serviceFlag(l),
     ro ? ageFlag(l) : ageFlag(l, { type: "early_age_check", register: reg, side: "counter", start: true }, find(v.actions, "early_age_check")),
@@ -666,7 +734,7 @@ function counterLine(reg: number, l: CounterLine, v: CounterView, side: Side): s
       ? `${n}`
       : qtyCell(reg, side, { id: l.id, qty: n }, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, v.lines));
   return `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}">
-    <td>${esc(l.name)} ${[...tags, ...coupon].join(" ")}${svc}</td>
+    <td>${esc(lineName(l))} ${[...tags, ...coupon].join(" ")}${svc}</td>
     <td class="num">${qty}</td>
     <td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, v.coupons, l.id)}</td>
   </tr>`;
@@ -745,7 +813,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt" | "cpn";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt" | "cpn" | "shf" | "shq";
 /** error：テンキーの「決定」で送った入力が受け付けられなかった理由。テンキーを開いたまま表示し、次のキーで消す */
 export type PadEntry = { target: PadTarget; line?: number; digits: string; error?: string };
 export const padEntry = new Map<string, PadEntry>();
@@ -764,6 +832,8 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   mpw: { title: "店舗パスワード", unit: "", max: 8, code: true },
   ppt: { title: "使うポイント数", unit: "P", max: 5 },
   cpn: { title: "取り消す枚数", unit: "枚", max: 3 },
+  shf: { title: "棚番号", unit: "番", max: 3 },
+  shq: { title: "お求めの個数", unit: "", max: 2 },
 };
 /** 入力フォームの幅の見本：いちばん長く打ち込んだときの表示（law.ts fitForms が幅を決める） */
 const padFit = (target: PadTarget): string => padShow(target, "0".repeat(PAD[target].max)) + (PAD[target].decimal ? "." : "");
@@ -1162,6 +1232,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (r.receipt_stamp && !v.lines.length) return confirm(receiptStampScreen(reg, side, r.receipt_stamp, r.last_receipt?.no, a("affix_receipt_stamp")));
   if (r.last_receipt && !v.lines.length) return (r.change_left ? changeLeft() : confirm(r.outlet ? changeDue(side, r.outlet, r.last_receipt.method.includes("現金") ? r.last_receipt.paid : 0) : thanks(r.last_receipt)));
   if (!v.lines.length && !v.coupons.length && !v.point_card) cancelAsk.delete(reg);
+  const sf = side === "counter" && v.phase === "registering" ? shelfForm.get(`${reg}:${side}`) : undefined;
+  if (sf) return confirm(shelfFormScreen(reg, side, sf, a("hold_shelf")));
   // ポイントカード（アプリ）だけ読んだときも取引は始まっているので、登録画面に進む
   if (!v.lines.length && !v.coupons.length && !v.point_card && !v.returned.length && !v.confiscated.length && !v.ff_collect.length && !zeroDone.has(`${reg}:${side}`)) return staffOperatedWelcome(r, side);
   const ro = side === "floor";
@@ -1187,7 +1259,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       ? ageStep(reg, v, side, a)
       : "";
 
-  const ffFirst = !paying && v.lines.some((l) => l.kind === "ff" && l.state === "waiting") && a("check_ff").allowed;
+  const ffFirst = !paying && v.lines.some((l) => (l.kind === "ff" && l.state === "waiting") || isShelf(l)) && a("check_handover").allowed;
   // 販売期限切れの品を回収するまで会計は押せないので、会計ボタンはグレーアウト（core の checkout が理由つきで拒む）
   const expiredAny = v.lines.some((l) => l.expired);
   // 一部を払ったあと（電子マネーの残高を使い切って残りを現金で払うときなど）は、合計を残りのお支払い額にする
@@ -1343,7 +1415,7 @@ const ON_SCREEN: RegExp[] = [
   /^スタッフが身分証の生年月日を入力していません$/,
   /^ポイントカードの確認が済んでいません$/,
   /^適用先のないクーポンがあります\n/,
-  /^FF のお渡し確認（お渡し個数の照合）が済んでいません$/,
+  /^お渡し照合（FF のお渡し数・仮登録のたばこ）が済んでいません$/,
   /^サービス商品の受付が済んでいません$/,
   /^スタッフがサービス商品の受付をするまでお待ちください$/,
   /^同じお届け先の荷物があるか選んでください$/,
@@ -1681,7 +1753,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.emergency) return emergencyContactsRow();
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
   // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
-  if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length) return callingRow(r, side, snap.now);
+  // たばこの仮登録の入力中は、たばこの呼び出しの応答待ちでもタブと案内を残す（入力を続けられるように）
+  const shelfing = shelfForm.has(`${reg}:floor`) && r.waiting_calls.every((k) => k === "tobacco");
+  if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length && !shelfing) return callingRow(r, side, snap.now);
   // スタッフ操作モードの「取り消す商品をスキャンしてください」の場面では、最下段に FF タブを出す。
   // FF はスキャンできないので、取り消したい FF のボタンを押すと取り消しが成立する（user 2026-11-21）
   const asked = cancelAsk.get(reg);
@@ -1710,6 +1784,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     // 公開したタブがないボタン（たばこ・その他など）は、タブがすべて呼び出しになり、単品の代わりに添え書きを出す
     if (!tab) return `${row}${callNote([], now)}`;
     if (button.key === "ff") return `${row}${ffPage(reg, side, snap, tab.key, ui.page, a("register_ff"), r.floor.lines)}`;
+    if (button.key === "tobacco") return `${row}${SHELF_NOTE}`;
     return `${row}${goodsPage(reg, snap, button, tab, ui.page, side, a("scan"), r.floor.lines)}`;
   }
   if (r.mode === "staff_operated" && side === "floor") return signage(now);
@@ -1718,6 +1793,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
   const goods = goodsAt(snap, ui.tab);
+  if (goods?.button.key === "tobacco") return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${SHELF_NOTE}`;
   if (goods) return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "scan"), r.counter.lines)}`;
   const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
@@ -1760,6 +1836,9 @@ function selfNavAt(snap: Snapshot, key: string): { button: NavButtonView; tab: N
   return { button, tab: button.tabs.find((t) => t.key === key && t.public) ?? button.tabs.find((t) => t.public) };
 }
 
+/** たばこの銘柄タブの中身：単品ボタンは置かず、棚番号と個数の入力（三段目）を案内する一行 */
+const SHELF_NOTE = `<p class="call-note shelf-note"><span>棚番号とお求めの個数をご入力ください</span></p>`;
+
 /** 公開していないボタン・タブを売り場側で押したときの呼び出し */
 function navCall(reg: number, button: string): Command {
   if (button === "ff") return { type: "ff_button", register: reg };
@@ -1774,8 +1853,10 @@ export function navFoot(r: RegisterView, snap: Snapshot, tab: string): string {
   const cur = self ? selfNavAt(snap, tab)?.button : (goodsAt(snap, tab)?.button ?? snap.floor_nav.find((b) => b.key === "ff"));
   const one = (b: NavButtonView) => {
     const on = b === cur;
+    // セルフで公開した「たばこ」は、押した時点でたばこの呼び出しも立てる（棚のたばこはスタッフが取ってお渡しする）
+    const also = self && b.key === "tobacco" && !on ? ` data-navcall="${esc(JSON.stringify(navCall(reg, b.key)))}"` : "";
     if (!self || b.public)
-      return `<button type="button" class="${on ? "on" : "ghost"}" data-fftab="${reg}:${on ? tab : b.tabs[0].key}" aria-pressed="${on}">${esc(b.label)}</button>`;
+      return `<button type="button" class="${on ? "on" : "ghost"}" data-fftab="${reg}:${on ? tab : b.tabs[0].key}"${also} aria-pressed="${on}">${esc(b.label)}</button>`;
     const call = navCall(reg, b.key);
     const gate = find(r.floor.actions, call.type === "ff_button" ? "ff_button" : "call_staff");
     return `<button type="button" class="ghost call-tab" data-hold="${esc(JSON.stringify(call))}"${gate.allowed ? "" : ` disabled title="${esc(gate.reason ?? "")}"`} title="スタッフを呼び出します">${esc(b.label)}</button>`;
@@ -1934,7 +2015,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   if (r.last_receipt && !c.lines.length) return (r.change_left ? changeLeft() : confirm(thanks(r.last_receipt)));
 
   const lineRows = c.lines.map((l): Row => {
-      const tags = [expiredFlag(reg, side, l, a("remove_line").allowed), stampFlag(reg, side, c.bills.find((b) => b.line_id === l.id), a("affix_stamp"), true), serviceFlag(l), ageFlag(l), limitFlag(l)].filter(Boolean);
+      const tags = [expiredFlag(reg, side, l, a("remove_line").allowed), ffFlag(reg, side, l, a("check_handover"), side === "floor" || !a("check_handover").allowed), stampFlag(reg, side, c.bills.find((b) => b.line_id === l.id), a("affix_stamp"), true), serviceFlag(l), ageFlag(l), limitFlag(l)].filter(Boolean);
       const fixedHere = isBill(l) || l.pickup || l.parcel || (l.kind === "ff" && l.state === "received");
       const n = l.tickets || l.qty;
       const qty =
@@ -1942,7 +2023,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
           ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, c.lines))
           : `${n}`;
       const coupon = couponFlags(reg, side, c.coupons, l.id, l.qty, a("remove_coupon"), false);
-      return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(l.name)} ${[...tags, ...coupon].join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, c.coupons, l.id)}</td></tr>`];
+      return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(lineName(l))} ${[...tags, ...coupon].join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, c.coupons, l.id)}</td></tr>`];
     });
   const rows = newestFirst([...couponRows(reg, side, c.coupons, a("remove_coupon")), ...lineRows]);
 
@@ -1961,6 +2042,8 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
   );
 
   if (!c.lines.length && !c.coupons.length && !c.point_card) cancelAsk.delete(reg);
+  const sf = c.phase === "registering" ? shelfForm.get(`${reg}:${side}`) : undefined;
+  if (sf) return confirm(shelfFormScreen(reg, side, sf, a("hold_shelf")));
   if (!c.lines.length && !c.coupons.length && !c.point_card && !c.returned.length && !zeroDone.has(`${reg}:${side}`)) return `${welcomeBand(r, side, a("emoney"), false)}${welcome(r, side, a("emoney"))}`;
   const back = c.phase === "paying" ? backFoot(reg, side, a("back_to_registering")) : "";
   const screen = (body: string) => `${top}${confirm(body + (cancelAsk.has(reg) ? "" : back))}`;

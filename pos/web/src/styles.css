@@ -1115,3 +1115,11 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 /* 売り場側のナビゲーションで、公開したボタンがない・公開したタブがないときの添え書き（user 2026-11-26）：残りの高さの中央に */
 .self-nav.nav-note, .ff-tabs.self-nav + .call-note { flex: 1; display: flex; align-items: center; justify-content: center; }
 .rules tr.nav-button-row td { border-top: var(--s17, 1px) solid var(--border); }
+
+/* たばこの仮登録（user 2026-11-26）：三段目の棚番号・個数の入力。左下にバック、右下に「仮登録」 */
+.shelf-form .ffv-foot { justify-content: space-between; align-items: center; }
+.shelf-form .lines.ffv td { text-align: left; }
+.shelf-form .shelf-unit { gap: var(--gap); flex-wrap: nowrap; }
+.ffv-wait { font-weight: 700; color: var(--msg-strong); white-space: nowrap; }
+.ffv-screen .lines.ffv tr.shelf-target td { font-weight: 700; }
+.ff-tabs.self-nav + .shelf-note, .ff-tabs + .shelf-note { flex: 1; display: flex; align-items: center; justify-content: center; margin: 0; }

@@ -1,7 +1,7 @@
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{
-    Command, FfState, LineKind, RegisterView, Store, EMERGENCY_LOG_MS, EMERGENCY_PRESSES,
+    Command, FfState, LineKind, Passed, RegisterView, Store, EMERGENCY_LOG_MS, EMERGENCY_PRESSES,
     EMERGENCY_WINDOW_MS,
 };
 use serde_json::{json, Value};
@@ -330,7 +330,7 @@ fn fast_food_flow_in_self_operated_mode() {
         json!({"type":"checkout","register":2,"side":"counter"}),
     )
     .unwrap_err();
-    assert!(e.contains("お渡し確認"), "{e}");
+    assert!(e.contains("お渡し照合"), "{e}");
     let ff = reg(&s, 2)
         .counter
         .lines
@@ -1439,7 +1439,7 @@ fn staff_operated_screens_lock_only_while_touched() {
     let v = reg(&s, 1);
     assert_eq!(v.counter.lines.len(), 2);
     assert!(!allowed(&v, Side::Counter, Action::Checkout));
-    assert!(allowed(&v, Side::Counter, Action::CheckFf));
+    assert!(allowed(&v, Side::Counter, Action::CheckHandover));
     let ids: Vec<u32> = v.counter.lines.iter().map(|l| l.line.id).collect();
     let check = |id: u32, side: &str| json!({"type":"check_ff","register":1,"side":side,"line_id":id,"handed":1});
     assert!(run(&mut s, check(ids[0], "floor")).is_err());
@@ -3372,24 +3372,49 @@ fn cancel_scan_removes_one_and_tells_when_the_item_was_not_registered() {
     scan(&mut s, 1, "counter", TEA);
     scan(&mut s, 1, "counter", TEA);
     scan(&mut s, 1, "counter", BREAD);
-    let cancel = |code: &str| json!({"type":"cancel_item","register":1,"side":"counter","code":code});
+    let cancel =
+        |code: &str| json!({"type":"cancel_item","register":1,"side":"counter","code":code});
     let msg = run(&mut s, cancel(TEA)).unwrap().unwrap();
     assert!(msg.ends_with("を1点取り消しました"), "{msg}");
     let v = reg(&s, 1);
-    assert_eq!(v.counter.lines.iter().find(|l| l.line.code == TEA).unwrap().line.qty, 1);
+    assert_eq!(
+        v.counter
+            .lines
+            .iter()
+            .find(|l| l.line.code == TEA)
+            .unwrap()
+            .line
+            .qty,
+        1
+    );
     ok(&mut s, cancel(TEA));
-    assert!(reg(&s, 1).counter.lines.iter().all(|l| l.line.code != TEA), "一点なら明細ごと");
+    assert!(
+        reg(&s, 1).counter.lines.iter().all(|l| l.line.code != TEA),
+        "一点なら明細ごと"
+    );
     let e = run(&mut s, cancel(TEA)).unwrap_err();
     assert!(e.contains("登録されていません"), "{e}");
     let v = reg(&s, 1);
     assert_eq!(v.counter.lines.len(), 1, "登録もしない");
-    assert!(run(&mut s, cancel("PC0000000001")).unwrap_err().contains("商品のバーコードではありません"));
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
-    assert!(run(&mut s, cancel(BREAD)).is_err(), "お会計中は取り消せない");
+    assert!(run(&mut s, cancel("PC0000000001"))
+        .unwrap_err()
+        .contains("商品のバーコードではありません"));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
+    assert!(
+        run(&mut s, cancel(BREAD)).is_err(),
+        "お会計中は取り消せない"
+    );
     // セルフ操作モードでは商品取消しはできない（取引中止だけ）
     let mut s = Store::new(1, 2, 1);
     scan(&mut s, 1, "floor", BREAD);
-    let e = run(&mut s, json!({"type":"cancel_item","register":1,"side":"floor","code":BREAD})).unwrap_err();
+    let e = run(
+        &mut s,
+        json!({"type":"cancel_item","register":1,"side":"floor","code":BREAD}),
+    )
+    .unwrap_err();
     assert!(e.contains("スタッフ操作モードだけ"), "{e}");
     assert_eq!(reg(&s, 1).floor.lines.len(), 1);
 }
@@ -3400,15 +3425,36 @@ fn cancel_ff_by_its_button_removes_one() {
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "counter", BREAD);
-    ok(&mut s, json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":2}));
-    let cancel = |code: &str| json!({"type":"cancel_item","register":1,"side":"counter","code":code});
+    ok(
+        &mut s,
+        json!({"type":"register_ff","register":1,"side":"counter","code":"FF01","qty":2}),
+    );
+    let cancel =
+        |code: &str| json!({"type":"cancel_item","register":1,"side":"counter","code":code});
     let msg = run(&mut s, cancel("FF01")).unwrap().unwrap();
     assert!(msg.ends_with("を1点取り消しました"), "{msg}");
-    assert_eq!(reg(&s, 1).counter.lines.iter().find(|l| l.line.code == "FF01").unwrap().line.qty, 1);
+    assert_eq!(
+        reg(&s, 1)
+            .counter
+            .lines
+            .iter()
+            .find(|l| l.line.code == "FF01")
+            .unwrap()
+            .line
+            .qty,
+        1
+    );
     ok(&mut s, cancel("FF01"));
-    assert!(reg(&s, 1).counter.lines.iter().all(|l| l.line.code != "FF01"));
+    assert!(reg(&s, 1)
+        .counter
+        .lines
+        .iter()
+        .all(|l| l.line.code != "FF01"));
     let e = run(&mut s, cancel("FF01")).unwrap_err();
-    assert!(e.contains("登録されていません") && e.contains("もう一度押して"), "{e}");
+    assert!(
+        e.contains("登録されていません") && e.contains("もう一度押して"),
+        "{e}"
+    );
 }
 
 /// 仕様 12.3：店舗メニューからログアウト・休止する
@@ -5249,7 +5295,6 @@ fn call_topic_is_concrete() {
 /// 仕様 9.1：年確・FF の照合が済んだ案内はスタッフが次へ進むまで出す
 #[test]
 fn passing_age_or_ff_check_is_shown_until_staff_moves_on() {
-    use janus_pos_core::store::Passed;
     let mut s = Store::new(1, 2, 1);
     login(&mut s, 1);
     scan(&mut s, 1, "counter", BEER);
@@ -5308,7 +5353,7 @@ fn passing_age_or_ff_check_is_shown_until_staff_moves_on() {
         &mut s,
         json!({"type":"check_ff","register":1,"side":"counter","line_id":ff,"handed":2}),
     );
-    assert_eq!(reg(&s, 1).counter.passed, Some(Passed::Ff));
+    assert_eq!(reg(&s, 1).counter.passed, Some(Passed::Handover));
 }
 
 /// 仕様 9：店舗の年齢制限は顔写真付きの身分証、法令の年齢制限は公的な身分証
@@ -5588,13 +5633,19 @@ fn held_transaction_comes_back_after_the_interrupting_one() {
     hold(&mut s, 1).unwrap();
     let v = reg(&s, 1);
     assert!(v.held);
-    assert!(v.counter.lines.is_empty(), "第二待ち受けから新しい取引を始められる");
+    assert!(
+        v.counter.lines.is_empty(),
+        "第二待ち受けから新しい取引を始められる"
+    );
     assert_eq!(v.mode, Mode::StaffOperated);
 
     scan(&mut s, 1, "counter", TEA);
     assert_eq!(line_codes(&reg(&s, 1)), vec![TEA]);
     assert!(hold(&mut s, 1).unwrap_err().contains("一件だけ"));
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
     confirm_point(&mut s, 1);
     pay_cash(&mut s, 1);
     assert!(reg(&s, 1).held, "お釣りを返すまでは割り込みの取引の後始末");
@@ -5603,7 +5654,11 @@ fn held_transaction_comes_back_after_the_interrupting_one() {
     let v = reg(&s, 1);
     assert!(!v.held);
     assert_eq!(line_codes(&v), vec![BREAD]);
-    assert_eq!(v.mode, Mode::StaffOperated, "担当はログインしたまま保留した取引に戻る");
+    assert_eq!(
+        v.mode,
+        Mode::StaffOperated,
+        "担当はログインしたまま保留した取引に戻る"
+    );
     assert_eq!(v.counter.staff, Some("001"));
 
     hold(&mut s, 1).unwrap();
@@ -5618,7 +5673,11 @@ fn store_menu_stays_closed_while_a_transaction_is_held() {
     scan(&mut s, 1, "counter", BREAD);
     hold(&mut s, 1).unwrap();
     assert!(reg(&s, 1).counter.lines.is_empty());
-    let err = run(&mut s, json!({"type":"open_menu","register":1,"screen":"top"})).unwrap_err();
+    let err = run(
+        &mut s,
+        json!({"type":"open_menu","register":1,"screen":"top"}),
+    )
+    .unwrap_err();
     assert!(err.contains("取引中"), "{err}");
     assert!(reg(&s, 1).menu.is_none());
 }
@@ -5638,7 +5697,10 @@ fn scanning_during_the_interrupt_aftercare_goes_to_the_held_transaction() {
 
     hold(&mut s, 1).unwrap();
     scan(&mut s, 1, "counter", TEA);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
     confirm_point(&mut s, 1);
     pay_cash(&mut s, 1);
     ok(&mut s, json!({"type":"take_outlet","register":1}));
@@ -5660,11 +5722,19 @@ fn only_plain_registering_transactions_can_be_held() {
     login(&mut s, 1);
     assert!(hold(&mut s, 1).unwrap_err().contains("ありません"));
     scan(&mut s, 1, "counter", BREAD);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"counter"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"counter"}),
+    );
     assert!(hold(&mut s, 1).unwrap_err().contains("商品登録の画面"));
     ok(&mut s, json!({"type":"void_transaction","register":1}));
 
-    for (code, why) in [(BILL, "お支払い"), (PARCEL, "宅配便"), (RECEIVE, "宅配便"), (TICKET, "チケット")] {
+    for (code, why) in [
+        (BILL, "お支払い"),
+        (PARCEL, "宅配便"),
+        (RECEIVE, "宅配便"),
+        (TICKET, "チケット"),
+    ] {
         login(&mut s, 1);
         scan(&mut s, 1, "counter", code);
         let e = hold(&mut s, 1).unwrap_err();
@@ -5681,14 +5751,21 @@ fn held_transaction_can_be_resumed_before_an_interrupt() {
     login(&mut s, 1);
     scan(&mut s, 1, "counter", BREAD);
     hold(&mut s, 1).unwrap();
-    let e = run(&mut s, json!({"type":"scan","register":1,"side":"counter","code":"ST002"})).unwrap_err();
+    let e = run(
+        &mut s,
+        json!({"type":"scan","register":1,"side":"counter","code":"ST002"}),
+    )
+    .unwrap_err();
     assert!(e.contains("保留中の取引"), "{e}");
     ok(&mut s, json!({"type":"resume_held","register":1}));
     assert_eq!(line_codes(&reg(&s, 1)), vec![BREAD]);
 
     hold(&mut s, 1).unwrap();
     scan(&mut s, 1, "counter", TEA);
-    assert!(run(&mut s, json!({"type":"resume_held","register":1})).is_err(), "割り込みの取引の途中では戻れない");
+    assert!(
+        run(&mut s, json!({"type":"resume_held","register":1})).is_err(),
+        "割り込みの取引の途中では戻れない"
+    );
     ok(&mut s, json!({"type":"void_transaction","register":1}));
 
     hold(&mut s, 1).unwrap();
@@ -5697,7 +5774,14 @@ fn held_transaction_can_be_resumed_before_an_interrupt() {
     assert!(!v.held, "割り込む前にログアウトしたら保留した取引に戻る");
     assert_eq!(line_codes(&v), vec![BREAD]);
     assert_eq!(v.mode, Mode::SelfOperated);
-    assert!(run(&mut s, json!({"type":"scan","register":1,"side":"counter","code":"ST002"})).is_err(), "担当は保留したときのスタッフのまま");
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"scan","register":1,"side":"counter","code":"ST002"})
+        )
+        .is_err(),
+        "担当は保留したときのスタッフのまま"
+    );
 }
 
 /// 仕様 5.7：無操作が続けば、保留した取引も中止する
@@ -5723,10 +5807,19 @@ fn ff_published_on_the_floor_can_be_bought_in_self_operated_mode() {
     let coffee = json!({"type":"register_ff","register":1,"side":"floor","code":"FF32","qty":1});
     let chicken = json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1});
     assert!(run(&mut s, coffee.clone()).is_err(), "既定はすべて非公開");
-    assert!(run(&mut s, publish("0000", "drink", true)).is_err(), "オーナーだけ");
-    assert!(run(&mut s, publish("9999", "nope", true)).is_err(), "ないボタン・タブ");
+    assert!(
+        run(&mut s, publish("0000", "drink", true)).is_err(),
+        "オーナーだけ"
+    );
+    assert!(
+        run(&mut s, publish("9999", "nope", true)).is_err(),
+        "ないボタン・タブ"
+    );
     ok(&mut s, publish("9999", "drink", true));
-    assert!(run(&mut s, coffee.clone()).is_err(), "タブだけ公開しても、「FF」のボタンが非公開なら登録できない");
+    assert!(
+        run(&mut s, coffee.clone()).is_err(),
+        "タブだけ公開しても、「FF」のボタンが非公開なら登録できない"
+    );
     ok(&mut s, publish("9999", "ff", true));
     let snap = s.snapshot();
     let ff = snap.floor_nav.iter().find(|b| b.key == "ff").unwrap();
@@ -5785,11 +5878,14 @@ fn ff_published_on_the_floor_can_be_bought_in_self_operated_mode() {
     )
     .is_err());
     ok(&mut s, publish("9999", "ff", false));
-    assert!(run(
-        &mut s,
-        json!({"type":"register_ff","register":1,"side":"floor","code":"FF02","qty":1})
-    )
-    .is_err(), "「FF」のボタンを非公開に戻すと、タブが公開でも登録できない");
+    assert!(
+        run(
+            &mut s,
+            json!({"type":"register_ff","register":1,"side":"floor","code":"FF02","qty":1})
+        )
+        .is_err(),
+        "「FF」のボタンを非公開に戻すと、タブが公開でも登録できない"
+    );
 }
 
 /// 仕様 3：店はレジ・Bell とも 10 台まで作れる（実機のソリューションが想定する構成）。超える指定は 10 台に切り詰める
@@ -5801,7 +5897,13 @@ fn store_supports_up_to_ten_registers_and_bells() {
     let snap = s.snapshot();
     assert_eq!(snap.registers.len(), 10);
     assert_eq!(snap.bells.len(), 10);
-    assert_eq!(snap.bells.iter().filter(|m| m.kind == BellKind::StoreComputer).count(), 1);
+    assert_eq!(
+        snap.bells
+            .iter()
+            .filter(|m| m.kind == BellKind::StoreComputer)
+            .count(),
+        1
+    );
     let back = Store::load_json(&s.save_json()).unwrap_or_else(|e| panic!("load failed: {e}"));
     assert_eq!(back.snapshot().registers.len(), 10);
     let over = Store::new(1, 20, 20).snapshot();
@@ -5812,7 +5914,12 @@ fn store_supports_up_to_ten_registers_and_bells() {
 #[test]
 fn simulator_bells_are_fixed_handheld_and_store_computer() {
     let s = Store::new(1, 2, 3);
-    let ids = s.snapshot().bells.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
+    let ids = s
+        .snapshot()
+        .bells
+        .iter()
+        .map(|m| m.id.clone())
+        .collect::<Vec<_>>();
     assert_eq!(ids, ["据え付け端末", "可搬性端末", "ストアコンピューター"]);
 }
 
@@ -5846,7 +5953,10 @@ fn floor_touches_do_not_hold_a_staffed_register() {
     advance(&mut s, 21_000);
     let v = reg(&s, 1);
     assert_eq!(v.mode, Mode::SelfOperated);
-    assert!(v.floor.lines.is_empty(), "戻るときに読んだ商品は取引中止で消える");
+    assert!(
+        v.floor.lines.is_empty(),
+        "戻るときに読んだ商品は取引中止で消える"
+    );
 }
 
 /// 仕様 12.2：同じスタッフが別のレジにログインしたら、取引のない有人レジはすぐセルフ操作モードに戻る
@@ -5859,7 +5969,6 @@ fn empty_staffed_register_returns_to_self_when_its_staff_logs_in_elsewhere() {
     assert_eq!(reg(&s, 1).mode, Mode::SelfOperated);
     assert_eq!(reg(&s, 2).mode, Mode::StaffOperated);
 }
-
 
 /// 仕様 12.2：取引のある有人レジは、スタッフ操作モードで始めた取引でも呼び出しで入った取引でも、
 /// スタッフが別のレジにログインしてもスタッフ操作モードのまま（スタッフが最後まで受け持つ。5 分の規則）
@@ -5875,10 +5984,19 @@ fn staffed_register_with_a_transaction_stays_staffed_when_staff_logs_in_elsewher
 
     let mut s = Store::new(1, 3, 1);
     scan(&mut s, 1, "floor", BEER);
-    ok(&mut s, json!({"type":"checkout","register":1,"side":"floor"}));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"floor"}),
+    );
     login_as(&mut s, 1, "ST001");
-    ok(&mut s, json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}));
-    ok(&mut s, json!({"type":"check_id","register":1,"birth":"19900101","today":"2026-11-24"}));
+    ok(
+        &mut s,
+        json!({"type":"choose_age_check","register":1,"side":"counter","id_check":true}),
+    );
+    ok(
+        &mut s,
+        json!({"type":"check_id","register":1,"birth":"19900101","today":"2026-11-24"}),
+    );
     login_as(&mut s, 2, "ST001");
     assert_eq!(reg(&s, 1).mode, Mode::StaffOperated);
 }
@@ -5912,4 +6030,108 @@ fn setting_the_quantity_to_zero_removes_the_line() {
     );
     assert!(res.is_ok());
     assert!(reg(&s, 1).counter.lines.is_empty());
+}
+
+/// 仕様 8：たばこの仮登録。お客様が売り場側で棚番号とお求めの個数を何件でも入力し、明細に「たばこ 棚番号」を仮登録する。
+/// 仮登録は FF の「お渡し前」と同じお渡し照合を待つ明細で、スタッフが商品のたばこを読み取ると本登録になり、年確のフラグに替わる
+#[test]
+fn held_tobacco_is_matched_by_scanning_then_needs_age_check() {
+    const CARTON: &str = "4900000000158";
+    let mut s = Store::new(1, 2, 1);
+    let msg = run(
+        &mut s,
+        json!({"type":"hold_shelf","register":2,"side":"floor","entries":[
+            {"shelf":123,"qty":3,"carton":false},
+            {"shelf":44,"qty":2,"carton":true}
+        ]}),
+    )
+    .unwrap();
+    assert!(msg.unwrap().contains("スタッフがお持ちします"));
+    let v = reg(&s, 2);
+    assert_eq!(v.counter.lines.len(), 2);
+    assert!(v
+        .counter
+        .lines
+        .iter()
+        .all(|l| matches!(l.line.kind, LineKind::Shelf { .. })
+            && l.age.is_none()
+            && l.amount == 0));
+    assert!(v.counter.calls.iter().any(|c| c.kind == CallKind::Tobacco));
+    // 仮登録が残るあいだはお会計に進めない
+    let e = run(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"floor"}),
+    )
+    .unwrap_err();
+    assert!(e.contains("お渡し照合"), "{e}");
+    // セルフのままでは本登録できない（スタッフがログインしてから）
+    let ids: Vec<u32> = v.counter.lines.iter().map(|l| l.line.id).collect();
+    assert!(run(
+        &mut s,
+        json!({"type":"match_shelf","register":2,"side":"counter","line_id":ids[0],"code":TOBACCO})
+    )
+    .is_err());
+    scan(&mut s, 2, "counter", "ST002");
+    // たばこ以外は充てられない
+    let e = run(
+        &mut s,
+        json!({"type":"match_shelf","register":2,"side":"counter","line_id":ids[0],"code":BREAD}),
+    )
+    .unwrap_err();
+    assert!(e.contains("たばこではありません"), "{e}");
+    ok(
+        &mut s,
+        json!({"type":"match_shelf","register":2,"side":"counter","line_id":ids[0],"code":TOBACCO}),
+    );
+    let v = reg(&s, 2);
+    let l = v
+        .counter
+        .lines
+        .iter()
+        .find(|l| l.line.id == ids[0])
+        .unwrap();
+    assert_eq!(
+        (l.line.code, l.line.qty, l.amount, l.age),
+        (TOBACCO, 3, 1800, Some(20))
+    );
+    assert!(v.counter.passed.is_none());
+    let msg = run(
+        &mut s,
+        json!({"type":"match_shelf","register":2,"side":"counter","line_id":ids[1],"code":CARTON}),
+    )
+    .unwrap();
+    assert!(msg.unwrap().contains("すべてのお渡しを確認しました"));
+    assert_eq!(reg(&s, 2).counter.passed, Some(Passed::Handover));
+    ok(
+        &mut s,
+        json!({"type":"checkout","register":2,"side":"counter"}),
+    );
+}
+
+/// 仕様 8：仮登録を通さず、スタッフがたばこを直接読み取って登録してもよい。仮登録の明細は取り消せる
+#[test]
+fn tobacco_can_be_scanned_directly_and_held_lines_removed() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"hold_shelf","register":1,"side":"counter","entries":[{"shelf":7,"qty":1,"carton":false}]}),
+    );
+    scan(&mut s, 1, "counter", TOBACCO);
+    let v = reg(&s, 1);
+    let held = v
+        .counter
+        .lines
+        .iter()
+        .find(|l| matches!(l.line.kind, LineKind::Shelf { .. }))
+        .unwrap()
+        .line
+        .id;
+    ok(
+        &mut s,
+        json!({"type":"remove_line","register":1,"side":"counter","line_id":held}),
+    );
+    let v = reg(&s, 1);
+    assert_eq!(v.counter.lines.len(), 1);
+    assert!(allowed(&v, Side::Counter, Action::Checkout));
 }

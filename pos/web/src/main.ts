@@ -12,6 +12,9 @@ import {
   esc,
   FF_TABS,
   ffVerifying,
+  shelfTarget,
+  shelfForm,
+  shelfEntries,
   stampVerifying,
   expiredClosed,
   ffvInput,
@@ -676,6 +679,18 @@ const SUBMIT: Partial<Record<PadTarget, (register: number, side: Side, digits: s
   ppt: (register, side, digits) => ({ type: "use_points", register, side, how: "amount", points: Number(digits) }),
 };
 
+/** たばこの仮登録の入力を閉じる（両画面、入力途中の欄も消す） */
+function closeShelfForm(register: number): void {
+  shelfForm.delete(`${register}:floor`);
+  shelfForm.delete(`${register}:counter`);
+  padValue.delete(padValueKey(register, "shf"));
+  padValue.delete(padValueKey(register, "shq"));
+  for (const side of ["floor", "counter"]) {
+    const t = padEntry.get(`${register}:${side}`)?.target;
+    if (t === "shf" || t === "shq") padEntry.delete(`${register}:${side}`);
+  }
+}
+
 function padKey(key: string, k: string): void {
   const e = padEntry.get(key);
   if (!e) return;
@@ -720,6 +735,22 @@ function padKey(key: string, k: string): void {
       for (const c of cs.slice(-value).reverse()) send({ type: "remove_coupon", register, side: side as Side, coupon_id: c.id });
       couponCancel.delete(`${register}:${side}`);
       padValue.delete(padValueKey(register, "cpn"));
+    } else if (e.target === "shf" || e.target === "shq") {
+      // たばこの仮登録：棚番号を決めたら個数のテンキーを開き、両方そろったら一件として一覧に加え、欄を空ける
+      if (e.digits === "" || value <= 0) return;
+      padValue.set(padValueKey(register, e.target), String(value));
+      const f = shelfForm.get(`${register}:${side}`);
+      const shelf = padValue.get(padValueKey(register, "shf"));
+      const qty = padValue.get(padValueKey(register, "shq"));
+      if (f && shelf && qty) {
+        f.entries.push({ shelf: Number(shelf), qty: Number(qty), carton: f.carton });
+        f.carton = false;
+        padValue.delete(padValueKey(register, "shf"));
+        padValue.delete(padValueKey(register, "shq"));
+      } else if (e.target === "shf" && !qty) {
+        padEntry.set(key, { target: "shq", digits: "" });
+        return frame();
+      }
     } else if (e.target in SUBMIT) {
       // 入力欄ひとつの画面：テンキーの「決定」でそのまま送る。受け付けられなければ理由を出してテンキーを開いたままにする
       if (e.digits === "") return;
@@ -837,6 +868,12 @@ function send(cmd: Command, quiet = false): boolean {
     cancelAsk.delete(cmd.register);
     cmd = { type: "cancel_item", register: cmd.register, side: asked.side, code: cmd.code };
   }
+  // お渡し照合の画面を開いているあいだにレジカウンター側で読んだ商品は、仮登録のたばこ（上の行から順に）に充てる（本登録）
+  if (cmd.type === "scan" && !cmd.code.startsWith(STAFF_BARCODE_PREFIX) && ffVerifying.has(`${cmd.register}:counter`)) {
+    const { register, code } = cmd;
+    const target = shelfTarget(snap.registers.find((x) => x.id === register)?.counter.lines ?? []);
+    if (target) cmd = { type: "match_shelf", register, side: "counter", line_id: target.id, code };
+  }
   // 最下段の FF ボタンで取り消したときも一度きり（user 2026-11-21）
   if (cmd.type === "cancel_item") cancelAsk.delete(cmd.register);
   sim.tick(performance.now() - t0);
@@ -890,7 +927,7 @@ function send(cmd: Command, quiet = false): boolean {
   const emoneyShort = cmd.type === "tap_emoney" && !!res.message?.startsWith("電子マネーの残高が足りません");
   if (["scan", "cancel_item", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired && !emoneyShort ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
   // 照合イベント（年確・FFのお渡し）が済んだら「ピンポン」
-  if (res.ok && ((cmd.type === "check_id" && !!res.message?.includes("年齢確認が済みました")) || (cmd.type === "check_ff" && !!res.message?.includes("すべてのFFのお渡しを確認しました")))) chimeOk();
+  if (res.ok && ((cmd.type === "check_id" && !!res.message?.includes("年齢確認が済みました")) || ((cmd.type === "check_ff" || cmd.type === "match_shelf") && !!res.message?.includes("すべてのお渡しを確認しました")))) chimeOk();
   frame();
   fx?.();
   if (res.ok) save();
@@ -1170,7 +1207,46 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.fftab) {
     const [reg, tab] = b.dataset.fftab.split(":");
-    ffTabs.set(Number(reg), { tab, page: 0 });
+    const register = Number(reg);
+    ffTabs.set(register, { tab, page: 0 });
+    // たばこの銘柄タブ：三段目を棚番号と個数の入力にする（セルフは売り場側、スタッフ操作モードはレジカウンター側）。ほかのタブに移ったら閉じる
+    if (tab.startsWith("tobacco_")) {
+      const side = snap.registers.find((x) => x.id === register)?.mode === "self_operated" ? "floor" : "counter";
+      if (!shelfForm.has(`${register}:${side}`)) shelfForm.set(`${register}:${side}`, { entries: [], carton: false });
+    } else closeShelfForm(register);
+    // セルフで公開した「たばこ」は、押した時点でたばこの呼び出しも立てる
+    if (b.dataset.navcall) {
+      if (send(JSON.parse(b.dataset.navcall) as Command)) send({ type: "release_call", register });
+      return;
+    }
+    return frame();
+  }
+  if (b.dataset.shelfUnit) {
+    const [reg, side, carton] = b.dataset.shelfUnit.split(":");
+    const f = shelfForm.get(`${reg}:${side}`);
+    if (f) f.carton = carton === "1";
+    return frame();
+  }
+  if (b.dataset.shelfDel) {
+    const [reg, side, i] = b.dataset.shelfDel.split(":");
+    shelfForm.get(`${reg}:${side}`)?.entries.splice(Number(i), 1);
+    return frame();
+  }
+  if (b.dataset.shelfClose) {
+    const register = Number(b.dataset.shelfClose.split(":")[0]);
+    closeShelfForm(register);
+    ffTabs.delete(register);
+    return frame();
+  }
+  if (b.dataset.shelfHold) {
+    const [reg, side] = b.dataset.shelfHold.split(":");
+    const register = Number(reg);
+    const f = shelfForm.get(`${reg}:${side}`);
+    if (!f) return;
+    if (send({ type: "hold_shelf", register, side: side as Side, entries: shelfEntries(register, f) })) {
+      closeShelfForm(register);
+      ffTabs.delete(register);
+    }
     return frame();
   }
   if (b.dataset.ffpage) {

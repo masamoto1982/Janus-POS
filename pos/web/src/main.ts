@@ -45,6 +45,7 @@ import {
   cancelAsk,
   ffFloorOpen,
   ffOpenFoot,
+  goodsFoot,
   parcelError,
   bellPanel,
   ownerPanel,
@@ -540,7 +541,9 @@ function render(): void {
       const lang = langOf(r.id, side);
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side), lang);
       setRegion(`items-${r.id}-${side}`, items, lang);
-      setRegion(`foot-${r.id}-${side}`, items.includes("ff-open") ? ffOpenFoot(r) : "", lang);
+      // スタッフ操作モードのレジカウンター側は、FF タブを出しているあいだ常に「金券」「たばこ」「その他」の段を置く（user 2026-11-25）
+      const goods = r.mode === "staff_operated" && side === "counter" && items.includes("ff-tabs");
+      setRegion(`foot-${r.id}-${side}`, items.includes("ff-open") ? ffOpenFoot(r) : goods ? goodsFoot(r, ffUi(r.id).tab) : "", lang);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       if (side === "counter" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {

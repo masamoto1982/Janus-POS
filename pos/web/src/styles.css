@@ -195,7 +195,7 @@ button { touch-action: manipulation; }
 .ff-arrow.prev { grid-column: 1; justify-self: start; }
 .ff-arrow.next { grid-column: 3; justify-self: end; }
 /* FF の単品は特大の白銀比を一行に四つ（user 2026-11-17：将来商品画像を入れるので正方形に近い形）。入らないときは白銀比のまま縮む */
-.ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(4, minmax(0, var(--btn-xl-w))); justify-content: center; align-content: center; gap: var(--gap); }
+.ff-grid { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, var(--btn-xl-w))); justify-content: center; align-content: center; gap: var(--gap); }
 .ff-item { box-sizing: border-box; width: 100%; max-width: var(--btn-xl-w); height: auto; aspect-ratio: var(--silver, 1.4142); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 0 var(--s14, 3px); font-size: var(--text-sm); line-height: 1.1; word-break: normal; overflow-wrap: anywhere; min-width: 0; overflow: hidden; }
 /* 登録数量のバッジ：オーダーの入った FF ボタンの右上に「②」のような丸数字（user 2026-11-21）。
    背景は注意喚起の薄い黄色 --alert-bg、輪郭と数字は黄色の背景に添えるオレンジ --alert-note（user 2026-11-22）。
@@ -1105,3 +1105,5 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
   .splash-logo, .splash-heading, .splash-lead { animation: none; opacity: 1; transform: none; }
   .splash-howto { transition: none; opacity: 1; transform: none; }
 }
+/* スタッフ操作モードのレジカウンター側の「金券」「たばこ」「その他」（user 2026-11-25）：選んでいるものは積極（濃い背景・白文字・枠線なし） */
+.screen .goods-foot button.on { background: var(--btn-on); color: var(--btn-on-ink); border-color: var(--btn-on); font-weight: 700; }

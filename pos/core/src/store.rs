@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
-use crate::age_rules::{AgeRules, FfTabDisplay, RuleTarget};
+use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
@@ -513,12 +513,12 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         limit: Option<u32>,
     },
-    /// 設定：FF タブをどちらの画面に出すか（オーナー）
-    SetFfTabDisplay {
+    /// 設定：売り場側の公開（四段目のボタン・五段目のタブごと、オーナー）
+    SetFloorPublic {
         owner_id: String,
         password: String,
-        tab: FfTab,
-        display: FfTabDisplay,
+        key: String,
+        public: bool,
     },
     /// 設定を開くときのオーナー認証
     VerifyOwner { owner_id: String, password: String },
@@ -1669,7 +1669,7 @@ impl Register {
             items_full: t.item_count() >= MAX_ITEMS,
             emoney_short: t.emoney_short || t.emoney_partial,
             cash_only_goods: t.cash_only() > 0,
-            ff_floor: !rules.ff_floor_tabs.is_empty(),
+            ff_floor: rules.any_ff_on_floor(),
         }
     }
 }
@@ -3407,20 +3407,15 @@ impl Store {
                 self.age_rules.set_limit(&code, limit, by, self.now)?;
                 done("販売個数の上限を変更しました")
             }
-            C::SetFfTabDisplay {
+            C::SetFloorPublic {
                 owner_id,
                 password,
-                tab,
-                display,
+                key,
+                public,
             } => {
                 let by = self.owner(&owner_id, &password)?;
-                self.age_rules
-                    .set_ff_tab_display(tab, display, by, self.now);
-                done(format!(
-                    "FFタブ「{}」を{}に表示します",
-                    tab.label(),
-                    display.label()
-                ))
+                let label = self.age_rules.set_floor_public(&key, public, by, self.now)?;
+                done(format!("「{label}」を売り場側に{}", if public { "公開しました" } else { "公開しないようにしました" }))
             }
             C::VerifyOwner { owner_id, password } => {
                 self.owner(&owner_id, &password)?;
@@ -4826,12 +4821,22 @@ impl Store {
             },
             audit: self.audit.clone(),
             ff_stock: self.ff_menu(),
-            ff_tabs: FfTab::ALL
+            floor_nav: catalog::NAV
                 .iter()
-                .map(|&tab| FfTabView {
-                    tab,
-                    label: tab.label(),
-                    display: self.age_rules.ff_tab_display(tab),
+                .map(|b| NavButtonView {
+                    key: b.key,
+                    label: b.label,
+                    public: self.age_rules.floor_public(b.key),
+                    tabs: b
+                        .tabs
+                        .iter()
+                        .map(|t| NavTabView {
+                            key: t.key,
+                            label: t.label,
+                            public: self.age_rules.floor_public(t.key),
+                            codes: t.codes.to_vec(),
+                        })
+                        .collect(),
                 })
                 .collect(),
             bell_loss: self.bell_loss,
@@ -5481,13 +5486,23 @@ pub struct FfMenuItem {
     pub tab_label: &'static str,
 }
 
-/// FF タブ表示の設定
+/// 四段目のボタン（売り場側の公開つき）
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct FfTabView {
-    pub tab: FfTab,
+pub struct NavButtonView {
+    pub key: &'static str,
     pub label: &'static str,
-    pub display: FfTabDisplay,
+    pub public: bool,
+    pub tabs: Vec<NavTabView>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct NavTabView {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub public: bool,
+    pub codes: Vec<&'static str>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -5561,7 +5576,7 @@ pub struct Snapshot {
     pub age_rules: AgeRulesView,
     pub audit: Vec<AuditEntry>,
     pub ff_stock: Vec<FfMenuItem>,
-    pub ff_tabs: Vec<FfTabView>,
+    pub floor_nav: Vec<NavButtonView>,
     pub bell_loss: u8,
     pub accounts: Vec<AccountView>,
     pub catalog: Vec<CatalogItem>,

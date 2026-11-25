@@ -1,6 +1,6 @@
 import { applyLaw, fitForms, fitText, MOBILE as MOBILE_MQ } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
+import type { CashOutKind, Command, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { CancelStage, GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
@@ -43,9 +43,7 @@ import {
   isoDate,
   scanGuide,
   cancelAsk,
-  ffFloorOpen,
-  ffOpenFoot,
-  goodsFoot,
+  navFoot,
   parcelError,
   bellPanel,
   ownerPanel,
@@ -521,8 +519,6 @@ function render(): void {
     for (const side of ["counter", "floor"] as const) {
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.counter.phase !== "registering" || !r.counter.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
-      // 「FF」から開いた FF タブは、セルフ操作モードを抜けたとき・呼び出しが立ったとき・取引が終わったときに閉じる（四つのボタンに戻る）
-      if (r.mode !== "self_operated" || r.waiting_calls.length || r.last_receipt) ffFloorOpen.delete(r.id);
       const items = itemsPanel(r, snap, ffUi(r.id), side, Date.now(), first);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-screen="${r.id}:${side}"]`);
@@ -545,7 +541,9 @@ function render(): void {
       setRegion(`items-${r.id}-${side}`, items, lang);
       // スタッフ操作モードのレジカウンター側は、FF タブを出しているあいだ常に「FF」「金券」「拡張用」「拡張用」の段を置く（user 2026-11-25・26）
       const goods = r.mode === "staff_operated" && side === "counter" && items.includes("ff-tabs");
-      setRegion(`foot-${r.id}-${side}`, items.includes("ff-open") ? ffOpenFoot(r) : goods ? goodsFoot(r, ffUi(r.id).tab) : "", lang);
+      // セルフ操作モードは両画面に同じ四段目（売り場側のナビゲーション、user 2026-11-26）。呼び出し中など五段目を差し替えている場面では出さない
+      const selfNav = r.mode === "self_operated" && items.includes("self-nav");
+      setRegion(`foot-${r.id}-${side}`, goods || selfNav ? navFoot(r, snap, ffUi(r.id).tab) : "", lang);
       if (side === "counter") counterGoods = goods;
       // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）
       el?.classList.toggle("items-tall", side === "floor" && counterGoods);
@@ -1020,8 +1018,8 @@ app.addEventListener("change", (e) => {
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
-  if (sel.dataset.fftabDisplay && ownerAuth) {
-    const ok = send({ type: "set_ff_tab_display", ...ownerAuth, tab: sel.dataset.fftabDisplay as FfTab, display: sel.value as FfTabDisplay });
+  if (sel.dataset.floorPublic && ownerAuth) {
+    const ok = send({ type: "set_floor_public", ...ownerAuth, key: sel.dataset.floorPublic, public: sel.value === "1" });
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
@@ -1045,7 +1043,7 @@ app.addEventListener("change", (e) => {
 const RULES_GEAR = `<button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="設定" title="設定">⚙</button>`;
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
-const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_ff_tab_display", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
+const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_floor_public", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
 let ownerAuth: { owner_id: string; password: string } | null = null;
 let rulesTab: RulesTab = "tax";
 
@@ -1169,13 +1167,6 @@ app.addEventListener("click", (e) => {
     if (send({ type: "set_invoice", ...ownerAuth, invoice_no: digits ? `T${digits}` : "", rounding })) rulesValue.delete("inv");
     render();
     return;
-  }
-  if (b.dataset.ffopen) {
-    const reg = Number(b.dataset.ffopen);
-    const first = FF_TABS.find(([k]) => snap.ff_tabs.some((t) => t.tab === k && t.display === "both"));
-    ffFloorOpen.add(reg);
-    if (first) ffTabs.set(reg, { tab: first[0], page: 0 });
-    return frame();
   }
   if (b.dataset.fftab) {
     const [reg, tab] = b.dataset.fftab.split(":");

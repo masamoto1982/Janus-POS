@@ -36,30 +36,10 @@ pub struct AgeRules {
     pub rules: Vec<AgeRule>,
     pub history: Vec<RuleChange>,
     pub limits: BTreeMap<String, u32>,
-    /// 売り場側にも出す FF タブ（FF タブ表示が「両側」のタブ）。既定は空＝すべてレジカウンター側のみ
-    pub ff_floor_tabs: BTreeSet<FfTab>,
+    /// 売り場側に公開した四段目のボタン・五段目のタブのキー（catalog::NAV）。既定は空＝すべて非公開（押すと呼び出し）
+    pub floor_public: BTreeSet<String>,
     #[serde(skip)]
     pub(crate) next_id: u32,
-}
-
-/// FF タブ表示：タブをどちらの画面に出すか。売り場側だけに出す選択肢は持たない（スタッフはいつでも FF を登録できる）
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-#[serde(rename_all = "snake_case")]
-pub enum FfTabDisplay {
-    /// レジカウンター側のみ（既定）
-    Counter,
-    /// 両側（レジカウンター側と売り場側）
-    Both,
-}
-
-impl FfTabDisplay {
-    pub fn label(self) -> &'static str {
-        match self {
-            FfTabDisplay::Counter => "レジカウンター側のみ",
-            FfTabDisplay::Both => "両側",
-        }
-    }
 }
 
 fn label_of(target: &RuleTarget) -> String {
@@ -81,7 +61,7 @@ impl Default for AgeRules {
                 catalog::TRADING_CARD.to_string(),
                 catalog::TRADING_CARD_LIMIT,
             )]),
-            ff_floor_tabs: BTreeSet::new(),
+            floor_public: BTreeSet::new(),
             next_id: 1,
         };
         r.push(
@@ -197,38 +177,38 @@ impl AgeRules {
         Ok(())
     }
 
-    pub fn ff_tab_display(&self, tab: FfTab) -> FfTabDisplay {
-        if self.ff_floor_tabs.contains(&tab) {
-            FfTabDisplay::Both
-        } else {
-            FfTabDisplay::Counter
-        }
+    /// 売り場側に公開しているか（ボタンまたはタブのキー）
+    pub fn floor_public(&self, key: &str) -> bool {
+        self.floor_public.contains(key)
     }
 
-    /// その FF を売り場側の画面からも登録できるか（タブが「両側」）
+    /// その FF を売り場側の画面からも登録できるか（「FF」のボタンとその FF のタブがどちらも公開）
     pub fn ff_on_floor(&self, code: &str) -> bool {
-        catalog::ff_tab(code).is_some_and(|t| self.ff_floor_tabs.contains(&t))
+        self.floor_public("ff") && catalog::ff_tab(code).is_some_and(|t| self.floor_public(catalog::ff_tab_key(t)))
     }
 
-    pub fn set_ff_tab_display(&mut self, tab: FfTab, display: FfTabDisplay, by: &str, now: u64) {
-        let before = self.ff_tab_display(tab);
-        if before == display {
-            return;
+    /// 売り場側で登録できる FF のタブがあるか
+    pub fn any_ff_on_floor(&self) -> bool {
+        self.floor_public("ff") && FfTab::ALL.iter().any(|&t| self.floor_public(catalog::ff_tab_key(t)))
+    }
+
+    pub fn set_floor_public(&mut self, key: &str, public: bool, by: &str, now: u64) -> Result<String, String> {
+        let label = catalog::nav_label(key).ok_or("ボタン・タブがありません")?;
+        if self.floor_public(key) == public {
+            return Ok(label);
         }
-        match display {
-            FfTabDisplay::Both => self.ff_floor_tabs.insert(tab),
-            FfTabDisplay::Counter => self.ff_floor_tabs.remove(&tab),
-        };
+        if public {
+            self.floor_public.insert(key.to_string());
+        } else {
+            self.floor_public.remove(key);
+        }
+        let word = |p: bool| if p { "公開" } else { "非公開" };
         self.history.push(RuleChange {
             at: now,
             by: by.into(),
-            change: format!(
-                "FFタブ「{}」の表示：{} → {}",
-                tab.label(),
-                before.label(),
-                display.label()
-            ),
+            change: format!("売り場側の公開「{label}」：{} → {}", word(!public), word(public)),
         });
+        Ok(label)
     }
 
     pub fn limit_for(&self, code: &str) -> Option<u32> {

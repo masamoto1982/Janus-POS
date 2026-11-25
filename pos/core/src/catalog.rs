@@ -430,6 +430,82 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF79", 0),
 ];
 
+/// 四段目・五段目のナビゲーション（user 2026-11-25・26）：四段目のボタン（FF・金券・拡張用×2）と、その下の五段目のタブ。
+/// レジカウンター側（スタッフ操作モード）はすべて使え、売り場側（セルフ操作モード）はボタン・タブごとに公開を設定する
+/// （設定「売り場側の公開」）。公開していないボタン・タブを売り場側で押すと、そのボタンの用件の呼び出しになる
+pub struct NavButton {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub tabs: &'static [NavTab],
+}
+
+pub struct NavTab {
+    pub key: &'static str,
+    pub label: &'static str,
+    /// タブの商品（FF のタブは FF_MENU から引くので空）
+    pub codes: &'static [&'static str],
+}
+
+const fn tab(key: &'static str, label: &'static str, codes: &'static [&'static str]) -> NavTab {
+    NavTab { key, label, codes }
+}
+
+pub const NAV: &[NavButton] = &[
+    NavButton {
+        key: "ff",
+        label: "FF",
+        tabs: &[
+            tab("fried", "フライヤー", &[]),
+            tab("drink", "ドリンク", &[]),
+            tab("cold", "コールド", &[]),
+            tab("bun", "中華まん", &[]),
+            tab("oden", "おでん", &[]),
+        ],
+    },
+    // バーコードのない金券。管理が難しいので需要の少ないものは扱わない（印紙は 200 円だけ、user 2026-11-26）
+    NavButton {
+        key: "voucher",
+        label: "金券",
+        tabs: &[
+            tab("g_stamp", "切手", &["4900000000189", "4900000000141"]),
+            tab("g_postcard", "はがき", &["4900000000165", "4900000000219"]),
+            tab("g_revenue", "印紙", &["4900000000172"]),
+            tab("g_garbage", "ゴミ処理券", &["4900000000196"]),
+        ],
+    },
+    NavButton {
+        key: "ext1",
+        label: "拡張用",
+        tabs: &[tab("ext1_a", "拡張用", &[]), tab("ext1_b", "拡張用", &[]), tab("ext1_c", "拡張用", &[])],
+    },
+    NavButton {
+        key: "ext2",
+        label: "拡張用",
+        tabs: &[tab("ext2_a", "拡張用", &[]), tab("ext2_b", "拡張用", &[]), tab("ext2_c", "拡張用", &[])],
+    },
+];
+
+/// ナビゲーションのキー（ボタンまたはタブ）の表示名。「FF」「FF／ドリンク」の形
+pub fn nav_label(key: &str) -> Option<String> {
+    NAV.iter().find_map(|b| {
+        if b.key == key {
+            return Some(b.label.to_string());
+        }
+        b.tabs.iter().find(|t| t.key == key).map(|t| format!("{}／{}", b.label, t.label))
+    })
+}
+
+/// FF のタブのナビゲーションのキー（FfTab の名前と同じ）
+pub fn ff_tab_key(t: FfTab) -> &'static str {
+    match t {
+        FfTab::Fried => "fried",
+        FfTab::Drink => "drink",
+        FfTab::Cold => "cold",
+        FfTab::Bun => "bun",
+        FfTab::Oden => "oden",
+    }
+}
+
 pub fn ff_tab(code: &str) -> Option<FfTab> {
     FF_MENU.iter().find(|(c, _)| *c == code).map(|&(_, t)| t)
 }

@@ -1,4 +1,3 @@
-use janus_pos_core::age_rules::FfTabDisplay;
 use janus_pos_core::authority::{Action, Mode, PaymentMethod, Phase, Side, StaffState};
 use janus_pos_core::calls::CallKind;
 use janus_pos_core::store::{
@@ -5716,32 +5715,29 @@ fn idle_revert_voids_the_held_transaction_too() {
     assert_eq!(v.mode, Mode::SelfOperated);
 }
 
-/// 仕様 14.4：FF タブ表示を「両側」にしたタブの FF は、セルフ操作モードの売り場側で登録できる
+/// 仕様 14.4：売り場側に「FF」のボタンとそのタブを公開すると、セルフ操作モードの売り場側でその FF を登録できる
 #[test]
-fn ff_tab_shown_on_both_sides_can_be_bought_in_self_operated_mode() {
+fn ff_published_on_the_floor_can_be_bought_in_self_operated_mode() {
     let mut s = Store::new(1, 2, 1);
-    let display = |pw: &str, tab: &str, d: &str| json!({"type":"set_ff_tab_display","owner_id":"000","password":pw,"tab":tab,"display":d});
+    let publish = |pw: &str, key: &str, public: bool| json!({"type":"set_floor_public","owner_id":"000","password":pw,"key":key,"public":public});
     let coffee = json!({"type":"register_ff","register":1,"side":"floor","code":"FF32","qty":1});
     let chicken = json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1});
-    assert!(
-        run(&mut s, coffee.clone()).is_err(),
-        "既定はレジカウンター側のみ"
-    );
-    assert!(
-        run(&mut s, display("0000", "drink", "both")).is_err(),
-        "オーナーだけ"
-    );
-    ok(&mut s, display("9999", "drink", "both"));
+    assert!(run(&mut s, coffee.clone()).is_err(), "既定はすべて非公開");
+    assert!(run(&mut s, publish("0000", "drink", true)).is_err(), "オーナーだけ");
+    assert!(run(&mut s, publish("9999", "nope", true)).is_err(), "ないボタン・タブ");
+    ok(&mut s, publish("9999", "drink", true));
+    assert!(run(&mut s, coffee.clone()).is_err(), "タブだけ公開しても、「FF」のボタンが非公開なら登録できない");
+    ok(&mut s, publish("9999", "ff", true));
     let snap = s.snapshot();
-    assert!(snap
-        .ff_tabs
-        .iter()
-        .any(|t| t.label == "ドリンク" && t.display == FfTabDisplay::Both));
+    let ff = snap.floor_nav.iter().find(|b| b.key == "ff").unwrap();
+    assert!(ff.public);
+    assert!(ff.tabs.iter().any(|t| t.label == "ドリンク" && t.public));
+    assert!(ff.tabs.iter().any(|t| t.label == "フライヤー" && !t.public));
     assert!(snap
         .age_rules
         .history
         .iter()
-        .any(|h| h.change.contains("ドリンク") && h.change.contains("両側")));
+        .any(|h| h.change.contains("FF／ドリンク") && h.change.contains("非公開 → 公開")));
     assert!(
         run(
             &mut s,
@@ -5775,8 +5771,8 @@ fn ff_tab_shown_on_both_sides_can_be_bought_in_self_operated_mode() {
     ok(&mut s, json!({"type":"tap_emoney","register":1}));
     assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 150);
 
-    // 作り置きの FF を両側にすると、売り場側で登録できるがお渡しはスタッフ（お渡し前・呼び出し）
-    ok(&mut s, display("9999", "fried", "both"));
+    // 作り置きの FF を公開すると、売り場側で登録できるがお渡しはスタッフ（お渡し前・呼び出し）
+    ok(&mut s, publish("9999", "fried", true));
     ok(&mut s, chicken);
     assert!(s
         .snapshot()
@@ -5788,12 +5784,12 @@ fn ff_tab_shown_on_both_sides_can_be_bought_in_self_operated_mode() {
         json!({"type":"checkout","register":1,"side":"floor"})
     )
     .is_err());
-    ok(&mut s, display("9999", "fried", "counter"));
+    ok(&mut s, publish("9999", "ff", false));
     assert!(run(
         &mut s,
         json!({"type":"register_ff","register":1,"side":"floor","code":"FF02","qty":1})
     )
-    .is_err());
+    .is_err(), "「FF」のボタンを非公開に戻すと、タブが公開でも登録できない");
 }
 
 /// 仕様 3：店はレジ・Bell とも 10 台まで作れる（実機のソリューションが想定する構成）。超える指定は 10 台に切り詰める

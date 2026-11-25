@@ -544,7 +544,7 @@ const DICT: Record<string, string> = {
   先に年齢確認をするか選んでください: "Choose whether to check age first",
   生年月日の入力は不要です: "No date of birth needed",
   先に年齢確認をしてください: "Check age first",
-  "買い物点数の上限（100点）に達しています": "The item limit (100) has been reached",
+  "買い物点数の上限（99点）に達しています": "The item limit (99) has been reached",
   取引中は担当スタッフを切り替えられません: "Staff can't be switched during a transaction",
   公共料金の払込票はありません: "No utility bill slips",
   会計ボタンを押してから確認します: "Checked after pressing Pay",

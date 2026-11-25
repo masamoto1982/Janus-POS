@@ -346,6 +346,14 @@ export function fitText(root: ParentNode): void {
   //    余白は上の手順と同じ（幅を変えられるボタンは左右 B÷4、変えられないボタンは B÷8）
   const mobile = typeof matchMedia === "function" && matchMedia(MOBILE).matches;
   for (const b of buttons) if (mobile || narrowScreen(b)) shrinkToFit(b, b.matches(RIGID));
+  // 5. 金券のタブの単品（一行だけの「通常」「インクジェット」など）は、同じ群で文字の大きさをそろえる（一番小さいものに合わせる）。
+  //    一行のボタンは特大から収まるまで縮むので、短い名前だけが極端に大きくなり、並べると不揃いになる
+  for (const grid of root.querySelectorAll<HTMLElement>(".goods-grid")) {
+    const one = [...grid.querySelectorAll<HTMLElement>(":scope > button")].filter((b) => !parts(b));
+    if (one.length < 2) continue;
+    const min = Math.min(...one.map((b) => parseFloat(b.style.fontSize) || Infinity));
+    if (Number.isFinite(min)) for (const b of one) b.style.fontSize = `${min}px`;
+  }
 }
 
 /** 画面の幅が W の下限（384px＋枠）より狭い。styles.css の @container wrap と同じ境目 */

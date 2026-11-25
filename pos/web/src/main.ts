@@ -516,6 +516,8 @@ function render(): void {
       floorMain = firstWelcome(r, "floor");
     }
     app.querySelector(`[data-swipe="${r.id}"]`)?.classList.toggle("first-wait", first);
+    // レジカウンター側に四段目（FF・金券・拡張用の段）を出しているか。売り場側の最下段をその分高くして、三段目の高さを両画面でそろえる
+    let counterGoods = false;
     for (const side of ["counter", "floor"] as const) {
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.counter.phase !== "registering" || !r.counter.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
@@ -541,9 +543,12 @@ function render(): void {
       const lang = langOf(r.id, side);
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side), lang);
       setRegion(`items-${r.id}-${side}`, items, lang);
-      // スタッフ操作モードのレジカウンター側は、FF タブを出しているあいだ常に「金券」「たばこ」「その他」の段を置く（user 2026-11-25）
+      // スタッフ操作モードのレジカウンター側は、FF タブを出しているあいだ常に「FF」「金券」「拡張用」「拡張用」の段を置く（user 2026-11-25・26）
       const goods = r.mode === "staff_operated" && side === "counter" && items.includes("ff-tabs");
       setRegion(`foot-${r.id}-${side}`, items.includes("ff-open") ? ffOpenFoot(r) : goods ? goodsFoot(r, ffUi(r.id).tab) : "", lang);
+      if (side === "counter") counterGoods = goods;
+      // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）
+      el?.classList.toggle("items-tall", side === "floor" && counterGoods);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       if (side === "counter" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {

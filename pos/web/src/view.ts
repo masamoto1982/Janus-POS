@@ -1731,10 +1731,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
 }
 
-/** スタッフ操作モードのレジカウンター側で、FF タブの上に常に置く段（四段目）：「金券」と拡張用の二つ（user 2026-11-25・26）。
+/** スタッフ操作モードのレジカウンター側で、FF タブの上に常に置く段（四段目）：「FF」「金券」と拡張用の二つ（user 2026-11-25・26）。
  *  セルフ操作モードで FF を開いたときの段（ffOpenFoot）と同じ形・同じ位置。スタッフにとっては呼び出しではなく、
  *  バーコードのない FF 以外の商品の切り替えで、押すと最下段の FF のタブがそのボタンのタブ（「金券」なら 切手・はがき・印紙・ゴミ処理券）に変わる。
- *  選んでいるものは積極、もう一度押すと FF に戻る。カウンター内のバーコードのない商品は今のところ金券だけなので、
+ *  選んでいるものは積極（既定は「FF」）。カウンター内のバーコードのない商品は今のところ金券だけなので、
  *  ほかの二つのボタンとその下のタブは「拡張用」と出し、商品は置かない */
 /// 仕様 8：スタッフ操作モードのレジカウンター側の金券・拡張用の段
 /** タブの中身は [商品コード, 一行目, 添え字]。タブの名前で何の商品かは自明なので「切手」「はがき」の添え字は付けない（user 2026-11-26）。
@@ -1760,9 +1760,11 @@ const isGoodsTab = (tab: string): boolean => !!groupOf(tab);
 export function goodsFoot(r: RegisterView, tab: string): string {
   const reg = r.id;
   const cur = groupOf(tab);
-  const b = (g: (typeof GOODS_GROUPS)[number]) =>
-    `<button type="button" class="${g === cur ? "on" : "ghost"}" data-fftab="${reg}:${g === cur ? FF_TABS[0][0] : g.tabs[0][0]}" aria-pressed="${g === cur}">${g.label}</button>`;
-  return `<div class="ff-open-foot goods-foot">${GOODS_GROUPS.map(b).join("")}</div>`;
+  // 先頭に「FF」（user 2026-11-26）：既定は FF で FF のタブを出す。四つのうち選んでいる一つが積極で、押しても切り替わるだけ（もう一度押しても戻らない）
+  const one = (label: string, on: boolean, to: string) =>
+    `<button type="button" class="${on ? "on" : "ghost"}" data-fftab="${reg}:${on ? tab : to}" aria-pressed="${on}">${label}</button>`;
+  const ff = one("FF", !cur, FF_TABS[0][0]);
+  return `<div class="ff-open-foot goods-foot">${ff}${GOODS_GROUPS.map((g) => one(g.label, g === cur, g.tabs[0][0])).join("")}</div>`;
 }
 
 /** 金券・たばこ・その他の単品ボタン。FF の単品ボタンと同じ形・同じページ送りで、押すとその商品のバーコードを読んだのと同じ登録（取消しの場面では取り消し） */

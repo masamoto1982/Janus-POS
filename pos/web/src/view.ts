@@ -113,13 +113,13 @@ const flagSpan = (label: string): string => `<span class="flag">${esc(label)}</s
 /** 仮登録のたばこ（棚番号だけで、まだどの商品か決まっていない明細） */
 type ShelfLike = { kind: string; shelf?: number; carton?: boolean };
 const isShelf = (l: ShelfLike): boolean => l.kind === "shelf";
-/** たばこの仮登録の入力（user 2026-11-26）。「たばこ」の銘柄タブを選ぶと五段目がこの入力になる。キーは `${reg}:${side}`。
+/** たばこの仮登録の入力（user 2026-11-26）。「たばこ」を選ぶと五段目がこの入力になる。キーは `${reg}:${side}`。
  *  carton＝入力中の一件の単位。棚番号・個数の欄は padValue（shf・shq）に持つ */
 export type ShelfForm = { carton: boolean };
 export const shelfForm = new Map<string, ShelfForm>();
 
-/** 五段目：棚番号と個数の入力欄、単位（個・カートン）、「次の製品」。一つの製品を指定して「次の製品」を押すと、
- *  その一件を明細に仮登録して欄を空け、続けて次の製品を入力できる（宅配便の複数口と同じ考え方、user 2026-11-26）。
+/** 五段目：棚番号と個数の入力欄、単位（個・カートン）、「次の銘柄」。銘柄のタブは置かず、「たばこ」を選ぶとすぐこの入力になる（user 2026-11-26）。
+ *  一つの銘柄を指定して「次の銘柄」を押すと、その一件を明細に仮登録して欄を空け、続けて次の銘柄を入力できる（宅配便の複数口と同じ考え方）。
  *  仮登録した行は三段目の明細ですぐに確かめられる */
 function shelfRow(reg: number, side: Side, st: Gate): string {
   const f = shelfForm.get(`${reg}:${side}`) ?? { carton: false };
@@ -128,8 +128,8 @@ function shelfRow(reg: number, side: Side, st: Gate): string {
   const choice = (carton: boolean) =>
     `<button type="button" class="seg${f.carton === carton ? " on" : ""}" data-shelf-unit="${reg}:${side}:${carton ? 1 : 0}" aria-pressed="${f.carton === carton}">${carton ? "カートン" : "個"}</button>`;
   const ready = shelf !== "" && qty !== "" && st.allowed;
-  const next = `<button type="button" class="primary" data-shelf-next="${reg}:${side}"${ready ? "" : ` disabled${st.reason ? ` title="${esc(st.reason)}"` : ""}`}>次の製品</button>`;
-  return `<div class="shelf-row">
+  const next = `<button type="button" class="primary" data-shelf-next="${reg}:${side}"${ready ? "" : ` disabled${st.reason ? ` title="${esc(st.reason)}"` : ""}`}>次の銘柄</button>`;
+  return `<div class="shelf-row nav-body">
       <p class="shelf-guide">棚番号とお求めの個数をご入力ください</p>
       <div class="shelf-inputs">${padField(reg, side, "shf", shelf, "棚番号", "棚番号", undefined, "", st)}${padField(reg, side, "shq", qty, "個数", "お求めの個数", undefined, "", st)}<span class="shelf-unit">${choice(false)}${choice(true)}</span>${next}</div>
     </div>`;
@@ -1765,7 +1765,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   const asked = cancelAsk.get(reg);
   if (r.mode === "staff_operated" && side === "counter" && asked?.stage === "item" && !r.paused && !r.menu) {
     const goods = goodsAt(snap, ui.tab);
-    if (goods) return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "remove_line"), r.counter.lines, true)}`;
+    if (goods) return `${goodsTabRow(reg, goods.button, ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "remove_line"), r.counter.lines, true)}`;
     const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
     return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "remove_line"), r.counter.lines, true)}`;
   }
@@ -1783,9 +1783,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
     const callAttr = (t: NavTabView) => (t.call && t !== tab && gate.allowed ? ` data-navcall="${esc(JSON.stringify(call))}"` : "");
     const tabBtn = (t: NavTabView) =>
       `<button type="button" role="tab" class="tab ff-tab ${t === tab ? "on" : ""}" data-fftab="${reg}:${t.key}"${callAttr(t)} aria-selected="${t === tab}">${esc(t.label)}</button>`;
+    // 「たばこ」には銘柄のタブを置かず、五段目はすぐ棚番号と個数の入力（user 2026-11-26）
+    if (button.key === "tobacco") return shelfRow(reg, "floor", a("hold_shelf"));
     const row = `<div class="tabs ff-tabs self-nav" role="tablist" aria-label="${esc(button.label)}">${button.tabs.map(tabBtn).join("")}</div>`;
     if (button.key === "ff") return `${row}${ffPage(reg, side, snap, tab.key, ui.page, a("register_ff"), r.floor.lines)}`;
-    if (button.key === "tobacco") return `${row}${shelfRow(reg, "floor", a("hold_shelf"))}`;
     // 商品を置いていないタブ（「拡張用」）は、単品の代わりに添え書きを出す
     if (!tab.codes.length) return `${row}${callNote([], now)}`;
     return `${row}${goodsPage(reg, snap, button, tab, ui.page, side, a("scan"), r.floor.lines)}`;
@@ -1796,9 +1797,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
   const goods = goodsAt(snap, ui.tab);
-  // スタッフはたばこの商品のバーコードを直接読み取って登録するので、レジカウンター側に棚番号と個数の仮登録は出さない（user 2026-11-26：冗長）
-  if (goods?.button.key === "tobacco") return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}<p class="call-note">たばこはバーコードを読み取ってください</p>`;
-  if (goods) return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "scan"), r.counter.lines)}`;
+  // スタッフはたばこの商品のバーコードを直接読み取って登録するので、レジカウンター側に棚番号と個数の仮登録は出さない（user 2026-11-26：冗長）。
+  // 案内はたばこに限らない一般の文（user 2026-11-26）：この案内のあいだもどのバーコードも受け付け、読んだバーコードのとおりに登録・呼び出しになる
+  if (goods?.button.key === "tobacco") return `<p class="call-note nav-body">商品のバーコードをスキャンしてください</p>`;
+  if (goods) return `${goodsTabRow(reg, goods.button, ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "scan"), r.counter.lines)}`;
   const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
 }
@@ -1807,7 +1809,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
  *  四段目＝「FF」「金券」「たばこ」「その他」（セルフの売り場側にあった四つをレジカウンター側にも、user 2026-11-26）、押すと五段目のタブがそのボタンのタブに変わる。
  *  スタッフ操作モードのレジカウンター側はすべて使え、セルフ操作モードの売り場側は「呼出し」を「しない」にしたボタン・タブだけ使え、
  *  ほかを押すとそのボタンの用件の呼び出し（ボタンの名前のとおり）。
- *  カウンター内のバーコードのない商品は今のところ金券だけなので、たばこ・その他のタブは「拡張用」で商品を置かない */
+ *  カウンター内のバーコードのない商品は今のところ金券だけなので、その他のタブは「拡張用」で商品を置かない。
+ *  「たばこ」はタブを持たない（銘柄のタブは廃止、user 2026-11-26）。タブのないボタンはボタンのキーを一つのタブとして選ぶ */
 /// 仕様 8：四段目・五段目のナビゲーション
 
 /** 金券の単品ボタンの表記 [一行目, 添え字]。タブの名前で何の商品かは自明なので「切手」「はがき」の添え字は付けない（user 2026-11-26）。
@@ -1821,11 +1824,21 @@ const GOODS_LABEL: Record<string, readonly [string, string]> = {
   "4900000000196": ["300円", "東京都"],
 };
 
+/** ボタンのタブ。タブのないボタン（たばこ）は、ボタンそのものを一つのタブとして扱う（タブの段は出さない） */
+function navTabs(b: NavButtonView): NavTabView[] {
+  return b.tabs.length ? b.tabs : [{ key: b.key, label: b.label, call: b.call, codes: [] }];
+}
+
+/** レジカウンター側の五段目のタブの段。タブのないボタンは段を出さない */
+function goodsTabRow(reg: number, button: NavButtonView, cur: string): string {
+  return button.tabs.length ? ffTabRow(reg, button.tabs.map((t) => [t.key, t.label] as const), cur) : "";
+}
+
 /** FF 以外のボタンのタブ（金券・たばこ・その他）なら、そのボタンとタブ */
 function goodsAt(snap: Snapshot, key: string): { button: NavButtonView; tab: NavTabView } | null {
   for (const button of snap.floor_nav) {
     if (button.key === "ff") continue;
-    const tab = button.tabs.find((t) => t.key === key);
+    const tab = navTabs(button).find((t) => t.key === key);
     if (tab) return { button, tab };
   }
   return null;
@@ -1836,10 +1849,11 @@ function goodsAt(snap: Snapshot, key: string): { button: NavButtonView; tab: Nav
 /** セルフ操作モードで開いているボタン・タブ。選んだタブがあればそれ、なければ呼び出しでないボタンの呼び出しでないタブ（お客様が選ぶ前に
  *  呼び出しにならないものを先に見せる）、それもなければ最初のボタンの最初のタブ */
 function selfNavAt(snap: Snapshot, key: string): { button: NavButtonView; tab: NavTabView } | null {
-  const chosen = snap.floor_nav.find((b) => b.tabs.some((t) => t.key === key));
-  const button = chosen ?? snap.floor_nav.find((b) => !b.call && b.tabs.some((t) => !t.call)) ?? snap.floor_nav[0];
-  if (!button?.tabs.length) return null;
-  return { button, tab: button.tabs.find((t) => t.key === key) ?? button.tabs.find((t) => !t.call) ?? button.tabs[0] };
+  const chosen = snap.floor_nav.find((b) => navTabs(b).some((t) => t.key === key));
+  const button = chosen ?? snap.floor_nav.find((b) => !b.call && navTabs(b).some((t) => !t.call)) ?? snap.floor_nav[0];
+  if (!button) return null;
+  const tabs = navTabs(button);
+  return { button, tab: tabs.find((t) => t.key === key) ?? tabs.find((t) => !t.call) ?? tabs[0] };
 }
 
 /** 選んだ時点で立てた呼び出しのうち、応答待ちでもナビゲーションを残すもの */
@@ -1864,7 +1878,8 @@ export function navFoot(r: RegisterView, snap: Snapshot, tab: string): string {
     const call = navCall(reg, b.key);
     const gate = find(r.floor.actions, call.type === "ff_button" ? "ff_button" : "call_staff");
     const also = self && (b.call || b.key === "tobacco") && !on && gate.allowed ? ` data-navcall="${esc(JSON.stringify(call))}"` : "";
-    const first = self ? (b.tabs.find((t) => !t.call) ?? b.tabs[0]) : b.tabs[0];
+    const tabs = navTabs(b);
+    const first = self ? (tabs.find((t) => !t.call) ?? tabs[0]) : tabs[0];
     return `<button type="button" class="${on ? "on" : "ghost"}" data-fftab="${reg}:${on ? tab : first.key}"${also} aria-pressed="${on}">${esc(b.label)}</button>`;
   };
   return `<div class="ff-open-foot goods-foot">${snap.floor_nav.map(one).join("")}</div>`;

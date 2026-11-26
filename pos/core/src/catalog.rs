@@ -402,6 +402,13 @@ pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF79", FfTab::Oden),
 ];
 
+/// カートンのたばこ（10 個入り）。仮登録の単位（個・カートン）と読み取ったたばこの単位を合わせるのに使う（user 2026-11-26）
+pub const TOBACCO_CARTONS: &[&str] = &["4900000000158"];
+
+pub fn is_carton(code: &str) -> bool {
+    TOBACCO_CARTONS.contains(&code)
+}
+
 pub fn find(code: &str) -> Option<&'static Product> {
     CATALOG.iter().find(|p| p.code == code)
 }
@@ -496,16 +503,13 @@ pub const NAV: &[NavButton] = &[
         ],
     },
     // たばこはスタッフがバーコードで登録するので、レジカウンター側の「たばこ」は今のところ使い道がない（user 2026-11-26、そのまま置く）。
-    // たばこ・その他のタブは拡張用で商品を置かない
+    // その他のタブは拡張用で商品を置かない
     NavButton {
         key: "tobacco",
         label: "たばこ",
-        // 主要銘柄（実機では「メビウス」「マルボロ」など）。ボタンは置かず、お客様が三段目で棚番号とお求めの個数を入力して仮登録する
-        tabs: &[
-            tab("tobacco_a", "銘柄1", &[]),
-            tab("tobacco_b", "銘柄2", &[]),
-            tab("tobacco_c", "銘柄3", &[]),
-        ],
+        // 銘柄のタブは置かない（user 2026-11-26）。お客様が五段目で棚番号とお求めの個数を直接入力して仮登録し、
+        // ほかにもお求めの銘柄があれば「次の銘柄」で続ける
+        tabs: &[],
     },
     NavButton {
         key: "other",

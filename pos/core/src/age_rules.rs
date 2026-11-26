@@ -31,15 +31,8 @@ pub struct RuleChange {
 }
 
 /// 既定で呼び出しにしない（お客様が操作できる）ボタン・タブ（user 2026-11-26）：FF のドリンク（作り置きのないコーヒーなどは
-/// お客様がご自分でお取りになる）と、たばこ（銘柄のタブで棚番号と個数を入力して仮登録する）。ほかは押すと呼び出し
-pub const FLOOR_OPEN_DEFAULT: &[&str] = &[
-    "ff",
-    "drink",
-    "tobacco",
-    "tobacco_a",
-    "tobacco_b",
-    "tobacco_c",
-];
+/// お客様がご自分でお取りになる）と、たばこ（棚番号と個数を入力して仮登録する）。ほかは押すと呼び出し
+pub const FLOOR_OPEN_DEFAULT: &[&str] = &["ff", "drink", "tobacco"];
 
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]

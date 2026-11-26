@@ -4219,11 +4219,33 @@ impl Store {
             }
             _ => return Err("仮登録のたばこには、たばこを読み取ってください".into()),
         };
-        let qty = self
-            .reg(register)
-            .and_then(|r| r.txn.lines.iter().find(|l| l.id == line_id && l.is_shelf()))
-            .map(|l| l.qty)
-            .ok_or("仮登録のたばこの明細が見つかりません")?;
+        // 棚番号は仮登録のためだけの文字なので照らし合わせない。単位（個・カートン）は合わせる（user 2026-11-26）：
+        // 数量に意味があるので、カートンの行にはカートン、個の行には 1 個のたばこだけを充てる。
+        // 指した行と単位が違えば、同じ単位の仮登録の行（上から順）に充てる
+        let carton = catalog::is_carton(p.code);
+        let unit = |l: &Line| matches!(l.kind, LineKind::Shelf { carton: c, .. } if c == carton);
+        let (line_id, qty) = {
+            let lines = &self.reg(register).ok_or("レジがありません")?.txn.lines;
+            let picked = lines.iter().find(|l| l.id == line_id && l.is_shelf());
+            if picked.is_none() {
+                return Err("仮登録のたばこの明細が見つかりません".into());
+            }
+            let mut same: Vec<&Line> = lines.iter().filter(|l| unit(l)).collect();
+            same.sort_by_key(|l| l.id);
+            match picked.filter(|l| unit(l)).or(same.first().copied()) {
+                Some(l) => (l.id, l.qty),
+                None if carton => {
+                    return Err(
+                        "カートンの仮登録はありません\n1 個のたばこを読み取ってください".into(),
+                    )
+                }
+                None => {
+                    return Err(
+                        "1 個の仮登録はありません\nカートンのたばこを読み取ってください".into(),
+                    )
+                }
+            }
+        };
         self.check_limit(register, p.code, qty)?;
         let tax = self.tax_for(p.code);
         let r = self.reg_mut(register)?;

@@ -1212,7 +1212,11 @@ fn owner_logs_out_after_each_transaction() {
 fn ff_button_calls_staff_in_self_operated() {
     let mut s = Store::new(1, 2, 1);
     ok(&mut s, json!({"type":"ff_button","register":2}));
-    assert!(s.snapshot().calls.iter().any(|c| c.register == 2 && c.kind == CallKind::FastFood));
+    assert!(s
+        .snapshot()
+        .calls
+        .iter()
+        .any(|c| c.register == 2 && c.kind == CallKind::FastFood));
 }
 
 /// 仕様 12.2：無操作のレジはセルフ操作モードに戻る
@@ -5809,8 +5813,14 @@ fn ff_can_be_bought_on_the_floor_whatever_the_call_setting() {
     assert!(!nav("ff").call && !nav("tobacco").call && nav("voucher").call && nav("other").call);
     assert!(nav("ff").tabs.iter().all(|t| t.call == (t.key != "drink")));
     assert!(nav("tobacco").tabs.iter().all(|t| !t.call));
-    assert!(run(&mut s, set_call("0000", "drink", true)).is_err(), "オーナーだけ");
-    assert!(run(&mut s, set_call("9999", "nope", false)).is_err(), "ないボタン・タブ");
+    assert!(
+        run(&mut s, set_call("0000", "drink", true)).is_err(),
+        "オーナーだけ"
+    );
+    assert!(
+        run(&mut s, set_call("9999", "nope", false)).is_err(),
+        "ないボタン・タブ"
+    );
     ok(&mut s, set_call("9999", "drink", true));
     ok(&mut s, set_call("9999", "ff", true));
     assert!(s
@@ -5818,22 +5828,44 @@ fn ff_can_be_bought_on_the_floor_whatever_the_call_setting() {
         .age_rules
         .history
         .iter()
-        .any(|h| h.change.contains("FF／ドリンク") && h.change.contains("呼出し") && h.change.contains("しない → する")));
+        .any(|h| h.change.contains("FF／ドリンク")
+            && h.change.contains("呼出し")
+            && h.change.contains("しない → する")));
     assert!(
-        run(&mut s, json!({"type":"register_ff","register":1,"side":"counter","code":"FF32","qty":1})).is_err(),
+        run(
+            &mut s,
+            json!({"type":"register_ff","register":1,"side":"counter","code":"FF32","qty":1})
+        )
+        .is_err(),
         "セルフ操作モードのレジカウンター側は表示だけ"
     );
     // 呼び出しの設定でも登録できる
     ok(&mut s, coffee);
     let v = reg(&s, 1);
-    assert_eq!(v.counter.lines[0].line.kind, LineKind::Ff { state: FfState::SelfServe }, "コーヒーはお客様がご自分でお取りになる");
-    assert!(s.snapshot().calls.is_empty(), "登録だけではスタッフを呼ばない（呼び出しはタブを選んだ時点）");
+    assert_eq!(
+        v.counter.lines[0].line.kind,
+        LineKind::Ff {
+            state: FfState::SelfServe
+        },
+        "コーヒーはお客様がご自分でお取りになる"
+    );
+    assert!(
+        s.snapshot().calls.is_empty(),
+        "登録だけではスタッフを呼ばない（呼び出しはタブを選んだ時点）"
+    );
     ok(&mut s, chicken);
     assert!(
-        s.snapshot().calls.iter().any(|c| c.register == 1 && c.kind == CallKind::FastFood),
+        s.snapshot()
+            .calls
+            .iter()
+            .any(|c| c.register == 1 && c.kind == CallKind::FastFood),
         "作り置きの FF はお渡し前になり、スタッフを呼ぶ"
     );
-    assert!(run(&mut s, json!({"type":"checkout","register":1,"side":"floor"})).is_err());
+    assert!(run(
+        &mut s,
+        json!({"type":"checkout","register":1,"side":"floor"})
+    )
+    .is_err());
 }
 
 /// 仕様 3：店はレジ・Bell とも 10 台まで作れる（実機のソリューションが想定する構成）。超える指定は 10 台に切り詰める
@@ -6054,6 +6086,52 @@ fn held_tobacco_is_matched_by_scanning_then_needs_age_check() {
         &mut s,
         json!({"type":"checkout","register":2,"side":"counter"}),
     );
+}
+
+/// 仕様 8：棚番号は照らし合わせないが、単位（個・カートン）は合わせる。カートンの行にはカートンだけ、
+/// 個の行には 1 個のたばこだけ。指した行と単位が違えば同じ単位の行に充てる
+#[test]
+fn held_tobacco_unit_must_match_the_scanned_tobacco() {
+    const CARTON: &str = "4900000000158";
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"hold_shelf","register":1,"side":"counter","entries":[
+            {"shelf":123,"qty":3,"carton":false},
+            {"shelf":44,"qty":2,"carton":true}
+        ]}),
+    );
+    let ids: Vec<u32> = reg(&s, 1).counter.lines.iter().map(|l| l.line.id).collect();
+    // 個の行を指してカートンを読むと、カートンの行に充たる（数量 2 のまま）
+    ok(
+        &mut s,
+        json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":CARTON}),
+    );
+    let v = reg(&s, 1);
+    let get = |id: u32| v.counter.lines.iter().find(|l| l.line.id == id).unwrap();
+    assert_eq!((get(ids[1]).line.code, get(ids[1]).line.qty), (CARTON, 2));
+    assert!(matches!(get(ids[0]).line.kind, LineKind::Shelf { .. }));
+    // 残りは個の行だけ。もう一度カートンを読んでも受け付けない
+    let e = run(
+        &mut s,
+        json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":CARTON}),
+    )
+    .unwrap_err();
+    assert!(e.contains("カートンの仮登録はありません"), "{e}");
+    // 棚番号は照らし合わせないので、どの棚の 1 個のたばこでも充てられる（数量 3 のまま）
+    ok(
+        &mut s,
+        json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":TOBACCO}),
+    );
+    let v = reg(&s, 1);
+    let l = v
+        .counter
+        .lines
+        .iter()
+        .find(|l| l.line.id == ids[0])
+        .unwrap();
+    assert_eq!((l.line.code, l.line.qty), (TOBACCO, 3));
 }
 
 /// 仕様 8：仮登録を通さず、スタッフがたばこを直接読み取って登録してもよい。仮登録の明細は取り消せる

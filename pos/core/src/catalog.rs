@@ -402,6 +402,13 @@ pub const FF_MENU: &[(&str, FfTab)] = &[
     ("FF79", FfTab::Oden),
 ];
 
+/// カートンのたばこ（10 個入り）。仮登録の単位（個・カートン）と読み取ったたばこの単位を合わせるのに使う（user 2026-11-26）
+pub const TOBACCO_CARTONS: &[&str] = &["4900000000158"];
+
+pub fn is_carton(code: &str) -> bool {
+    TOBACCO_CARTONS.contains(&code)
+}
+
 pub fn find(code: &str) -> Option<&'static Product> {
     CATALOG.iter().find(|p| p.code == code)
 }

@@ -262,6 +262,8 @@ const DICT: Record<string, string> = {
   "棚番号は 1〜999 で入力してください": "Enter a shelf number from 1 to 999",
   "お求めの個数は 1〜99 で入力してください": "Enter a quantity from 1 to 99",
   仮登録のたばこの明細が見つかりません: "Held tobacco line not found",
+  "カートンの仮登録はありません\n1 個のたばこを読み取ってください": "No carton is held\nScan a single pack",
+  "1 個の仮登録はありません\nカートンのたばこを読み取ってください": "No single pack is held\nScan a carton",
   "仮登録のたばこには、たばこを読み取ってください": "Scan tobacco for the held tobacco",
   お渡しした数を入力してください: "Enter how many you handed over",
   お受け取りした数を入力してください: "Enter how many you received",

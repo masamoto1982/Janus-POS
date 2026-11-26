@@ -6,7 +6,7 @@ use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
-    StaffState, ACTIONS, FF_ASK_STAFF, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
+    StaffState, ACTIONS, ITEMS_FULL, MAX_ITEMS, TOUCH_LOCK_MS,
 };
 use crate::bell::{Bell, BellSignal};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
@@ -1733,7 +1733,6 @@ impl Register {
             items_full: t.item_count() >= MAX_ITEMS,
             emoney_short: t.emoney_short || t.emoney_partial,
             cash_only_goods: t.cash_only() > 0,
-            ff_floor: rules.any_ff_on_floor(),
         }
     }
 }
@@ -4330,13 +4329,11 @@ impl Store {
         force: bool,
     ) -> Result<Outcome, String> {
         self.check(register, side, Action::RegisterFf)?;
-        // セルフ操作モードの売り場側で登録できるのは、FF タブ表示が「両側」のタブの品だけ
+        // セルフ操作モードの売り場側でも、どの FF のタブの品も登録できる。設定の「呼出し」は、タブを選んだ時点で
+        // 呼び出しを立てるかどうかだけを決める（user 2026-11-26：呼び出しの設定でもお客様が登録できる、たばこと同じ）
         let self_op = self
             .reg(register)
             .is_some_and(|r| r.mode == Mode::SelfOperated);
-        if self_op && !self.age_rules.ff_on_floor(code) {
-            return Err(FF_ASK_STAFF.into());
-        }
         if self.reg(register).is_some_and(|r| r.txn.bill_slips() > 0) {
             return Err(BILL_ALONE.into());
         }

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::catalog::{self, Category, FfTab};
+use crate::catalog::{self, Category};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -192,20 +192,6 @@ impl AgeRules {
     /// セルフ操作モードの売り場側で押すと呼び出しになるか（ボタンまたはタブのキー）
     pub fn floor_calls(&self, key: &str) -> bool {
         !self.floor_open.contains(key)
-    }
-
-    /// その FF を売り場側の画面からも登録できるか（「FF」のボタンとその FF のタブがどちらも呼び出しでない）
-    pub fn ff_on_floor(&self, code: &str) -> bool {
-        !self.floor_calls("ff")
-            && catalog::ff_tab(code).is_some_and(|t| !self.floor_calls(catalog::ff_tab_key(t)))
-    }
-
-    /// 売り場側で登録できる FF のタブがあるか
-    pub fn any_ff_on_floor(&self) -> bool {
-        !self.floor_calls("ff")
-            && FfTab::ALL
-                .iter()
-                .any(|&t| !self.floor_calls(catalog::ff_tab_key(t)))
     }
 
     /// 設定の「呼出し」：売り場側で押すと呼び出しにするか

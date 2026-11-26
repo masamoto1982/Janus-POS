@@ -1206,12 +1206,12 @@ app.addEventListener("click", (e) => {
     const [reg, tab] = b.dataset.fftab.split(":");
     const register = Number(reg);
     ffTabs.set(register, { tab, page: 0 });
-    // たばこの銘柄タブ：五段目を棚番号と個数の入力にする（セルフは売り場側、スタッフ操作モードはレジカウンター側）。ほかのタブに移ったら閉じる
-    if (tab.startsWith("tobacco_")) {
-      const side = snap.registers.find((x) => x.id === register)?.mode === "self_operated" ? "floor" : "counter";
-      if (!shelfForm.has(`${register}:${side}`)) shelfForm.set(`${register}:${side}`, { carton: false });
+    // たばこの銘柄タブ：セルフ操作モードの売り場側の五段目を棚番号と個数の入力にする。ほかのタブに移ったら閉じる。
+    // スタッフはたばこのバーコードを直接読み取るので、レジカウンター側には出さない（user 2026-11-26）
+    if (tab.startsWith("tobacco_") && snap.registers.find((x) => x.id === register)?.mode === "self_operated") {
+      if (!shelfForm.has(`${register}:floor`)) shelfForm.set(`${register}:floor`, { carton: false });
     } else closeShelfForm(register);
-    // セルフで呼び出しでない「たばこ」も、押した時点でたばこの呼び出しも立てる
+    // 呼び出しのボタン・タブ（と「たばこ」）は、選んだ時点でそのボタンの用件の呼び出しを立てる（user 2026-11-26）
     if (b.dataset.navcall) {
       if (send(JSON.parse(b.dataset.navcall) as Command)) send({ type: "release_call", register });
       return;

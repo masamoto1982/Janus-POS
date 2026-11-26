@@ -548,8 +548,9 @@ function render(): void {
       const selfNav = r.mode === "self_operated" && (items.includes("self-nav") || items.includes("nav-body"));
       setRegion(`foot-${r.id}-${side}`, goods || selfNav ? navFoot(r, snap, ffUi(r.id).tab) : "", lang);
       if (side === "counter") counterGoods = goods;
-      // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）
-      el?.classList.toggle("items-tall", side === "floor" && counterGoods);
+      // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）。
+      // 第一待ち受けのサイネージも、第二待ち受けの四段目＋五段目と同じ高さ（user 2026-11-26）
+      el?.classList.toggle("items-tall", (side === "floor" && counterGoods) || (first && items.includes('class="signage"')));
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       if (side === "counter" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {

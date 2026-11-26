@@ -30,6 +30,17 @@ pub struct RuleChange {
     pub change: String,
 }
 
+/// 既定で呼び出しにしない（お客様が操作できる）ボタン・タブ（user 2026-11-26）：FF のドリンク（作り置きのないコーヒーなどは
+/// お客様がご自分でお取りになる）と、たばこ（銘柄のタブで棚番号と個数を入力して仮登録する）。ほかは押すと呼び出し
+pub const FLOOR_OPEN_DEFAULT: &[&str] = &[
+    "ff",
+    "drink",
+    "tobacco",
+    "tobacco_a",
+    "tobacco_b",
+    "tobacco_c",
+];
+
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AgeRules {
@@ -37,7 +48,7 @@ pub struct AgeRules {
     pub history: Vec<RuleChange>,
     pub limits: BTreeMap<String, u32>,
     /// セルフ操作モードの売り場側で、押しても呼び出しにしない（お客様が操作できる）四段目のボタン・五段目のタブのキー（catalog::NAV）。
-    /// 設定の「呼出し」で「しない」にしたもの。既定は空＝すべて押すと呼び出し
+    /// 設定の「呼出し」で「しない」にしたもの。既定は FLOOR_OPEN_DEFAULT（ドリンク・たばこ）
     pub floor_open: BTreeSet<String>,
     #[serde(skip)]
     pub(crate) next_id: u32,
@@ -62,7 +73,7 @@ impl Default for AgeRules {
                 catalog::TRADING_CARD.to_string(),
                 catalog::TRADING_CARD_LIMIT,
             )]),
-            floor_open: BTreeSet::new(),
+            floor_open: FLOOR_OPEN_DEFAULT.iter().map(|k| k.to_string()).collect(),
             next_id: 1,
         };
         r.push(

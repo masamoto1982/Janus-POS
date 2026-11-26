@@ -5806,10 +5806,21 @@ fn ff_published_on_the_floor_can_be_bought_in_self_operated_mode() {
     let publish = |pw: &str, key: &str, public: bool| json!({"type":"set_floor_call","owner_id":"000","password":pw,"key":key,"call":!public});
     let coffee = json!({"type":"register_ff","register":1,"side":"floor","code":"FF32","qty":1});
     let chicken = json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1});
-    assert!(run(&mut s, coffee.clone()).is_err(), "既定はすべて呼び出し");
+    // 既定でドリンクとたばこは呼び出しにしない（user 2026-11-26）。いったん「FF」とドリンクを呼び出しに戻してから確かめる
+    let snap = s.snapshot();
+    let nav = |k: &str| snap.floor_nav.iter().find(|b| b.key == k).unwrap();
+    assert!(!nav("ff").call && !nav("tobacco").call && nav("voucher").call && nav("other").call);
+    assert!(nav("ff").tabs.iter().all(|t| t.call == (t.key != "drink")));
+    assert!(nav("tobacco").tabs.iter().all(|t| !t.call));
     assert!(
-        run(&mut s, publish("0000", "drink", true)).is_err(),
+        run(&mut s, publish("0000", "drink", false)).is_err(),
         "オーナーだけ"
+    );
+    ok(&mut s, publish("9999", "drink", false));
+    ok(&mut s, publish("9999", "ff", false));
+    assert!(
+        run(&mut s, coffee.clone()).is_err(),
+        "呼び出しのタブでは登録できない"
     );
     assert!(
         run(&mut s, publish("9999", "nope", true)).is_err(),

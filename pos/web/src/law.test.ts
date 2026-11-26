@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alignByLength, arrange, fitRatio, seats, shells, wrapUnit } from "./law";
+import { alignByLength, arrange, fitRatio, seats, shells, softRadius, wrapUnit } from "./law";
 
 // W=400 の目安：小ボタン 50×25、大ボタン 100×50、特大 141×71、最小間隔 8.8
 const g = 400 / 45.255;
@@ -112,5 +112,21 @@ describe("モバイルモードの文字の縮め（ボタンの大きさから�
     expect(fitRatio({ width: 48, height: 19 }, { width: 36, height: 27 })).toBeCloseTo(0.75);
     expect(fitRatio({ width: 30, height: 19 }, { width: 36, height: 27 })).toBe(1);
     expect(fitRatio({ width: 30, height: 40 }, { width: 60, height: 20 })).toBeCloseTo(0.5);
+  });
+});
+
+describe("弱い角丸の丸み", () => {
+  // W=400：特大 50・大 35.4・小 25・極小 17.7、上限（大の丸み）W÷√2¹¹＝8.84
+  const cap = 400 / 45.255;
+  it("大・特大は上限（今までの丸み）のまま", () => {
+    expect(softRadius(400 / 8, cap)).toBeCloseTo(cap);
+    expect(softRadius(400 / 11.314, cap)).toBeCloseTo(cap, 2);
+  });
+  it("小・極小は高さ÷4（小は五段目のタブの上の角 W÷64 と同じ）", () => {
+    expect(softRadius(400 / 16, cap)).toBeCloseTo(400 / 64);
+    expect(softRadius(400 / 22.627, cap)).toBeCloseTo(400 / 90.51, 2);
+  });
+  it("丸みは高さの 1/4 を超えない（強い角丸の 1/2 と見分けられる）", () => {
+    for (const h of [400 / 8, 400 / 11.314, 400 / 16, 400 / 22.627]) expect(softRadius(h, cap) / h).toBeLessThanOrEqual(0.25 + 1e-9);
   });
 });

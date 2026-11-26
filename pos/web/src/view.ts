@@ -1222,7 +1222,7 @@ function staffOperatedWelcome(r: RegisterView, side: Side): string {
 }
 
 export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side ?? "counter"): string {
-  if (r.menu) return side === "counter" ? storeMenu(r) : menuPaused();
+  if (r.menu) return side === "counter" ? storeMenu(r) : pausedScreen();
   const v = r.counter;
   const reg = r.id;
   const a = (n: Action) => find(v.actions, n);
@@ -1472,7 +1472,7 @@ export function itemCount(lines: { qty: number }[]): number {
 
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
   // レジ休止も、店舗メニュー中の売り場側と同じサイネージ付きの「休止中」（user 2026-11-26）。レジカウンター側だけ添え字を再開の手順にする
-  if (r.paused) return menuPaused(side === "counter" ? "スタッフバーコードを読むと再開します" : undefined);
+  if (r.paused) return pausedScreen(side === "counter" ? "スタッフバーコードを読むと再開します" : undefined);
   if (r.emergency) return emergencyScreen(r, side);
   if (r.emergency_log && side === "counter") return emergencyEnded(snap, r.emergency_log);
   if (!r.menu && r.outlet_detail.some(([d]) => d === 2000)) return returned2000(side);
@@ -1729,7 +1729,7 @@ export function firstWelcome(r: RegisterView, side: Side): string {
 
 /** 休止中の画面（店舗メニューを開いている間の売り場側と、レジ休止の両画面、user 2026-11-26 で一つに）：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
  *  帯には部品を置かず英語の「Please use another register」、「休止中」の下に添え字「空いているレジをお使いください」。言語切り替えの影響を受けない（data-i18n-skip）。最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
-export function menuPaused(sub = "空いているレジをお使いください"): string {
+export function pausedScreen(sub = "空いているレジをお使いください"): string {
   return `<div class="reg-top welcome-band paused-band" data-i18n-skip><div class="band-row">${msg("Please use another register")}</div></div><div class="first-welcome" data-i18n-skip><b class="mode-big">休止中</b><small class="mode-sub">${esc(sub)}</small></div>`;
 }
 

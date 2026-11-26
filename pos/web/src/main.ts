@@ -549,8 +549,9 @@ function render(): void {
       setRegion(`foot-${r.id}-${side}`, goods || selfNav ? navFoot(r, snap, ffUi(r.id).tab) : "", lang);
       if (side === "counter") counterGoods = goods;
       // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）。
-      // 第一待ち受けのサイネージも、第二待ち受けの四段目＋五段目と同じ高さ（user 2026-11-26）
-      el?.classList.toggle("items-tall", (side === "floor" && counterGoods) || (first && items.includes('class="signage"')));
+      // 第一待ち受けと、店舗メニュー中の売り場側（休止中）のサイネージも、第二待ち受けの四段目＋五段目と同じ高さ（user 2026-11-26）
+      const tallSignage = (first || (r.menu !== null && side === "floor")) && items.includes('class="signage"');
+      el?.classList.toggle("items-tall", (side === "floor" && counterGoods) || tallSignage);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);
       if (side === "counter" && !["refund", "emergency", "expense"].includes(r.menu?.screen ?? "")) {

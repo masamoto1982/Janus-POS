@@ -86,8 +86,8 @@ const DICT: Record<string, string> = {
   ご用件をお伺いしてください: "Ask how you can help",
   休止中: "Closed",
   空いているレジをお使い下さい: "Please use another register",
-  レジ休止中: "Register closed",
-  "お手数ですが、ほかのレジをご利用ください": "Sorry, please use another register",
+  レジ休止: "Close register",
+  "レジを休止しました（スタッフバーコードで再開）": "Register closed (scan a staff barcode to reopen)",
   スタッフバーコードを読むと再開します: "Scan a staff barcode to reopen",
 
   // 第一待ち受け

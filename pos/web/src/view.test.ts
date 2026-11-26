@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RegisterView } from "./types";
-import { billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, menuPaused, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, rejectFlash, shownOnScreen } from "./view";
+import { isWelcome, billHandover, billPayCard, billVerifyScreen, btn, stampVerifyScreen, callScreen, esc, itemCount, pausedScreen, regTop, sideOf, signage, SIGNAGE, SIGNAGE_MS, tenderSum, rejectFlash, shownOnScreen } from "./view";
 import { trCore } from "./i18n";
 
 describe("view helpers", () => {
@@ -9,12 +9,20 @@ describe("view helpers", () => {
   });
 
   it("shows the floor side as closed in the first-wait style while the store menu is open", () => {
-    const html = menuPaused();
+    const html = pausedScreen();
     expect(html).toContain('<b class="mode-big">休止中</b>');
     expect(html).toContain(">Please use another register<");
     expect(html).toContain("空いているレジをお使いください");
     expect(html).toContain("data-i18n-skip");
     expect(html).not.toContain("<button");
+  });
+
+  it("uses the same closed screen for レジ休止, with the resume hint only on the counter side", () => {
+    const html = pausedScreen("スタッフバーコードを読むと再開します");
+    expect(html).toContain('<b class="mode-big">休止中</b>');
+    expect(html).toContain(">Please use another register<");
+    expect(html).toContain("スタッフバーコードを読むと再開します");
+    expect(isWelcome(html)).toBe(false);
   });
 
   it("escapes HTML", () => {

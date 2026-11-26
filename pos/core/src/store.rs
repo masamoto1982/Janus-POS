@@ -471,7 +471,7 @@ pub enum Command {
     ResumeHeld { register: u8 },
     /// ログアウトしてセルフ操作モードに戻る
     EndStaffMode { register: u8 },
-    /// レジ休止中にする
+    /// レジを休止する（店舗メニューの「レジ休止」）
     Pause { register: u8 },
     /// 店舗メニュー：お金を抜く（返品返金・緊急出金・経費支出など、店舗パスワードが要る）
     CashOut {
@@ -3398,7 +3398,7 @@ impl Store {
                 r.menu = None;
                 r.touch = None;
                 r.paused = true;
-                done("レジ休止中にしました（スタッフバーコードで再開）")
+                done("レジを休止しました（スタッフバーコードで再開）")
             }
             C::EndStaffMode { register } => {
                 self.check_active(register, Action::EndStaffMode)?;

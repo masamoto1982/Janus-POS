@@ -12,6 +12,7 @@ import {
   esc,
   FF_TABS,
   ffVerifying,
+  shelfVerifying,
   shelfTarget,
   shelfForm,
   stampVerifying,
@@ -859,8 +860,8 @@ function send(cmd: Command, quiet = false): boolean {
     cancelAsk.delete(cmd.register);
     cmd = { type: "cancel_item", register: cmd.register, side: asked.side, code: cmd.code };
   }
-  // お渡し照合の画面を開いているあいだにレジカウンター側で読んだ商品は、仮登録のたばこ（上の行から順に）に充てる（本登録）
-  if (cmd.type === "scan" && !cmd.code.startsWith(STAFF_BARCODE_PREFIX) && ffVerifying.has(`${cmd.register}:counter`)) {
+  // たばこの本登録の画面を開いているあいだにレジカウンター側で読んだ商品は、仮登録のたばこ（上の行から順に）に充てる（本登録）
+  if (cmd.type === "scan" && !cmd.code.startsWith(STAFF_BARCODE_PREFIX) && shelfVerifying.has(`${cmd.register}:counter`)) {
     const { register, code } = cmd;
     const target = shelfTarget(snap.registers.find((x) => x.id === register)?.counter.lines ?? []);
     if (target) cmd = { type: "match_shelf", register, side: "counter", line_id: target.id, code };
@@ -870,6 +871,11 @@ function send(cmd: Command, quiet = false): boolean {
   sim.tick(performance.now() - t0);
   const res = JSON.parse(sim.dispatch(JSON.stringify(cmd))) as { ok: boolean; message?: string; error?: string };
   lastError = res.ok ? undefined : res.error;
+  // FF のお渡し照合が済んでも仮登録のたばこが残っていれば、続けてたばこの本登録の画面を開く（確認の画面は分けるが流れは一続き）
+  if (res.ok && cmd.type === "check_ff" && cmd.side === "counter" && ffVerifying.has(`${cmd.register}:counter`)) {
+    const lines = (JSON.parse(sim.snapshot()) as Snapshot).registers.find((x) => x.id === cmd.register)?.counter.lines ?? [];
+    if (!lines.some((l) => l.kind === "ff" && l.state === "waiting") && lines.some((l) => l.kind === "shelf")) shelfVerifying.add(`${cmd.register}:counter`);
+  }
   // 取引を取り消して保留した取引に戻ったときも、取消しの画面は閉じる（戻った取引に持ち越さない）
   if (res.ok && cmd.type === "void_transaction") cancelAsk.delete(cmd.register);
   // 取り消せたら、登録済みだったことを操作した側の登録画面の中央に一瞬だけ知らせる
@@ -1264,6 +1270,16 @@ app.addEventListener("click", (e) => {
   }
   if (b.dataset.ffverify) {
     ffVerifying.add(b.dataset.ffverify);
+    frame();
+    return;
+  }
+  if (b.dataset.shelfverify) {
+    shelfVerifying.add(b.dataset.shelfverify);
+    frame();
+    return;
+  }
+  if (b.dataset.shelfverifyClose) {
+    shelfVerifying.delete(b.dataset.shelfverifyClose);
     frame();
     return;
   }

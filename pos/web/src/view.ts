@@ -140,13 +140,14 @@ export function lineName(l: ShelfLike & { name: string }): string {
   return isShelf(l) ? `${l.name} ${l.shelf}${l.carton ? " カートン" : ""}` : l.name;
 }
 
-/** お渡し照合を待つ明細のフラグ：FF の「お渡し前」と仮登録のたばこの「仮登録」。どちらも押すと同じお渡し照合の画面を開く。
+/** お渡し照合を待つ明細のフラグ：FF の「お渡し前」と仮登録のたばこの「仮登録」。仕組み（会計の止め方・済んだ案内）は共通だが、
+ *  確認の画面は分ける（user 2026-11-26）：「お渡し前」は FF のお渡し照合、「仮登録」はたばこの本登録の画面を開く。
  *  「お渡し前」はお客様側に出さない、「仮登録」はお客様が入力したものなので売り場側にも（押せない札で）出す */
 function ffFlag(reg: number, side: Side, l: { kind: string; state?: FfState }, a: Gate, ro: boolean): string {
   if (isShelf(l)) {
     if (ro) return flagSpan("仮登録");
     const title = a.allowed ? "押して、仮登録のたばこを読み取る" : (a.reason ?? "");
-    return `<button type="button" class="flag ff-verify" data-ffverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>仮登録</button>`;
+    return `<button type="button" class="flag ff-verify" data-shelfverify="${reg}:${side}" title="${esc(title)}"${a.allowed ? "" : " disabled"}>仮登録</button>`;
   }
   if (l.kind !== "ff" || l.state !== "waiting" || ro) return "";
   const title = a.allowed ? "押してお渡しした個数を照合" : (a.reason ?? "");
@@ -154,6 +155,8 @@ function ffFlag(reg: number, side: Side, l: { kind: string; state?: FfState }, a
 }
 
 export const ffVerifying = new Set<string>();
+/** たばこの本登録の画面を開いているレジ・側（`${reg}:${side}`）。FF のお渡し照合とは別の画面（user 2026-11-26） */
+export const shelfVerifying = new Set<string>();
 export const ffvInput = new Map<string, string>();
 
 function closeFfVerify(reg: number, side: Side): void {
@@ -161,9 +164,9 @@ function closeFfVerify(reg: number, side: Side): void {
   for (const k of [...ffvInput.keys()]) if (k.startsWith(`${reg}:${side}:`)) ffvInput.delete(k);
 }
 
-/** お渡し照合の行：お渡し前の FF（照合した行も入力が残るあいだ）と、レジカウンター側では仮登録のたばこ */
+/** お渡し照合の行：お渡し前の FF（照合した行も入力が残るあいだ） */
 function ffVerifyRows<L extends { id: number; kind: string; state?: FfState }>(reg: number, side: Side, lines: L[]): L[] {
-  return lines.filter((l) => (l.kind === "ff" && (l.state === "waiting" || ffvInput.has(`${reg}:${side}:${l.id}`))) || (side === "counter" && isShelf(l)));
+  return lines.filter((l) => l.kind === "ff" && (l.state === "waiting" || ffvInput.has(`${reg}:${side}:${l.id}`)));
 }
 
 /** お渡し照合の画面で、次に読み取ったたばこを充てる仮登録の明細（入力した順に一つずつ） */
@@ -178,14 +181,7 @@ function ffVerifyOpen<L extends { id: number; kind: string; state?: FfState }>(r
 }
 
 function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; state?: FfState; touched: number; qty: number; ff_base?: number; shelf?: number; carton?: boolean }[], floor: boolean): string {
-  const all = ffVerifyRows(reg, side, lines);
-  const ff = all.filter((l) => !isShelf(l)).sort((a, b) => b.touched - a.touched);
-  const shelves = all.filter(isShelf).sort((a, b) => a.id - b.id);
-  const target = shelfTarget(shelves);
-  // 仮登録のたばこ：お渡し数の入力の代わりに、棚から取ったたばこを読み取る（上の行から順に充てる）
-  const shelfRows = shelves
-    .map((l) => `<tr${l === target ? ` class="shelf-target"` : ""}><td>${esc(lineName(l))}</td><td class="num">${l.qty}</td><td class="num">—</td><td class="ffv-judge">${l === target ? `<span class="ffv-wait">読み取り待ち</span>` : ""}</td></tr>`)
-    .join("");
+  const ff = ffVerifyRows(reg, side, lines).sort((a, b) => b.touched - a.touched);
   const rows = ff
     .map((l) => {
       const key = `${reg}:${side}:${l.id}`;
@@ -201,17 +197,30 @@ function ffVerifyScreen(reg: number, side: Side, lines: { id: number; name: stri
       return `<tr><td>${esc(name)}</td><td class="num">${need}</td><td class="num">${padField(reg, side, "ffv", value, "", `${l.name}の${floor ? "お受け取り" : "お渡し"}数`, l.id, "ffv-input")}</td><td class="ffv-judge">${judge}</td></tr>`;
     })
     .join("");
-  const head = floor
-    ? "お受け取りした数を入力してください"
-    : !shelves.length
-      ? "お渡しした数を入力してください"
-      : ff.some((l) => l.state !== "received")
-        ? "お渡し数を入力し、たばこを読み取ってください"
-        : "棚のたばこを読み取ってください";
+  const head = floor ? "お受け取りした数を入力してください" : "お渡しした数を入力してください";
   return `<div class="ffv-screen">
       <div class="big">${head}</div>
-      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${floor ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}${shelfRows}</tbody></table>
+      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">注文数</th><th class="num">${floor ? "お受け取り数" : "お渡し数"}</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-ffverify-close="${reg}:${side}" >バック</button></div>
+    </div>`;
+}
+
+function shelfVerifyOpen<L extends { kind: string }>(reg: number, side: Side, lines: L[]): boolean {
+  return side === "counter" && shelfVerifying.has(`${reg}:${side}`) && lines.some(isShelf);
+}
+
+/** たばこの本登録の画面（user 2026-11-26：FF のお渡し照合とは分ける）。仮登録の行を入力した順に並べ、棚から取ったたばこを
+ *  読み取ると上の行から順に充てて本登録にする（照合の列に「読み取り待ち」）。読み取りで照合するので、数を打つ欄はない */
+function shelfVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; qty: number; shelf?: number; carton?: boolean }[]): string {
+  const shelves = lines.filter(isShelf).sort((a, b) => a.id - b.id);
+  const target = shelfTarget(shelves);
+  const rows = shelves
+    .map((l) => `<tr${l === target ? ` class="shelf-target"` : ""}><td>${esc(lineName(l))}</td><td class="num">${l.qty}</td><td class="ffv-judge">${l === target ? `<span class="ffv-wait">読み取り待ち</span>` : ""}</td></tr>`)
+    .join("");
+  return `<div class="ffv-screen shelf-verify">
+      <div class="big">棚のたばこを読み取ってください</div>
+      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">個数</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
+      <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-shelfverify-close="${reg}:${side}" >バック</button></div>
     </div>`;
 }
 
@@ -389,8 +398,11 @@ function passedCard(reg: number, side: Side, v: CounterView): string {
     return side === "counter"
       ? `<div class="point-screen passed">${mark}${msg(`${p.age}歳以上であることを確認しました`, "身分証をお返しください")}${next}</div>`
       : `<div class="point-screen passed">${mark}${msg("年齢確認が完了しました", "ご協力ありがとうございました")}</div>`;
-  // FF はスタッフが取り仕切るので、スタッフ操作モードの売り場側には出さない
-  return side === "counter" ? `<div class="point-screen passed">${mark}${msg("お渡しを確認しました", "お渡し照合がすべて済みました")}${next}</div>` : "";
+  // FF はスタッフが取り仕切るので、スタッフ操作モードの売り場側には出さない。たばこの本登録の画面で済んだときは、その画面の言葉で
+  if (side !== "counter") return "";
+  return shelfVerifying.has(`${reg}:counter`)
+    ? `<div class="point-screen passed">${mark}${msg("たばこを本登録しました", "仮登録がすべて済みました")}${next}</div>`
+    : `<div class="point-screen passed">${mark}${msg("お渡しを確認しました", "お渡し照合がすべて済みました")}${next}</div>`;
 }
 
 export function pendingParcel(lines: CounterLine[]): CounterLine | undefined {
@@ -1246,7 +1258,9 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
       ? ageStep(reg, v, side, a)
       : "";
 
-  const ffFirst = !paying && v.lines.some((l) => (l.kind === "ff" && l.state === "waiting") || isShelf(l)) && a("check_handover").allowed;
+  // お渡し前の FF と仮登録のたばこが残るあいだ、会計ボタンは確認の画面を開く。両方あれば FF のお渡し照合が先、済むとたばこの本登録へ
+  const ffWaiting = v.lines.some((l) => l.kind === "ff" && l.state === "waiting");
+  const ffFirst = !paying && (ffWaiting || v.lines.some(isShelf)) && a("check_handover").allowed;
   // 販売期限切れの品を回収するまで会計は押せないので、会計ボタンはグレーアウト（core の checkout が理由つきで拒む）
   const expiredAny = v.lines.some((l) => l.expired);
   // 一部を払ったあと（電子マネーの残高を使い切って残りを現金で払うときなど）は、合計を残りのお支払い額にする
@@ -1256,7 +1270,7 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
     (ro || paying
         ? ""
         : ffFirst && !expiredAny
-          ? `<button type="button" class="primary" data-ffverify="${reg}:${side}">お会計</button>`
+          ? `<button type="button" class="primary" data-${ffWaiting ? "ffverify" : "shelfverify"}="${reg}:${side}">お会計</button>`
           : btn("お会計", { type: "checkout", register: reg, side }, a("checkout"), "primary")),
     r.points,
     ro || cancelAsk.has(reg) ? "" : cancelBtn(r, side, a("void_transaction")),
@@ -1322,6 +1336,8 @@ export function staffOperatedScreen(r: RegisterView, side: Side = r.active_side 
   if (!ro && !paying && ffVerifyOpen(reg, side, v.lines))
     return screen(ffVerifyScreen(reg, side, v.lines, false));
   closeFfVerify(reg, side);
+  if (!ro && !paying && shelfVerifyOpen(reg, side, v.lines)) return screen(shelfVerifyScreen(reg, side, v.lines));
+  shelfVerifying.delete(`${reg}:${side}`);
   if (!ro && !paying && stampVerifying.has(`${reg}:${side}`) && stampPending(v.bills))
     return screen(stampVerifyScreen(reg, side, v.bills, a("affix_stamp"), true));
   stampVerifying.delete(`${reg}:${side}`);

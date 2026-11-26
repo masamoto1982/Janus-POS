@@ -285,6 +285,28 @@ function rowsOf(buttons: HTMLElement[]): HTMLElement[][] {
   return [...groups.values()].filter((g) => g.length > 1);
 }
 
+/**
+ * 弱い角丸の丸みはボタンの短い辺 B の 1/4、上限は大ボタンの丸み（W÷√2¹¹＝大の高さ W÷√2⁷ の 1/4）（user 2026-11-26）。
+ * 丸みを W÷√2¹¹ に固定していたころは、小（高さ W÷16）では高さの 35% にもなり、強い角丸（50%）の案内ボタンと見分けにくかった。
+ * 大・特大は上限で今までと同じ、小・極小だけ丸みが弱まる（小は B÷4＝FF のタブの上の角と同じ）
+ */
+export function softRadius(short: number, cap: number): number {
+  return Math.min(short / 4, cap);
+}
+
+/** 弱い角丸のボタン（四隅が同じ px の丸みで、強い角丸・円・タブでないもの）に softRadius を当てる */
+function fitSoftCorner(b: HTMLElement): void {
+  b.style.removeProperty("border-radius");
+  const cs = getComputedStyle(b);
+  const r = cs.borderTopLeftRadius;
+  const box = b.getBoundingClientRect();
+  const short = Math.min(box.width, box.height);
+  if (!r.endsWith("px") || r !== cs.borderBottomRightRadius || r !== cs.borderTopRightRadius || r !== cs.borderBottomLeftRadius) return;
+  const px = parseFloat(r);
+  if (!(px > 0) || px >= short / 2) return;
+  b.style.borderRadius = `${softRadius(short, px)}px`;
+}
+
 const RIGID = ".ff-item, .pad-key, .qty-step button, button.tab, .ff-arrow, .bell-btn";
 
 export function fitText(root: ParentNode): void {
@@ -346,6 +368,8 @@ export function fitText(root: ParentNode): void {
   //    余白は上の手順と同じ（幅を変えられるボタンは左右 B÷4、変えられないボタンは B÷8）
   const mobile = typeof matchMedia === "function" && matchMedia(MOBILE).matches;
   for (const b of buttons) if (mobile || narrowScreen(b)) shrinkToFit(b, b.matches(RIGID));
+  // 弱い角丸の丸みは高さに合わせる（幅と文字が決まってから、B＝短い辺で）
+  for (const b of buttons) fitSoftCorner(b);
   // 5. 金券のタブの単品（一行だけの「通常」「インクジェット」など）は、同じ群で文字の大きさをそろえる（一番小さいものに合わせる）。
   //    一行のボタンは特大から収まるまで縮むので、短い名前だけが極端に大きくなり、並べると不揃いになる
   for (const grid of root.querySelectorAll<HTMLElement>(".goods-grid")) {

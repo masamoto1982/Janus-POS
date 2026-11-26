@@ -1756,9 +1756,10 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.emergency) return emergencyContactsRow();
   // セルフ操作モードで応答のない呼び出しがあるあいだは、種類を問わず（年確・公共料金・宅配便・電子マネー・釣銭忘れなど）
   // 最下段を呼び出し中の案内にする（user 2026-11-14：あらゆる呼び出しで挙動を揃える）。電子マネーの手続き中なども同じ
-  // たばこの仮登録の入力中は、たばこの呼び出しの応答待ちでもタブと案内を残す（入力を続けられるように）
-  const shelfing = shelfForm.has(`${reg}:floor`) && r.waiting_calls.every((k) => k === "tobacco");
-  if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length && !shelfing) return callingRow(r, side, snap.now);
+  // 四段目・五段目のボタン・タブを選んで立てた呼び出し（FF・金券・たばこ）と、作り置きの FF のお渡し前の呼び出しは、応答待ちでも
+  // ナビゲーションを残す（お客様は続けて商品を登録できる、user 2026-11-26）。呼び出しの最中はヘッダーの点滅でわかる
+  const navWaiting = r.waiting_calls.every((k) => NAV_CALLS.includes(k));
+  if (r.mode === "self_operated" && !r.paused && !r.menu && r.waiting_calls.length && !navWaiting) return callingRow(r, side, snap.now);
   // スタッフ操作モードの「取り消す商品をスキャンしてください」の場面では、最下段に FF タブを出す。
   // FF はスキャンできないので、取り消したい FF のボタンを押すと取り消しが成立する（user 2026-11-21）
   const asked = cancelAsk.get(reg);
@@ -1771,23 +1772,22 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.paused || r.menu || r.emoney || r.emoney_short !== null || r.emoney_partial !== null || cancelAsk.has(reg)) return "";
   if (first) return signage(now);
   if (r.mode === "self_operated") {
-    // 売り場側にもレジカウンター側と同じ四段目・五段目のナビゲーション（user 2026-11-26）。設定の「呼出し」で「する」のボタン・タブ（既定）は
-    // 押すとそのボタンの用件の呼び出し（押している間 Bell が鳴る）、「しない」にしたものはお客様が使える。レジカウンター側は同じものを表示だけ
+    // 売り場側にもレジカウンター側と同じ四段目・五段目のナビゲーション（user 2026-11-26）。どのボタン・タブもお客様が選べ、単品を登録できる。
+    // 設定の「呼出し」で「する」のボタン・タブは、選んだ時点でそのボタンの用件の呼び出しを立てる（たばこと同じ）。レジカウンター側は同じものを表示だけ
     const a = (n: Action) => find(r.floor.actions, n);
     const at = selfNavAt(snap, ui.tab);
     if (!at) return `<div class="self-nav nav-note">${callNote([], now)}</div>`;
     const { button, tab } = at;
     const call = navCall(reg, button.key);
     const gate = a(call.type === "ff_button" ? "ff_button" : "call_staff");
+    const callAttr = (t: NavTabView) => (t.call && t !== tab && gate.allowed ? ` data-navcall="${esc(JSON.stringify(call))}"` : "");
     const tabBtn = (t: NavTabView) =>
-      !t.call
-        ? `<button type="button" role="tab" class="tab ff-tab ${t === tab ? "on" : ""}" data-fftab="${reg}:${t.key}" aria-selected="${t === tab}">${esc(t.label)}</button>`
-        : `<button type="button" role="tab" class="tab ff-tab call-tab" aria-selected="false" data-hold="${esc(JSON.stringify(call))}"${gate.allowed ? "" : ` disabled title="${esc(gate.reason ?? "")}"`} title="スタッフを呼び出します">${esc(t.label)}</button>`;
+      `<button type="button" role="tab" class="tab ff-tab ${t === tab ? "on" : ""}" data-fftab="${reg}:${t.key}"${callAttr(t)} aria-selected="${t === tab}">${esc(t.label)}</button>`;
     const row = `<div class="tabs ff-tabs self-nav" role="tablist" aria-label="${esc(button.label)}">${button.tabs.map(tabBtn).join("")}</div>`;
-    // タブがすべて呼び出しのボタンは、単品の代わりに添え書きを出す
-    if (!tab) return `${row}${callNote([], now)}`;
     if (button.key === "ff") return `${row}${ffPage(reg, side, snap, tab.key, ui.page, a("register_ff"), r.floor.lines)}`;
     if (button.key === "tobacco") return `${row}${shelfRow(reg, "floor", a("hold_shelf"))}`;
+    // 商品を置いていないタブ（「拡張用」）は、単品の代わりに添え書きを出す
+    if (!tab.codes.length) return `${row}${callNote([], now)}`;
     return `${row}${goodsPage(reg, snap, button, tab, ui.page, side, a("scan"), r.floor.lines)}`;
   }
   if (r.mode === "staff_operated" && side === "floor") return signage(now);
@@ -1796,7 +1796,8 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
   const goods = goodsAt(snap, ui.tab);
-  if (goods?.button.key === "tobacco") return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${shelfRow(reg, "counter", find(r.counter.actions, "hold_shelf"))}`;
+  // スタッフはたばこの商品のバーコードを直接読み取って登録するので、レジカウンター側に棚番号と個数の仮登録は出さない（user 2026-11-26：冗長）
+  if (goods?.button.key === "tobacco") return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}<p class="call-note">たばこはバーコードを読み取ってください</p>`;
   if (goods) return `${ffTabRow(reg, goods.button.tabs.map((t) => [t.key, t.label] as const), ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "scan"), r.counter.lines)}`;
   const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;
@@ -1832,12 +1833,17 @@ function goodsAt(snap: Snapshot, key: string): { button: NavButtonView; tab: Nav
 
 /** 売り場側（セルフ操作モード）で開いているボタンとタブ。選んだタブが呼び出しなら、そのボタンの最初の呼び出しでないタブ。
  *  ボタンが呼び出しなら、最初の呼び出しでないボタン。そのボタンがなければ null（タブは出さない） */
-function selfNavAt(snap: Snapshot, key: string): { button: NavButtonView; tab: NavTabView | undefined } | null {
-  const chosen = snap.floor_nav.find((b) => !b.call && b.tabs.some((t) => t.key === key));
-  const button = chosen ?? snap.floor_nav.find((b) => !b.call);
-  if (!button) return null;
-  return { button, tab: button.tabs.find((t) => t.key === key && !t.call) ?? button.tabs.find((t) => !t.call) };
+/** セルフ操作モードで開いているボタン・タブ。選んだタブがあればそれ、なければ呼び出しでないボタンの呼び出しでないタブ（お客様が選ぶ前に
+ *  呼び出しにならないものを先に見せる）、それもなければ最初のボタンの最初のタブ */
+function selfNavAt(snap: Snapshot, key: string): { button: NavButtonView; tab: NavTabView } | null {
+  const chosen = snap.floor_nav.find((b) => b.tabs.some((t) => t.key === key));
+  const button = chosen ?? snap.floor_nav.find((b) => !b.call && b.tabs.some((t) => !t.call)) ?? snap.floor_nav[0];
+  if (!button?.tabs.length) return null;
+  return { button, tab: button.tabs.find((t) => t.key === key) ?? button.tabs.find((t) => !t.call) ?? button.tabs[0] };
 }
+
+/** 選んだ時点で立てた呼び出しのうち、応答待ちでもナビゲーションを残すもの */
+const NAV_CALLS: readonly string[] = ["fast_food", "voucher", "tobacco"];
 
 /** 呼び出しのボタン・タブ（設定の「呼出し」で「する」）を売り場側で押したときの呼び出し */
 function navCall(reg: number, button: string): Command {
@@ -1853,13 +1859,13 @@ export function navFoot(r: RegisterView, snap: Snapshot, tab: string): string {
   const cur = self ? selfNavAt(snap, tab)?.button : (goodsAt(snap, tab)?.button ?? snap.floor_nav.find((b) => b.key === "ff"));
   const one = (b: NavButtonView) => {
     const on = b === cur;
-    // セルフで呼び出しでない「たばこ」も、押した時点でたばこの呼び出しも立てる（棚のたばこはスタッフが取ってお渡しする）
-    const also = self && b.key === "tobacco" && !on ? ` data-navcall="${esc(JSON.stringify(navCall(reg, b.key)))}"` : "";
-    if (!self || !b.call)
-      return `<button type="button" class="${on ? "on" : "ghost"}" data-fftab="${reg}:${on ? tab : b.tabs[0].key}"${also} aria-pressed="${on}">${esc(b.label)}</button>`;
+    // セルフでは呼び出しのボタンも切り替えで、選んだ時点でそのボタンの用件の呼び出しを立てる（user 2026-11-26）。
+    // 呼び出しでない「たばこ」も、押した時点でたばこの呼び出しを立てる（棚のたばこはスタッフが取ってお渡しする）
     const call = navCall(reg, b.key);
     const gate = find(r.floor.actions, call.type === "ff_button" ? "ff_button" : "call_staff");
-    return `<button type="button" class="ghost call-tab" data-hold="${esc(JSON.stringify(call))}"${gate.allowed ? "" : ` disabled title="${esc(gate.reason ?? "")}"`} title="スタッフを呼び出します">${esc(b.label)}</button>`;
+    const also = self && (b.call || b.key === "tobacco") && !on && gate.allowed ? ` data-navcall="${esc(JSON.stringify(call))}"` : "";
+    const first = self ? (b.tabs.find((t) => !t.call) ?? b.tabs[0]) : b.tabs[0];
+    return `<button type="button" class="${on ? "on" : "ghost"}" data-fftab="${reg}:${on ? tab : first.key}"${also} aria-pressed="${on}">${esc(b.label)}</button>`;
   };
   return `<div class="ff-open-foot goods-foot">${snap.floor_nav.map(one).join("")}</div>`;
 }
@@ -2201,7 +2207,7 @@ const RULES_TABS: { id: RulesTab; label: string; note: string }[] = [
   {
     id: "floor",
     label: "呼出し",
-    note: "セルフ操作モードの売り場側で、押すとスタッフを呼び出すボタン・タブを決めます（既定はドリンクとたばこだけ「しない」、ほかは呼び出し）<br>呼び出しを「しない」にしたボタン・タブは、お客様が自分で使えます<br>タブを「しない」にしても、そのボタンが呼び出しならお客様は開けません<br>コーヒーなど作り置きのない FF はお客様がご自分でお取りになり、揚げ物など作り置きの FF はスタッフがお渡しします",
+    note: "セルフ操作モードの売り場側で、選んだ時点でスタッフを呼び出すボタン・タブを決めます（既定はドリンクとたばこだけ「しない」、ほかは呼び出し）<br>呼び出しの設定にかかわらず、お客様はどのタブの商品も登録できます<br>コーヒーなど作り置きのない FF はお客様がご自分でお取りになり、揚げ物など作り置きの FF はスタッフがお渡しします",
   },
   // Bell の鳴動は独立した「Bell の設定」から設定のタブに移した（user 2026-11-24）
   {

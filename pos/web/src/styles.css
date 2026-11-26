@@ -1117,8 +1117,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 /* タブがすべて呼び出しのボタンは単品の代わりに添え書き。タブの中身（単品・添え書き・たばこの入力）が何であってもタブの位置が動かないように、
    中身の高さは単品ボタンと同じ --btn-xl-h に固定し、その中で縦の中央に置く（user 2026-11-26：タブ内部のボタンの有無で余白が変動するのは気に入らない） */
 .screen-items:has(> .ff-tabs):has(> .call-note) { justify-content: space-evenly; }
-.ff-tabs.self-nav + .call-note { flex: none; height: var(--btn-xl-h); display: flex; align-items: center; justify-content: center; }
-.ff-tabs.self-nav + .call-note.marquee { justify-content: flex-start; }
+.ff-tabs + .call-note { flex: none; height: var(--btn-xl-h); display: flex; align-items: center; justify-content: center; }
+.ff-tabs + .call-note.marquee { justify-content: flex-start; }
 .rules tr.nav-button-row td { border-top: var(--s17, 1px) solid var(--border); }
 
 /* たばこの仮登録（user 2026-11-26）：五段目で完結。案内の一行の下に、棚番号・個数の入力欄、単位、「次の製品」 */

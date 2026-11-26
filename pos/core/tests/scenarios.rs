@@ -1207,16 +1207,12 @@ fn owner_logs_out_after_each_transaction() {
     assert_eq!(v.floor.lines.len(), 1);
 }
 
-/// 仕様 4.3：セルフ操作モードではお客様が FF を登録できない
+/// 仕様 4.3：セルフ操作モードの「FF」ボタン（呼び出し）は FF の呼び出しを立てる
 #[test]
-fn customer_cannot_register_ff_in_self_operated() {
+fn ff_button_calls_staff_in_self_operated() {
     let mut s = Store::new(1, 2, 1);
-    assert!(run(
-        &mut s,
-        json!({"type":"register_ff","register":2,"side":"floor","code":"FF01","qty":1})
-    )
-    .is_err());
     ok(&mut s, json!({"type":"ff_button","register":2}));
+    assert!(s.snapshot().calls.iter().any(|c| c.register == 2 && c.kind == CallKind::FastFood));
 }
 
 /// 仕様 12.2：無操作のレジはセルフ操作モードに戻る
@@ -5799,106 +5795,45 @@ fn idle_revert_voids_the_held_transaction_too() {
     assert_eq!(v.mode, Mode::SelfOperated);
 }
 
-/// 仕様 14.4：設定の「呼出し」で「FF」のボタンとそのタブを呼び出しにしないと、セルフ操作モードの売り場側でその FF を登録できる
+/// 仕様 14.4：設定の「呼出し」は、売り場側でボタン・タブを選んだ時点で呼び出しを立てるかだけを決める。呼び出しのタブでも
+/// お客様は FF を登録できる（user 2026-11-26）。作り置きのない FF はお客様がご自分でお取りになり、作り置きの FF はお渡し前
 #[test]
-fn ff_published_on_the_floor_can_be_bought_in_self_operated_mode() {
+fn ff_can_be_bought_on_the_floor_whatever_the_call_setting() {
     let mut s = Store::new(1, 2, 1);
-    let publish = |pw: &str, key: &str, public: bool| json!({"type":"set_floor_call","owner_id":"000","password":pw,"key":key,"call":!public});
+    let set_call = |pw: &str, key: &str, call: bool| json!({"type":"set_floor_call","owner_id":"000","password":pw,"key":key,"call":call});
     let coffee = json!({"type":"register_ff","register":1,"side":"floor","code":"FF32","qty":1});
     let chicken = json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1});
-    // 既定でドリンクとたばこは呼び出しにしない（user 2026-11-26）。いったん「FF」とドリンクを呼び出しに戻してから確かめる
+    // 既定でドリンクとたばこは呼び出しにしない（user 2026-11-26）
     let snap = s.snapshot();
     let nav = |k: &str| snap.floor_nav.iter().find(|b| b.key == k).unwrap();
     assert!(!nav("ff").call && !nav("tobacco").call && nav("voucher").call && nav("other").call);
     assert!(nav("ff").tabs.iter().all(|t| t.call == (t.key != "drink")));
     assert!(nav("tobacco").tabs.iter().all(|t| !t.call));
-    assert!(
-        run(&mut s, publish("0000", "drink", false)).is_err(),
-        "オーナーだけ"
-    );
-    ok(&mut s, publish("9999", "drink", false));
-    ok(&mut s, publish("9999", "ff", false));
-    assert!(
-        run(&mut s, coffee.clone()).is_err(),
-        "呼び出しのタブでは登録できない"
-    );
-    assert!(
-        run(&mut s, publish("9999", "nope", true)).is_err(),
-        "ないボタン・タブ"
-    );
-    ok(&mut s, publish("9999", "drink", true));
-    assert!(
-        run(&mut s, coffee.clone()).is_err(),
-        "タブだけ呼び出しをやめても、「FF」のボタンが呼び出しなら登録できない"
-    );
-    ok(&mut s, publish("9999", "ff", true));
-    let snap = s.snapshot();
-    let ff = snap.floor_nav.iter().find(|b| b.key == "ff").unwrap();
-    assert!(!ff.call);
-    assert!(ff.tabs.iter().any(|t| t.label == "ドリンク" && !t.call));
-    assert!(ff.tabs.iter().any(|t| t.label == "フライヤー" && t.call));
-    assert!(snap
+    assert!(run(&mut s, set_call("0000", "drink", true)).is_err(), "オーナーだけ");
+    assert!(run(&mut s, set_call("9999", "nope", false)).is_err(), "ないボタン・タブ");
+    ok(&mut s, set_call("9999", "drink", true));
+    ok(&mut s, set_call("9999", "ff", true));
+    assert!(s
+        .snapshot()
         .age_rules
         .history
         .iter()
-        .any(|h| h.change.contains("FF／ドリンク")
-            && h.change.contains("呼出し")
-            && h.change.contains("する → しない")));
+        .any(|h| h.change.contains("FF／ドリンク") && h.change.contains("呼出し") && h.change.contains("しない → する")));
     assert!(
-        run(
-            &mut s,
-            json!({"type":"register_ff","register":1,"side":"counter","code":"FF32","qty":1})
-        )
-        .is_err(),
+        run(&mut s, json!({"type":"register_ff","register":1,"side":"counter","code":"FF32","qty":1})).is_err(),
         "セルフ操作モードのレジカウンター側は表示だけ"
     );
-    ok(&mut s, coffee.clone());
+    // 呼び出しの設定でも登録できる
+    ok(&mut s, coffee);
     let v = reg(&s, 1);
-    let l = &v.counter.lines[0].line;
-    assert_eq!(
-        l.kind,
-        LineKind::Ff {
-            state: FfState::SelfServe
-        },
-        "コーヒーはお客様がご自分でお取りになる"
-    );
-    assert!(s.snapshot().calls.is_empty(), "スタッフを呼ばない");
-    let e = run(&mut s, chicken.clone()).unwrap_err();
-    assert!(e.contains("スタッフにお申し付けください"), "{e}");
-    ok(
-        &mut s,
-        json!({"type":"checkout","register":1,"side":"floor"}),
-    );
-    confirm_point(&mut s, 1);
-    ok(
-        &mut s,
-        json!({"type":"select_payment","register":1,"side":"floor","method":"emoney"}),
-    );
-    ok(&mut s, json!({"type":"tap_emoney","register":1}));
-    assert_eq!(reg(&s, 1).last_receipt.unwrap().total, 150);
-
-    // 作り置きの FF を公開すると、売り場側で登録できるがお渡しはスタッフ（お渡し前・呼び出し）
-    ok(&mut s, publish("9999", "fried", true));
+    assert_eq!(v.counter.lines[0].line.kind, LineKind::Ff { state: FfState::SelfServe }, "コーヒーはお客様がご自分でお取りになる");
+    assert!(s.snapshot().calls.is_empty(), "登録だけではスタッフを呼ばない（呼び出しはタブを選んだ時点）");
     ok(&mut s, chicken);
-    assert!(s
-        .snapshot()
-        .calls
-        .iter()
-        .any(|c| c.register == 1 && c.kind == CallKind::FastFood));
-    assert!(run(
-        &mut s,
-        json!({"type":"checkout","register":1,"side":"floor"})
-    )
-    .is_err());
-    ok(&mut s, publish("9999", "ff", false));
     assert!(
-        run(
-            &mut s,
-            json!({"type":"register_ff","register":1,"side":"floor","code":"FF02","qty":1})
-        )
-        .is_err(),
-        "「FF」のボタンを非公開に戻すと、タブが公開でも登録できない"
+        s.snapshot().calls.iter().any(|c| c.register == 1 && c.kind == CallKind::FastFood),
+        "作り置きの FF はお渡し前になり、スタッフを呼ぶ"
     );
+    assert!(run(&mut s, json!({"type":"checkout","register":1,"side":"floor"})).is_err());
 }
 
 /// 仕様 3：店はレジ・Bell とも 10 台まで作れる（実機のソリューションが想定する構成）。超える指定は 10 台に切り詰める

@@ -1797,8 +1797,9 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
   if (r.mode === "staff_operated" && r.counter.lines.some((l) => l.parcel || l.pickup)) return "";
   if (r.mode === "staff_operated" && r.pickup_handover && !r.counter.lines.length) return "";
   const goods = goodsAt(snap, ui.tab);
-  // スタッフはたばこの商品のバーコードを直接読み取って登録するので、レジカウンター側に棚番号と個数の仮登録は出さない（user 2026-11-26：冗長）
-  if (goods?.button.key === "tobacco") return `<p class="call-note nav-body">たばこはバーコードを読み取ってください</p>`;
+  // スタッフはたばこの商品のバーコードを直接読み取って登録するので、レジカウンター側に棚番号と個数の仮登録は出さない（user 2026-11-26：冗長）。
+  // 案内はたばこに限らない一般の文（user 2026-11-26）：この案内のあいだもどのバーコードも受け付け、読んだバーコードのとおりに登録・呼び出しになる
+  if (goods?.button.key === "tobacco") return `<p class="call-note nav-body">商品のバーコードをスキャンしてください</p>`;
   if (goods) return `${goodsTabRow(reg, goods.button, ui.tab)}${goodsPage(reg, snap, goods.button, goods.tab, ui.page, "counter", find(r.counter.actions, "scan"), r.counter.lines)}`;
   const tab = FF_TABS.some(([k]) => k === ui.tab) ? ui.tab : FF_TABS[0][0];
   return `${ffTabRow(reg, FF_TABS, tab)}${ffPage(reg, side, snap, tab, ui.page, find(r.counter.actions, "register_ff"), r.counter.lines)}`;

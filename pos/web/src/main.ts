@@ -543,9 +543,9 @@ function render(): void {
       setRegion(`head-${r.id}-${side}`, screenHead(r, new Date(), side), lang);
       setRegion(`items-${r.id}-${side}`, items, lang);
       // スタッフ操作モードのレジカウンター側は、FF タブを出しているあいだ常に「FF」「金券」「拡張用」「拡張用」の段を置く（user 2026-11-25・26）
-      const goods = r.mode === "staff_operated" && side === "counter" && items.includes("ff-tabs");
+      const goods = r.mode === "staff_operated" && side === "counter" && (items.includes("ff-tabs") || items.includes("nav-body"));
       // セルフ操作モードは両画面に同じ四段目（売り場側のナビゲーション、user 2026-11-26）。呼び出し中など五段目を差し替えている場面では出さない
-      const selfNav = r.mode === "self_operated" && items.includes("self-nav");
+      const selfNav = r.mode === "self_operated" && (items.includes("self-nav") || items.includes("nav-body"));
       setRegion(`foot-${r.id}-${side}`, goods || selfNav ? navFoot(r, snap, ffUi(r.id).tab) : "", lang);
       if (side === "counter") counterGoods = goods;
       // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）
@@ -736,7 +736,7 @@ function padKey(key: string, k: string): void {
       couponCancel.delete(`${register}:${side}`);
       padValue.delete(padValueKey(register, "cpn"));
     } else if (e.target === "shf" || e.target === "shq") {
-      // たばこの仮登録：棚番号を決めたら、個数がまだなら個数のテンキーを続けて開く（「次の製品」で一件を仮登録する）
+      // たばこの仮登録：棚番号を決めたら、個数がまだなら個数のテンキーを続けて開く（「次の銘柄」で一件を仮登録する）
       if (e.digits === "" || value <= 0) return;
       padValue.set(padValueKey(register, e.target), String(value));
       if (e.target === "shf" && !padValue.get(padValueKey(register, "shq"))) {
@@ -1206,9 +1206,9 @@ app.addEventListener("click", (e) => {
     const [reg, tab] = b.dataset.fftab.split(":");
     const register = Number(reg);
     ffTabs.set(register, { tab, page: 0 });
-    // たばこの銘柄タブ：セルフ操作モードの売り場側の五段目を棚番号と個数の入力にする。ほかのタブに移ったら閉じる。
+    // 「たばこ」：セルフ操作モードの売り場側の五段目をすぐ棚番号と個数の入力にする（銘柄のタブは廃止、user 2026-11-26）。ほかのボタン・タブに移ったら閉じる。
     // スタッフはたばこのバーコードを直接読み取るので、レジカウンター側には出さない（user 2026-11-26）
-    if (tab.startsWith("tobacco_") && snap.registers.find((x) => x.id === register)?.mode === "self_operated") {
+    if (tab === "tobacco" && snap.registers.find((x) => x.id === register)?.mode === "self_operated") {
       if (!shelfForm.has(`${register}:floor`)) shelfForm.set(`${register}:floor`, { carton: false });
     } else closeShelfForm(register);
     // 呼び出しのボタン・タブ（と「たばこ」）は、選んだ時点でそのボタンの用件の呼び出しを立てる（user 2026-11-26）
@@ -1225,7 +1225,7 @@ app.addEventListener("click", (e) => {
     return frame();
   }
   if (b.dataset.shelfNext) {
-    // 一つの製品（棚番号と個数）をその場で仮登録し、欄を空けて次の製品の入力に移る
+    // 一つの銘柄（棚番号と個数）をその場で仮登録し、欄を空けて次の銘柄の入力に移る
     const [reg, side] = b.dataset.shelfNext.split(":");
     const register = Number(reg);
     const shelf = padValue.get(padValueKey(register, "shf"));

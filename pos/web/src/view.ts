@@ -1471,11 +1471,8 @@ export function itemCount(lines: { qty: number }[]): number {
 }
 
 export function sharedScreen(r: RegisterView, snap: Snapshot, side: Side): string {
-  if (r.paused)
-    return confirm(`<div class="point-screen paused-screen">${msg(
-      "レジ休止中",
-      side === "floor" ? "お手数ですが、ほかのレジをご利用ください" : "スタッフバーコードを読むと再開します",
-    )}</div>`);
+  // レジ休止も、店舗メニュー中の売り場側と同じサイネージ付きの「休止中」（user 2026-11-26）。レジカウンター側だけ添え字を再開の手順にする
+  if (r.paused) return menuPaused(side === "counter" ? "スタッフバーコードを読むと再開します" : undefined);
   if (r.emergency) return emergencyScreen(r, side);
   if (r.emergency_log && side === "counter") return emergencyEnded(snap, r.emergency_log);
   if (!r.menu && r.outlet_detail.some(([d]) => d === 2000)) return returned2000(side);
@@ -1730,14 +1727,14 @@ export function firstWelcome(r: RegisterView, side: Side): string {
   return `${band}<div class="first-welcome" data-i18n-skip><b class="mode-big">${ja}</b><small class="mode-sub">${en}</small></div>`;
 }
 
-/** レジカウンター側で店舗メニューを開いている間の売り場側：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
+/** 休止中の画面（店舗メニューを開いている間の売り場側と、レジ休止の両画面、user 2026-11-26 で一つに）：第一待ち受けと同じ形で「休止中」を特大の文字で示す。
  *  帯には部品を置かず英語の「Please use another register」、「休止中」の下に添え字「空いているレジをお使いください」。言語切り替えの影響を受けない（data-i18n-skip）。最下段はサイネージ。レジ前に人が立っても解除されず、スタッフが店舗メニューを閉じたときに解除される */
-export function menuPaused(): string {
-  return `<div class="reg-top welcome-band" data-i18n-skip><div class="band-row">${msg("Please use another register")}</div></div><div class="first-welcome" data-i18n-skip><b class="mode-big">休止中</b><small class="mode-sub">空いているレジをお使いください</small></div>`;
+export function menuPaused(sub = "空いているレジをお使いください"): string {
+  return `<div class="reg-top welcome-band paused-band" data-i18n-skip><div class="band-row">${msg("Please use another register")}</div></div><div class="first-welcome" data-i18n-skip><b class="mode-big">休止中</b><small class="mode-sub">${esc(sub)}</small></div>`;
 }
 
 /** 待ち受け（第二待ち受け）を表示しているか。第一待ち受けに切り替えてよいのはこのときだけ */
-export const isWelcome = (main: string): boolean => main.includes("welcome-band");
+export const isWelcome = (main: string): boolean => main.includes("welcome-band") && !main.includes("paused-band");
 
 
 /** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。売り場側は「スタッフを呼び出しています」（添え字なし）、
@@ -1750,7 +1747,7 @@ function callingRow(r: RegisterView, side: Side, now: number): string {
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {
   const reg = r.id;
-  if (r.menu && side === "floor" && !r.paused) return signage(now);
+  if (r.paused || (r.menu && side === "floor")) return signage(now);
   // 非常事態モード中の売り場側の最下段：英語で「警戒してください」「通報をお願いします」（ヘッダーと同じ赤で点滅）
   if (r.emergency && side === "floor") return `<div class="call-row calling" data-i18n-skip>${msg("Stay alert", "Please call emergency services")}</div>`;
   if (r.emergency) return emergencyContactsRow();
@@ -1984,7 +1981,7 @@ export function storeMenu(r: RegisterView): string {
           .join("")}</div>
         <div class="menu-list" data-law>
           ${btn("ログアウト", { type: "end_staff_mode", register: reg }, find(v.actions, "end_staff_mode"), "menu-item")}
-          ${btn("レジ休止中", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
+          ${btn("レジ休止", { type: "pause", register: reg }, find(v.actions, "pause"), "menu-item")}
         </div>
         ${backFootRow(go(null))}</div>`;
     case "journal":

@@ -447,6 +447,13 @@ const touchedAt = new Map<number, number>();
 /** 取引を終えたお客様はレジを離れる：取引の完了から猶予のあいだは人の検知を受け付けない（シミュレーターではカーソルが残っていても離れたとみなす） */
 const leftAt = new Map<number, number>();
 const leaving = (reg: number): boolean => Date.now() - (leftAt.get(reg) ?? -Infinity) < FIRST_WAIT_AFTER_MS;
+/** スタッフがログインしているレジ。ログアウトしたら即座にセルフ操作モードの第一待ち受けで立ち上がる（user 2026-11-26）：
+ *  ログアウトしたスタッフはレジを離れるので、取引の完了と同じく猶予のあいだは人の検知を受け付けない */
+const loggedIn = new Set<number>();
+/** 取引を終えた時刻 */
+const endedAt = new Map<number, number>();
+/** ログアウトして、まだ第一待ち受けに切り替えていないレジ */
+const loggedOut = new Set<number>();
 const present = (reg: number): boolean => hovering.has(reg) || Date.now() - (touchedAt.get(reg) ?? -Infinity) < PRESENCE_TOUCH_MS;
 const regOf = (t: EventTarget | null): number | null => {
   const el = t instanceof Element ? t.closest<HTMLElement>("[data-swipe]") : null;
@@ -481,6 +488,7 @@ function render(): void {
   for (const r of snap.registers) {
     const busy = inTransaction(r);
     if (busyRegs.has(r.id) && !busy) {
+      endedAt.set(r.id, Date.now());
       resetLangs(r.id);
       hovering.delete(r.id);
       touchedAt.delete(r.id);
@@ -488,6 +496,16 @@ function render(): void {
     }
     if (busy) busyRegs.add(r.id);
     else busyRegs.delete(r.id);
+    const staffIn = r.counter.state !== "absent";
+    // 取引を終えて担当がログアウトしたとき（取引の完了の 3 秒）は除く
+    if (loggedIn.has(r.id) && !staffIn && !(Date.now() - (endedAt.get(r.id) ?? -Infinity) < FIRST_WAIT_AFTER_MS)) {
+      hovering.delete(r.id);
+      touchedAt.delete(r.id);
+      leftAt.set(r.id, Date.now());
+      loggedOut.add(r.id);
+    }
+    if (staffIn) loggedIn.add(r.id);
+    else loggedIn.delete(r.id);
     const sel = app.querySelector<HTMLSelectElement>(`[data-login="${r.id}"]`);
     if (sel && document.activeElement !== sel) {
       const acc = r.counter.state === "absent" ? undefined : snap.accounts.find((a) => a.id === r.counter.staff);
@@ -509,8 +527,10 @@ function render(): void {
     // 第一待ち受け：取引のない待ち受けで、レジ前に人がいない（カーソルが重なっていない・取引を終えて離れた）状態が FIRST_WAIT_AFTER_MS 続いたとき
     let counterMain = sharedScreen(r, snap, "counter");
     let floorMain = sharedScreen(r, snap, "floor");
-    const vacant = isWelcome(counterMain) && isWelcome(floorMain) && !busy && !r.counter.point_card && !r.floor.point_card;
-    if (!vacant || present(r.id)) lastBusy.set(r.id, Date.now());
+    const vacant = !r.paused && isWelcome(counterMain) && isWelcome(floorMain) && !busy && !r.counter.point_card && !r.floor.point_card;
+    if (vacant && loggedOut.delete(r.id)) lastBusy.set(r.id, -Infinity);
+    else if (!vacant || present(r.id)) lastBusy.set(r.id, Date.now());
+    if (busy || r.counter.state !== "absent") loggedOut.delete(r.id);
     const first = vacant && Date.now() - (lastBusy.get(r.id) ?? 0) >= FIRST_WAIT_AFTER_MS;
     if (first) {
       counterMain = firstWelcome(r, "counter");
@@ -550,7 +570,7 @@ function render(): void {
       if (side === "counter") counterGoods = goods;
       // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）。
       // 第一待ち受けと、店舗メニュー中の売り場側（休止中）のサイネージも、第二待ち受けの四段目＋五段目と同じ高さ（user 2026-11-26）
-      const tallSignage = (first || (r.menu !== null && side === "floor")) && items.includes('class="signage"');
+      const tallSignage = (first || r.paused || (r.menu !== null && side === "floor")) && items.includes('class="signage"');
       el?.classList.toggle("items-tall", (side === "floor" && counterGoods) || tallSignage);
       const pad = padEntry.get(`${r.id}:${side}`);
       if (pad && pad.target !== "inlet" && !el?.querySelector(`[data-padopen="${r.id}:${side}:${pad.target}:${pad.line ?? ""}"]`)) padEntry.delete(`${r.id}:${side}`);

@@ -71,7 +71,8 @@ pub enum Action {
     Scan,
     RegisterFf,
     FfButton,
-    CheckFf,
+    CheckHandover,
+    HoldShelf,
     CompleteService,
     ParcelNext,
     RemoveLine,
@@ -105,7 +106,8 @@ pub const ACTIONS: &[Action] = &[
     Action::Scan,
     Action::RegisterFf,
     Action::FfButton,
-    Action::CheckFf,
+    Action::CheckHandover,
+    Action::HoldShelf,
     Action::CompleteService,
     Action::ParcelNext,
     Action::RemoveLine,
@@ -145,8 +147,8 @@ pub struct Context {
     pub id_pending: bool,
     pub age_unchecked: bool,
     pub age_early: bool,
-    pub ff_waiting: bool,
-    pub has_ff: bool,
+    pub handover_waiting: bool,
+    pub has_handover: bool,
     pub service_pending: bool,
     pub parcel_ask: bool,
     pub has_bills: bool,
@@ -207,8 +209,8 @@ impl Context {
             Some(POINT_UNCONFIRMED)
         } else if self.coupon_unmatched {
             Some(COUPON_UNMATCHED)
-        } else if self.ff_waiting {
-            Some(FF_UNCHECKED)
+        } else if self.handover_waiting {
+            Some(HANDOVER_UNCHECKED)
         } else if self.service_pending {
             Some("サービス商品の受付が済んでいません")
         } else if self.parcel_ask {
@@ -222,7 +224,7 @@ impl Context {
 pub type Denial = &'static str;
 
 pub const FF_ASK_STAFF: Denial = "FF はスタッフにお申し付けください";
-const FF_UNCHECKED: Denial = "FF のお渡し確認（お渡し個数の照合）が済んでいません";
+const HANDOVER_UNCHECKED: Denial = "お渡し照合（FF のお渡し数・仮登録のたばこ）が済んでいません";
 const PARCEL_ASK: Denial = "同じお届け先の荷物があるか選んでください";
 pub const EXPIRED: Denial = "販売期限切れの商品があります\n取り消してから、お会計に進んでください";
 const POINT_UNCONFIRMED: Denial = "ポイントカードの確認が済んでいません";
@@ -282,7 +284,7 @@ pub fn is_counter_only(action: Action) -> bool {
             | Action::AffixStamp
             | Action::AffixReceiptStamp
             | Action::HandOverBills
-            | Action::CheckFf
+            | Action::CheckHandover
             | Action::HandTickets
     )
 }
@@ -362,8 +364,8 @@ pub fn permitted(side: Side, action: Action, c: &Context) -> Result<(), Denial> 
             Err("払込票の確認・お渡しはレジカウンター側の画面で行います")
         } else if matches!(action, Action::AffixStamp | Action::AffixReceiptStamp) {
             Err("収入印紙の貼り付け確認はレジカウンター側の画面で行います")
-        } else if action == Action::CheckFf {
-            Err("FF のお渡し確認はレジカウンター側の画面で行います")
+        } else if action == Action::CheckHandover {
+            Err("お渡し照合はレジカウンター側の画面で行います")
         } else if action == Action::HandTickets {
             Err("チケットのお渡し枚数はレジカウンター側の画面で入力します")
         } else if action == Action::ReceiveTickets {
@@ -393,7 +395,13 @@ fn check_ff(c: &Context) -> Result<(), Denial> {
         c.phase == Phase::Registering,
         "お会計中はお渡し確認を変えられません",
     )?;
-    require(c.has_ff, "FF の明細がありません")
+    require(c.has_handover, "お渡し照合を待つ明細はありません")
+}
+
+/// たばこの仮登録：登録中なら、どちらのモード・どちらの画面でも（売り場側のお客様、レジカウンター側のスタッフ）
+fn hold_shelf(c: &Context) -> Result<(), Denial> {
+    require(c.phase == Phase::Registering, "お会計中です")?;
+    require(!c.items_full, ITEMS_FULL)
 }
 
 fn require(cond: bool, reason: Denial) -> Result<(), Denial> {
@@ -444,7 +452,8 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
         ),
         Action::CashOut => require(!c.has_lines, "取引中は出金操作ができません"),
         Action::CashIn => require(!c.has_lines, "取引中は入金操作ができません"),
-        Action::CheckFf => check_ff(c),
+        Action::CheckHandover => check_ff(c),
+        Action::HoldShelf => hold_shelf(c),
         Action::CompleteService => require(c.service_pending, "受付待ちのサービス商品はありません"),
         Action::ParcelNext => require(
             c.parcel_ask,
@@ -460,7 +469,7 @@ fn staff_operated(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "すでに会計画面です")?;
             require(c.has_lines, "明細がありません")?;
             require(!c.expired, EXPIRED)?;
-            require(!c.ff_waiting, FF_UNCHECKED)?;
+            require(!c.handover_waiting, HANDOVER_UNCHECKED)?;
             require(!c.service_pending, "サービス商品の受付が済んでいません")?;
             require(!c.parcel_ask, PARCEL_ASK)
         }
@@ -496,10 +505,11 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "お会計中です")?;
             require(!c.items_full, ITEMS_FULL)
         }
-        Action::CheckFf => {
+        Action::CheckHandover => {
             check_ff(c)?;
-            Err("FF のお渡し確認はスタッフがログインしてから行います")
+            Err("お渡し照合はスタッフがログインしてから行います")
         }
+        Action::HoldShelf => hold_shelf(c),
         Action::RemoveLine => {
             require(!paying, "お会計中です")?;
             require(c.has_lines, "明細がありません")
@@ -509,7 +519,7 @@ fn self_operated(action: Action, c: &Context) -> Result<(), Denial> {
             require(!paying, "すでにお会計中です")?;
             require(c.has_lines, "商品を登録してください")?;
             require(!c.expired, EXPIRED)?;
-            require(!c.ff_waiting, FF_UNCHECKED)?;
+            require(!c.handover_waiting, HANDOVER_UNCHECKED)?;
             require(
                 !c.service_pending,
                 "スタッフがサービス商品の受付をするまでお待ちください",
@@ -573,7 +583,9 @@ mod tests {
             for phase in [Phase::Registering, Phase::Paying] {
                 for has_lines in b {
                     for age_choice_pending in b {
-                        for (ff_waiting, has_ff) in [(false, false), (false, true), (true, true)] {
+                        for (handover_waiting, has_handover) in
+                            [(false, false), (false, true), (true, true)]
+                        {
                             for (service_pending, bill_unchecked) in
                                 [(false, false), (true, false), (false, true)]
                             {
@@ -603,8 +615,8 @@ mod tests {
                                             age_early: false,
                                             age_choice_pending: age_choice_pending
                                                 && phase == Phase::Paying,
-                                            ff_waiting,
-                                            has_ff,
+                                            handover_waiting,
+                                            has_handover,
                                             service_pending,
                                             parcel_ask: false,
                                             has_bills: bill_unchecked,
@@ -689,7 +701,7 @@ mod tests {
     fn payment_is_gated_until_blockers_clear() {
         for c in contexts().into_iter().filter(|c| c.phase == Phase::Paying) {
             let blocked =
-                c.age_choice_pending || c.bill_unchecked || c.ff_waiting || c.service_pending;
+                c.age_choice_pending || c.bill_unchecked || c.handover_waiting || c.service_pending;
             for a in [Action::InsertCash, Action::TapEmoney] {
                 if blocked {
                     assert!(permitted(Side::Floor, a, &c).is_err());

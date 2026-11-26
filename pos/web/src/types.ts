@@ -2,7 +2,7 @@
 
 export type AccountView = { id: string, barcode: string, name: string, role: Role, };
 
-export type Action = "scan" | "register_ff" | "ff_button" | "check_ff" | "complete_service" | "parcel_next" | "remove_line" | "remove_coupon" | "checkout" | "back_to_registering" | "select_payment" | "confirm_point_card" | "choose_age_check" | "early_age_check" | "check_id" | "check_bill" | "affix_stamp" | "affix_receipt_stamp" | "hand_over_bills" | "receive_tickets" | "hand_tickets" | "insert_cash" | "tap_emoney" | "call_staff" | "void_transaction" | "end_staff_mode" | "pause" | "cash_out" | "cash_in" | "emoney" | "resolve_emoney_short";
+export type Action = "scan" | "register_ff" | "ff_button" | "check_handover" | "hold_shelf" | "complete_service" | "parcel_next" | "remove_line" | "remove_coupon" | "checkout" | "back_to_registering" | "select_payment" | "confirm_point_card" | "choose_age_check" | "early_age_check" | "check_id" | "check_bill" | "affix_stamp" | "affix_receipt_stamp" | "hand_over_bills" | "receive_tickets" | "hand_tickets" | "insert_cash" | "tap_emoney" | "call_staff" | "void_transaction" | "end_staff_mode" | "pause" | "cash_out" | "cash_in" | "emoney" | "resolve_emoney_short";
 
 export type ActionState = { action: Action, allowed: boolean, reason: string | null, };
 
@@ -65,11 +65,11 @@ dates: Dates | null, };
 
 export type Category = "food" | "drink" | "daily" | "newspaper" | "magazine" | "alcohol" | "tobacco" | "smoking_goods" | "adult_book" | "adult_goods" | "lottery" | "fireworks" | "fast_food" | "bag" | "service" | "stamp" | "voucher";
 
-export type Command = { "type": "scan", register: number, side: Side, code: string, } | { "type": "register_ff", register: number, side?: Side, code: string, qty: number, force?: boolean, } | { "type": "ff_button", register: number, } | { "type": "check_ff", register: number, side: Side, line_id: number, handed: number, } | { "type": "complete_service", register: number, line_id: number, amount: number, } | { "type": "parcel_length", register: number, line_id: number, sum_cm: number, } | { "type": "parcel_size", register: number, line_id: number, sum_cm: number, weight_g: number, } | { "type": "parcel_postal", register: number, line_id: number, postal: string, } | { "type": "parcel_back", register: number, line_id: number, } | { "type": "parcel_next", register: number, more: boolean, } | { "type": "pickup_handover", register: number, } | { "type": "pickup_found", register: number, found?: boolean | null, } | { "type": "remove_line", register: number, side: Side, line_id: number, } | { "type": "cancel_item", register: number, side: Side, code: string, } | { "type": "set_qty", register: number, side: Side, line_id: number, qty: number, } | { "type": "remove_coupon", register: number, side: Side, coupon_id: number, } | { "type": "dismiss_returned", register: number, } | { "type": "touch", register: number, side?: Side, } | { "type": "checkout", register: number, side: Side, } | { "type": "back_to_registering", register: number, side: Side, } | { "type": "select_payment", register: number, side: Side, method: PaymentMethod, } | { "type": "choose_age_check", register: number, side?: Side, id_check: boolean, } | { "type": "early_age_check", register: number, side?: Side, start: boolean, } | { "type": "check_id", register: number, side?: Side, birth: string, today: string, } | { "type": "dismiss_confiscated", register: number, } | { "type": "dismiss_ff_collect", register: number, } | { "type": "dismiss_passed", register: number, } | { "type": "check_bill", register: number, side?: Side, line_id: number, checked: boolean, } | { "type": "affix_receipt_stamp", register: number, side?: Side, } | { "type": "affix_stamp", register: number, side?: Side, line_id: number, affixed: boolean, } | { "type": "hand_over_bills", register: number, side?: Side, } | { "type": "hand_tickets", register: number, side?: Side, handed: number, } | { "type": "receive_tickets", register: number, side?: Side, received: number, } | { "type": "insert_cash", register: number, denomination: number, count: number, } | { "type": "finish_insert", register: number, } | { "type": "tap_emoney", register: number, method?: PaymentMethod, } | { "type": "start_emoney", register: number, side: Side, kind: EmoneyKind, } | { "type": "close_emoney", register: number, side: Side, } | { "type": "resolve_emoney_short", register: number, side: Side, choice: ShortChoice, } | { "type": "call_staff", register: number, topic?: CallTopic, } | { "type": "confirm_point_card", register: number, side: Side, } | { "type": "use_points", register: number, side: Side, how: PointsUse, 
+export type Command = { "type": "scan", register: number, side: Side, code: string, } | { "type": "register_ff", register: number, side?: Side, code: string, qty: number, force?: boolean, } | { "type": "ff_button", register: number, } | { "type": "check_ff", register: number, side: Side, line_id: number, handed: number, } | { "type": "hold_shelf", register: number, side: Side, entries: Array<ShelfEntry>, } | { "type": "match_shelf", register: number, side: Side, line_id: number, code: string, } | { "type": "complete_service", register: number, line_id: number, amount: number, } | { "type": "parcel_length", register: number, line_id: number, sum_cm: number, } | { "type": "parcel_size", register: number, line_id: number, sum_cm: number, weight_g: number, } | { "type": "parcel_postal", register: number, line_id: number, postal: string, } | { "type": "parcel_back", register: number, line_id: number, } | { "type": "parcel_next", register: number, more: boolean, } | { "type": "pickup_handover", register: number, } | { "type": "pickup_found", register: number, found?: boolean | null, } | { "type": "remove_line", register: number, side: Side, line_id: number, } | { "type": "cancel_item", register: number, side: Side, code: string, } | { "type": "set_qty", register: number, side: Side, line_id: number, qty: number, } | { "type": "remove_coupon", register: number, side: Side, coupon_id: number, } | { "type": "dismiss_returned", register: number, } | { "type": "touch", register: number, side?: Side, } | { "type": "checkout", register: number, side: Side, } | { "type": "back_to_registering", register: number, side: Side, } | { "type": "select_payment", register: number, side: Side, method: PaymentMethod, } | { "type": "choose_age_check", register: number, side?: Side, id_check: boolean, } | { "type": "early_age_check", register: number, side?: Side, start: boolean, } | { "type": "check_id", register: number, side?: Side, birth: string, today: string, } | { "type": "dismiss_confiscated", register: number, } | { "type": "dismiss_ff_collect", register: number, } | { "type": "dismiss_passed", register: number, } | { "type": "check_bill", register: number, side?: Side, line_id: number, checked: boolean, } | { "type": "affix_receipt_stamp", register: number, side?: Side, } | { "type": "affix_stamp", register: number, side?: Side, line_id: number, affixed: boolean, } | { "type": "hand_over_bills", register: number, side?: Side, } | { "type": "hand_tickets", register: number, side?: Side, handed: number, } | { "type": "receive_tickets", register: number, side?: Side, received: number, } | { "type": "insert_cash", register: number, denomination: number, count: number, } | { "type": "finish_insert", register: number, } | { "type": "tap_emoney", register: number, method?: PaymentMethod, } | { "type": "start_emoney", register: number, side: Side, kind: EmoneyKind, } | { "type": "close_emoney", register: number, side: Side, } | { "type": "resolve_emoney_short", register: number, side: Side, choice: ShortChoice, } | { "type": "call_staff", register: number, topic?: CallTopic, } | { "type": "confirm_point_card", register: number, side: Side, } | { "type": "use_points", register: number, side: Side, how: PointsUse, 
 /**
  * 使うポイント数（how が amount のときだけ）
  */
-points?: number, } | { "type": "release_call", register: number, } | { "type": "end_emergency", register: number, } | { "type": "void_transaction", register: number, } | { "type": "hold_transaction", register: number, } | { "type": "resume_held", register: number, } | { "type": "end_staff_mode", register: number, } | { "type": "pause", register: number, } | { "type": "cash_out", register: number, kind: CashOutKind, amount: number, password?: string, } | { "type": "cash_in", register: number, kind: CashInKind, amount: number, } | { "type": "open_menu", register: number, screen?: MenuScreen | null, exchange_to?: number, } | { "type": "insert", register: number, amount: number, } | { "type": "take_outlet", register: number, } | { "type": "claim", register: number, side: Side, } | { "type": "add_age_rule", owner_id: string, password: string, target: RuleTarget, min_age: number, } | { "type": "remove_age_rule", owner_id: string, password: string, rule_id: number, } | { "type": "set_product_age", owner_id: string, password: string, code: string, min_age?: number | null, } | { "type": "set_sale_limit", owner_id: string, password: string, code: string, limit?: number | null, } | { "type": "set_ff_tab_display", owner_id: string, password: string, tab: FfTab, display: FfTabDisplay, } | { "type": "verify_owner", owner_id: string, password: string, } | { "type": "set_tax_rate", owner_id: string, password: string, class_id: string, rate_bp: number, } | { "type": "add_tax_class", owner_id: string, password: string, name: string, kind: TaxKind, rate_bp: number, } | { "type": "set_product_tax", owner_id: string, password: string, code: string, class_id: string, } | { "type": "set_invoice", owner_id: string, password: string, invoice_no: string, rounding: Rounding, } | { "type": "set_bell_loss", percent: number, } | { "type": "set_bell_offline", bell: number, offline: boolean, } | { "type": "set_bell_on", bell: number, on: boolean, };
+points?: number, } | { "type": "release_call", register: number, } | { "type": "end_emergency", register: number, } | { "type": "void_transaction", register: number, } | { "type": "hold_transaction", register: number, } | { "type": "resume_held", register: number, } | { "type": "end_staff_mode", register: number, } | { "type": "pause", register: number, } | { "type": "cash_out", register: number, kind: CashOutKind, amount: number, password?: string, } | { "type": "cash_in", register: number, kind: CashInKind, amount: number, } | { "type": "open_menu", register: number, screen?: MenuScreen | null, exchange_to?: number, } | { "type": "insert", register: number, amount: number, } | { "type": "take_outlet", register: number, } | { "type": "claim", register: number, side: Side, } | { "type": "add_age_rule", owner_id: string, password: string, target: RuleTarget, min_age: number, } | { "type": "remove_age_rule", owner_id: string, password: string, rule_id: number, } | { "type": "set_product_age", owner_id: string, password: string, code: string, min_age?: number | null, } | { "type": "set_sale_limit", owner_id: string, password: string, code: string, limit?: number | null, } | { "type": "set_floor_call", owner_id: string, password: string, key: string, call: boolean, } | { "type": "verify_owner", owner_id: string, password: string, } | { "type": "set_tax_rate", owner_id: string, password: string, class_id: string, rate_bp: number, } | { "type": "add_tax_class", owner_id: string, password: string, name: string, kind: TaxKind, rate_bp: number, } | { "type": "set_product_tax", owner_id: string, password: string, code: string, class_id: string, } | { "type": "set_invoice", owner_id: string, password: string, invoice_no: string, rounding: Rounding, } | { "type": "set_bell_loss", percent: number, } | { "type": "set_bell_offline", bell: number, offline: boolean, } | { "type": "set_bell_on", bell: number, on: boolean, };
 
 export type Confiscated = { name: string, qty: number, };
 
@@ -93,7 +93,7 @@ dates: Dates | null,
 /**
  * チケットの発券枚数（チケットでなければ 0）
  */
-tickets: number, id: number, touched: number, code: string, name: string, unit_price: number, qty: number, ff_base: number, tax: string, rate_bp: number, category: Category, cash_only: boolean, parcel?: Parcel, pickup?: Pickup, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, });
+tickets: number, id: number, touched: number, code: string, name: string, unit_price: number, qty: number, ff_base: number, tax: string, rate_bp: number, category: Category, cash_only: boolean, parcel?: Parcel, pickup?: Pickup, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, } | { "kind": "shelf", shelf: number, carton: boolean, });
 
 export type CounterView = { state: StaffState, 
 /**
@@ -142,21 +142,11 @@ export type FfState = "waiting" | "received" | "self_serve";
 
 export type FfTab = "fried" | "drink" | "cold" | "bun" | "oden";
 
-/**
- * FF タブ表示：タブをどちらの画面に出すか。売り場側だけに出す選択肢は持たない（スタッフはいつでも FF を登録できる）
- */
-export type FfTabDisplay = "counter" | "both";
-
-/**
- * FF タブ表示の設定
- */
-export type FfTabView = { tab: FfTab, label: string, display: FfTabDisplay, };
-
 export type FloorLine = { id: number, touched: number, name: string, qty: number, ff_base: number, amount: number, age: number | null, age_checked: boolean, limit: number | null, 
 /**
  * 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
  */
-limit_hit: boolean, cash_only: boolean, pickup: boolean, parcel: boolean, fresh: boolean, expired: boolean, dates: Dates | null, tickets: number, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, });
+limit_hit: boolean, cash_only: boolean, pickup: boolean, parcel: boolean, fresh: boolean, expired: boolean, dates: Dates | null, tickets: number, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, } | { "kind": "shelf", shelf: number, carton: boolean, });
 
 export type FloorView = { phase: Phase, lines: Array<FloorLine>, coupons: Array<CouponView>, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, total: number, taxes: Array<TaxTotal>, inserted: number, settle_in_ms: number | null, due: number, point_card: boolean, point_pending: boolean, parcel_ask: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, staff_called: boolean, age_wait: number | null, staff_present: boolean, method: PaymentMethod | null, payment_blocker: string | null, actions: Array<ActionState>, };
 
@@ -165,6 +155,21 @@ export type Menu = { screen: MenuScreen, exchange_to: number, };
 export type MenuScreen = "top" | "refund" | "emergency" | "deposit" | "expense" | "changer" | "journal" | "waste" | "ff_fresh";
 
 export type Mode = "staff_operated" | "self_operated";
+
+/**
+ * 四段目のボタン（セルフ操作モードの売り場側で押すと呼び出しになるかつき）
+ */
+export type NavButtonView = { key: string, label: string, 
+/**
+ * セルフ操作モードの売り場側で押すと呼び出し（設定の「呼出し」）
+ */
+call: boolean, tabs: Array<NavTabView>, };
+
+export type NavTabView = { key: string, label: string, 
+/**
+ * セルフ操作モードの売り場側で押すと呼び出し（設定の「呼出し」）
+ */
+call: boolean, codes: Array<string>, };
 
 export type Parcel = { sum_cm: number, weight_g: number, size: number | null, postal: string | null, region: string | null, slip: string, collect: boolean, 
 /**
@@ -179,7 +184,7 @@ continued: boolean, fee: number, };
 /**
  * 照合イベントの結果（済んだもの）。年確＝身分証の生年月日で確かめた年齢、FF＝すべてのお渡し数が一致
  */
-export type Passed = { "kind": "age", age: number, } | { "kind": "ff" };
+export type Passed = { "kind": "age", age: number, } | { "kind": "handover" };
 
 export type PaymentMethod = "cash" | "emoney" | "qr" | "credit" | "points";
 
@@ -304,11 +309,16 @@ export type RuleChange = { at: number, by: string, change: string, };
 
 export type RuleTarget = { "kind": "category", category: Category, } | { "kind": "product", code: string, };
 
+/**
+ * たばこの仮登録の一件：棚番号とお求めの個数（カートンか）
+ */
+export type ShelfEntry = { shelf: number, qty: number, carton: boolean, };
+
 export type ShortChoice = "cancel" | "cash" | "cash_confirmed" | "charge" | "staff";
 
 export type Side = "counter" | "floor";
 
-export type Snapshot = { now: number, registers: Array<RegisterView>, bells: Array<BellView>, bell_links: Array<BellLink>, signal: BellSignal, calls: Array<Call>, call_history: Array<ResolvedCall>, age_rules: AgeRulesView, audit: Array<AuditEntry>, ff_stock: Array<FfMenuItem>, ff_tabs: Array<FfTabView>, bell_loss: number, accounts: Array<AccountView>, catalog: Array<CatalogItem>, tax: TaxView, categories: Array<[Category, string]>, emoney_balance: number, };
+export type Snapshot = { now: number, registers: Array<RegisterView>, bells: Array<BellView>, bell_links: Array<BellLink>, signal: BellSignal, calls: Array<Call>, call_history: Array<ResolvedCall>, age_rules: AgeRulesView, audit: Array<AuditEntry>, ff_stock: Array<FfMenuItem>, floor_nav: Array<NavButtonView>, bell_loss: number, accounts: Array<AccountView>, catalog: Array<CatalogItem>, tax: TaxView, categories: Array<[Category, string]>, emoney_balance: number, };
 
 export type StaffState = "absent" | "ready";
 

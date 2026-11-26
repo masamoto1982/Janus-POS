@@ -253,9 +253,21 @@ pub const CATALOG: &[Product] = &[
     // 切手と同じく現金のみ・スタッフがログインしているレジでのみ扱う
     p("4900000000189", "切手 85円", 85, Standard10, Stamp),
     p("4900000000165", "はがき 通常", 85, Standard10, Stamp),
-    p("4900000000219", "はがき インクジェット", 85, Standard10, Stamp),
+    p(
+        "4900000000219",
+        "はがき インクジェット",
+        85,
+        Standard10,
+        Stamp,
+    ),
     p("4900000000172", "収入印紙 200円", 200, Standard10, Stamp),
-    p("4900000000196", "ゴミ処理券 300円 東京都", 300, Standard10, Stamp),
+    p(
+        "4900000000196",
+        "ゴミ処理券 300円 東京都",
+        300,
+        Standard10,
+        Stamp,
+    ),
     p("2000000000015", "レジ袋 S", 3, Standard10, Bag),
     p("2000000000039", "フォーク", 3, Standard10, Bag),
     Product {
@@ -394,6 +406,16 @@ pub fn find(code: &str) -> Option<&'static Product> {
     CATALOG.iter().find(|p| p.code == code)
 }
 
+/// 仮登録のたばこの明細が指す商品（棚番号だけで、まだどの商品か決まっていない）。値段は 0 円、
+/// スタッフが商品のたばこを読み取ると本登録になり、その商品に置き換わる。カタログ（Item）には並べない
+pub static TOBACCO_SHELF: Product = p(
+    "tobacco-shelf",
+    "たばこ",
+    0,
+    TaxRate::Standard10,
+    Category::Tobacco,
+);
+
 /// 作り置きの概念が無い FF（注文を受けてから作る・注ぐ）。在庫を持たず、ボタンはいつも積極
 pub const FF_MADE_TO_ORDER: &[&str] = &[
     "FF31", "FF32", "FF33", "FF34", "FF35", "FF36", "FF37", "FF39", "FF51", "FF52", "FF53", "FF54",
@@ -429,6 +451,96 @@ pub const INITIAL_FF_STOCK: &[(&str, u32)] = &[
     ("FF78", 4),
     ("FF79", 0),
 ];
+
+/// 四段目・五段目のナビゲーション（user 2026-11-25・26）：四段目のボタン（FF・金券・たばこ・その他）と、その下の五段目のタブ。
+/// レジカウンター側（スタッフ操作モード）はすべて使え、売り場側（セルフ操作モード）はボタン・タブごとに公開を設定する
+/// （設定「売り場側の公開」）。公開していないボタン・タブを売り場側で押すと、そのボタンの用件の呼び出しになる
+pub struct NavButton {
+    pub key: &'static str,
+    pub label: &'static str,
+    pub tabs: &'static [NavTab],
+}
+
+pub struct NavTab {
+    pub key: &'static str,
+    pub label: &'static str,
+    /// タブの商品（FF のタブは FF_MENU から引くので空）
+    pub codes: &'static [&'static str],
+}
+
+const fn tab(key: &'static str, label: &'static str, codes: &'static [&'static str]) -> NavTab {
+    NavTab { key, label, codes }
+}
+
+pub const NAV: &[NavButton] = &[
+    NavButton {
+        key: "ff",
+        label: "FF",
+        tabs: &[
+            tab("fried", "フライヤー", &[]),
+            tab("drink", "ドリンク", &[]),
+            tab("cold", "コールド", &[]),
+            tab("bun", "中華まん", &[]),
+            tab("oden", "おでん", &[]),
+        ],
+    },
+    // バーコードのない金券。管理が難しいので需要の少ないものは扱わない（印紙は 200 円だけ、user 2026-11-26）
+    NavButton {
+        key: "voucher",
+        label: "金券",
+        tabs: &[
+            tab("g_stamp", "切手", &["4900000000189", "4900000000141"]),
+            tab("g_postcard", "はがき", &["4900000000165", "4900000000219"]),
+            tab("g_revenue", "印紙", &["4900000000172"]),
+            tab("g_garbage", "ゴミ処理券", &["4900000000196"]),
+        ],
+    },
+    // たばこはスタッフがバーコードで登録するので、レジカウンター側の「たばこ」は今のところ使い道がない（user 2026-11-26、そのまま置く）。
+    // たばこ・その他のタブは拡張用で商品を置かない
+    NavButton {
+        key: "tobacco",
+        label: "たばこ",
+        // 主要銘柄（実機では「メビウス」「マルボロ」など）。ボタンは置かず、お客様が三段目で棚番号とお求めの個数を入力して仮登録する
+        tabs: &[
+            tab("tobacco_a", "銘柄1", &[]),
+            tab("tobacco_b", "銘柄2", &[]),
+            tab("tobacco_c", "銘柄3", &[]),
+        ],
+    },
+    NavButton {
+        key: "other",
+        label: "その他",
+        tabs: &[
+            tab("other_a", "拡張用", &[]),
+            tab("other_b", "拡張用", &[]),
+            tab("other_c", "拡張用", &[]),
+        ],
+    },
+];
+
+/// ナビゲーションのキー（ボタンまたはタブ）の表示名。「FF」「FF／ドリンク」の形
+pub fn nav_label(key: &str) -> Option<String> {
+    NAV.iter().find_map(|b| {
+        if b.key == key {
+            return Some(b.label.to_string());
+        }
+        b.tabs
+            .iter()
+            .find(|t| t.key == key)
+            .map(|t| format!("{}／{}", b.label, t.label))
+    })
+}
+
+/// FF のタブのナビゲーションのキー（FfTab の名前と同じ）
+pub fn ff_tab_key(t: FfTab) -> &'static str {
+    match t {
+        FfTab::Fried => "fried",
+        FfTab::Drink => "drink",
+        FfTab::Cold => "cold",
+        FfTab::Bun => "bun",
+        FfTab::Oden => "oden",
+    }
+}
 
 pub fn ff_tab(code: &str) -> Option<FfTab> {
     FF_MENU.iter().find(|(c, _)| *c == code).map(|&(_, t)| t)

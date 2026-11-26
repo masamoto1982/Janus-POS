@@ -1,6 +1,6 @@
 import { applyLaw, fitForms, fitText, MOBILE as MOBILE_MQ } from "./law";
 import init, { PosSimulator } from "./wasm/generated/janus_pos.js";
-import type { CashOutKind, Command, FfTab, FfTabDisplay, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
+import type { CashOutKind, Command, PaymentMethod, RegisterView, Rounding, Side, Snapshot, TaxKind } from "./types";
 import type { CancelStage, GuideKind, RulesTab } from "./view";
 import { beepError, beepPress, beepScan, chimeOk, chimePay, setBellRinging, unlockAudio } from "./sound";
 import logoUrl from "./logo.jpg";
@@ -12,6 +12,8 @@ import {
   esc,
   FF_TABS,
   ffVerifying,
+  shelfTarget,
+  shelfForm,
   stampVerifying,
   expiredClosed,
   ffvInput,
@@ -43,9 +45,7 @@ import {
   isoDate,
   scanGuide,
   cancelAsk,
-  ffFloorOpen,
-  ffOpenFoot,
-  goodsFoot,
+  navFoot,
   parcelError,
   bellPanel,
   ownerPanel,
@@ -521,8 +521,6 @@ function render(): void {
     for (const side of ["counter", "floor"] as const) {
       const entry = qtyEntry.get(`${r.id}:${side}`);
       if (entry && (r.counter.phase !== "registering" || !r.counter.lines.some((l) => l.id === entry.id))) qtyEntry.delete(`${r.id}:${side}`);
-      // 「FF」から開いた FF タブは、セルフ操作モードを抜けたとき・呼び出しが立ったとき・取引が終わったときに閉じる（四つのボタンに戻る）
-      if (r.mode !== "self_operated" || r.waiting_calls.length || r.last_receipt) ffFloorOpen.delete(r.id);
       const items = itemsPanel(r, snap, ffUi(r.id), side, Date.now(), first);
       const locked = r.active_side !== null && r.active_side !== side;
       const el = app.querySelector(`[data-screen="${r.id}:${side}"]`);
@@ -545,7 +543,9 @@ function render(): void {
       setRegion(`items-${r.id}-${side}`, items, lang);
       // スタッフ操作モードのレジカウンター側は、FF タブを出しているあいだ常に「FF」「金券」「拡張用」「拡張用」の段を置く（user 2026-11-25・26）
       const goods = r.mode === "staff_operated" && side === "counter" && items.includes("ff-tabs");
-      setRegion(`foot-${r.id}-${side}`, items.includes("ff-open") ? ffOpenFoot(r) : goods ? goodsFoot(r, ffUi(r.id).tab) : "", lang);
+      // セルフ操作モードは両画面に同じ四段目（売り場側のナビゲーション、user 2026-11-26）。呼び出し中など五段目を差し替えている場面では出さない
+      const selfNav = r.mode === "self_operated" && items.includes("self-nav");
+      setRegion(`foot-${r.id}-${side}`, goods || selfNav ? navFoot(r, snap, ffUi(r.id).tab) : "", lang);
       if (side === "counter") counterGoods = goods;
       // 売り場側の最下段の高さ＝レジカウンター側の四段目＋五段目（user 2026-11-26）
       el?.classList.toggle("items-tall", side === "floor" && counterGoods);
@@ -678,6 +678,18 @@ const SUBMIT: Partial<Record<PadTarget, (register: number, side: Side, digits: s
   ppt: (register, side, digits) => ({ type: "use_points", register, side, how: "amount", points: Number(digits) }),
 };
 
+/** たばこの仮登録の入力を閉じる（両画面、入力途中の欄も消す） */
+function closeShelfForm(register: number): void {
+  shelfForm.delete(`${register}:floor`);
+  shelfForm.delete(`${register}:counter`);
+  padValue.delete(padValueKey(register, "shf"));
+  padValue.delete(padValueKey(register, "shq"));
+  for (const side of ["floor", "counter"]) {
+    const t = padEntry.get(`${register}:${side}`)?.target;
+    if (t === "shf" || t === "shq") padEntry.delete(`${register}:${side}`);
+  }
+}
+
 function padKey(key: string, k: string): void {
   const e = padEntry.get(key);
   if (!e) return;
@@ -722,6 +734,14 @@ function padKey(key: string, k: string): void {
       for (const c of cs.slice(-value).reverse()) send({ type: "remove_coupon", register, side: side as Side, coupon_id: c.id });
       couponCancel.delete(`${register}:${side}`);
       padValue.delete(padValueKey(register, "cpn"));
+    } else if (e.target === "shf" || e.target === "shq") {
+      // たばこの仮登録：棚番号を決めたら、個数がまだなら個数のテンキーを続けて開く（「次の製品」で一件を仮登録する）
+      if (e.digits === "" || value <= 0) return;
+      padValue.set(padValueKey(register, e.target), String(value));
+      if (e.target === "shf" && !padValue.get(padValueKey(register, "shq"))) {
+        padEntry.set(key, { target: "shq", digits: "" });
+        return frame();
+      }
     } else if (e.target in SUBMIT) {
       // 入力欄ひとつの画面：テンキーの「決定」でそのまま送る。受け付けられなければ理由を出してテンキーを開いたままにする
       if (e.digits === "") return;
@@ -839,6 +859,12 @@ function send(cmd: Command, quiet = false): boolean {
     cancelAsk.delete(cmd.register);
     cmd = { type: "cancel_item", register: cmd.register, side: asked.side, code: cmd.code };
   }
+  // お渡し照合の画面を開いているあいだにレジカウンター側で読んだ商品は、仮登録のたばこ（上の行から順に）に充てる（本登録）
+  if (cmd.type === "scan" && !cmd.code.startsWith(STAFF_BARCODE_PREFIX) && ffVerifying.has(`${cmd.register}:counter`)) {
+    const { register, code } = cmd;
+    const target = shelfTarget(snap.registers.find((x) => x.id === register)?.counter.lines ?? []);
+    if (target) cmd = { type: "match_shelf", register, side: "counter", line_id: target.id, code };
+  }
   // 最下段の FF ボタンで取り消したときも一度きり（user 2026-11-21）
   if (cmd.type === "cancel_item") cancelAsk.delete(cmd.register);
   sim.tick(performance.now() - t0);
@@ -892,7 +918,7 @@ function send(cmd: Command, quiet = false): boolean {
   const emoneyShort = cmd.type === "tap_emoney" && !!res.message?.startsWith("電子マネーの残高が足りません");
   if (["scan", "cancel_item", "register_ff", "tap_emoney"].includes(cmd.type)) (res.ok && !expired && !emoneyShort ? (paidAtTerminal ? chimePay : beepScan) : beepError)();
   // 照合イベント（年確・FFのお渡し）が済んだら「ピンポン」
-  if (res.ok && ((cmd.type === "check_id" && !!res.message?.includes("年齢確認が済みました")) || (cmd.type === "check_ff" && !!res.message?.includes("すべてのFFのお渡しを確認しました")))) chimeOk();
+  if (res.ok && ((cmd.type === "check_id" && !!res.message?.includes("年齢確認が済みました")) || ((cmd.type === "check_ff" || cmd.type === "match_shelf") && !!res.message?.includes("すべてのお渡しを確認しました")))) chimeOk();
   frame();
   fx?.();
   if (res.ok) save();
@@ -1020,8 +1046,8 @@ app.addEventListener("change", (e) => {
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
-  if (sel.dataset.fftabDisplay && ownerAuth) {
-    const ok = send({ type: "set_ff_tab_display", ...ownerAuth, tab: sel.dataset.fftabDisplay as FfTab, display: sel.value as FfTabDisplay });
+  if (sel.dataset.floorCall && ownerAuth) {
+    const ok = send({ type: "set_floor_call", ...ownerAuth, key: sel.dataset.floorCall, call: sel.value === "1" });
     if (!ok) for (const o of sel.options) o.selected = o.defaultSelected;
     return;
   }
@@ -1045,7 +1071,7 @@ app.addEventListener("change", (e) => {
 const RULES_GEAR = `<button type="button" class="icon-btn rules-open" data-open-rules aria-haspopup="dialog" aria-label="設定" title="設定">⚙</button>`;
 const rulesDlg = (): HTMLDialogElement => document.getElementById("rules-dlg") as HTMLDialogElement;
 
-const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_ff_tab_display", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
+const RULE_CMDS = ["verify_owner", "set_product_age", "set_sale_limit", "set_floor_call", "set_tax_rate", "add_tax_class", "set_product_tax", "set_invoice"];
 let ownerAuth: { owner_id: string; password: string } | null = null;
 let rulesTab: RulesTab = "tax";
 
@@ -1170,16 +1196,41 @@ app.addEventListener("click", (e) => {
     render();
     return;
   }
-  if (b.dataset.ffopen) {
-    const reg = Number(b.dataset.ffopen);
-    const first = FF_TABS.find(([k]) => snap.ff_tabs.some((t) => t.tab === k && t.display === "both"));
-    ffFloorOpen.add(reg);
-    if (first) ffTabs.set(reg, { tab: first[0], page: 0 });
-    return frame();
-  }
   if (b.dataset.fftab) {
     const [reg, tab] = b.dataset.fftab.split(":");
-    ffTabs.set(Number(reg), { tab, page: 0 });
+    const register = Number(reg);
+    ffTabs.set(register, { tab, page: 0 });
+    // たばこの銘柄タブ：五段目を棚番号と個数の入力にする（セルフは売り場側、スタッフ操作モードはレジカウンター側）。ほかのタブに移ったら閉じる
+    if (tab.startsWith("tobacco_")) {
+      const side = snap.registers.find((x) => x.id === register)?.mode === "self_operated" ? "floor" : "counter";
+      if (!shelfForm.has(`${register}:${side}`)) shelfForm.set(`${register}:${side}`, { carton: false });
+    } else closeShelfForm(register);
+    // セルフで呼び出しでない「たばこ」も、押した時点でたばこの呼び出しも立てる
+    if (b.dataset.navcall) {
+      if (send(JSON.parse(b.dataset.navcall) as Command)) send({ type: "release_call", register });
+      return;
+    }
+    return frame();
+  }
+  if (b.dataset.shelfUnit) {
+    const [reg, side, carton] = b.dataset.shelfUnit.split(":");
+    const f = shelfForm.get(`${reg}:${side}`);
+    if (f) f.carton = carton === "1";
+    return frame();
+  }
+  if (b.dataset.shelfNext) {
+    // 一つの製品（棚番号と個数）をその場で仮登録し、欄を空けて次の製品の入力に移る
+    const [reg, side] = b.dataset.shelfNext.split(":");
+    const register = Number(reg);
+    const shelf = padValue.get(padValueKey(register, "shf"));
+    const qty = padValue.get(padValueKey(register, "shq"));
+    const f = shelfForm.get(`${reg}:${side}`);
+    if (!shelf || !qty) return;
+    if (send({ type: "hold_shelf", register, side: side as Side, entries: [{ shelf: Number(shelf), qty: Number(qty), carton: !!f?.carton }] })) {
+      padValue.delete(padValueKey(register, "shf"));
+      padValue.delete(padValueKey(register, "shq"));
+      if (f) f.carton = false;
+    }
     return frame();
   }
   if (b.dataset.ffpage) {

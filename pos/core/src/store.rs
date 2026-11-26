@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use serde::{Deserialize, Serialize};
 
-use crate::age_rules::{AgeRules, FfTabDisplay, RuleTarget};
+use crate::age_rules::{AgeRules, RuleTarget};
 use crate::auth::{self, Authenticator, Role, ACCOUNTS};
 use crate::authority::{
     active_side, fixed_side, permitted, Action, Context, Mode, PaymentMethod, Phase, Side,
@@ -45,10 +45,16 @@ const HOLD_BILL: &str = "お支払いのある取引は保留できません";
 const HOLD_PARCEL: &str = "宅配便のある取引は保留できません";
 const HOLD_TICKET: &str = "チケットのある取引は保留できません";
 const PICKUP_STAFF: &str = "荷物の照合と引き渡しは、スタッフがログインしてから行います";
+/// お渡し照合（FF のお渡し数・仮登録のたばこ）がすべて済んだときの知らせ（照合 OK の音を鳴らす合図にもなる）
+pub const HANDOVER_DONE: &str = "すべてのお渡しを確認しました";
+/// 仮登録のたばこの税区分を借りる商品（たばこ）
+const TOBACCO_CODE: &str = "4900000000127";
 const PICKUP_ALONE: &str = "会計を分けてください\n荷物のお受け取りは一件ずつのお取り扱いです";
 const CANCEL_NOT_ITEM: &str = "商品のバーコードではありません\n取り消せるのは登録した商品だけです";
-const CANCEL_NOT_REGISTERED: &str = "は登録されていません\n登録するときは、もう一度スキャンしてください";
-const CANCEL_FF_NOT_REGISTERED: &str = "は登録されていません\n登録するときは、もう一度押してください";
+const CANCEL_NOT_REGISTERED: &str =
+    "は登録されていません\n登録するときは、もう一度スキャンしてください";
+const CANCEL_FF_NOT_REGISTERED: &str =
+    "は登録されていません\n登録するときは、もう一度押してください";
 /// 商品取消しはスタッフ操作モードだけ（user 2026-11-21：取消しキー＋スキャンはお客様には学習の負担が大きい）
 const CANCEL_STAFF_ONLY: &str = "商品の取り消しはスタッフ操作モードだけです";
 const PICKUP_NO_REMOVE: &str = "荷物のお受け取りをやめるときは取引を取り消してください";
@@ -229,6 +235,19 @@ pub enum Command {
         side: Side,
         line_id: u32,
         handed: u32,
+    },
+    /// たばこの仮登録：棚番号とお求めの個数を、何件でもまとめて明細に加える（品目「たばこ 棚番号」、数量＝個数）
+    HoldShelf {
+        register: u8,
+        side: Side,
+        entries: Vec<ShelfEntry>,
+    },
+    /// お渡し照合で、仮登録のたばこの明細に商品のたばこを読み取る（本登録）。明細はその商品に置き換わり、年確のフラグが立つ
+    MatchShelf {
+        register: u8,
+        side: Side,
+        line_id: u32,
+        code: String,
     },
     /// サービス商品の受付を済ませる
     CompleteService {
@@ -513,12 +532,12 @@ pub enum Command {
         #[cfg_attr(feature = "ts", ts(optional = nullable))]
         limit: Option<u32>,
     },
-    /// 設定：FF タブをどちらの画面に出すか（オーナー）
-    SetFfTabDisplay {
+    /// 設定：呼出し（セルフ操作モードの売り場側で押すと呼び出しにする四段目のボタン・五段目のタブ、オーナー）
+    SetFloorCall {
         owner_id: String,
         password: String,
-        tab: FfTab,
-        display: FfTabDisplay,
+        key: String,
+        call: bool,
     },
     /// 設定を開くときのオーナー認証
     VerifyOwner { owner_id: String, password: String },
@@ -567,6 +586,8 @@ impl Command {
             | C::RegisterFf { register, .. }
             | C::FfButton { register, .. }
             | C::CheckFf { register, .. }
+            | C::HoldShelf { register, .. }
+            | C::MatchShelf { register, .. }
             | C::CompleteService { register, .. }
             | C::ParcelLength { register, .. }
             | C::ParcelSize { register, .. }
@@ -627,6 +648,8 @@ impl Command {
         match self {
             C::RegisterFf { side, .. }
             | C::CheckFf { side, .. }
+            | C::HoldShelf { side, .. }
+            | C::MatchShelf { side, .. }
             | C::RemoveLine { side, .. }
             | C::CancelItem { side, .. }
             | C::SetQty { side, .. }
@@ -742,8 +765,28 @@ pub enum FfState {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LineKind {
     Item,
-    Ff { state: FfState },
-    Service { done: bool, confirm_pending: bool },
+    Ff {
+        state: FfState,
+    },
+    Service {
+        done: bool,
+        confirm_pending: bool,
+    },
+    /// 仮登録のたばこ：お客様が売り場側で入力した棚番号（とカートンか）。品目は「たばこ 棚番号」、値段は 0 円。
+    /// FF の「お渡し前」と同じくスタッフのお渡し照合を待つ明細で、スタッフが商品のたばこを読み取ると本登録になる
+    Shelf {
+        shelf: u16,
+        carton: bool,
+    },
+}
+
+/// たばこの仮登録の一件：棚番号とお求めの個数（カートンか）
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ShelfEntry {
+    pub shelf: u16,
+    pub qty: u32,
+    pub carton: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -824,6 +867,20 @@ impl Line {
 
     fn is_pickup(&self) -> bool {
         self.pickup.is_some()
+    }
+
+    /// 仮登録のたばこ（まだどの商品か決まっていない）
+    fn is_shelf(&self) -> bool {
+        matches!(self.kind, LineKind::Shelf { .. })
+    }
+
+    /// 年齢制限：仮登録のたばこは商品が決まる（本登録）まで年確のフラグを立てない
+    fn age(&self, rules: &AgeRules) -> Option<u8> {
+        if self.is_shelf() {
+            None
+        } else {
+            rules.age_for(self.code, self.category)
+        }
     }
 
     /// 日配食品（数量を増やせない）
@@ -1060,6 +1117,11 @@ impl Txn {
             .any(|l| matches!(l.kind, LineKind::Ff { state } if state == s))
     }
 
+    /// スタッフのお渡し照合を待つ明細がある（FF の「お渡し前」と仮登録のたばこ）
+    fn handover_waiting(&self) -> bool {
+        self.any_ff(FfState::Waiting) || self.lines.iter().any(Line::is_shelf)
+    }
+
     fn service_pending(&self) -> bool {
         self.lines
             .iter()
@@ -1173,6 +1235,7 @@ impl Txn {
         let mut needs: Vec<(u8, bool)> = self
             .lines
             .iter()
+            .filter(|l| !l.is_shelf())
             .filter_map(|l| {
                 rules
                     .age_for(l.code, l.category)
@@ -1220,6 +1283,7 @@ impl Txn {
     fn max_age(&self, rules: &AgeRules) -> Option<u8> {
         self.lines
             .iter()
+            .filter(|l| !l.is_shelf())
             .filter_map(|l| rules.age_for(l.code, l.category))
             .max()
     }
@@ -1641,11 +1705,11 @@ impl Register {
             id_pending: t.id_pending(),
             age_unchecked: t.age_unchecked(rules),
             age_early: t.age_early,
-            ff_waiting: t.any_ff(FfState::Waiting),
-            has_ff: t
+            handover_waiting: t.handover_waiting(),
+            has_handover: t
                 .lines
                 .iter()
-                .any(|l| matches!(l.kind, LineKind::Ff { .. })),
+                .any(|l| matches!(l.kind, LineKind::Ff { .. } | LineKind::Shelf { .. })),
             service_pending: t.service_pending(),
             parcel_ask: t.parcel_ask,
             has_bills: t.bill_slips() > 0,
@@ -1669,7 +1733,7 @@ impl Register {
             items_full: t.item_count() >= MAX_ITEMS,
             emoney_short: t.emoney_short || t.emoney_partial,
             cash_only_goods: t.cash_only() > 0,
-            ff_floor: !rules.ff_floor_tabs.is_empty(),
+            ff_floor: rules.any_ff_on_floor(),
         }
     }
 }
@@ -1748,8 +1812,11 @@ pub struct ReturnedCoupon {
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Passed {
-    Age { age: u8 },
-    Ff,
+    Age {
+        age: u8,
+    },
+    /// お渡し照合（FF のお渡し数・仮登録のたばこの本登録）がすべて済んだ
+    Handover,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2069,7 +2136,10 @@ impl Store {
     /// 取引の途中でお客様に押し戻すと、現金などで呼び直されてかえってスタッフの手間が増える
     fn release_empty_registers(&mut self, here: u8, staff: &str, now: u64) {
         for r in self.registers.iter_mut() {
-            if r.id == here || r.mode != Mode::StaffOperated || !r.staff.as_ref().is_some_and(|s| s.account.id == staff) {
+            if r.id == here
+                || r.mode != Mode::StaffOperated
+                || !r.staff.as_ref().is_some_and(|s| s.account.id == staff)
+            {
                 continue;
             }
             if r.busy() || r.emoney.is_some() || r.on_hold.is_some() || r.handover_pending() {
@@ -2342,7 +2412,7 @@ impl Store {
                 line_id,
                 handed,
             } => {
-                self.check(register, side, Action::CheckFf)?;
+                self.check(register, side, Action::CheckHandover)?;
                 let r = self.reg_mut(register)?;
                 let l = r
                     .txn
@@ -2362,18 +2432,10 @@ impl Store {
                         FfState::Waiting
                     },
                 };
-                // スタッフがお渡しした FF がすべて一致したら、照合が済んだことをはっきり示す
-                let all = !r.txn.lines.iter().any(|l| {
-                    matches!(
-                        l.kind,
-                        LineKind::Ff {
-                            state: FfState::Waiting
-                        }
-                    )
-                });
-                if matched && all && side == Side::Counter {
-                    r.txn.passed = Some(Passed::Ff);
-                    return done(format!("{name}：照合 OK\nすべてのFFのお渡しを確認しました"));
+                // お渡し照合を待つ明細（FF・仮登録のたばこ）がすべて済んだら、照合が済んだことをはっきり示す
+                if matched && !r.txn.handover_waiting() && side == Side::Counter {
+                    r.txn.passed = Some(Passed::Handover);
+                    return done(format!("{name}：照合 OK\n{HANDOVER_DONE}"));
                 }
                 done(if matched {
                     format!("{name}：照合 OK")
@@ -2381,6 +2443,17 @@ impl Store {
                     format!("{name}：照合 NG（お渡し数 {handed} が注文数と合いません）")
                 })
             }
+            C::HoldShelf {
+                register,
+                side,
+                entries,
+            } => self.hold_shelf(register, side, &entries),
+            C::MatchShelf {
+                register,
+                side,
+                line_id,
+                code,
+            } => self.match_shelf(register, side, line_id, &code),
             C::CompleteService {
                 register,
                 line_id,
@@ -3407,19 +3480,21 @@ impl Store {
                 self.age_rules.set_limit(&code, limit, by, self.now)?;
                 done("販売個数の上限を変更しました")
             }
-            C::SetFfTabDisplay {
+            C::SetFloorCall {
                 owner_id,
                 password,
-                tab,
-                display,
+                key,
+                call,
             } => {
                 let by = self.owner(&owner_id, &password)?;
-                self.age_rules
-                    .set_ff_tab_display(tab, display, by, self.now);
+                let label = self.age_rules.set_floor_call(&key, call, by, self.now)?;
                 done(format!(
-                    "FFタブ「{}」を{}に表示します",
-                    tab.label(),
-                    display.label()
+                    "「{label}」{}",
+                    if call {
+                        "を押すと呼び出すようにしました"
+                    } else {
+                        "はお客様が操作できるようにしました"
+                    }
                 ))
             }
             C::VerifyOwner { owner_id, password } => {
@@ -3639,7 +3714,11 @@ impl Store {
                 .filter(|p| p.category == Category::FastFood)
                 .ok_or(CANCEL_NOT_ITEM)?,
         };
-        let not_registered = if p.category == Category::FastFood { CANCEL_FF_NOT_REGISTERED } else { CANCEL_NOT_REGISTERED };
+        let not_registered = if p.category == Category::FastFood {
+            CANCEL_FF_NOT_REGISTERED
+        } else {
+            CANCEL_NOT_REGISTERED
+        };
         let Some(l) = r
             .txn
             .lines
@@ -3812,7 +3891,12 @@ impl Store {
                     ));
                 }
             }
-            if let Some(o) = r.on_hold.as_ref().and_then(|h| h.owner).filter(|o| o.id != acc.id) {
+            if let Some(o) = r
+                .on_hold
+                .as_ref()
+                .and_then(|h| h.owner)
+                .filter(|o| o.id != acc.id)
+            {
                 return Err(format!(
                     "保留中の取引があるため、担当スタッフを切り替えられません\n{}さんの取引です",
                     o.name
@@ -4060,6 +4144,114 @@ impl Store {
                 done(format!("{} {}円{back}", p.name, p.price))
             }
         }
+    }
+
+    /// たばこの仮登録（仕様 8 たばこの仮登録）。棚番号とお求めの個数を一件ずつ明細に加える。セルフ操作モードで
+    /// スタッフがいなければ、たばこの呼び出しを立てる（ふつうは「たばこ」ボタンを押した時点で立っている）
+    fn hold_shelf(
+        &mut self,
+        register: u8,
+        side: Side,
+        entries: &[ShelfEntry],
+    ) -> Result<Outcome, String> {
+        self.check(register, side, Action::HoldShelf)?;
+        if entries.is_empty() {
+            return Err("棚番号とお求めの個数を入力してください".into());
+        }
+        if entries.iter().any(|e| e.shelf == 0 || e.shelf > 999) {
+            return Err("棚番号は 1〜999 で入力してください".into());
+        }
+        if entries.iter().any(|e| e.qty == 0 || e.qty > 99) {
+            return Err("お求めの個数は 1〜99 で入力してください".into());
+        }
+        let tax = self.tax_for(TOBACCO_CODE);
+        let r = self.reg_mut(register)?;
+        if r.txn.lines.iter().any(Line::is_pickup) {
+            return Err(PICKUP_ALONE.into());
+        }
+        if r.txn.bill_slips() > 0 {
+            return Err(BILL_ALONE.into());
+        }
+        if r.txn.lines.iter().any(Line::is_parcel) {
+            return Err(PARCEL_ALONE.into());
+        }
+        if r.txn.lines.iter().any(|l| l.tickets() > 0) {
+            return Err(TICKET_ALONE.into());
+        }
+        let add: u32 = entries.iter().map(|e| e.qty).sum();
+        if r.txn.item_count() + add > MAX_ITEMS {
+            return Err(ITEMS_FULL.into());
+        }
+        for e in entries {
+            let kind = LineKind::Shelf {
+                shelf: e.shelf,
+                carton: e.carton,
+            };
+            r.txn
+                .push(&catalog::TOBACCO_SHELF, e.qty, kind, tax.clone());
+        }
+        let staffed = r.staff_state() == StaffState::Ready;
+        if !staffed && !self.calls.is_open(register, CallKind::Tobacco) {
+            self.call(register, CallKind::Tobacco, "");
+        }
+        done(if staffed {
+            "たばこを仮登録しました\n棚から取って、お渡し照合で読み取ってください"
+        } else {
+            "たばこを仮登録しました\nスタッフがお持ちします"
+        })
+    }
+
+    /// お渡し照合で、仮登録のたばこに商品のたばこを読み取る（本登録）。明細はその商品に置き換わる（数量はそのまま）
+    fn match_shelf(
+        &mut self,
+        register: u8,
+        side: Side,
+        line_id: u32,
+        code: &str,
+    ) -> Result<Outcome, String> {
+        self.check(register, side, Action::CheckHandover)?;
+        let p = match catalog::classify(code) {
+            Scanned::Product(p) if p.category == Category::Tobacco => p,
+            Scanned::Product(p) => {
+                return Err(format!(
+                    "{}はたばこではありません\n仮登録のたばこには、たばこを読み取ってください",
+                    p.name
+                ))
+            }
+            _ => return Err("仮登録のたばこには、たばこを読み取ってください".into()),
+        };
+        let qty = self
+            .reg(register)
+            .and_then(|r| r.txn.lines.iter().find(|l| l.id == line_id && l.is_shelf()))
+            .map(|l| l.qty)
+            .ok_or("仮登録のたばこの明細が見つかりません")?;
+        self.check_limit(register, p.code, qty)?;
+        let tax = self.tax_for(p.code);
+        let r = self.reg_mut(register)?;
+        r.txn.next_line += 1;
+        let touched = r.txn.next_line;
+        let l = r
+            .txn
+            .lines
+            .iter_mut()
+            .find(|l| l.id == line_id)
+            .ok_or("仮登録のたばこの明細が見つかりません")?;
+        l.code = p.code;
+        l.name = p.name;
+        l.unit_price = p.price;
+        l.tax = tax.0;
+        l.rate_bp = tax.1;
+        l.category = p.category;
+        l.cash_only = p.cash_only;
+        l.kind = LineKind::Item;
+        l.touched = touched;
+        r.txn.tobacco_asked = false;
+        let head = format!("{} {}円 × {}：本登録しました", p.name, p.price, qty);
+        if !r.txn.handover_waiting() && side == Side::Counter {
+            r.txn.passed = Some(Passed::Handover);
+            return done(format!("{head}\n{HANDOVER_DONE}"));
+        }
+        done(head)
     }
 
     fn cancel_parcel(&mut self, register: u8, side: Side, no: &str) -> Result<Outcome, String> {
@@ -4826,12 +5018,22 @@ impl Store {
             },
             audit: self.audit.clone(),
             ff_stock: self.ff_menu(),
-            ff_tabs: FfTab::ALL
+            floor_nav: catalog::NAV
                 .iter()
-                .map(|&tab| FfTabView {
-                    tab,
-                    label: tab.label(),
-                    display: self.age_rules.ff_tab_display(tab),
+                .map(|b| NavButtonView {
+                    key: b.key,
+                    label: b.label,
+                    call: self.age_rules.floor_calls(b.key),
+                    tabs: b
+                        .tabs
+                        .iter()
+                        .map(|t| NavTabView {
+                            key: t.key,
+                            label: t.label,
+                            call: self.age_rules.floor_calls(t.key),
+                            codes: t.codes.to_vec(),
+                        })
+                        .collect(),
                 })
                 .collect(),
             bell_loss: self.bell_loss,
@@ -4971,9 +5173,9 @@ impl Store {
             .map(|l| CounterLine {
                 line: l.clone(),
                 amount: l.amount(),
-                age: self.age_rules.age_for(l.code, l.category),
+                age: l.age(&self.age_rules),
                 age_checked: t.line_age_checked(
-                    self.age_rules.age_for(l.code, l.category),
+                    l.age(&self.age_rules),
                     self.age_rules.legal_age_for(l.code, l.category).is_some(),
                 ),
                 limit: self.age_rules.limit_for(l.code),
@@ -4995,9 +5197,9 @@ impl Store {
                 qty: l.qty,
                 ff_base: l.ff_base,
                 amount: l.amount(),
-                age: self.age_rules.age_for(l.code, l.category),
+                age: l.age(&self.age_rules),
                 age_checked: t.line_age_checked(
-                    self.age_rules.age_for(l.code, l.category),
+                    l.age(&self.age_rules),
                     self.age_rules.legal_age_for(l.code, l.category).is_some(),
                 ),
                 limit: self.age_rules.limit_for(l.code),
@@ -5481,13 +5683,25 @@ pub struct FfMenuItem {
     pub tab_label: &'static str,
 }
 
-/// FF タブ表示の設定
+/// 四段目のボタン（セルフ操作モードの売り場側で押すと呼び出しになるかつき）
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
-pub struct FfTabView {
-    pub tab: FfTab,
+pub struct NavButtonView {
+    pub key: &'static str,
     pub label: &'static str,
-    pub display: FfTabDisplay,
+    /// セルフ操作モードの売り場側で押すと呼び出し（設定の「呼出し」）
+    pub call: bool,
+    pub tabs: Vec<NavTabView>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct NavTabView {
+    pub key: &'static str,
+    pub label: &'static str,
+    /// セルフ操作モードの売り場側で押すと呼び出し（設定の「呼出し」）
+    pub call: bool,
+    pub codes: Vec<&'static str>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -5561,7 +5775,7 @@ pub struct Snapshot {
     pub age_rules: AgeRulesView,
     pub audit: Vec<AuditEntry>,
     pub ff_stock: Vec<FfMenuItem>,
-    pub ff_tabs: Vec<FfTabView>,
+    pub floor_nav: Vec<NavButtonView>,
     pub bell_loss: u8,
     pub accounts: Vec<AccountView>,
     pub catalog: Vec<CatalogItem>,

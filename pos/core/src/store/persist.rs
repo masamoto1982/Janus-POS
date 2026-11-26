@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    AgeMethod, OnHold, AuditEntry, EmoneyTask, Line, LineKind, Menu, Passed, Receipt,
-    ReceiptStamp, Register, StaffSession, Store, TicketRow, Txn,
+    AgeMethod, AuditEntry, EmoneyTask, Line, LineKind, Menu, OnHold, Passed, Receipt, ReceiptStamp,
+    Register, StaffSession, Store, TicketRow, Txn,
 };
 use crate::age_rules::{AgeRule, AgeRules, RuleChange};
 use crate::auth::{self, Authenticator, Guard};
@@ -12,7 +12,7 @@ use crate::authority::{Mode, PaymentMethod, Side};
 use crate::bell::{Bell, BellKind, BellSignal, Packet};
 use crate::calls::{Call, CallKind, Calls, ResolvedCall};
 use crate::cash::{Cash, Drawer};
-use crate::catalog::{self, FfTab, COUPONS};
+use crate::catalog::{self, COUPONS};
 use crate::parcel::{Parcel, Pickup};
 use crate::rng::Rng;
 use crate::tax::{Rounding, TaxClass, TaxSettings};
@@ -25,6 +25,9 @@ fn leak(s: String) -> &'static str {
 }
 
 fn product(code: &str) -> Result<&'static catalog::Product, String> {
+    if code == catalog::TOBACCO_SHELF.code {
+        return Ok(&catalog::TOBACCO_SHELF);
+    }
     catalog::find(code).ok_or_else(|| format!("商品 {code} がありません"))
 }
 
@@ -106,7 +109,7 @@ struct SavedAgeRules {
     history: Vec<RuleChange>,
     limits: BTreeMap<String, u32>,
     #[serde(default)]
-    ff_floor_tabs: BTreeSet<FfTab>,
+    floor_open: BTreeSet<String>,
     next_id: u32,
 }
 
@@ -512,7 +515,8 @@ impl SavedRegister {
                     txn: h.txn.restore()?,
                     owner: match h.owner {
                         Some(id) => Some(
-                            auth::account(&id).ok_or_else(|| format!("スタッフ {id} がいません"))?,
+                            auth::account(&id)
+                                .ok_or_else(|| format!("スタッフ {id} がいません"))?,
                         ),
                         None => None,
                     },
@@ -640,7 +644,7 @@ impl Store {
                 rules: self.age_rules.rules.clone(),
                 history: self.age_rules.history.clone(),
                 limits: self.age_rules.limits.clone(),
-                ff_floor_tabs: self.age_rules.ff_floor_tabs.clone(),
+                floor_open: self.age_rules.floor_open.clone(),
                 next_id: self.age_rules.next_id,
             },
             tax: SavedTax {
@@ -753,7 +757,7 @@ impl Store {
                 rules: s.age_rules.rules,
                 history: s.age_rules.history,
                 limits: s.age_rules.limits,
-                ff_floor_tabs: s.age_rules.ff_floor_tabs,
+                floor_open: s.age_rules.floor_open,
                 next_id: s.age_rules.next_id,
             },
             tax: TaxSettings {

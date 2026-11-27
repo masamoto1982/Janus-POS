@@ -6169,6 +6169,48 @@ fn held_tobacco_unit_must_match_the_scanned_tobacco() {
     ));
 }
 
+/// 仕様 8：仮登録が多いときは、1 個読み取って銘柄を決めてから読み取り数をテンキーで打てる（FF のお渡し数と同じ入力）
+#[test]
+fn held_tobacco_read_count_can_be_typed_after_one_scan() {
+    let mut s = Store::new(1, 2, 1);
+    login(&mut s, 1);
+    ok(
+        &mut s,
+        json!({"type":"hold_shelf","register":1,"side":"counter","entries":[{"shelf":5,"qty":10,"carton":false}]}),
+    );
+    let id = reg(&s, 1).counter.lines[0].line.id;
+    let set = |s: &mut Store, read: u32| {
+        run(
+            s,
+            json!({"type":"set_shelf_read","register":1,"side":"counter","line_id":id,"read":read}),
+        )
+    };
+    // 銘柄が決まるまでは打てない
+    let e = set(&mut s, 10).unwrap_err();
+    assert!(e.contains("先にたばこを 1 個読み取って"), "{e}");
+    ok(
+        &mut s,
+        json!({"type":"match_shelf","register":1,"side":"counter","line_id":id,"code":TOBACCO}),
+    );
+    // 個数より多くはできない
+    let e = set(&mut s, 11).unwrap_err();
+    assert!(e.contains("より多くはできません"), "{e}");
+    // 途中の数も打てる（仮登録のまま）
+    set(&mut s, 4).unwrap();
+    assert!(matches!(
+        reg(&s, 1).counter.lines[0].line.kind,
+        LineKind::Shelf { read: 4, .. }
+    ));
+    // 個数を打つと、読んだ銘柄 10 個で本登録
+    let msg = set(&mut s, 10).unwrap().unwrap_or_default();
+    assert!(msg.contains("すべてのお渡しを確認しました"), "{msg}");
+    let l = &reg(&s, 1).counter.lines[0];
+    assert_eq!(
+        (l.line.kind, l.line.code, l.line.qty),
+        (LineKind::Item, TOBACCO, 10)
+    );
+}
+
 /// 仕様 8：仮登録を通さず、スタッフがたばこを直接読み取って登録してもよい。仮登録の明細は取り消せる
 #[test]
 fn tobacco_can_be_scanned_directly_and_held_lines_removed() {

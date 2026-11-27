@@ -743,6 +743,9 @@ function padKey(key: string, k: string): void {
       const ffKey = `${register}:${side}:${e.line}`;
       ffvInput.set(ffKey, String(value));
       send({ type: "check_ff", register, side: side as Side, line_id: e.line!, handed: value });
+    } else if (e.target === "shr") {
+      if (e.digits === "") return;
+      send({ type: "set_shelf_read", register, side: "counter", line_id: e.line!, read: value });
     } else if (e.target === "cpn") {
       // 取り消す枚数：新しく読んだクーポンから、その枚数だけ取り消す（返却の案内が出る）
       if (e.digits === "") return;

@@ -4191,13 +4191,13 @@ impl Store {
     ) -> Result<Outcome, String> {
         self.check(register, side, Action::HoldShelf)?;
         if entries.is_empty() {
-            return Err("棚番号とお求めの個数を入力してください".into());
+            return Err("棚番号とお求めの数量を入力してください".into());
         }
         if entries.iter().any(|e| e.shelf == 0 || e.shelf > 999) {
             return Err("棚番号は 1〜999 で入力してください".into());
         }
         if entries.iter().any(|e| e.qty == 0 || e.qty > 99) {
-            return Err("お求めの個数は 1〜99 で入力してください".into());
+            return Err("お求めの数量は 1〜99 で入力してください".into());
         }
         let tax = self.tax_for(TOBACCO_CODE);
         let r = self.reg_mut(register)?;

@@ -14,7 +14,6 @@ import {
   ffVerifying,
   shelfVerifying,
   shelfTarget,
-  shelfForm,
   stampVerifying,
   expiredClosed,
   ffvInput,
@@ -703,8 +702,6 @@ const SUBMIT: Partial<Record<PadTarget, (register: number, side: Side, digits: s
 
 /** たばこの仮登録の入力を閉じる（両画面、入力途中の欄も消す） */
 function closeShelfForm(register: number): void {
-  shelfForm.delete(`${register}:floor`);
-  shelfForm.delete(`${register}:counter`);
   padValue.delete(padValueKey(register, "shf"));
   padValue.delete(padValueKey(register, "shq"));
   for (const side of ["floor", "counter"]) {
@@ -761,7 +758,7 @@ function padKey(key: string, k: string): void {
       couponCancel.delete(`${register}:${side}`);
       padValue.delete(padValueKey(register, "cpn"));
     } else if (e.target === "shf" || e.target === "shq") {
-      // たばこの仮登録：棚番号を決めたら、個数がまだなら個数のテンキーを続けて開く（「次の銘柄」で一件を仮登録する）
+      // たばこの仮登録：棚番号を決めたら、数量がまだなら数量のテンキーを続けて開く（「パック」「カートン」で一件を仮登録する）
       if (e.digits === "" || value <= 0) return;
       padValue.set(padValueKey(register, e.target), String(value));
       if (e.target === "shf" && !padValue.get(padValueKey(register, "shq"))) {
@@ -1233,9 +1230,7 @@ app.addEventListener("click", (e) => {
     ffTabs.set(register, { tab, page: 0 });
     // 「たばこ」：セルフ操作モードの売り場側の五段目をすぐ棚番号と個数の入力にする（銘柄のタブは廃止、user 2026-11-26）。ほかのボタン・タブに移ったら閉じる。
     // スタッフはたばこのバーコードを直接読み取るので、レジカウンター側には出さない（user 2026-11-26）
-    if (tab === "tobacco" && snap.registers.find((x) => x.id === register)?.mode === "self_operated") {
-      if (!shelfForm.has(`${register}:floor`)) shelfForm.set(`${register}:floor`, { carton: false });
-    } else closeShelfForm(register);
+    if (!(tab === "tobacco" && snap.registers.find((x) => x.id === register)?.mode === "self_operated")) closeShelfForm(register);
     // 呼び出しのボタン・タブ（と「たばこ」）は、選んだ時点でそのボタンの用件の呼び出しを立てる（user 2026-11-26）
     if (b.dataset.navcall) {
       if (send(JSON.parse(b.dataset.navcall) as Command)) send({ type: "release_call", register });
@@ -1244,23 +1239,15 @@ app.addEventListener("click", (e) => {
     return frame();
   }
   if (b.dataset.shelfUnit) {
+    // 「パック」「カートン」：押した方の単位で一つの銘柄（棚番号と数量）をその場で仮登録し、欄を空けて次の銘柄の入力に移る
     const [reg, side, carton] = b.dataset.shelfUnit.split(":");
-    const f = shelfForm.get(`${reg}:${side}`);
-    if (f) f.carton = carton === "1";
-    return frame();
-  }
-  if (b.dataset.shelfNext) {
-    // 一つの銘柄（棚番号と個数）をその場で仮登録し、欄を空けて次の銘柄の入力に移る
-    const [reg, side] = b.dataset.shelfNext.split(":");
     const register = Number(reg);
     const shelf = padValue.get(padValueKey(register, "shf"));
     const qty = padValue.get(padValueKey(register, "shq"));
-    const f = shelfForm.get(`${reg}:${side}`);
     if (!shelf || !qty) return;
-    if (send({ type: "hold_shelf", register, side: side as Side, entries: [{ shelf: Number(shelf), qty: Number(qty), carton: !!f?.carton }] })) {
+    if (send({ type: "hold_shelf", register, side: side as Side, entries: [{ shelf: Number(shelf), qty: Number(qty), carton: carton === "1" }] })) {
       padValue.delete(padValueKey(register, "shf"));
       padValue.delete(padValueKey(register, "shq"));
-      if (f) f.carton = false;
     }
     return frame();
   }

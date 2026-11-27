@@ -393,6 +393,7 @@ const DICT: Record<string, string> = {
   "販売期限切れの商品があります\n取り消してから、お会計に進んでください": "An item is past its sell-by date\nCancel it before checking out",
   日配食品は一点ずつスキャンしてください: "Scan fresh food one at a time",
   "日配食品は数量を増やせません\n一点ずつスキャンしてください": "Fresh food quantity can't be raised\nScan each one",
+  "仮登録のたばこは 1 個ずつの行です\n増やすときは、もう一度仮登録してください": "Held tobacco is one line per pack\nHold again to add more",
   押して新しい商品との取り替えを案内: "Press to guide the swap for a fresh item",
   公共料金: "Utility bills",
 
@@ -747,7 +748,7 @@ const RULES: Rule[] = [
   [/^限定(\d+)$/, (m) => `Limit ${m[1]}`],
   [/^たばこ (\d+)( カートン)?$/, (m) => `Tobacco ${m[1]}${m[2] ? " carton" : ""}`],
   [/^(.+)はたばこではありません\n仮登録のたばこには、たばこを読み取ってください$/, (m) => `${t(m[1])} is not tobacco\nScan tobacco for the held tobacco`],
-  [/^(.+) (.+) × (\d+)：本登録しました$/, (m) => `${t(m[1])} ${yenify(m[2])} × ${m[3]}: registered`],
+  [/^(.+) (.+)：本登録しました$/, (m) => `${t(m[1])} ${yenify(m[2])}: registered`],
   [/^(.+)がセルフレジで買えるようになりました$/, (m) => `Now available at self checkout: ${m[1].split("・").map((x) => t(x)).join(", ")}`],
   [/^(.+)（追加分）$/, (m) => `${t(m[1])} (added)`],
   [/^(.+)の(お受け取り|お渡し)を確認した$/, (m) => `Confirmed ${m[2] === "お渡し" ? "hand-over" : "receipt"} of ${t(m[1])}`],

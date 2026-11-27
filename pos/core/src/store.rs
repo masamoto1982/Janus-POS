@@ -242,7 +242,7 @@ pub enum Command {
         side: Side,
         entries: Vec<ShelfEntry>,
     },
-    /// お渡し照合で、仮登録のたばこの明細に商品のたばこを読み取る（本登録）。一回の読み取りで 1 点だけ本登録になり（仮登録の個数が 1 減る）、本登録した分に年確のフラグが立つ
+    /// お渡し照合で、仮登録のたばこの明細に商品のたばこを読み取る（本登録）。仮登録の行は 1 個ずつで、一回の読み取りで一つがその商品の行に置き換わり、年確のフラグが立つ
     MatchShelf {
         register: u8,
         side: Side,
@@ -818,6 +818,10 @@ pub struct Line {
     pub pickup: Option<Pickup>,
 }
 
+/// 仮登録のたばこは 1 個ずつの行なので、数量を増やせない
+pub const SHELF_ONE_BY_ONE: &str =
+    "仮登録のたばこは 1 個ずつの行です\n増やすときは、もう一度仮登録してください";
+
 fn slip_no(seed: u64) -> String {
     let d = format!("91{:014}", mix(seed) % 100_000_000_000_000);
     format!("{} {} {} {}", &d[..4], &d[4..8], &d[8..12], &d[12..])
@@ -1323,10 +1327,11 @@ impl Txn {
         self.next_line += 1;
         let touched = self.next_line;
         if let Some(l) = self.lines.iter_mut().max_by_key(|l| l.touched).filter(|l| {
-            // 日配食品は一点ずつ販売期限が違うので、続けて読んでもまとめず一行ずつ（期限切れの一点を見分ける）
+            // 日配食品は一点ずつ販売期限が違うので、続けて読んでもまとめず一行ずつ（期限切れの一点を見分ける）。
+            // 仮登録のたばこも 1 個ずつの行（読み取るたびに 1 行ずつ本登録に替わる、user 2026-11-27）
             l.code == p.code
                 && l.kind == kind
-                && !matches!(kind, LineKind::Service { .. })
+                && !matches!(kind, LineKind::Service { .. } | LineKind::Shelf { .. })
                 && !p.fresh
         }) {
             l.qty += qty;
@@ -3778,6 +3783,7 @@ impl Store {
             };
         match kind {
             LineKind::Service { .. } => return Err("サービス商品の個数は変えられません".into()),
+            LineKind::Shelf { .. } if qty > old => return Err(SHELF_ONE_BY_ONE.into()),
             _ if received && r.staff_state() != StaffState::Ready => {
                 return Err(FF_RECEIVED_SELF.into())
             }
@@ -4181,13 +4187,16 @@ impl Store {
         if r.txn.item_count() + add > MAX_ITEMS {
             return Err(ITEMS_FULL.into());
         }
+        // 個数 5 なら仮登録の行が 5 つ（1 個ずつ）。読み取るたびに 1 行ずつ本登録に替わる（user 2026-11-27：
+        // 一つの行の個数が読み取りのたびに減っていく形はわかりにくい）
         for e in entries {
             let kind = LineKind::Shelf {
                 shelf: e.shelf,
                 carton: e.carton,
             };
-            r.txn
-                .push(&catalog::TOBACCO_SHELF, e.qty, kind, tax.clone());
+            for _ in 0..e.qty {
+                r.txn.push(&catalog::TOBACCO_SHELF, 1, kind, tax.clone());
+            }
         }
         let staffed = r.staff_state() == StaffState::Ready;
         if !staffed && !self.calls.is_open(register, CallKind::Tobacco) {
@@ -4200,9 +4209,8 @@ impl Store {
         })
     }
 
-    /// お渡し照合で、仮登録のたばこに商品のたばこを読み取る（本登録）。一回の読み取りで本登録になるのは 1 点だけ
-    /// （user 2026-11-27：個数 2 の仮登録は 2 回読み取るまで残る）。仮登録の個数を 1 減らし、読んだたばこを明細に 1 点足す
-    /// （同じたばこの明細があればその数量に足す）。最後の 1 点は仮登録の行がそのたばこに置き換わる
+    /// お渡し照合で、仮登録のたばこに商品のたばこを読み取る（本登録）。仮登録は 1 個ずつの行なので、
+    /// 一回の読み取りで仮登録の行が一つ、その商品の行に置き換わる（user 2026-11-27）
     fn match_shelf(
         &mut self,
         register: u8,
@@ -4253,43 +4261,21 @@ impl Store {
         let r = self.reg_mut(register)?;
         r.txn.next_line += 1;
         let touched = r.txn.next_line;
-        let lines = &mut r.txn.lines;
-        let at = lines
-            .iter()
-            .position(|l| l.id == line_id)
+        let l = r
+            .txn
+            .lines
+            .iter_mut()
+            .find(|l| l.id == line_id)
             .ok_or("仮登録のたばこの明細が見つかりません")?;
-        let mut item = lines[at].clone();
-        item.code = p.code;
-        item.name = p.name;
-        item.unit_price = p.price;
-        item.tax = tax.0;
-        item.rate_bp = tax.1;
-        item.category = p.category;
-        item.cash_only = p.cash_only;
-        item.kind = LineKind::Item;
-        item.touched = touched;
-        item.qty = 1;
-        let left = lines[at].qty - 1;
-        let same = lines
-            .iter()
-            .position(|l| l.code == p.code && l.kind == LineKind::Item);
-        match (same, left) {
-            (Some(j), _) => {
-                lines[j].qty += 1;
-                lines[j].touched = touched;
-                if left == 0 {
-                    lines.remove(at);
-                } else {
-                    lines[at].qty = left;
-                }
-            }
-            (None, 0) => lines[at] = item,
-            (None, _) => {
-                lines[at].qty = left;
-                item.id = touched;
-                lines.insert(at, item);
-            }
-        }
+        l.code = p.code;
+        l.name = p.name;
+        l.unit_price = p.price;
+        l.tax = tax.0;
+        l.rate_bp = tax.1;
+        l.category = p.category;
+        l.cash_only = p.cash_only;
+        l.kind = LineKind::Item;
+        l.touched = touched;
         r.txn.tobacco_asked = false;
         let head = format!("{} {}円：本登録しました", p.name, p.price);
         if !r.txn.handover_waiting() && side == Side::Counter {

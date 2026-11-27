@@ -6027,15 +6027,14 @@ fn held_tobacco_is_matched_by_scanning_then_needs_age_check() {
     )
     .unwrap();
     assert!(msg.unwrap().contains("スタッフがお持ちします"));
-    // 個数の分だけ 1 個ずつの仮登録の行ができる（個数 3 と 2 で 5 行、user 2026-11-27）
+    // 仮登録は一行（個数 3 と 2 で 2 行）
     let v = reg(&s, 2);
-    assert_eq!(v.counter.lines.len(), 5);
+    assert_eq!(v.counter.lines.len(), 2);
     assert!(v
         .counter
         .lines
         .iter()
-        .all(|l| matches!(l.line.kind, LineKind::Shelf { .. })
-            && l.line.qty == 1
+        .all(|l| matches!(l.line.kind, LineKind::Shelf { read: 0, .. })
             && l.age.is_none()
             && l.amount == 0));
     assert!(v.counter.calls.iter().any(|c| c.kind == CallKind::Tobacco));
@@ -6061,28 +6060,13 @@ fn held_tobacco_is_matched_by_scanning_then_needs_age_check() {
     )
     .unwrap_err();
     assert!(e.contains("たばこではありません"), "{e}");
-    // 仮登録の行は 1 個ずつなので、数量を増やせない（減らす＝削除はできる）
-    let e = run(
-        &mut s,
-        json!({"type":"set_qty","register":2,"side":"counter","line_id":ids[0],"qty":2}),
-    )
-    .unwrap_err();
-    assert!(e.contains("1 個ずつの行"), "{e}");
     let line = |s: &Store, id: u32| {
         reg(s, 2)
             .counter
             .lines
             .iter()
             .find(|l| l.line.id == id)
-            .map(|l| (l.line.code, l.line.qty, l.amount, l.age))
-    };
-    let shelves = |s: &Store| {
-        reg(s, 2)
-            .counter
-            .lines
-            .iter()
-            .filter(|l| matches!(l.line.kind, LineKind::Shelf { .. }))
-            .count()
+            .map(|l| (l.line.kind, l.line.code, l.line.qty, l.amount, l.age))
     };
     let match_one = |s: &mut Store, id: u32, code: &str| {
         run(
@@ -6092,20 +6076,33 @@ fn held_tobacco_is_matched_by_scanning_then_needs_age_check() {
         .unwrap()
         .unwrap_or_default()
     };
-    // 一回の読み取りで仮登録の行が一つ、その商品の行（1 個）に置き換わる。残りの仮登録はそのまま
+    // FF のお渡し照合と同じ形（user 2026-11-27）：仮登録は一行のまま、読み取るたびに読み取り数が増える（個数は減らない）
+    let msg = match_one(&mut s, ids[0], TOBACCO);
+    assert!(msg.contains("1/3"), "{msg}");
+    let (kind, _, qty, amount, age) = line(&s, ids[0]).unwrap();
+    assert!(matches!(kind, LineKind::Shelf { read: 1, .. }));
+    assert_eq!((qty, amount, age), (3, 0, None));
     match_one(&mut s, ids[0], TOBACCO);
-    assert_eq!(line(&s, ids[0]), Some((TOBACCO, 1, 600, Some(20))));
-    assert_eq!(shelves(&s), 4);
-    match_one(&mut s, ids[1], TOBACCO);
-    match_one(&mut s, ids[2], TOBACCO);
-    assert_eq!(shelves(&s), 2);
+    // 読み取った数より少なくはできない
+    let e = run(
+        &mut s,
+        json!({"type":"set_qty","register":2,"side":"counter","line_id":ids[0],"qty":1}),
+    )
+    .unwrap_err();
+    assert!(e.contains("より少なくはできません"), "{e}");
+    // 個数に届くと、その行が読んだたばこに置き換わる（年確のフラグ）
+    let msg = match_one(&mut s, ids[0], TOBACCO);
+    assert!(msg.contains("本登録しました"), "{msg}");
+    assert_eq!(
+        line(&s, ids[0]),
+        Some((LineKind::Item, TOBACCO, 3, 1800, Some(20)))
+    );
     assert!(reg(&s, 2).counter.passed.is_none());
-    let msg = match_one(&mut s, ids[3], CARTON);
+    let msg = match_one(&mut s, ids[1], CARTON);
     assert!(!msg.contains("すべてのお渡しを確認しました"), "{msg}");
-    let msg = match_one(&mut s, ids[4], CARTON);
+    let msg = match_one(&mut s, ids[1], CARTON);
     assert!(msg.contains("すべてのお渡しを確認しました"), "{msg}");
-    assert_eq!(shelves(&s), 0);
-    assert_eq!(reg(&s, 2).counter.lines.len(), 5);
+    assert_eq!(reg(&s, 2).counter.lines.len(), 2);
     assert_eq!(reg(&s, 2).counter.passed, Some(Passed::Handover));
     ok(
         &mut s,
@@ -6127,25 +6124,33 @@ fn held_tobacco_unit_must_match_the_scanned_tobacco() {
             {"shelf":44,"qty":2,"carton":true}
         ]}),
     );
-    // 個の行が 3 つ、カートンの行が 2 つ
     let ids: Vec<u32> = reg(&s, 1).counter.lines.iter().map(|l| l.line.id).collect();
-    let code = |s: &Store, id: u32| {
+    let kind = |s: &Store, id: u32| {
         reg(s, 1)
             .counter
             .lines
             .iter()
             .find(|l| l.line.id == id)
-            .map(|l| l.line.code)
+            .map(|l| (l.line.kind, l.line.code))
     };
-    // 個の行を指してカートンを読むと、カートンの行に上から順に充たる
-    for (i, at) in [(1, ids[3]), (2, ids[4])] {
-        ok(
-            &mut s,
-            json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":CARTON}),
-        );
-        assert_eq!(code(&s, at), Some(CARTON), "{i} 回目");
-        assert_eq!(code(&s, ids[0]), Some("tobacco-shelf"));
-    }
+    // 個の行を指してカートンを読むと、カートンの行に充たる（2 回で本登録）
+    ok(
+        &mut s,
+        json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":CARTON}),
+    );
+    assert!(matches!(
+        kind(&s, ids[1]),
+        Some((LineKind::Shelf { read: 1, .. }, _))
+    ));
+    assert!(matches!(
+        kind(&s, ids[0]),
+        Some((LineKind::Shelf { read: 0, .. }, _))
+    ));
+    ok(
+        &mut s,
+        json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":CARTON}),
+    );
+    assert_eq!(kind(&s, ids[1]), Some((LineKind::Item, CARTON)));
     // 残りは個の行だけ。もう一度カートンを読んでも受け付けない
     let e = run(
         &mut s,
@@ -6158,8 +6163,10 @@ fn held_tobacco_unit_must_match_the_scanned_tobacco() {
         &mut s,
         json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":TOBACCO}),
     );
-    assert_eq!(code(&s, ids[0]), Some(TOBACCO));
-    assert_eq!(code(&s, ids[1]), Some("tobacco-shelf"));
+    assert!(matches!(
+        kind(&s, ids[0]),
+        Some((LineKind::Shelf { read: 1, .. }, _))
+    ));
 }
 
 /// 仕様 8：仮登録を通さず、スタッフがたばこを直接読み取って登録してもよい。仮登録の明細は取り消せる

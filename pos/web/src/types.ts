@@ -93,7 +93,11 @@ dates: Dates | null,
 /**
  * チケットの発券枚数（チケットでなければ 0）
  */
-tickets: number, id: number, touched: number, code: string, name: string, unit_price: number, qty: number, ff_base: number, tax: string, rate_bp: number, category: Category, cash_only: boolean, parcel?: Parcel, pickup?: Pickup, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, } | { "kind": "shelf", shelf: number, carton: boolean, });
+tickets: number, id: number, touched: number, code: string, name: string, unit_price: number, qty: number, ff_base: number, tax: string, rate_bp: number, category: Category, cash_only: boolean, parcel?: Parcel, pickup?: Pickup, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, } | { "kind": "shelf", shelf: number, carton: boolean, 
+/**
+ * 本登録の画面で読み取った数。個数に届くと読んだたばこの行に置き換わる（FF のお渡し数と同じく増えていく数）
+ */
+read: number, });
 
 export type CounterView = { state: StaffState, 
 /**
@@ -146,7 +150,11 @@ export type FloorLine = { id: number, touched: number, name: string, qty: number
 /**
  * 販売個数の上限を超えて登録しようとした（個数制限のフラグ）
  */
-limit_hit: boolean, cash_only: boolean, pickup: boolean, parcel: boolean, fresh: boolean, expired: boolean, dates: Dates | null, tickets: number, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, } | { "kind": "shelf", shelf: number, carton: boolean, });
+limit_hit: boolean, cash_only: boolean, pickup: boolean, parcel: boolean, fresh: boolean, expired: boolean, dates: Dates | null, tickets: number, } & ({ "kind": "item" } | { "kind": "ff", state: FfState, } | { "kind": "service", done: boolean, confirm_pending: boolean, } | { "kind": "shelf", shelf: number, carton: boolean, 
+/**
+ * 本登録の画面で読み取った数。個数に届くと読んだたばこの行に置き換わる（FF のお渡し数と同じく増えていく数）
+ */
+read: number, });
 
 export type FloorView = { phase: Phase, lines: Array<FloorLine>, coupons: Array<CouponView>, coupon_unmatched: boolean, returned: Array<ReturnedCoupon>, total: number, taxes: Array<TaxTotal>, inserted: number, settle_in_ms: number | null, due: number, point_card: boolean, point_pending: boolean, parcel_ask: boolean, bills: Array<BillRow>, bill_unchecked: boolean, stamp_pending: boolean, staff_called: boolean, age_wait: number | null, staff_present: boolean, method: PaymentMethod | null, payment_blocker: string | null, actions: Array<ActionState>, };
 

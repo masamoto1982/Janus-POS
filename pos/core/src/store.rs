@@ -249,6 +249,13 @@ pub enum Command {
         line_id: u32,
         code: String,
     },
+    /// たばこの本登録の画面で、読み取り数をテンキーで直す（先に 1 個読み取った銘柄で数える）。個数に届くと本登録になる
+    SetShelfRead {
+        register: u8,
+        side: Side,
+        line_id: u32,
+        read: u32,
+    },
     /// サービス商品の受付を済ませる
     CompleteService {
         register: u8,
@@ -588,6 +595,7 @@ impl Command {
             | C::CheckFf { register, .. }
             | C::HoldShelf { register, .. }
             | C::MatchShelf { register, .. }
+            | C::SetShelfRead { register, .. }
             | C::CompleteService { register, .. }
             | C::ParcelLength { register, .. }
             | C::ParcelSize { register, .. }
@@ -650,6 +658,7 @@ impl Command {
             | C::CheckFf { side, .. }
             | C::HoldShelf { side, .. }
             | C::MatchShelf { side, .. }
+            | C::SetShelfRead { side, .. }
             | C::RemoveLine { side, .. }
             | C::CancelItem { side, .. }
             | C::SetQty { side, .. }
@@ -2469,6 +2478,12 @@ impl Store {
                 line_id,
                 code,
             } => self.match_shelf(register, side, line_id, &code),
+            C::SetShelfRead {
+                register,
+                side,
+                line_id,
+                read,
+            } => self.set_shelf_read(register, side, line_id, read),
             C::CompleteService {
                 register,
                 line_id,
@@ -4293,7 +4308,77 @@ impl Store {
                 p.name, p.price
             ));
         }
-        // 個数分そろった：銘柄ごとに数え、最初の銘柄はその行に、ほかの銘柄はすぐ下の行に置き換える
+        self.finish_shelf(register, side, line_id)
+    }
+
+    /// 本登録の画面で、読み取り数をテンキーで直す（user 2026-11-27：仮登録が多いとスキャンが大変）。
+    /// FF のお渡し数と同じ入力欄。銘柄を決めるため先に 1 個は読み取り、増やした分は最後に読んだ銘柄で数える
+    /// （減らせば後から読んだ分を外す）。個数に届けば本登録
+    fn set_shelf_read(
+        &mut self,
+        register: u8,
+        side: Side,
+        line_id: u32,
+        read: u32,
+    ) -> Result<Outcome, String> {
+        self.check(register, side, Action::CheckHandover)?;
+        let (qty, have, last) = {
+            let l = self
+                .reg(register)
+                .ok_or("レジがありません")?
+                .txn
+                .lines
+                .iter()
+                .find(|l| l.id == line_id && l.is_shelf())
+                .ok_or("仮登録のたばこの明細が見つかりません")?;
+            (
+                l.qty,
+                l.shelf_read.len() as u32,
+                l.shelf_read.last().copied(),
+            )
+        };
+        let Some(last) = last else {
+            return Err("先にたばこを 1 個読み取ってください\n読み取った銘柄で数えます".into());
+        };
+        if read == 0 {
+            return Err("読み取り数は 1 以上で入力してください".into());
+        }
+        if read > qty {
+            return Err(format!("個数（{qty}個）より多くはできません"));
+        }
+        if read > have {
+            self.check_limit(register, last, read - have)?;
+        }
+        let r = self.reg_mut(register)?;
+        r.txn.next_line += 1;
+        let touched = r.txn.next_line;
+        let l = r
+            .txn
+            .lines
+            .iter_mut()
+            .find(|l| l.id == line_id)
+            .ok_or("仮登録のたばこの明細が見つかりません")?;
+        l.shelf_read.resize(read as usize, last);
+        l.touched = touched;
+        if let LineKind::Shelf { read: n, .. } = &mut l.kind {
+            *n = read;
+        }
+        if read < qty {
+            return done(format!("読み取り数 {read}/{qty}"));
+        }
+        self.finish_shelf(register, side, line_id)
+    }
+
+    /// 仮登録のたばこの読み取り数が個数に届いた：銘柄ごとに数え、最初の銘柄はその行に、ほかの銘柄はすぐ下の行に置き換える
+    fn finish_shelf(&mut self, register: u8, side: Side, line_id: u32) -> Result<Outcome, String> {
+        let r = self.reg_mut(register)?;
+        let at = r
+            .txn
+            .lines
+            .iter()
+            .position(|l| l.id == line_id)
+            .ok_or("仮登録のたばこの明細が見つかりません")?;
+        let l = &mut r.txn.lines[at];
         let mut brands: Vec<(&'static str, u32)> = Vec::new();
         for c in std::mem::take(&mut l.shelf_read) {
             match brands.iter_mut().find(|(b, _)| *b == c) {

@@ -209,13 +209,14 @@ function shelfVerifyOpen<L extends { kind: string }>(reg: number, side: Side, li
   return side === "counter" && shelfVerifying.has(`${reg}:${side}`) && lines.some(isShelf);
 }
 
-/** たばこの本登録の画面（user 2026-11-26：FF のお渡し照合とは分ける）。仮登録の行を入力した順に並べ、棚から取ったたばこを
+/** たばこの本登録の画面（user 2026-11-26：FF のお渡し照合とは分ける）。1 個読み取って銘柄が決まった行は、読み取り数を
+ *  FF のお渡し数と同じ入力欄でテンキーから打てる（user 2026-11-27：仮登録が多いとスキャンが大変）。仮登録の行を入力した順に並べ、棚から取ったたばこを
  *  読み取ると上の行から順に充てて本登録にする（照合の列に「読み取り待ち」）。読み取りで照合するので、数を打つ欄はない */
 function shelfVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; qty: number; shelf?: number; carton?: boolean; read?: number }[]): string {
   const shelves = lines.filter(isShelf).sort((a, b) => a.id - b.id);
   const target = shelfTarget(shelves);
   const rows = shelves
-    .map((l) => `<tr${l === target ? ` class="shelf-target"` : ""}><td>${esc(lineName(l))}</td><td class="num">${l.qty}</td><td class="num">${l.read ?? 0}</td><td class="ffv-judge">${l === target ? `<span class="ffv-wait">読み取り待ち</span>` : ""}</td></tr>`)
+    .map((l) => `<tr${l === target ? ` class="shelf-target"` : ""}><td>${esc(lineName(l))}</td><td class="num">${l.qty}</td><td class="num">${l.read ? padField(reg, side, "shr", String(l.read), "", `${lineName(l)}の読み取り数`, l.id, "ffv-input") : "0"}</td><td class="ffv-judge">${l === target ? `<span class="ffv-wait">読み取り待ち</span>` : ""}</td></tr>`)
     .join("");
   return `<div class="ffv-screen shelf-verify">
       <div class="big">棚のたばこを読み取ってください</div>
@@ -814,7 +815,7 @@ export function qtyPopup(r: RegisterView, side: Side): string {
     </div>`;
 }
 
-export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt" | "cpn" | "shf" | "shq";
+export type PadTarget = "pcm" | "pkg" | "post" | "birth" | "ffv" | "tkh" | "tkr" | "inlet" | "mamt" | "mpw" | "ppt" | "cpn" | "shf" | "shq" | "shr";
 /** error：テンキーの「決定」で送った入力が受け付けられなかった理由。テンキーを開いたまま表示し、次のキーで消す */
 export type PadEntry = { target: PadTarget; line?: number; digits: string; error?: string };
 export const padEntry = new Map<string, PadEntry>();
@@ -835,6 +836,7 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   cpn: { title: "取り消す枚数", unit: "枚", max: 3 },
   shf: { title: "棚番号", unit: "番", max: 3 },
   shq: { title: "お求めの個数", unit: "", max: 2 },
+  shr: { title: "読み取り数", unit: "", max: 2, code: true },
 };
 /** 入力フォームの幅の見本：いちばん長く打ち込んだときの表示（law.ts fitForms が幅を決める） */
 const padFit = (target: PadTarget): string => padShow(target, "0".repeat(PAD[target].max)) + (PAD[target].decimal ? "." : "");
@@ -862,7 +864,8 @@ export function padPopup(r: RegisterView, side: Side): string {
   const ok = e.digits !== "" ? d.code || Number(e.digits) > 0 : e.target === "inlet" && !r.menu && inserted > 0;
   const now = e.target === "inlet" && inserted ? `<div class="qty-pop-note muted">入金済み ${yen(inserted)}</div>` : "";
   const name = e.target === "ffv" ? r.counter.lines.find((l) => l.id === e.line)?.name : undefined;
-  const title = name ? `${name}の${side === "floor" ? "お受け取り数" : "お渡し数"}` : d.title;
+  const held = e.target === "shr" ? r.counter.lines.find((l) => l.id === e.line) : undefined;
+  const title = name ? `${name}の${side === "floor" ? "お受け取り数" : "お渡し数"}` : held ? `${lineName(held)}の読み取り数` : d.title;
   // 最下段は左から バック・削除（←）・決定、どれも数字のキーと同じ大きさ（user 2026-11-17）
   const last = `${PAD_GAP}${k("0")}${d.decimal ? k(".", ".") : PAD_GAP}${k("cancel", "バック", "pad-key pad-fn ghost back-btn")}${k("back", "←", "pad-key pad-fn neg")}<button type="button" class="pad-key pad-fn primary" data-pad="${reg}:${side}:ok"${ok ? "" : " disabled"}>決定</button>`;
   const shown = padShow(e.target, e.digits);

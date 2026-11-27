@@ -782,6 +782,8 @@ button.back-btn { box-sizing: border-box; width: calc(var(--btn-md-w) * 2); heig
 .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--call-soft) calc(var(--blink-on) * 100%), var(--alert-bg)); }
 /* エマージェンシーモード中は、点滅するところをすべてレジカウンター側ヘッダーと同じ色・同じ拍に揃える（user 2026-11-14）：
    点いているあいだは赤 --sos-head＋白文字、消えているあいだはその段のふだんの色 */
+/* 呼び出しの応答待ちの最下段（両画面）は、ヘッダー2つ分と帯を足した高さ（user 2026-11-27）。その分だけ三段目が低くなる */
+.screen .screen-items:has(> .call-row.call-wait) { height: calc(var(--head-h) * 2 + var(--band-h)); }
 .screen.sos .screen-items:has(> .call-row.calling) { background: color-mix(in oklch, var(--sos-head) calc(var(--blink-on) * 100%), var(--tier-deep)); }
 .screen.sos .call-row.calling :is(.big, p.small) { color: color-mix(in oklch, var(--sos-head-ink) calc(var(--blink-on) * 100%), var(--msg-strong)); }
 /* セルフ操作モードの最下段：ボタン群の上に「カウンター内の商品はスタッフが対応いたします（一部商品除く）」を添え、案内とボタン群をまとめて縦の中央に置く（user 2026-11-16） */

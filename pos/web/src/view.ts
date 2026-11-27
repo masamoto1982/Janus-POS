@@ -211,15 +211,15 @@ function shelfVerifyOpen<L extends { kind: string }>(reg: number, side: Side, li
 
 /** たばこの本登録の画面（user 2026-11-26：FF のお渡し照合とは分ける）。仮登録の行を入力した順に並べ、棚から取ったたばこを
  *  読み取ると上の行から順に充てて本登録にする（照合の列に「読み取り待ち」）。読み取りで照合するので、数を打つ欄はない */
-function shelfVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; qty: number; shelf?: number; carton?: boolean }[]): string {
+function shelfVerifyScreen(reg: number, side: Side, lines: { id: number; name: string; kind: string; qty: number; shelf?: number; carton?: boolean; read?: number }[]): string {
   const shelves = lines.filter(isShelf).sort((a, b) => a.id - b.id);
   const target = shelfTarget(shelves);
   const rows = shelves
-    .map((l) => `<tr${l === target ? ` class="shelf-target"` : ""}><td>${esc(lineName(l))}</td><td class="num">${l.qty}</td><td class="ffv-judge">${l === target ? `<span class="ffv-wait">読み取り待ち</span>` : ""}</td></tr>`)
+    .map((l) => `<tr${l === target ? ` class="shelf-target"` : ""}><td>${esc(lineName(l))}</td><td class="num">${l.qty}</td><td class="num">${l.read ?? 0}</td><td class="ffv-judge">${l === target ? `<span class="ffv-wait">読み取り待ち</span>` : ""}</td></tr>`)
     .join("");
   return `<div class="ffv-screen shelf-verify">
       <div class="big">棚のたばこを読み取ってください</div>
-      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">個数</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="lines ffv"><thead><tr><th>品目</th><th class="num">個数</th><th class="num">読み取り数</th><th class="ffv-judge">照合</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="ffv-foot"><button type="button" class="md ghost back-btn" data-shelfverify-close="${reg}:${side}" >バック</button></div>
     </div>`;
 }
@@ -733,7 +733,7 @@ function counterLine(reg: number, l: CounterLine, v: CounterView, side: Side): s
   const qty =
     ro || isBill(l) || l.pickup || l.parcel
       ? `${n}`
-      : qtyCell(reg, side, { id: l.id, qty: n }, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service" || l.kind === "shelf", l.fresh, lineMax(l, v.lines));
+      : qtyCell(reg, side, { id: l.id, qty: n }, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, v.lines));
   return `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}">
     <td>${esc(lineName(l))} ${[...tags, ...coupon].join(" ")}${svc}</td>
     <td class="num">${qty}</td>
@@ -2038,7 +2038,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
       const n = l.tickets || l.qty;
       const qty =
         c.phase === "registering" && !fixedHere && !(l.expired && side === "floor")
-          ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service" || l.kind === "shelf", l.fresh, lineMax(l, c.lines))
+          ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, c.lines))
           : `${n}`;
       const coupon = couponFlags(reg, side, c.coupons, l.id, l.qty, a("remove_coupon"), false);
       return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(lineName(l))} ${[...tags, ...coupon].join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, c.coupons, l.id)}</td></tr>`];

@@ -242,7 +242,7 @@ pub enum Command {
         side: Side,
         entries: Vec<ShelfEntry>,
     },
-    /// お渡し照合で、仮登録のたばこの明細に商品のたばこを読み取る（本登録）。仮登録の行は 1 個ずつで、一回の読み取りで一つがその商品の行に置き換わり、年確のフラグが立つ
+    /// お渡し照合で、仮登録のたばこの明細に商品のたばこを読み取る（本登録）。読み取るたびに読み取り数が増え、個数に届くとその行が読み取ったたばこに置き換わり、年確のフラグが立つ
     MatchShelf {
         register: u8,
         side: Side,
@@ -777,6 +777,9 @@ pub enum LineKind {
     Shelf {
         shelf: u16,
         carton: bool,
+        /// 本登録の画面で読み取った数。個数に届くと読んだたばこの行に置き換わる（FF のお渡し数と同じく増えていく数）
+        #[serde(default)]
+        read: u32,
     },
 }
 
@@ -816,11 +819,10 @@ pub struct Line {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "ts", ts(optional))]
     pub pickup: Option<Pickup>,
+    /// 仮登録のたばこに読み取ったたばこ（読んだ順）。個数分そろうと銘柄ごとの行に置き換わる
+    #[serde(skip)]
+    pub shelf_read: Vec<&'static str>,
 }
-
-/// 仮登録のたばこは 1 個ずつの行なので、数量を増やせない
-pub const SHELF_ONE_BY_ONE: &str =
-    "仮登録のたばこは 1 個ずつの行です\n増やすときは、もう一度仮登録してください";
 
 fn slip_no(seed: u64) -> String {
     let d = format!("91{:014}", mix(seed) % 100_000_000_000_000);
@@ -1315,23 +1317,31 @@ impl Txn {
         self.lines.iter().map(|l| l.qty).sum()
     }
 
+    /// その商品の点数。仮登録のたばこに読み取ったまま本登録を待つ分も数える（個数制限）
     fn qty_of(&self, code: &str) -> u32 {
-        self.lines
+        let lines: u32 = self
+            .lines
             .iter()
             .filter(|l| l.code == code)
             .map(|l| l.qty)
-            .sum()
+            .sum();
+        let read = self
+            .lines
+            .iter()
+            .flat_map(|l| &l.shelf_read)
+            .filter(|c| **c == code)
+            .count();
+        lines + read as u32
     }
 
     fn push(&mut self, p: &'static Product, qty: u32, kind: LineKind, tax: (String, u32)) {
         self.next_line += 1;
         let touched = self.next_line;
         if let Some(l) = self.lines.iter_mut().max_by_key(|l| l.touched).filter(|l| {
-            // 日配食品は一点ずつ販売期限が違うので、続けて読んでもまとめず一行ずつ（期限切れの一点を見分ける）。
-            // 仮登録のたばこも 1 個ずつの行（読み取るたびに 1 行ずつ本登録に替わる、user 2026-11-27）
+            // 日配食品は一点ずつ販売期限が違うので、続けて読んでもまとめず一行ずつ（期限切れの一点を見分ける）
             l.code == p.code
                 && l.kind == kind
-                && !matches!(kind, LineKind::Service { .. } | LineKind::Shelf { .. })
+                && !matches!(kind, LineKind::Service { .. })
                 && !p.fresh
         }) {
             l.qty += qty;
@@ -1360,6 +1370,7 @@ impl Txn {
                 ..Parcel::default()
             }),
             pickup: None,
+            shelf_read: Vec::new(),
         });
     }
 }
@@ -3783,7 +3794,11 @@ impl Store {
             };
         match kind {
             LineKind::Service { .. } => return Err("サービス商品の個数は変えられません".into()),
-            LineKind::Shelf { .. } if qty > old => return Err(SHELF_ONE_BY_ONE.into()),
+            LineKind::Shelf { read, .. } if qty < read => {
+                return Err(format!(
+                    "読み取ったたばこ（{read}個）より少なくはできません"
+                ))
+            }
             _ if received && r.staff_state() != StaffState::Ready => {
                 return Err(FF_RECEIVED_SELF.into())
             }
@@ -4187,16 +4202,14 @@ impl Store {
         if r.txn.item_count() + add > MAX_ITEMS {
             return Err(ITEMS_FULL.into());
         }
-        // 個数 5 なら仮登録の行が 5 つ（1 個ずつ）。読み取るたびに 1 行ずつ本登録に替わる（user 2026-11-27：
-        // 一つの行の個数が読み取りのたびに減っていく形はわかりにくい）
         for e in entries {
             let kind = LineKind::Shelf {
                 shelf: e.shelf,
                 carton: e.carton,
+                read: 0,
             };
-            for _ in 0..e.qty {
-                r.txn.push(&catalog::TOBACCO_SHELF, 1, kind, tax.clone());
-            }
+            r.txn
+                .push(&catalog::TOBACCO_SHELF, e.qty, kind, tax.clone());
         }
         let staffed = r.staff_state() == StaffState::Ready;
         if !staffed && !self.calls.is_open(register, CallKind::Tobacco) {
@@ -4209,8 +4222,9 @@ impl Store {
         })
     }
 
-    /// お渡し照合で、仮登録のたばこに商品のたばこを読み取る（本登録）。仮登録は 1 個ずつの行なので、
-    /// 一回の読み取りで仮登録の行が一つ、その商品の行に置き換わる（user 2026-11-27）
+    /// お渡し照合で、仮登録のたばこに商品のたばこを読み取る（本登録）。FF のお渡し照合と同じ形（user 2026-11-27）：
+    /// 仮登録は一行のまま、読み取るたびに読み取り数が増え、個数に届くとその行が読んだたばこに置き換わる
+    /// （違う銘柄が混じれば銘柄ごとの行に分ける）
     fn match_shelf(
         &mut self,
         register: u8,
@@ -4233,7 +4247,7 @@ impl Store {
         // 数量に意味があるので、カートンの行にはカートン、個の行には 1 個のたばこだけを充てる。
         // 指した行と単位が違えば、同じ単位の仮登録の行（上から順）に充てる
         let carton = catalog::is_carton(p.code);
-        let unit = |l: &Line| matches!(l.kind, LineKind::Shelf { carton: c, .. } if c == carton);
+        let unit = |l: &Line| matches!(l.kind, LineKind::Shelf { carton: c, read, .. } if c == carton && read < l.qty);
         let line_id = {
             let lines = &self.reg(register).ok_or("レジがありません")?.txn.lines;
             let picked = lines.iter().find(|l| l.id == line_id && l.is_shelf());
@@ -4257,27 +4271,66 @@ impl Store {
             }
         };
         self.check_limit(register, p.code, 1)?;
-        let tax = self.tax_for(p.code);
         let r = self.reg_mut(register)?;
         r.txn.next_line += 1;
         let touched = r.txn.next_line;
-        let l = r
+        let at = r
             .txn
             .lines
-            .iter_mut()
-            .find(|l| l.id == line_id)
+            .iter()
+            .position(|l| l.id == line_id)
             .ok_or("仮登録のたばこの明細が見つかりません")?;
-        l.code = p.code;
-        l.name = p.name;
-        l.unit_price = p.price;
-        l.tax = tax.0;
-        l.rate_bp = tax.1;
-        l.category = p.category;
-        l.cash_only = p.cash_only;
-        l.kind = LineKind::Item;
+        let l = &mut r.txn.lines[at];
+        l.shelf_read.push(p.code);
         l.touched = touched;
+        let (read, qty) = (l.shelf_read.len() as u32, l.qty);
+        if let LineKind::Shelf { read: n, .. } = &mut l.kind {
+            *n = read;
+        }
+        if read < qty {
+            return done(format!(
+                "{} {}円：読み取りました（{read}/{qty}）",
+                p.name, p.price
+            ));
+        }
+        // 個数分そろった：銘柄ごとに数え、最初の銘柄はその行に、ほかの銘柄はすぐ下の行に置き換える
+        let mut brands: Vec<(&'static str, u32)> = Vec::new();
+        for c in std::mem::take(&mut l.shelf_read) {
+            match brands.iter_mut().find(|(b, _)| *b == c) {
+                Some((_, n)) => *n += 1,
+                None => brands.push((c, 1)),
+            }
+        }
+        let shelf = l.clone();
+        let mut rows = Vec::new();
+        for (i, (c, n)) in brands.into_iter().enumerate() {
+            let p = catalog::find(c).ok_or("たばこが見つかりません")?;
+            let mut row = shelf.clone();
+            if i > 0 {
+                r.txn.next_line += 1;
+                row.id = r.txn.next_line;
+            }
+            row.code = p.code;
+            row.name = p.name;
+            row.unit_price = p.price;
+            row.category = p.category;
+            row.cash_only = p.cash_only;
+            row.kind = LineKind::Item;
+            row.qty = n;
+            rows.push(row);
+        }
+        for row in &mut rows {
+            (row.tax, row.rate_bp) = self.tax_for(row.code);
+        }
+        let r = self.reg_mut(register)?;
+        let names = rows
+            .iter()
+            .map(|l| format!("{} × {}", l.name, l.qty))
+            .collect::<Vec<_>>()
+            .join("、");
+        r.txn.lines.splice(at..=at, rows);
         r.txn.tobacco_asked = false;
-        let head = format!("{} {}円：本登録しました", p.name, p.price);
+        let head = format!("{names}：本登録しました");
         if !r.txn.handover_waiting() && side == Side::Counter {
             r.txn.passed = Some(Passed::Handover);
             return done(format!("{head}\n{HANDOVER_DONE}"));

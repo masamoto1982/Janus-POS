@@ -254,6 +254,8 @@ struct SavedLine {
     stamped: bool,
     parcel: Option<SavedParcel>,
     pickup: Option<Pickup>,
+    #[serde(default)]
+    shelf_read: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -305,6 +307,7 @@ impl SavedLine {
                 fee: p.fee,
             }),
             pickup: l.pickup.clone(),
+            shelf_read: l.shelf_read.iter().map(|c| c.to_string()).collect(),
         }
     }
 
@@ -339,6 +342,11 @@ impl SavedLine {
                 fee: p.fee,
             }),
             pickup: self.pickup,
+            shelf_read: self
+                .shelf_read
+                .iter()
+                .map(|c| product(c).map(|p| p.code))
+                .collect::<Result<_, _>>()?,
         })
     }
 }

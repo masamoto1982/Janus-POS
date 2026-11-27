@@ -6059,28 +6059,46 @@ fn held_tobacco_is_matched_by_scanning_then_needs_age_check() {
     )
     .unwrap_err();
     assert!(e.contains("たばこではありません"), "{e}");
-    ok(
-        &mut s,
-        json!({"type":"match_shelf","register":2,"side":"counter","line_id":ids[0],"code":TOBACCO}),
-    );
-    let v = reg(&s, 2);
-    let l = v
-        .counter
-        .lines
-        .iter()
-        .find(|l| l.line.id == ids[0])
-        .unwrap();
-    assert_eq!(
-        (l.line.code, l.line.qty, l.amount, l.age),
-        (TOBACCO, 3, 1800, Some(20))
-    );
-    assert!(v.counter.passed.is_none());
-    let msg = run(
-        &mut s,
-        json!({"type":"match_shelf","register":2,"side":"counter","line_id":ids[1],"code":CARTON}),
-    )
-    .unwrap();
-    assert!(msg.unwrap().contains("すべてのお渡しを確認しました"));
+    // 一回の読み取りで本登録になるのは 1 点だけ（user 2026-11-27）：仮登録は個数 2 で残り、たばこが 1 点加わる
+    let shelf = |s: &Store, id: u32| {
+        reg(s, 2)
+            .counter
+            .lines
+            .iter()
+            .find(|l| l.line.id == id && matches!(l.line.kind, LineKind::Shelf { .. }))
+            .map(|l| l.line.qty)
+    };
+    let item = |s: &Store, code: &str| {
+        reg(s, 2)
+            .counter
+            .lines
+            .iter()
+            .find(|l| l.line.code == code)
+            .map(|l| (l.line.qty, l.amount, l.age))
+    };
+    let match_one = |s: &mut Store, id: u32, code: &str| {
+        run(
+            s,
+            json!({"type":"match_shelf","register":2,"side":"counter","line_id":id,"code":code}),
+        )
+        .unwrap()
+        .unwrap_or_default()
+    };
+    match_one(&mut s, ids[0], TOBACCO);
+    assert_eq!(shelf(&s, ids[0]), Some(2));
+    assert_eq!(item(&s, TOBACCO), Some((1, 600, Some(20))));
+    match_one(&mut s, ids[0], TOBACCO);
+    match_one(&mut s, ids[0], TOBACCO);
+    // 個数分を読み取ると仮登録の行はなくなり、同じたばこは一行にまとまる
+    assert_eq!(shelf(&s, ids[0]), None);
+    assert_eq!(item(&s, TOBACCO), Some((3, 1800, Some(20))));
+    assert!(reg(&s, 2).counter.passed.is_none());
+    let msg = match_one(&mut s, ids[1], CARTON);
+    assert!(!msg.contains("すべてのお渡しを確認しました"), "{msg}");
+    assert_eq!(shelf(&s, ids[1]), Some(1));
+    let msg = match_one(&mut s, ids[1], CARTON);
+    assert!(msg.contains("すべてのお渡しを確認しました"), "{msg}");
+    assert_eq!(item(&s, CARTON).map(|x| x.0), Some(2));
     assert_eq!(reg(&s, 2).counter.passed, Some(Passed::Handover));
     ok(
         &mut s,
@@ -6103,15 +6121,26 @@ fn held_tobacco_unit_must_match_the_scanned_tobacco() {
         ]}),
     );
     let ids: Vec<u32> = reg(&s, 1).counter.lines.iter().map(|l| l.line.id).collect();
-    // 個の行を指してカートンを読むと、カートンの行に充たる（数量 2 のまま）
-    ok(
-        &mut s,
-        json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":CARTON}),
-    );
-    let v = reg(&s, 1);
-    let get = |id: u32| v.counter.lines.iter().find(|l| l.line.id == id).unwrap();
-    assert_eq!((get(ids[1]).line.code, get(ids[1]).line.qty), (CARTON, 2));
-    assert!(matches!(get(ids[0]).line.kind, LineKind::Shelf { .. }));
+    // 個の行を指してカートンを読むと、カートンの行に充たる（1 点ずつ。2 回でカートンの仮登録がなくなる）
+    for left in [Some(1), None] {
+        ok(
+            &mut s,
+            json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":CARTON}),
+        );
+        let v = reg(&s, 1);
+        let get = |id: u32| v.counter.lines.iter().find(|l| l.line.id == id);
+        assert_eq!(get(ids[1]).map(|l| l.line.qty), left);
+        assert_eq!(get(ids[0]).map(|l| l.line.qty), Some(3));
+    }
+    let carton = |s: &Store| {
+        reg(s, 1)
+            .counter
+            .lines
+            .iter()
+            .find(|l| l.line.code == CARTON)
+            .map(|l| l.line.qty)
+    };
+    assert_eq!(carton(&s), Some(2));
     // 残りは個の行だけ。もう一度カートンを読んでも受け付けない
     let e = run(
         &mut s,
@@ -6119,19 +6148,21 @@ fn held_tobacco_unit_must_match_the_scanned_tobacco() {
     )
     .unwrap_err();
     assert!(e.contains("カートンの仮登録はありません"), "{e}");
-    // 棚番号は照らし合わせないので、どの棚の 1 個のたばこでも充てられる（数量 3 のまま）
+    // 棚番号は照らし合わせないので、どの棚の 1 個のたばこでも充てられる（1 点ずつ）
     ok(
         &mut s,
         json!({"type":"match_shelf","register":1,"side":"counter","line_id":ids[0],"code":TOBACCO}),
     );
     let v = reg(&s, 1);
-    let l = v
-        .counter
-        .lines
-        .iter()
-        .find(|l| l.line.id == ids[0])
-        .unwrap();
-    assert_eq!((l.line.code, l.line.qty), (TOBACCO, 3));
+    let qty = |pick: &dyn Fn(&LineKind, &str) -> bool| {
+        v.counter
+            .lines
+            .iter()
+            .find(|l| pick(&l.line.kind, l.line.code))
+            .map(|l| l.line.qty)
+    };
+    assert_eq!(qty(&|k, _| matches!(k, LineKind::Shelf { .. })), Some(2));
+    assert_eq!(qty(&|_, c| c == TOBACCO), Some(1));
 }
 
 /// 仕様 8：仮登録を通さず、スタッフがたばこを直接読み取って登録してもよい。仮登録の明細は取り消せる

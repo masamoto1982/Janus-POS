@@ -1738,9 +1738,9 @@ export const isWelcome = (main: string): boolean => main.includes("welcome-band"
 /** セルフ操作モードの最下段：お客様の呼び出しに応答があるまで。売り場側は「スタッフを呼び出しています」（添え字なし）、
  *  レジカウンター側は呼び出しからの経過秒数（取り消しボタンは置かない、user 2026-11-14） */
 function callingRow(r: RegisterView, side: Side, now: number): string {
-  if (side === "floor") return `<div class="call-row calling">${msg("スタッフを呼び出しています")}</div>`;
+  if (side === "floor") return `<div class="call-row calling call-wait">${msg("スタッフを呼び出しています")}</div>`;
   const at = r.counter.calls.filter((c) => r.waiting_calls.includes(c.kind)).map((c) => c.created_at);
-  return `<div class="call-row calling">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
+  return `<div class="call-row calling call-wait">${msg(at.length ? `${secs(now, Math.min(...at))}経過` : "")}</div>`;
 }
 
 export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side, now = Date.now(), first = false): string {

@@ -113,25 +113,20 @@ const flagSpan = (label: string): string => `<span class="flag">${esc(label)}</s
 /** 仮登録のたばこ（棚番号だけで、まだどの商品か決まっていない明細） */
 type ShelfLike = { kind: string; shelf?: number; carton?: boolean };
 const isShelf = (l: ShelfLike): boolean => l.kind === "shelf";
-/** たばこの仮登録の入力（user 2026-11-26）。「たばこ」を選ぶと五段目がこの入力になる。キーは `${reg}:${side}`。
- *  carton＝入力中の一件の単位。棚番号・個数の欄は padValue（shf・shq）に持つ */
-export type ShelfForm = { carton: boolean };
-export const shelfForm = new Map<string, ShelfForm>();
-
-/** 五段目：棚番号と個数の入力欄、単位（個・カートン）、「次の銘柄」。銘柄のタブは置かず、「たばこ」を選ぶとすぐこの入力になる（user 2026-11-26）。
- *  一つの銘柄を指定して「次の銘柄」を押すと、その一件を明細に仮登録して欄を空け、続けて次の銘柄を入力できる（宅配便の複数口と同じ考え方）。
- *  仮登録した行は三段目の明細ですぐに確かめられる */
+/** 五段目：棚番号と数量の入力欄、単位の「パック」「カートン」。銘柄のタブは置かず、「たばこ」を選ぶとすぐこの入力になる（user 2026-11-26）。
+ *  「パック」「カートン」はどちらも消極で選択中の状態を持たず、押した方の単位でその一件を明細に仮登録して欄を空ける（user 2026-11-27、
+ *  旧「個」「カートン」の選択＋「次の銘柄」）。ほかにもお求めの銘柄があれば続けて入力できる（宅配便の複数口と同じ考え方）。
+ *  棚番号と数量がそろうまでは押せない（グレー）。仮登録した行は三段目の明細ですぐに確かめられる */
 function shelfRow(reg: number, side: Side, st: Gate): string {
-  const f = shelfForm.get(`${reg}:${side}`) ?? { carton: false };
   const shelf = padValue.get(padValueKey(reg, "shf")) ?? "";
   const qty = padValue.get(padValueKey(reg, "shq")) ?? "";
-  const choice = (carton: boolean) =>
-    `<button type="button" class="seg${f.carton === carton ? " on" : ""}" data-shelf-unit="${reg}:${side}:${carton ? 1 : 0}" aria-pressed="${f.carton === carton}">${carton ? "カートン" : "個"}</button>`;
   const ready = shelf !== "" && qty !== "" && st.allowed;
-  const next = `<button type="button" class="primary" data-shelf-next="${reg}:${side}"${ready ? "" : ` disabled${st.reason ? ` title="${esc(st.reason)}"` : ""}`}>次の銘柄</button>`;
+  const off = ready ? "" : ` disabled${st.reason ? ` title="${esc(st.reason)}"` : ""}`;
+  const unit = (carton: boolean) =>
+    `<button type="button" class="seg" data-shelf-unit="${reg}:${side}:${carton ? 1 : 0}"${off}>${carton ? "カートン" : "パック"}</button>`;
   return `<div class="shelf-row nav-body">
-      <p class="shelf-guide">棚番号とお求めの個数をご入力ください</p>
-      <div class="shelf-inputs">${padField(reg, side, "shf", shelf, "棚番号", "棚番号", undefined, "", st)}${padField(reg, side, "shq", qty, "個数", "お求めの個数", undefined, "", st)}<span class="shelf-unit">${choice(false)}${choice(true)}</span>${next}</div>
+      <p class="shelf-guide">棚番号とお求めの数量をご入力ください</p>
+      <div class="shelf-inputs">${padField(reg, side, "shf", shelf, "棚番号", "棚番号", undefined, "", st)}${padField(reg, side, "shq", qty, "数量", "お求めの数量", undefined, "", st)}<span class="shelf-unit">${unit(false)}${unit(true)}</span></div>
     </div>`;
 }
 
@@ -835,7 +830,7 @@ export const PAD: Record<PadTarget, { title: string; unit: string; max: number; 
   ppt: { title: "使うポイント数", unit: "P", max: 5 },
   cpn: { title: "取り消す枚数", unit: "枚", max: 3 },
   shf: { title: "棚番号", unit: "番", max: 3 },
-  shq: { title: "お求めの個数", unit: "", max: 2 },
+  shq: { title: "お求めの数量", unit: "", max: 2 },
   shr: { title: "読み取り数", unit: "", max: 2, code: true },
 };
 /** 入力フォームの幅の見本：いちばん長く打ち込んだときの表示（law.ts fitForms が幅を決める） */

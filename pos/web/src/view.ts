@@ -733,7 +733,7 @@ function counterLine(reg: number, l: CounterLine, v: CounterView, side: Side): s
   const qty =
     ro || isBill(l) || l.pickup || l.parcel
       ? `${n}`
-      : qtyCell(reg, side, { id: l.id, qty: n }, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, v.lines));
+      : qtyCell(reg, side, { id: l.id, qty: n }, remove, { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service" || l.kind === "shelf", l.fresh, lineMax(l, v.lines));
   return `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}">
     <td>${esc(lineName(l))} ${[...tags, ...coupon].join(" ")}${svc}</td>
     <td class="num">${qty}</td>
@@ -2038,7 +2038,7 @@ export function selfOperatedScreen(r: RegisterView, side: Side = r.active_side ?
       const n = l.tickets || l.qty;
       const qty =
         c.phase === "registering" && !fixedHere && !(l.expired && side === "floor")
-          ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service", l.fresh, lineMax(l, c.lines))
+          ? qtyCell(reg, side, { id: l.id, qty: n }, a("remove_line"), { type: "remove_line", register: reg, side, line_id: l.id }, l.kind === "service" || l.kind === "shelf", l.fresh, lineMax(l, c.lines))
           : `${n}`;
       const coupon = couponFlags(reg, side, c.coupons, l.id, l.qty, a("remove_coupon"), false);
       return [l.touched, `<tr class="${flash(reg, l.id)}${tags.length ? " flagged" : ""}"><td>${esc(lineName(l))} ${[...tags, ...coupon].join(" ")}</td><td class="num">${qty}</td><td class="num">${l.kind === "service" && !l.done && !l.amount ? "—" : amountCell(l.amount, c.coupons, l.id)}</td></tr>`];

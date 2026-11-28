@@ -5065,12 +5065,12 @@ fn a_point_card_alone_starts_a_transaction_that_can_be_voided() {
     assert!(!reg(&s, 1).floor.point_card);
 }
 
-/// 仕様 14.2：トレカは既定で 1 回のお会計 3 パックまで
+/// 仕様 14.2：TCG は既定で 1 回のお会計 3 パックまで
 #[test]
 fn trading_cards_sell_at_most_three_packs_by_default() {
     let mut s = Store::new(1, 2, 1);
     let card = janus_pos_core::catalog::TRADING_CARD;
-    // 既定の販売規則：トレカは3点まで、花火は（法令ではなく）店舗の判断で年確18
+    // 既定の販売規則：TCG は3点まで、花火は（法令ではなく）店舗の判断で年確18
     let snap = s.snapshot();
     let find = |code: &str| {
         snap.catalog
@@ -5095,7 +5095,7 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
         .floor
         .lines
         .iter()
-        .filter(|l| l.name == "トレカ")
+        .filter(|l| l.name == "TCG")
         .map(|l| l.qty)
         .sum();
     assert_eq!(qty, 3);
@@ -5108,7 +5108,7 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
         r.floor
             .lines
             .iter()
-            .find(|l| l.name == "トレカ")
+            .find(|l| l.name == "TCG")
             .unwrap()
             .limit_hit
     );
@@ -5116,7 +5116,7 @@ fn trading_cards_sell_at_most_three_packs_by_default() {
         !r.floor
             .lines
             .iter()
-            .find(|l| l.name != "トレカ")
+            .find(|l| l.name != "TCG")
             .unwrap()
             .limit_hit
     );
@@ -5799,6 +5799,22 @@ fn idle_revert_voids_the_held_transaction_too() {
     assert_eq!(v.mode, Mode::SelfOperated);
 }
 
+/// 仕様 14.4：売り場に並んでいる榊・仏花（その他の生花のタブ）は、既定ではお客様が選んでも呼び出しにならずに登録できる（user 2026-11-28）
+#[test]
+fn sakaki_and_buddhist_flowers_are_bought_on_the_floor_without_a_call() {
+    let mut s = Store::new(1, 2, 1);
+    let snap = s.snapshot();
+    let other = snap.floor_nav.iter().find(|b| b.key == "other").unwrap();
+    let flower = other.tabs.iter().find(|t| t.key == "other_flower").unwrap();
+    assert_eq!(flower.codes, vec!["4900000000226", "4900000000233"]);
+    scan(&mut s, 1, "floor", "4900000000226");
+    scan(&mut s, 1, "floor", "4900000000233");
+    let v = reg(&s, 1);
+    let names: Vec<_> = v.floor.lines.iter().map(|l| (l.name, l.amount)).collect();
+    assert_eq!(names, vec![("榊", 200), ("仏花", 400)]);
+    assert!(s.snapshot().calls.is_empty(), "呼び出しにならない");
+}
+
 /// 仕様 14.4：設定の「呼出し」は、売り場側でボタン・タブを選んだ時点で呼び出しを立てるかだけを決める。呼び出しのタブでも
 /// お客様は FF を登録できる（user 2026-11-26）。作り置きのない FF はお客様がご自分でお取りになり、作り置きの FF はお渡し前
 #[test]
@@ -5807,10 +5823,11 @@ fn ff_can_be_bought_on_the_floor_whatever_the_call_setting() {
     let set_call = |pw: &str, key: &str, call: bool| json!({"type":"set_floor_call","owner_id":"000","password":pw,"key":key,"call":call});
     let coffee = json!({"type":"register_ff","register":1,"side":"floor","code":"FF32","qty":1});
     let chicken = json!({"type":"register_ff","register":1,"side":"floor","code":"FF01","qty":1});
-    // 既定でドリンクとたばこは呼び出しにしない（user 2026-11-26）
+    // 既定でドリンクとたばこ（user 2026-11-26）、その他の生花（user 2026-11-28）は呼び出しにしない
     let snap = s.snapshot();
     let nav = |k: &str| snap.floor_nav.iter().find(|b| b.key == k).unwrap();
-    assert!(!nav("ff").call && !nav("tobacco").call && nav("voucher").call && nav("other").call);
+    assert!(!nav("ff").call && !nav("tobacco").call && nav("voucher").call && !nav("other").call);
+    assert!(nav("other").tabs.iter().all(|t| t.call == (t.key != "other_flower")));
     assert!(nav("ff").tabs.iter().all(|t| t.call == (t.key != "drink")));
     assert!(nav("tobacco").tabs.iter().all(|t| !t.call));
     assert!(

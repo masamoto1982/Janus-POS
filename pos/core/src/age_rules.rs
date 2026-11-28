@@ -31,8 +31,9 @@ pub struct RuleChange {
 }
 
 /// 既定で呼び出しにしない（お客様が操作できる）ボタン・タブ（user 2026-11-26）：FF のドリンク（作り置きのないコーヒーなどは
-/// お客様がご自分でお取りになる）と、たばこ（棚番号と個数を入力して仮登録する）。ほかは押すと呼び出し
-pub const FLOOR_OPEN_DEFAULT: &[&str] = &["ff", "drink", "tobacco"];
+/// お客様がご自分でお取りになる）と、たばこ（棚番号と個数を入力して仮登録する）と、その他の生花（売り場に並んでいる榊・仏花、
+/// user 2026-11-28）。ほかは押すと呼び出し
+pub const FLOOR_OPEN_DEFAULT: &[&str] = &["ff", "drink", "tobacco", "other", "other_flower"];
 
 #[derive(Clone, Debug, Serialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
@@ -41,7 +42,7 @@ pub struct AgeRules {
     pub history: Vec<RuleChange>,
     pub limits: BTreeMap<String, u32>,
     /// セルフ操作モードの売り場側で、押しても呼び出しにしない（お客様が操作できる）四段目のボタン・五段目のタブのキー（catalog::NAV）。
-    /// 設定の「呼出し」で「しない」にしたもの。既定は FLOOR_OPEN_DEFAULT（ドリンク・たばこ）
+    /// 設定の「呼出し」で「しない」にしたもの。既定は FLOOR_OPEN_DEFAULT（ドリンク・たばこ・生花）
     pub floor_open: BTreeSet<String>,
     #[serde(skip)]
     pub(crate) next_id: u32,

@@ -183,9 +183,9 @@ describe("view helpers", () => {
     expect(shownOnScreen("ポイントの使い方を選んでください")).toBe(true);
     expect(shownOnScreen("電子マネーが選ばれています（クレジットカードは使えません）")).toBe(true);
     expect(shownOnScreen("あと 120円 入れてください")).toBe(true);
-    expect(shownOnScreen("トレカは1回のお会計で3点までです\n3点を超える分はお売りできません")).toBe(false);
+    expect(shownOnScreen("TCGは1回のお会計で3点までです\n3点を超える分はお売りできません")).toBe(false);
     expect(shownOnScreen("お会計中です（登録に戻ってから伝票を読み取ってください）")).toBe(false);
-    expect(trCore("トレカは1回のお会計で3点までです\n3点を超える分はお売りできません")).toBe("Trading cards: up to 3 per purchase\nWe cannot sell more than 3");
+    expect(trCore("TCGは1回のお会計で3点までです\n3点を超える分はお売りできません")).toBe("TCG: up to 3 per purchase\nWe cannot sell more than 3");
     expect(trCore("取引中は担当スタッフを切り替えられません\nスタッフ001さんの取引です")).toBe("Staff can't be switched during a transaction\nThis is Staff 001's transaction");
   });
 

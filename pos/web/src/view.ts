@@ -1804,7 +1804,7 @@ export function itemsPanel(r: RegisterView, snap: Snapshot, ui: FfUi, side: Side
  *  四段目＝「FF」「金券」「たばこ」「その他」（セルフの売り場側にあった四つをレジカウンター側にも、user 2026-11-26）、押すと五段目のタブがそのボタンのタブに変わる。
  *  スタッフ操作モードのレジカウンター側はすべて使え、セルフ操作モードの売り場側は「呼出し」を「しない」にしたボタン・タブだけ使え、
  *  ほかを押すとそのボタンの用件の呼び出し（ボタンの名前のとおり）。
- *  カウンター内のバーコードのない商品は今のところ金券だけなので、その他のタブは「拡張用」で商品を置かない。
+ *  その他の最初のタブは売り場で管理するバーコードのない商品（「生花」＝榊・仏花、user 2026-11-28）、残りのタブは「拡張用」で商品を置かない。
  *  「たばこ」はタブを持たない（銘柄のタブは廃止、user 2026-11-26）。タブのないボタンはボタンのキーを一つのタブとして選ぶ */
 /// 仕様 8：四段目・五段目のナビゲーション
 
@@ -1817,6 +1817,8 @@ const GOODS_LABEL: Record<string, readonly [string, string]> = {
   "4900000000219": ["85円", "インクジェット"],
   "4900000000172": ["200円", ""],
   "4900000000196": ["300円", "東京都"],
+  "4900000000226": ["榊", "200円"],
+  "4900000000233": ["仏花", "400円"],
 };
 
 /** ボタンのタブ。タブのないボタン（たばこ）は、ボタンそのものを一つのタブとして扱う（タブの段は出さない） */
@@ -2242,7 +2244,7 @@ function floorCallRows(s: Snapshot): string {
 
 function shelfRows(s: Snapshot, cols: number, row: (p: Snapshot["catalog"][number]) => string): string {
   return SHELVES.map((g) => {
-    const items = s.catalog.filter(g.match);
+    const items = s.catalog.filter(g.match).sort((a, b) => itemRank(a.code) - itemRank(b.code));
     if (!items.length) return "";
     return `<tr class="grp"><th colspan="${cols}">${esc(g.label)}</th></tr>${items.map(row).join("")}`;
   }).join("");
@@ -2346,7 +2348,9 @@ const byCodes = (...codes: string[]) => (p: { code: string }) => codes.includes(
 const SHELVES: Shelf[] = [
   { label: "日配食品", match: byCodes("4900000000028", "4900000000011", "4900000000080") },
   { label: "加工食品", match: byCodes("4900000000035", "4900000000103", "4900000000073") },
-  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000158", "4900000000134", "4900000000141", "4910000000076", "4910000000069", "4910000000090") },
+  { label: "非食品", match: byCodes("4910000000014", "4910000000038", "4900000000127", "4900000000158", "4900000000134", "4910000000076", "4910000000069", "4910000000090", "4900000000226", "4900000000233") },
+  // バーコードのない金券（user 2026-11-28）。並びは四段目の金券のタブと同じ 切手・印紙・はがき・ゴミ処理券
+  { label: "金券", match: (p) => p.category === "stamp" },
   { label: "サービス", match: (p) => p.category === "service" },
   { label: "オプション", match: (p) => p.category === "bag" },
 ];
@@ -2374,9 +2378,16 @@ const PURPOSE: Record<string, string> = {
   "4900000000158": "コンビニでは高額な品、まとめ買いで税抜5万円を超え、レシートの収入印紙の確認を再現する",
   "4910000000076": "年齢確認（18歳）、20歳の年齢確認を済ませたあとに登録すると、18歳の確認をやり直すことを確かめる",
   "4910000000069": "コンビニでは高額な品、たばこカートンと合わせて、またはセルフ操作モードでも25個で税抜5万円になり、収入印紙の確認を再現する",
-  "4910000000090": "コンビニの販売制限商品の代表格（金券の扱い）、スタッフがログインしているレジでのみ扱え、1回のお会計3パックまで、4パック目はスキャンしても登録されず、＋も消えることを確かめる",
+  "4910000000090": "トレーディングカード、コンビニの販売制限商品の代表格（金券の扱い）、スタッフがログインしているレジでのみ扱え、1回のお会計3パックまで、4パック目はスキャンしても登録されず、＋も消えることを確かめる",
   "4900000000134": "法令ではなく店舗の判断で年齢確認（20歳）を行う例",
   "4900000000141": "現金でしか買えない商品、スタッフがログインしているレジでのみ扱える",
+  "4900000000189": "レジカウンター内で管理するバーコードのない金券、四段目の金券のタブと同じ登録、現金のみ",
+  "4900000000172": "レジカウンター内で管理するバーコードのない金券、需要の少ない額面は扱わないので200円だけ、現金のみ",
+  "4900000000165": "レジカウンター内で管理するバーコードのない金券、四段目の金券のタブと同じ登録、現金のみ",
+  "4900000000219": "通常はがきと同じ85円の別の種類、四段目の金券のタブと同じ登録、現金のみ",
+  "4900000000196": "自治体の金券（東京都）、四段目の金券のタブと同じ登録、現金のみ",
+  "4900000000226": "売り場で管理するバーコードのない商品、セルフ操作モードでもお客様が四段目の「その他」から呼び出しなしで登録できる",
+  "4900000000233": "売り場で管理するバーコードのない商品、セルフ操作モードでもお客様が四段目の「その他」から呼び出しなしで登録できる",
   "2000000000015": "有料のレジ袋、待ち受けの「レジ袋」案内と対になる登録",
   "2000000000039": "お弁当などに添える付属品、オプションの登録を試す",
   "2100000000014": "宅配便の受付（サイズ・お届け先の郵便番号・送料）、ほかの商品と一緒にお会計できない",
@@ -2398,6 +2409,22 @@ function item(code: string, name: string, sub: string, cls = "", hint = PURPOSE[
     <span class="item-name">${esc(name)}</span>${sub ? `<span class="item-sub">${sub}</span>` : ""}</button>`;
 }
 
+/** Item の金券の表記 [名前, 添え字]。並びは四段目の金券のタブと同じ（切手・印紙・はがき・ゴミ処理券、user 2026-11-28）。
+ *  はがきは同じ 85 円なので額面を名前に、種類を添え字に（「インクジェット 85円」はボタンに入らない） */
+const ITEM_LABEL: Record<string, readonly [string, string]> = {
+  "4900000000189": ["切手", "85円"],
+  "4900000000141": ["切手", "110円"],
+  "4900000000172": ["印紙", "200円"],
+  "4900000000165": ["はがき 85円", "通常"],
+  "4900000000219": ["はがき 85円", "インクジェット"],
+  "4900000000196": ["ゴミ処理券", "東京都 300円"],
+};
+const ITEM_ORDER = Object.keys(ITEM_LABEL);
+const itemRank = (code: string) => {
+  const i = ITEM_ORDER.indexOf(code);
+  return i < 0 ? -1 : i;
+};
+
 /** スタッフがログインしているレジ（スタッフ操作モード）でだけ扱えるカテゴリ（たばこ・切手・金券）。
  *  どのレジにもスタッフがいないあいだは選ぶ画面の Item でグレーアウトする */
 const STAFF_ONLY_SHELF = ["tobacco", "stamp", "voucher"];
@@ -2407,7 +2434,7 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
   const staffOperated = s.registers.some((r) => r.mode === "staff_operated");
   const asked = s.registers.some((r) => r.tobacco_asked);
   return SHELVES.map((g) => {
-    const items = s.catalog.filter(g.match);
+    const items = s.catalog.filter(g.match).sort((a, b) => itemRank(a.code) - itemRank(b.code));
     if (!items.length) return "";
     return `<div class="shelf"><h3>${esc(g.label)}</h3><div class="items uniform">${items
       .map((p) =>
@@ -2421,11 +2448,11 @@ export function shelfPanel(s: Snapshot, extra = ""): string {
             PARCEL_CODES.includes(p.code)
             ? item(p.code, p.name.split(" ")[0], esc(p.name.split(" ")[1] ?? ""))
             : STAFF_ONLY_SHELF.includes(p.category) && !staffOperated
-              ? item(p.code, p.name, `${yen(p.price)}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}`, "off", STAFF_ONLY_OFF)
+              ? item(p.code, ITEM_LABEL[p.code]?.[0] ?? p.name, ITEM_LABEL[p.code] ? ITEM_LABEL[p.code][1] : `${yen(p.price)}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}`, "off", p.code === "4910000000090" ? `トレーディングカード、${STAFF_ONLY_OFF}` : STAFF_ONLY_OFF)
               : item(
                 p.code,
-                p.name,
-                `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}${datesSub(p)}`,
+                ITEM_LABEL[p.code]?.[0] ?? p.name,
+                ITEM_LABEL[p.code] ? ITEM_LABEL[p.code][1] : `${p.code === PICKUP_CODE ? "受取用バーコード" : p.price ? yen(p.price) : "金額は受付時"}${p.age ? ` ・<b>年確${p.age}</b>` : ""}${p.limit ? ` ・<b>限定${p.limit}</b>` : ""}${datesSub(p)}`,
                 p.category === "tobacco" && asked ? "call-blink" : "",
               ),
       )

@@ -369,7 +369,9 @@ const DICT: Record<string, string> = {
   たばこカートン: "Cigarette carton",
   花火: "Fireworks",
   化粧品: "Cosmetics",
-  トレカ: "Trading cards",
+  TCG: "TCG",
+  榊: "Sakaki",
+  仏花: "Altar flowers",
   レシート: "Receipt",
   "金額（税抜）": "Amount (excl. tax)",
   "レシートに収入印紙を貼り付けたら、チェックを入れてください": "Tick once the receipt has a revenue stamp",
@@ -613,6 +615,7 @@ const DICT: Record<string, string> = {
   // 四段目・五段目のナビゲーション（user 2026-11-26）
   拡張用: "Spare",
   はがき: "Postcard",
+  生花: "Flowers",
   ゴミ処理券: "Garbage ticket",
   通常: "Standard",
   インクジェット: "Inkjet",
